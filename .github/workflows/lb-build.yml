@@ -69,7 +69,9 @@ jobs:
         if: env.OS_TYPE != 'windows-2019'
         run: |
           find . -name original-*.jar -exec rm {} \;
-
+      - name: get-build-info with maven sdk plugin
+        run: |
+          mvn org.liquibase.ext:liquibase-sdk-maven-plugin:0.9:get-build-info
       - name: Archive Test Results
         if: ${{ always() }}
         uses: actions/upload-artifact@v3

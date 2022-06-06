@@ -27,19 +27,11 @@ jobs:
           distribution: 'adopt'
           cache: 'maven'
 
-      - name: Download liquibase modules
-        uses: liquibase/action-download-artifact@v2-liquibase
-        with:
-          workflow: build.yml
-          workflow_conclusion: success
-          run_id: "${{ needs.setup.outputs.lastSuccessfulWorkflowId }}"
-          name: liquibase-modules
-          path: download
-          repo: liquibase/liquibase
-
-      - name: Install Downloaded liquibase-modules
+      - name: Install liquibase oss modules
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get repo information 
         run: |
-          find download -name *.jar -exec mvn -B org.apache.maven.plugins:maven-install-plugin:3.0.0-M1:install-file -Dfile={} \;
+          mvn -B --projects=com.datical.lb:liquibase-pro liquibase-sdk:install-snapshot "-Dliquibase.sdk.github.token=$GITHUB_TOKEN" "-Dliquibase.sdk.branchSearch=${{ inputs.thisBranchName }},master" "-Dliquibase.sdk.repo=liquibase/liquibase" "-Dliquibase.sdk.skipFailedBuilds=true"
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v3.0.1
@@ -52,7 +44,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.sonar_token }}
-        run: (cd pro && mvn -B -Dbuild.pro.number=${{ github.run_number }} -Dbuild.pro.commit=${{ needs.setup.outputs.thisSha }} -Dbuild.pro.branch=${{ needs.setup.outputs.thisBranchName }} -Dliquibase.sdk.testSystem.test=hub,h2,hsqldb,mssql -Dliquibase.sdk.testSystem.acceptLicenses=mssql clean install surefire-report:report sonar:sonar -P 'sonar,!run-proguard' -Dsonar.login=$SONAR_TOKEN  -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }})
+        run: (cd pro && mvn -B -Dbuild.pro.number=${{ github.run_number }} -Dbuild.pro.commit=${{ inputs.thisSha }} -Dbuild.pro.branch=${{ inputs.thisBranchName }} -Dliquibase.sdk.testSystem.test=hub,h2,hsqldb,mssql -Dliquibase.sdk.testSystem.acceptLicenses=mssql clean install surefire-report:report sonar:sonar -P 'sonar,!run-proguard' -Dsonar.login=$SONAR_TOKEN  -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }})
 
       - name: Save Test Results
         if: ${{ always() }}
@@ -75,7 +67,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.sonar_token }}
-        run: (cd liquibase-pro-extension-testing && mvn -B clean install && cd ../liquibase-pro-integration-tests && mvn -B -Dbuild.pro.number=${{ github.run_number }} -Dbuild.pro.commit=${{ needs.setup.outputs.thisSha }} -Dbuild.pro.branch=${{ needs.setup.outputs.thisBranchName }} -Dliquibase.sdk.testSystem.test=all -Dliquibase.sdk.testSystem.skip=oracle -Dliquibase.sdk.testSystem.acceptLicenses=mssql clean compile test sonar:sonar -P 'sonar,!run-proguard' -Dsonar.login=$SONAR_TOKEN)
+        run: (cd liquibase-pro-extension-testing && mvn -B clean install && cd ../liquibase-pro-integration-tests && mvn -B -Dbuild.pro.number=${{ github.run_number }} -Dbuild.pro.commit=${{ inputs.thisSha }} -Dbuild.pro.branch=${{ inputs.thisBranchName }} -Dliquibase.sdk.testSystem.test=all -Dliquibase.sdk.testSystem.skip=oracle -Dliquibase.sdk.testSystem.acceptLicenses=mssql clean compile test sonar:sonar -P 'sonar,!run-proguard' -Dsonar.login=$SONAR_TOKEN)
 
       - name: Save Integration Test Results
         if: ${{ always() }}

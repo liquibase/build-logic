@@ -77,7 +77,7 @@ jobs:
         run: |
           (find . -name *-SNAPSHOT.jar -exec mvn -B org.apache.maven.plugins:maven-install-plugin:3.0.0-M1:install-file -Dfile={} \;)
           (find . -name *-SNAPSHOT-sources.jar -exec mvn -B org.apache.maven.plugins:maven-install-plugin:3.0.0-M1:install-file -Dclassifier=sources -Dfile={} \;)
-          mvn -X org.liquibase.ext:liquibase-sdk-maven-plugin:0.9:install-snapshot "-Dliquibase.sdk.github.token=$GITHUB_TOKEN" "-Dliquibase.sdk.branchSearch=${{ inputs.thisBranchName }},master" "-Dliquibase.sdk.repo=liquibase/liquibase-pro"  "-Dliquibase.sdk.skipFailedBuilds=true"
+          mvn -X org.liquibase.ext:liquibase-sdk-maven-plugin:0.9:install-snapshot "-Dliquibase.sdk.github.token=$GITHUB_TOKEN" "-Dliquibase.sdk.branchSearch=github-action-DAT-10364,master" "-Dliquibase.sdk.repo=liquibase/liquibase-pro"  "-Dliquibase.sdk.skipFailedBuilds=true"
 
       - name: Build & Sign Artifacts
         env:

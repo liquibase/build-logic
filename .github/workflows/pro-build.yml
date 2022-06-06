@@ -56,7 +56,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get repo information 
         run: |
-          mvn -B --projects=liquibase-pro liquibase-sdk:install-snapshot "-Dliquibase.sdk.github.token=$GITHUB_TOKEN" "-Dliquibase.sdk.branchSearch=${{ inputs.thisBranchName }},master" "-Dliquibase.sdk.repo=liquibase/liquibase"  "-Dliquibase.sdk.skipFailedBuilds=false"
+          mvn -B --projects=liquibase-pro-base liquibase-sdk:install-snapshot "-Dliquibase.sdk.github.token=$GITHUB_TOKEN" "-Dliquibase.sdk.branchSearch=${{ inputs.thisBranchName }},master" "-Dliquibase.sdk.repo=liquibase/liquibase"  "-Dliquibase.sdk.skipFailedBuilds=false"
 
       - name: Build and Package
         run: mvn -B -Dbuild.pro.number=${{ github.run_number }} -Dbuild.pro.commit=${{ inputs.thisSha }} -Dbuild.pro.branch=${{ inputs.thisBranchName }} -DskipTests=true clean package

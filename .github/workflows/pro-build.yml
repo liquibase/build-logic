@@ -1,3 +1,4 @@
+
 on:
   workflow_call:
     inputs:
@@ -22,93 +23,55 @@ on:
         type: string
 
 jobs:
-  setup:
-    name: Setup
-    needs: check_build_safety
+  package:
+    name: Build and Package
+    needs: setup
     runs-on: ubuntu-latest
-    outputs:
-      standAlonePR: ${{ steps.find-branches.outputs.standAlonePR }}
-      thisSha: ${{ steps.find-branches.outputs.thisSha }}
-      thisBranchName: ${{ steps.find-branches.outputs.thisBranchName }}
-      thisBranchFileName: ${{ steps.find-branches.outputs.thisBranchFileName }}
-      liquibaseSha: ${{ steps.find-branches.outputs.liquibaseSha }}
-      liquibaseBranchName: ${{ steps.find-branches.outputs.liquibaseBranchName }}
-      liquibaseWorkflowId: ${{ steps.find-branches.outputs.liquibaseWorkflowId }}
-      liquibaseRunHtmlUrl: ${{ steps.find-branches.outputs.liquibaseRunHtmlUrl }}
-      liquibaseRunRerunUrl: ${{ steps.find-branches.outputs.liquibaseRunRerunUrl }}
-      lastSuccessfulWorkflowId: ${{ steps.find-branches.outputs.lastSuccessfulWorkflowId }}
     steps:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.after}}
-
-      - name: Find corresponding branches
-        id: find-branches
-        uses: actions/github-script@v6
+      - name: Built Code Cache
+        uses: actions/cache@v3.0.1
         with:
-          github-token: ${{ secrets.BOT_TOKEN }}
-          script: |
-            const helper = require('./.github/util/workflow-helper.js')({github, context});
-
-            core.setOutput("thisSha", helper.getCurrentSha());
-            core.setOutput("thisBranchName", helper.getCurrentBranch());
-            core.setOutput("thisBranchFileName", helper.getCurrentBranch().replace(/[^a-zA-Z0-9\-_]/g, "_"));
-
-            let branch = await helper.findMatchingBranch("liquibase", "liquibase");
-            core.setOutput("liquibaseSha", branch.sha);
-            core.setOutput("liquibaseBranchName", branch.name);
-
-            //count as not a stand-alone PR for branch builds on master/main, even though there are no PRs
-            if (helper.getCurrentBranch() == 'master' || helper.getCurrentBranch() == 'main' || branch.pullRequestId) {
-              core.setOutput("standAlonePR", helper.getCurrentBranch() !== branch.name);
-            } else {
-              core.setOutput("standAlonePR", true);
-            }
-
-            core.setOutput("liquibaseState", branch.pullRequestState);
-            core.setOutput("liquibaseRunStatus", branch.runStatus);
-            core.setOutput("liquibaseRunConclusion", branch.runConclusion);
-            core.setOutput("liquibaseWorkflowId", branch.workflowId);
-            core.setOutput("liquibaseRunHtmlUrl", branch.runHtmlUrl);
-            core.setOutput("liquibaseRunRerunUrl", branch.runRerunUrl);
-            core.setOutput("lastSuccessfulWorkflowId", branch.lastSuccessfulWorkflowId);
-
-            console.log("current branch "+ helper.getCurrentBranch());
-            console.log("branch.name: "+ branch.name);
-            console.log("standalone: "+(helper.getCurrentBranch() !== branch.name));
-
-      - name: Check Matching Builds
-        uses: actions/github-script@v6
-        id: check-matching-builds
+          key: built-code-${{ github.run_number }}-${{ github.run_attempt }}
+          path: ./**/target
+      - name: Set up JDK
+        uses: actions/setup-java@v3
         with:
-          script: |
-            const helper = require('./.github/util/workflow-helper.js')({github, context});
+          java-version: 8
+          distribution: 'adopt'
+          cache: 'maven'
 
-            let statusMessage = "success";
-            let failed = false;
-            if ( "${{ steps.find-branches.outputs.liquibaseRunStatus }}" != "completed") {
-              statusMessage = "build is ${{ steps.find-branches.outputs.liquibaseRunStatus}}";
-              failed = true
-            } else if ( "${{ steps.find-branches.outputs.liquibaseRunConclusion }}" != "success") {
-              statusMessage = "build conclusion was ${{ steps.find-branches.outputs.liquibaseRunConclusion }}";
-              failed = true
-            }
+# - name: Download liquibase modules
+#       uses: liquibase/action-download-artifact@v2-liquibase
+#        with:
+#          workflow: build.yml
+#          workflow_conclusion: success
+#          run_id: "${{ needs.setup.outputs.lastSuccessfulWorkflowId }}"
+#          name: liquibase-modules
+#          path: download
+#          repo: liquibase/liquibase
 
-            statusMessage = "liquibase/liquibase:${{ steps.find-branches.outputs.liquibaseBranchName }}@" + "${{ steps.find-branches.outputs.liquibaseSha }}".substring(0, 7) + " " + statusMessage;
+      - name: Install Downloaded liquibase-modules
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get repo information 
+        run: |
+          find download -name *.jar -exec mvn -B org.apache.maven.plugins:maven-install-plugin:3.0.0-M1:install-file -Dfile={} \;
+          mvn -X org.liquibase.ext:liquibase-sdk-maven-plugin:0.9:install-snapshot "-Dliquibase.sdk.github.token=$GITHUB_TOKEN" "-Dliquibase.sdk.branchSearch=${{ inputs.thisBranchName }},master" "-Dliquibase.sdk.repo=liquibase/liquibase"  "-Dliquibase.sdk.skipFailedBuilds=true"
 
-            github.rest.repos.createCommitStatus({
-              "owner": "liquibase",
-              "repo": "liquibase-pro",
-              "sha": helper.getCurrentSha(),
-              "state": (failed ? "failure" : "success"),
-              "target_url": "${{ steps.find-branches.outputs.liquibaseRunHtmlUrl }}",
-              "context": "Stable Liquibase Core",
-              "description": statusMessage
-            });
-            if (${{ steps.find-branches.outputs.standAlonePR }} == 'false') {
-              if (failed) {
-                core.setFailed(statusMessage);
-                return;
-              }
-            }
+      - name: Build and Package
+        run: mvn -B -Dbuild.pro.number=${{ github.run_number }} -Dbuild.pro.commit=${{ inputs.thisSha }} -Dbuild.pro.branch=${{ inputs.thisBranchName }} -DskipTests=true clean package
+
+      - name: Save Keygen
+        uses: actions/upload-artifact@v3
+        with:
+          name: licensing-keygen
+          path: ./licensing/keygen/target/licensing-keygen-0-SNAPSHOT-assembly.zip
+
+      - name: Save Module
+        uses: actions/upload-artifact@v3
+        with:
+          name: liquibase-pro-modules
+          path: ./pro/target/liquibase-pro-0-SNAPSHOT.jar
 

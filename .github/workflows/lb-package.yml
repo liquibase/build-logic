@@ -71,7 +71,7 @@ jobs:
 #          path: download/liquibase-pro
 #          repo: liquibase/liquibase-pro
 
-      - name: Install Built Modules
+      - name: Install Built Liquibase Pro Modules
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get repo information 
         run: |

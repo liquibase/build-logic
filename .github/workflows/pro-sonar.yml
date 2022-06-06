@@ -1,0 +1,88 @@
+on:
+  workflow_call:
+    inputs:
+      lb_flavor:
+        required: false
+        type: string
+        default: 'pro'
+    secrets:
+      sonar_token:
+        required: true
+
+jobs:
+  sonar:
+    name: Sonar Scan
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.after}}
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+        ## Needs 11 for sonar
+          java-version: 11
+          distribution: 'adopt'
+          cache: 'maven'
+
+      - name: Download liquibase modules
+        uses: liquibase/action-download-artifact@v2-liquibase
+        with:
+          workflow: build.yml
+          workflow_conclusion: success
+          run_id: "${{ needs.setup.outputs.lastSuccessfulWorkflowId }}"
+          name: liquibase-modules
+          path: download
+          repo: liquibase/liquibase
+
+      - name: Install Downloaded liquibase-modules
+        run: |
+          find download -name *.jar -exec mvn -B org.apache.maven.plugins:maven-install-plugin:3.0.0-M1:install-file -Dfile={} \;
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v3.0.1
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Test and Scan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.sonar_token }}
+        run: (cd pro && mvn -B -Dbuild.pro.number=${{ github.run_number }} -Dbuild.pro.commit=${{ needs.setup.outputs.thisSha }} -Dbuild.pro.branch=${{ needs.setup.outputs.thisBranchName }} -Dliquibase.sdk.testSystem.test=hub,h2,hsqldb,mssql -Dliquibase.sdk.testSystem.acceptLicenses=mssql clean install surefire-report:report sonar:sonar -P 'sonar,!run-proguard' -Dsonar.login=$SONAR_TOKEN  -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }})
+
+      - name: Save Test Results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: liquibase-test-results
+          path: |
+            ./**/target/surefire-reports
+            ./**/target/site
+
+            
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: liquibot
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Integration tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.sonar_token }}
+        run: (cd liquibase-pro-extension-testing && mvn -B clean install && cd ../liquibase-pro-integration-tests && mvn -B -Dbuild.pro.number=${{ github.run_number }} -Dbuild.pro.commit=${{ needs.setup.outputs.thisSha }} -Dbuild.pro.branch=${{ needs.setup.outputs.thisBranchName }} -Dliquibase.sdk.testSystem.test=all -Dliquibase.sdk.testSystem.skip=oracle -Dliquibase.sdk.testSystem.acceptLicenses=mssql clean compile test sonar:sonar -P 'sonar,!run-proguard' -Dsonar.login=$SONAR_TOKEN)
+
+      - name: Save Integration Test Results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: liquibase-integration-test-results
+          path: |
+            ./**/target/surefire-reports
+            ./**/target/site

@@ -1,0 +1,18 @@
+on:
+  workflow_call:
+    inputs:
+      lb_flavor:
+        required: false
+        type: string
+        default: 'pro'
+
+jobs:
+  check_build_safety:
+    name: Check if Build should be done
+    runs-on: ubuntu-latest
+    steps:
+      - name: Supress builds for PRs from branch github-action-*
+        if: github.event.pull_request && contains(github.head_ref, 'github-action')
+        run: |
+          echo "not building PRs with source branch github-action-*"
+          exit 1

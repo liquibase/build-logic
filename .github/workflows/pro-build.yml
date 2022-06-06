@@ -1,0 +1,114 @@
+on:
+  workflow_call:
+    inputs:
+      lb_flavor:
+        required: false
+        type: string
+        default: 'pro'
+      thisSha:
+        required: false
+        type: string
+      thisBranchName:
+        required: true
+        type: string
+      thisBranchFileName:
+        required: true
+        type: string
+      thisRepositoryName:
+        required: true
+        type: string
+      thisRepositoryOwner:
+        required: true
+        type: string
+
+jobs:
+  setup:
+    name: Setup
+    needs: check_build_safety
+    runs-on: ubuntu-latest
+    outputs:
+      standAlonePR: ${{ steps.find-branches.outputs.standAlonePR }}
+      thisSha: ${{ steps.find-branches.outputs.thisSha }}
+      thisBranchName: ${{ steps.find-branches.outputs.thisBranchName }}
+      thisBranchFileName: ${{ steps.find-branches.outputs.thisBranchFileName }}
+      liquibaseSha: ${{ steps.find-branches.outputs.liquibaseSha }}
+      liquibaseBranchName: ${{ steps.find-branches.outputs.liquibaseBranchName }}
+      liquibaseWorkflowId: ${{ steps.find-branches.outputs.liquibaseWorkflowId }}
+      liquibaseRunHtmlUrl: ${{ steps.find-branches.outputs.liquibaseRunHtmlUrl }}
+      liquibaseRunRerunUrl: ${{ steps.find-branches.outputs.liquibaseRunRerunUrl }}
+      lastSuccessfulWorkflowId: ${{ steps.find-branches.outputs.lastSuccessfulWorkflowId }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.after}}
+
+      - name: Find corresponding branches
+        id: find-branches
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.BOT_TOKEN }}
+          script: |
+            const helper = require('./.github/util/workflow-helper.js')({github, context});
+
+            core.setOutput("thisSha", helper.getCurrentSha());
+            core.setOutput("thisBranchName", helper.getCurrentBranch());
+            core.setOutput("thisBranchFileName", helper.getCurrentBranch().replace(/[^a-zA-Z0-9\-_]/g, "_"));
+
+            let branch = await helper.findMatchingBranch("liquibase", "liquibase");
+            core.setOutput("liquibaseSha", branch.sha);
+            core.setOutput("liquibaseBranchName", branch.name);
+
+            //count as not a stand-alone PR for branch builds on master/main, even though there are no PRs
+            if (helper.getCurrentBranch() == 'master' || helper.getCurrentBranch() == 'main' || branch.pullRequestId) {
+              core.setOutput("standAlonePR", helper.getCurrentBranch() !== branch.name);
+            } else {
+              core.setOutput("standAlonePR", true);
+            }
+
+            core.setOutput("liquibaseState", branch.pullRequestState);
+            core.setOutput("liquibaseRunStatus", branch.runStatus);
+            core.setOutput("liquibaseRunConclusion", branch.runConclusion);
+            core.setOutput("liquibaseWorkflowId", branch.workflowId);
+            core.setOutput("liquibaseRunHtmlUrl", branch.runHtmlUrl);
+            core.setOutput("liquibaseRunRerunUrl", branch.runRerunUrl);
+            core.setOutput("lastSuccessfulWorkflowId", branch.lastSuccessfulWorkflowId);
+
+            console.log("current branch "+ helper.getCurrentBranch());
+            console.log("branch.name: "+ branch.name);
+            console.log("standalone: "+(helper.getCurrentBranch() !== branch.name));
+
+      - name: Check Matching Builds
+        uses: actions/github-script@v6
+        id: check-matching-builds
+        with:
+          script: |
+            const helper = require('./.github/util/workflow-helper.js')({github, context});
+
+            let statusMessage = "success";
+            let failed = false;
+            if ( "${{ steps.find-branches.outputs.liquibaseRunStatus }}" != "completed") {
+              statusMessage = "build is ${{ steps.find-branches.outputs.liquibaseRunStatus}}";
+              failed = true
+            } else if ( "${{ steps.find-branches.outputs.liquibaseRunConclusion }}" != "success") {
+              statusMessage = "build conclusion was ${{ steps.find-branches.outputs.liquibaseRunConclusion }}";
+              failed = true
+            }
+
+            statusMessage = "liquibase/liquibase:${{ steps.find-branches.outputs.liquibaseBranchName }}@" + "${{ steps.find-branches.outputs.liquibaseSha }}".substring(0, 7) + " " + statusMessage;
+
+            github.rest.repos.createCommitStatus({
+              "owner": "liquibase",
+              "repo": "liquibase-pro",
+              "sha": helper.getCurrentSha(),
+              "state": (failed ? "failure" : "success"),
+              "target_url": "${{ steps.find-branches.outputs.liquibaseRunHtmlUrl }}",
+              "context": "Stable Liquibase Core",
+              "description": statusMessage
+            });
+            if (${{ steps.find-branches.outputs.standAlonePR }} == 'false') {
+              if (failed) {
+                core.setFailed(statusMessage);
+                return;
+              }
+            }
+

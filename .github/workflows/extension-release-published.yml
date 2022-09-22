@@ -2,6 +2,13 @@ name: Release Extension to Sonatype
 
 on:
   workflow_call:
+    secrets:
+      SONATYPE_USERNAME:
+        description: 'SONATYPE_USERNAME from the caller workflow'
+        required: true
+      SONATYPE_TOKEN:
+        description: 'SONATYPE_TOKEN from the caller workflow'
+        required: true
 
 jobs:
   release:

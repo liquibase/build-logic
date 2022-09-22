@@ -1,0 +1,21 @@
+name: Create Release
+
+on:
+  workflow_call:
+    secrets:
+      GITHUB_TOKEN:
+        description: 'GITHUB_TOKEN from the caller workflow'
+        required: true
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create Release Draft
+        id: create-release
+        uses: release-drafter/release-drafter@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

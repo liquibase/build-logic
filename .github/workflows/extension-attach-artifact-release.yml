@@ -54,6 +54,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Get Reusable Script Files
+        run: |
+          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/get_draft_release.sh
+          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
+          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/upload_asset.sh
+          chmod +x $PWD/.github/get_draft_release.sh
+          chmod +x $PWD/.github/sign_artifact.sh
+          chmod +x $PWD/.github/upload_asset.sh
+
       - name: Get Artifact ID
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV

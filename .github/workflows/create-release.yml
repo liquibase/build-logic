@@ -14,6 +14,7 @@ jobs:
     steps:
       - name: Get Reusable Release Drafter Template
         run: |
+          mkdir $PWD/.github
           curl -o $PWD/.github/reusable-template.yml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/release-drafter.yml
 
       - name: Create Release Draft

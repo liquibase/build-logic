@@ -6,6 +6,15 @@ on:
       GITHUB_PAT:
         description: 'GITHUB_PAT from the caller workflow'
         required: true
+      BOT_TOKEN:
+        description: 'BOT_TOKEN from the caller workflow'
+        required: true
+      GPG_SECRET:
+        description: 'GPG_SECRET from the caller workflow'
+        required: true
+      GPG_PASSPHRASE:
+        description: 'GPG_PASSPHRASE from the caller workflow'
+        required: true
 
 jobs:
   unit-test:

@@ -27,7 +27,7 @@ jobs:
       - name: Save Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ env.artifact_id }}-extension-artifacts``
+          name: ${{ env.artifact_id }}-extension-artifacts
           path: |
             target/${{ env.artifact_id }}-*
 

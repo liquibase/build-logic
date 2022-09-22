@@ -14,6 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Get Reusable Release Drafter Template
+        run: |
+          curl -o $PWD/.github/release-drafter.yml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/release-drafter.yml
+
       - name: Create Release Draft
         id: create-release
         uses: release-drafter/release-drafter@v5

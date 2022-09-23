@@ -68,7 +68,7 @@ jobs:
         id: download-artifact
         uses: dawidd6/action-download-artifact@v2
         with:
-          github_token: ${{ secrets.BOT_TOKEN }}
+          github_token: ${{secrets.BOT_TOKEN}}
           workflow: test.yml
           pr: ${{github.event.pull_request.number}}
           name: ${{ env.artifact_id }}-extension-artifacts
@@ -85,15 +85,15 @@ jobs:
 
       - name: Get Release Tag
         id: get-release-tag
-        run: echo "release_tag=$(BOT_TOKEN=$BOT_TOKEN ./.github/get_draft_release.sh TAG)" >> $GITHUB_ENV
+        run: echo "release_tag=$(./.github/get_draft_release.sh TAG)" >> $GITHUB_ENV
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}
 
       - name: Delete Outdated Files from Draft Release
         id: delete-outdated-release-asset
         uses: mknejp/delete-release-assets@v1
         with:
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ secrets.GITHUB_PAT }}
           tag: ${{ env.release_tag }}
           fail-if-no-assets: false
           fail-if-no-release: false
@@ -119,6 +119,6 @@ jobs:
         id: upload-release-asset
         run: ./.github/upload_asset.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
         env:
-          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./assets

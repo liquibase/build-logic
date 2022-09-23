@@ -4,13 +4,13 @@ set -e
 
 KEY=$1
 
-if [[ -z "$GITHUB_TOKEN" ]]; then
-  echo "Set the GITHUB_TOKEN env variable."
+if [[ -z "$BOT_TOKEN" ]]; then
+  echo "Set the $BOT_TOKEN env variable."
   exit 1
 fi
 
 RELEASE=$(curl -s \
-  -H "Authorization: token $GITHUB_TOKEN" \
+  -H "Authorization: token $BOT_TOKEN" \
   -H "Accept: application/vnd.github+json" \
     https://api.github.com/repos/liquibase/hashicorp-vault-plugin/releases |
     jq -r ".[] | select(.draft == true)")

@@ -85,9 +85,7 @@ jobs:
 
       - name: Get Release Tag
         id: get-release-tag
-        run: echo "release_tag=$(./.github/get_draft_release.sh TAG)" >> $GITHUB_ENV
-        env:
-          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: BOT_TOKEN=${{ secrets.BOT_TOKEN }} echo "release_tag=$(./.github/get_draft_release.sh TAG)" >> $GITHUB_ENV
 
       - name: Delete Outdated Files from Draft Release
         id: delete-outdated-release-asset

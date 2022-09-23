@@ -2,6 +2,10 @@ name: Build and Test Extension
 
 on:
   workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        description: 'SONAR_TOKEN from the caller workflow'
+        required: true
 
 jobs:
   build:

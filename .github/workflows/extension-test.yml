@@ -82,3 +82,51 @@ jobs:
           path: |
             **/target/surefire-reports
             **/target/jacoco.exec
+
+  sonar:
+    name: Sonar Scan
+    runs-on: ubuntu-latest
+    needs: [ unit-test ]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Build code
+        run: mvn -B compile
+
+      - name: Aggregate Jacoco Results
+        run: |
+          mvn -B -Djacoco.fileset.directory=artifacts \
+            -Djacoco.destFile=target\jacoco-merged.exec \
+            -Djacoco.dataFile=target\jacoco-merged.exec \
+            jacoco:merge \
+            jacoco:report
+
+      - name: Sonar Scan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn -B -Dsonar.login=$SONAR_TOKEN \
+              -Dsonar.projectId=${{ github.event.repository.name }} \
+              -Dsonar.pullrequest.key=${{ github.event.workflow_run.pull_request.number }} \
+              -Dsonar.pullrequest.branch=${{ github.event.workflow_run.pull_request.head.ref }} \
+              -Dsonar.pullrequest.base=${{ github.event.workflow_run.pull_request.base.ref }} \
+              -Dsonar.scm.revision=${{ github.event.workflow_run.head_commit.id }} \
+              sonar:sonar

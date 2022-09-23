@@ -3,6 +3,9 @@ name: Attach Artifact to Release
 on:
   workflow_call:
     secrets:
+      GITHUB_PAT:
+        description: 'GITHUB_PAT from the caller workflow'
+        required: true
       BOT_TOKEN:
         description: 'BOT_TOKEN from the caller workflow'
         required: true

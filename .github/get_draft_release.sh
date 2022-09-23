@@ -5,7 +5,7 @@ set -e
 KEY=$1
 
 if [[ -z "$BOT_TOKEN" ]]; then
-  echo "Set the $BOT_TOKEN env variable."
+  echo "Set the BOT_TOKEN env variable."
   exit 1
 fi
 

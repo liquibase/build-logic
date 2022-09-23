@@ -2,10 +2,6 @@ name: Create Release
 
 on:
   workflow_call:
-    secrets:
-      GITHUB_PAT:
-        description: 'GITHUB_PAT from the caller workflow'
-        required: true
 
 jobs:
   create-release:
@@ -23,4 +19,4 @@ jobs:
         with:
           config-name: reusable-template.yml
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

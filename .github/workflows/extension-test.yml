@@ -126,7 +126,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_CONTEXT: ${{ toJson(github) }}
         run: |
+          echo "$GITHUB_CONTEXT"
           mvn -B -Dsonar.login=$SONAR_TOKEN \
               -Dsonar.projectId=${{ github.event.repository.name }} \
               -Dsonar.pullrequest.key=${{ github.event.workflow_run.pull_request.number }} \

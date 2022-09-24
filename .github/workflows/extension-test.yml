@@ -122,11 +122,6 @@ jobs:
             jacoco:merge \
             jacoco:report
 
-      - name: Output Github Context
-        run: echo "$GITHUB_CONTEXT"
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-
       - name: Sonar Scan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -16,6 +16,9 @@ on:
         description: 'GPG_PASSPHRASE from the caller workflow'
         required: true
 
+env:
+  AWS_REGION: us-east-1
+
 jobs:
   unit-test:
     name: Test Java ${{ matrix.java }}

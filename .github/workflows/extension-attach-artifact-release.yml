@@ -46,8 +46,8 @@ jobs:
         with:
           name: test-reports-jdk-${{ matrix.java }}
           path: |
-            ${{ github.workspace }}/target/surefire-reports
-            ${{ github.workspace }}/target/jacoco.exec
+            **/target/surefire-reports
+            **/target/jacoco.exec
 
   attach-to-release:
     name: Attach Artifact to Release

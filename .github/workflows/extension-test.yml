@@ -61,7 +61,7 @@ jobs:
         with:
           key: build-${{ github.run_number }}-${{ github.run_attempt }}
           path: |
-            ${{ github.workspace }}/target/**
+            **/target/**
             ~/.m2/repository/org/liquibase/
 
   unit-test:
@@ -90,7 +90,7 @@ jobs:
         with:
           key: build-${{ github.run_number }}-${{ github.run_attempt }}
           path: |
-            ${{ github.workspace }}/target/**
+            **/target/**
             ~/.m2/repository/org/liquibase/
 
       - name: Run Tests

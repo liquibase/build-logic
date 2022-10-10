@@ -6,9 +6,13 @@ on:
       SONAR_TOKEN:
         description: 'SONAR_TOKEN from the caller workflow'
         required: true
+      PRO_LICENSE_KEY:
+        description: 'PRO_LICENSE_KEY from the caller workflow'
+        required: true
 
 env:
   AWS_REGION: us-east-1
+  LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
 
 jobs:
   build:

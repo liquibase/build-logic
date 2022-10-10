@@ -102,8 +102,8 @@ jobs:
         with:
           name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
           path: |
-            ${{ github.workspace }}/target/surefire-reports
-            ${{ github.workspace }}/target/jacoco.exec
+            **/target/surefire-reports
+            **/target/jacoco.exec
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: env.OS_TYPE == 'windows-latest'
@@ -111,8 +111,8 @@ jobs:
         with:
           name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
           path: |
-            ${{ github.workspace }}\target\surefire-reports
-            ${{ github.workspace }}\target\jacoco.exec
+            **/target/surefire-reports
+            **/target/jacoco.exec
 
   sonar:
     name: Sonar Scan

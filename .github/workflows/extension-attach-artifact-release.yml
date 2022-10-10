@@ -48,6 +48,7 @@ jobs:
           check_artifacts: true
           skip_unpack: false
           if_no_artifact_found: fail
+          workflow_conclusion: ""
 
       - name: Unzip Assets
         run: |

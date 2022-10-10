@@ -74,8 +74,6 @@ jobs:
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build
-    env:
-      OS_TYPE: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
 
@@ -102,22 +100,13 @@ jobs:
         run: mvn -B jacoco:prepare-agent surefire:test
 
       - name: Archive Test Results - ${{ matrix.os }}
-        if: env.OS_TYPE != 'windows-latest'
+        if: ${{ always() }}
         uses: actions/upload-artifact@v3
         with:
           name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
           path: |
             **/target/surefire-reports
             **/target/jacoco.exec
-
-      - name: Archive Test Results - ${{ matrix.os }}
-        if: env.OS_TYPE == 'windows-latest'
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
-          path: |
-            **\target\surefire-reports
-            **\target\jacoco.exec
 
   sonar:
     name: Sonar Scan

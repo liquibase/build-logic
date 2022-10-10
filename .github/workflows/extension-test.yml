@@ -111,8 +111,8 @@ jobs:
         with:
           name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
           path: |
-            **/target/surefire-reports
-            **/target/jacoco.exec
+            **\target\surefire-reports
+            **\target\jacoco.exec
 
   sonar:
     name: Sonar Scan

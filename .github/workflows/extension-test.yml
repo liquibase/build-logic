@@ -133,7 +133,7 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
 
       - name: Build code
-        run: mvn -B compile
+        run: mvn -B verify
 
       - name: Aggregate Jacoco Results
         run: |

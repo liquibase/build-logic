@@ -113,7 +113,6 @@ jobs:
           path: |
             ${{ github.workspace }}\target\surefire-reports
             ${{ github.workspace }}\target\jacoco.exec
-        shell: powershell
 
   sonar:
     name: Sonar Scan

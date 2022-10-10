@@ -41,14 +41,12 @@ jobs:
 
       - name: Get Artifact ID
         id: get-artifact-id
-        run: |
-          echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
-          echo "::set-output name=artifact_id::$artifact_id"
+        run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
 
       - name: Save Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.artifact_id }}-artifacts
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-artifacts
           path: |
             target/*
 

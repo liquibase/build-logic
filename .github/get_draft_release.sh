@@ -9,10 +9,15 @@ if [[ -z "$GITHUB_TOKEN" ]]; then
   exit 1
 fi
 
+if [[ -z "$GITHUB_REPOSITORY" ]]; then
+  echo "Set the GITHUB_REPOSITORY env variable."
+  exit 1
+fi
+
 RELEASE=$(curl -s \
   -H "Authorization: token $GITHUB_TOKEN" \
   -H "Accept: application/vnd.github+json" \
-    https://api.github.com/repos/liquibase/hashicorp-vault-plugin/releases |
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" |
     jq -r ".[] | select(.draft == true)")
 
 if [[ "${#RELEASE}" -eq 0 ]]; then

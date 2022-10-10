@@ -91,6 +91,10 @@ jobs:
           path: |
             ~/.m2/repository/org/liquibase/
 
+      - name: Get Artifact ID
+        id: get-artifact-id
+        run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
+
       - uses: actions/download-artifact@v3
         with:
           name: ${{ env.artifact_id }}-artifacts

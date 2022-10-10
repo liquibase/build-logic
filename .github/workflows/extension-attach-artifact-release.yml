@@ -12,9 +12,21 @@ on:
       GPG_PASSPHRASE:
         description: 'GPG_PASSPHRASE from the caller workflow'
         required: true
+      PRO_LICENSE_KEY:
+        description: 'PRO_LICENSE_KEY from the caller workflow'
+        required: true
+      GHA_AWS_KEY_ID:
+        description: 'GHA_AWS_KEY_ID from the caller workflow'
+        required: true
+      GHA_AWS_KEY:
+        description: 'GHA_AWS_KEY from the caller workflow'
+        required: true
 
 env:
   AWS_REGION: us-east-1
+  LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
 
 jobs:
   unit-test:

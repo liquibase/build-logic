@@ -77,7 +77,7 @@ jobs:
           github_token: ${{secrets.BOT_TOKEN}}
           workflow: test.yml
           pr: ${{github.event.pull_request.number}}
-          name: ${{ env.artifact_id }}-extension-artifacts
+          name: ${{ env.artifact_id }}-artifacts
           path: ./assets
           repo: ${{ github.repository }}
           check_artifacts: true
@@ -86,8 +86,8 @@ jobs:
 
       - name: Unzip Assets
         run: |
-          cd ./assets && unzip ${{ env.artifact_id }}-extension-artifacts.zip
-          rm ${{ env.artifact_id }}-extension-artifacts.zip
+          cd ./assets && unzip ${{ env.artifact_id }}-artifacts.zip
+          rm ${{ env.artifact_id }}-artifacts.zip
 
       - name: Get Release Tag
         id: get-release-tag

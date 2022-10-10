@@ -48,10 +48,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           mvn -B -Dsonar.login=$SONAR_TOKEN \
-              -Dsonar.projectId=${{ github.event.repository.name }} \
-              -Dsonar.pullrequest.key=${{ github.event.pull_request.id }} \
-              -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} \
-              -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }} \
               -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }} \
               sonar:sonar
               

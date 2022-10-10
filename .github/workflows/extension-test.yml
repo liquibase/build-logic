@@ -48,7 +48,7 @@ jobs:
         with:
           name: ${{ env.artifact_id }}-artifacts
           path: |
-            target/${{ env.artifact_id }}*
+            target/*
 
       - name: Save Event File
         uses: actions/upload-artifact@v3
@@ -61,7 +61,6 @@ jobs:
         with:
           key: build-${{ github.run_number }}-${{ github.run_attempt }}
           path: |
-            **/target/**
             ~/.m2/repository/org/liquibase/
 
   unit-test:
@@ -90,8 +89,12 @@ jobs:
         with:
           key: build-${{ github.run_number }}-${{ github.run_attempt }}
           path: |
-            **/target/**
             ~/.m2/repository/org/liquibase/
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.artifact_id }}-artifacts
+          path: ./target
 
       - name: Run Tests
         run: mvn -B jacoco:prepare-agent surefire:test

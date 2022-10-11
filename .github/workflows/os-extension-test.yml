@@ -49,5 +49,5 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/extension-attach-artifact-release.yml@main
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
     secrets: inherit

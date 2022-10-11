@@ -38,7 +38,7 @@ jobs:
 
       - name: Send Slack Message (Failure)
         if: ${{ failure() }}
-        uses: archive/github-actions-slack@v2.0.0
+        uses: archive/github-actions-slack@v2.4.0
         with:
           slack-bot-user-oauth-access-token: ${{ secrets.SLACK_BOT_API_TOKEN }}
           slack-channel: liquibase-labs

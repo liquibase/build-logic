@@ -1,4 +1,5 @@
 name: Sonar Scan for Pushes
+
 on:
   workflow_call:
     secrets:

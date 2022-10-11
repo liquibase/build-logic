@@ -1,5 +1,8 @@
 name: Build Artifact
 
+on:
+  workflow_call:
+
 jobs:
   build:
     name: Build & Package

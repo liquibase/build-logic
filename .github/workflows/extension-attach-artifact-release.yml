@@ -50,11 +50,6 @@ jobs:
           if_no_artifact_found: fail
           workflow_conclusion: ""
 
-      - name: Unzip Assets
-        run: |
-          cd ./assets && unzip ${{ env.artifact_id }}-artifacts.zip
-          rm ${{ env.artifact_id }}-artifacts.zip
-
       - name: Get Release Tag
         id: get-release-tag
         run: echo "release_tag=$(./.github/get_draft_release.sh TAG)" >> $GITHUB_ENV

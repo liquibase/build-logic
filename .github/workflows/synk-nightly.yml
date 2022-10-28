@@ -18,8 +18,7 @@ jobs:
       - name: Checkout Master Branch
         uses: actions/checkout@v3
 
-      - name: Run Snyk Test to check for vulnerabilities
-        id: test
+      - name: Run Snyk Test
         uses: snyk/actions/maven-3-jdk-11@master
         timeout-minutes: 10
         env:
@@ -27,22 +26,3 @@ jobs:
         with:
           command: test
           args: --fail-on=all --severity-threshold=medium --all-projects --org=datical
-
-      - name: Run Snyk Monitor
-        uses: snyk/actions/maven-3-jdk-11@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: monitor
-          args: -p --all-projects --org=datical
-
-      - name: Send Slack Message (Failure)
-        if: ${{ failure() }}
-        uses: archive/github-actions-slack@v2.4.0
-        with:
-          slack-bot-user-oauth-access-token: ${{ secrets.SLACK_BOT_API_TOKEN }}
-          slack-channel: liquibase-labs
-          slack-text: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} : ${{ job.status }} @here"
-          slack-optional-link_names: true
-          slack-optional-username: Liquibot
-          slack-optional-icon_emoji: ':liquibase:'

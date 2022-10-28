@@ -31,17 +31,6 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      - name: Build code
-        run: mvn -B verify
-
-      - name: Aggregate Jacoco Results
-        run: |
-          mvn -B -Djacoco.fileset.directory=artifacts \
-            -Djacoco.destFile=target\jacoco-merged.exec \
-            -Djacoco.dataFile=target\jacoco-merged.exec \
-            jacoco:merge \
-            jacoco:report
-
       - name: Sonar Scan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,4 +41,4 @@ jobs:
               -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} \
               -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }} \
               -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }} \
-              sonar:sonar
+              clean verify sonar:sonar

@@ -6,6 +6,12 @@ on:
       SONAR_TOKEN:
         description: 'SONAR_TOKEN from the caller workflow'
         required: true
+        
+env:
+  AWS_REGION: us-east-1
+  LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
 
 jobs:
   sonar-pr:

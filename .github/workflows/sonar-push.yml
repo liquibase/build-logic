@@ -12,6 +12,12 @@ jobs:
     name: Sonar Scan
     runs-on: ubuntu-latest
 
+    env:
+      AWS_REGION: us-east-1
+      LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
+
     steps:
       - uses: actions/checkout@v3
         with:

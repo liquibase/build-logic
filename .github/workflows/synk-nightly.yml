@@ -25,4 +25,4 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
-          args: --fail-on=all --fail-fast --severity-threshold=medium --all-projects --org=datical
+          args: --fail-on=all --fail-fast -d --severity-threshold=medium --all-projects --org=datical

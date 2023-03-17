@@ -1,7 +1,7 @@
 name: Liquibase Test Harness on Docker-Based Databases
 
 on:
-  workflow_dispatch:
+  workflow_call:
     secrets:
         PRO_LICENSE_KEY:
             description: 'Liquibase Pro license key'

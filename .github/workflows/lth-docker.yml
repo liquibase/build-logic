@@ -6,6 +6,10 @@ on:
         PRO_LICENSE_KEY:
             description: 'Liquibase Pro license key'
             required: true
+    inputs:
+        versions:
+        description: 'Version(s) of Docker Database to test'
+        required: false
 
 jobs:
   liquibase-test-harness:
@@ -15,6 +19,7 @@ jobs:
     strategy:
       matrix:
         liquibase-support-level: [Contributed, Foundational, Advanced] # Define the different test levels to run
+        versions: ["${{ inputs.versions }}"] # Define the different versions of Docker Database to test
       fail-fast: false # Set fail-fast to false to run all test levels even if some of them fail
 
     steps:
@@ -34,17 +39,17 @@ jobs:
       - name: Build with Maven # Build the code with Maven (skip tests)
         run: mvn -ntp -Dmaven.test.skip package
 
-      - name: Run ${{ matrix.liquibase-support-level }} Liquibase Test Harness # Run the Liquibase test harness at each test level
+      - name: Run ${{ matrix.liquibase-support-level }} Liquibase Test Harness ${{ matrix.versions }} # Run the Liquibase test harness at each test level
         continue-on-error: true # Continue to run the action even if the previous steps fail
         env:
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }} # Set the environment variable for the Liquibase Pro license key
-        run: mvn -ntp -Dtest=${{ matrix.liquibase-support-level }}ExtensionHarnessSuite test # Run the Liquibase test harness at each test level
+        run: mvn -ntp -DdbVersion=${{ matrix.versions }} -Dtest=${{ matrix.liquibase-support-level }}ExtensionHarnessSuite test # Run the Liquibase test harness at each test level
 
       - name: Test Reporter # Generate a test report using the Test Reporter action
         uses: dorny/test-reporter@v1.6.0
         if: always() # Run the action even if the previous steps fail
         with:
-          name: Liquibase Test Harness - ${{ matrix.liquibase-support-level }} Reports # Set the name of the test report
+          name: Liquibase Test Harness - ${{ matrix.liquibase-support-level }} Reports ${{ matrix.versions }} # Set the name of the test report
           path: target/surefire-reports/TEST-*.xml # Set the path to the test report files
           reporter: java-junit # Set the reporter to use
           fail-on-error: false # Set fail-on-error to false to show report even if it has failed tests

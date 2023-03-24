@@ -38,12 +38,6 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
 
       - name: Download Test Results Artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: test-results
-          path: ./target
-
-      - name: Download Test Results Artifact
         id: download-artifact
         uses: dawidd6/action-download-artifact@v2
         with:

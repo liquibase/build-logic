@@ -39,14 +39,14 @@ upload_asset() {
 
 declare -a StringArray=(".jar" ".jar.asc" ".jar.md5" ".jar.sha1" \
  ".pom" ".pom.asc" ".pom.md5" ".pom.sha1" \
- ".zip" ".zip.asc" ".zip.md5" ".zip.sha1" \
+ ".zip" \
  "-javadoc.jar" "-javadoc.jar.asc" "-javadoc.jar.md5" "-javadoc.jar.sha1" \
  "-sources.jar" "-sources.jar.asc" "-sources.jar.md5" "-sources.jar.sha1" )
 
 for val in "${StringArray[@]}"; do
     FILE=$ASSET_DIR/$ASSET_NAME_PREFIX$VERSION$val
     # Skip if zip files do not exist (some extensions do not generate examples in zip format)
-    if [[ ! -f "$FILE" && "$FILE" != *".zip"* ]]; then
+    if [[ ! -f "$FILE" && "$FILE" != *".zip" ]]; then
         echo "$FILE does not exist."
         exit 1
     fi

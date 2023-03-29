@@ -82,16 +82,6 @@ jobs:
           ./.github/sign_artifact.sh ./assets/${{ env.artifact_id }}-${version}-javadoc.jar
           ./.github/sign_artifact.sh ./assets/${{ env.artifact_id }}-${version}-sources.jar
 
-      - name: Sign zip File for Draft Release
-        run: |
-          if [ -f ./assets/${{ env.artifact_id }}-${version}.zip ]; then
-            gpg -K
-            version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-            ./.github/sign_artifact.sh ./assets/${{ env.artifact_id }}-${version}.zip
-          else
-            echo "No zip file to be signed"
-          fi
-
       - name: Attach Files to Draft Release
         id: upload-release-asset
         run: ./.github/upload_asset.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)

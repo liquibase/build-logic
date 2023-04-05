@@ -6,6 +6,8 @@ on:
         PRO_LICENSE_KEY:
             description: 'Liquibase Pro license key'
             required: true
+env:
+  LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
 
 jobs:
   liquibase-test-harness:

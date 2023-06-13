@@ -1,0 +1,37 @@
+name: Update extension version
+
+on:
+  workflow_call:
+    inputs:
+      liquibaseVersion:
+        description: 'Liquibase Version'
+        required: true
+        type: string
+    secrets:
+      BOT_TOKEN:
+        description: 'BOT_TOKEN from the caller workflow'
+        required: true
+
+jobs:
+  update-version:
+    name: Update extension version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Configure Git user
+        run: |
+          git config user.email "jandroav@icloud.com"
+          git config user.name "jandroav"
+
+      - name: Prepare and Perform Maven Release
+        run: |
+          mvn -B release:clean release:prepare release:perform -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}

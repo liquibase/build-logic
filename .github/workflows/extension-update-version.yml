@@ -29,8 +29,8 @@ jobs:
 
       - name: Configure Git user
         run: |
-          git config user.email "jandroav@icloud.com"
-          git config user.name "jandroav"
+          git config user.name "liquibot"
+          git config user.email "liquibot@liquibase.org"
 
       - name: Prepare and Perform Maven Release
         run: |

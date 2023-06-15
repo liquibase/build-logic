@@ -21,6 +21,7 @@ env:
   LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
   AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   build:

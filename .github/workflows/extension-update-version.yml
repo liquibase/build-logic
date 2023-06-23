@@ -35,14 +35,14 @@ jobs:
       - name: Prepare Maven Release
         if: ${{ !github.event.inputs.perform-release && !github.event.inputs.perform-rollback}}
         run: |
-          mvn -B release:clean release:prepare release:perform -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -Dusername=liquibot -Dpassword=${{ secrets.GITHUB_TOKEN }} -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
+          mvn -B release:clean release:prepare release:perform -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.GITHUB_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
 
       - name: Perform Maven Release
         if: ${{ github.event.inputs.perform-release }}
         run: |
-          mvn -B release:perform -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -Dusername=liquibot -Dpassword=${{ secrets.GITHUB_TOKEN }} -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
+          mvn -B release:perform -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.GITHUB_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
 
       - name: Perform Maven Release Rollback
         if: ${{ github.event.inputs.perform-rollback }}
         run: |
-          mvn -B release:rollback -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -Dusername=liquibot -Dpassword=${{ secrets.GITHUB_TOKEN }}
+          mvn -B release:rollback -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.GITHUB_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true"

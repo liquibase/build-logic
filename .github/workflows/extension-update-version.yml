@@ -32,7 +32,7 @@ jobs:
           git config user.name "liquibot"
           git config user.email "liquibot@liquibase.org"
           git remote remove origin
-          git remote add origin https://liquibot:${{ secrets.BOT_TOKEN }}@github.com/${{ github.repository_owner }}/${{ github.repository }}.git
+          git remote add origin https://liquibot:${{ secrets.BOT_TOKEN }}@github.com/${{ github.repository }}.git
 
       - name: Prepare Maven Release
         if: ${{ !github.event.inputs.perform-release && !github.event.inputs.perform-rollback}}

@@ -10,11 +10,11 @@ on:
       perform-release:
         description: 'Flag to perform the release or just prepare it'
         required: true
-        type: string
+        type: boolean
       perform-rollback:
         description: 'Flag to indicate if the release should be rolled back'
         required: true
-        type: string
+        type: boolean
 
 jobs:
   update-version:
@@ -37,16 +37,16 @@ jobs:
           git config user.email "liquibot@liquibase.org"
 
       - name: Prepare Maven Release
-        if: ${{ github.event.inputs.perform-release == 'false' && github.event.inputs.perform-rollback == 'false'}}
+        if: ${{ !github.event.inputs.perform-release && !github.event.inputs.perform-rollback}}
         run: |
           mvn -B release:clean release:prepare release:perform -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
 
       - name: Perform Maven Release
-        if: ${{ github.event.inputs.perform-release == 'true' }}
+        if: ${{ github.event.inputs.perform-release }}
         run: |
           mvn -B release:perform -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
 
       - name: Perform Maven Release Rollback
-        if: ${{ github.event.inputs.perform-rollback == 'true' }}
+        if: ${{ github.event.inputs.perform-rollback }}
         run: |
           mvn -B release:rollback -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }}

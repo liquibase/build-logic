@@ -10,11 +10,11 @@ on:
       perform-release:
         description: 'Flag to perform the release or just prepare it'
         required: true
-        type: boolean
+        type: string
       perform-rollback:
         description: 'Flag to indicate if the release should be rolled back'
         required: true
-        type: boolean
+        type: string
 
 jobs:
   update-version:

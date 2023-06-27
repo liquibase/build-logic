@@ -39,7 +39,7 @@ jobs:
       - name: Prepare Maven Release
         if: ${{ !github.event.inputs.perform-release && !github.event.inputs.perform-rollback}}
         run: |
-          mvn -B release:clean release:prepare release:perform -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
+          mvn -B release:clean release:prepare -Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
 
       - name: Perform Maven Release
         if: ${{ github.event.inputs.perform-release }}

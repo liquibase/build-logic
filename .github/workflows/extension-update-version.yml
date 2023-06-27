@@ -42,9 +42,11 @@ jobs:
       - name: Perform Maven Release
         if: ${{ github.event.inputs.perform-release }}
         run: |
+          git pull
           mvn -B release:perform -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
 
       - name: Perform Maven Release Rollback
         if: ${{ github.event.inputs.perform-rollback }}
         run: |
+          git pull
           mvn -B release:rollback -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true"

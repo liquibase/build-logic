@@ -32,7 +32,7 @@ jobs:
           git config user.name "liquibot"
           git config user.email "liquibot@liquibase.org"
           git remote remove origin
-          git remote add origin https://liquibot:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git
+          git remote add origin http://liquibot:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
 

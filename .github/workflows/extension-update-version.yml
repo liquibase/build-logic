@@ -16,6 +16,8 @@ jobs:
   update-version:
     name: Update extension version
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -35,14 +37,14 @@ jobs:
       - name: Prepare Maven Release
         if: ${{ !github.event.inputs.perform-release && !github.event.inputs.perform-rollback}}
         run: |
-          mvn -B release:clean release:prepare -Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
+          mvn -B release:clean release:prepare -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
 
       - name: Perform Maven Release
         if: ${{ github.event.inputs.perform-release }}
         run: |
-          mvn -B release:perform -Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
+          mvn -B release:perform -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
 
       - name: Perform Maven Release Rollback
         if: ${{ github.event.inputs.perform-rollback }}
         run: |
-          mvn -B release:rollback -Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true"
+          mvn -B release:rollback -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true"

@@ -1,0 +1,26 @@
+name: Perform release
+
+on:
+  workflow_call:
+
+jobs:
+  perform-release:
+    name: Perform release
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+    steps:
+      - name: Configure Git
+        run: |
+          git config user.name "liquibot"
+          git config user.email "liquibot@liquibase.org"
+
+      - name: Download release files
+        id: download-release-files
+        uses: actions/download-artifact@v3
+        with:
+          name: release-files
+
+      - name: Perform Maven Release
+        run: |
+          mvn -B release:perform -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git -Dtag=${{ github.event.inputs.liquibaseVersion }}

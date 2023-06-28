@@ -10,6 +10,16 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'maven'
+
       - name: Configure Git
         run: |
           git config user.name "liquibot"

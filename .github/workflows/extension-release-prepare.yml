@@ -36,4 +36,5 @@ jobs:
           path: |
             **/pom.xml.*
             **/release.properties
+            **/*${{ github.event.inputs.liquibaseVersion }}.jar
 

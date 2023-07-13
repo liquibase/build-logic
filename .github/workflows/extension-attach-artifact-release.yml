@@ -16,7 +16,7 @@ on:
 jobs:
 
   release-prepare:
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.3.3
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.3.4
     secrets: inherit
 
   attach-to-release:
@@ -29,9 +29,9 @@ jobs:
 
       - name: Get Reusable Script Files
         run: |
-          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.3/.github/get_draft_release.sh
-          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.3/.github/sign_artifact.sh
-          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.3/.github/upload_asset.sh
+          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.4/.github/get_draft_release.sh
+          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.4/.github/sign_artifact.sh
+          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.4/.github/upload_asset.sh
           chmod +x $PWD/.github/get_draft_release.sh
           chmod +x $PWD/.github/sign_artifact.sh
           chmod +x $PWD/.github/upload_asset.sh
@@ -84,6 +84,15 @@ jobs:
       - name: Attach Files to Draft Release
         id: upload-release-asset
         run: ./.github/upload_asset.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
+          ASSET_DIR: ./target
+
+      - name: Attach Zip File to Draft Release
+        id: upload-release-zip
+        run: ./.github/upload_zip.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"

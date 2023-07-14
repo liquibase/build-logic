@@ -32,6 +32,7 @@ jobs:
           curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.4/.github/get_draft_release.sh
           curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.4/.github/sign_artifact.sh
           curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.4/.github/upload_asset.sh
+          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.4/.github/upload_zip.sh
           chmod +x $PWD/.github/get_draft_release.sh
           chmod +x $PWD/.github/sign_artifact.sh
           chmod +x $PWD/.github/upload_asset.sh

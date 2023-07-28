@@ -1,0 +1,39 @@
+# The name of the workflow
+name: Automerge Dependabot PRs
+
+# The event that triggers the workflow
+on:
+  workflow_call:
+
+jobs:
+  dependabot:
+    # The name of the job
+    name: Merge dependabot
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    # The permissions for the GITHUB_TOKEN
+    permissions:
+      contents: write
+      pull-requests: write
+    # Conditional statement to run the job only when the event was triggered by 'dependabot[bot]'
+    if: ${{ github.actor == 'dependabot[bot]' }}
+
+    steps:
+      - name: Dependabot metadata
+        id: dependabot-metadata
+        # Use 'dependabot/fetch-metadata' to fetch the metadata about the update
+        uses: dependabot/fetch-metadata@v1.3.1
+
+      - name: Approve patch and minor updates
+        # Conditional statement to run the steps only when the update type is a patch or minor
+        if: ${{steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' || steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor'}}
+        run: |
+          # Command to merge the PR
+          gh pr merge --auto --merge "$PR_URL"
+          # Command to approve the PR with a custom message
+          gh pr review $PR_URL --approve -b "I'm **approving** this pull request because **it includes a patch or minor update**"
+        env:
+          # The URL of the PR to be merged and approved
+          PR_URL: ${{github.event.pull_request.html_url}}
+          # The GitHub token secret
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

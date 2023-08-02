@@ -49,6 +49,7 @@ jobs:
         run: |
           mvn -B release:clean release:prepare -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
           git reset HEAD~ --hard
+          mvn clean install -DskipTests
 
       - name: Get Artifact ID
         id: get-artifact-id

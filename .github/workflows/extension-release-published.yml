@@ -11,6 +11,13 @@ on:
         required: true
 
 jobs:
+
+  release-prepare-push:
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.3.5
+    with:
+      pushChanges: "true"
+    secrets: inherit
+
   release:
     runs-on: ubuntu-latest
     steps:

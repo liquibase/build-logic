@@ -5,10 +5,6 @@ name: Automerge Dependabot PRs
 on:
   workflow_call:
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
   dependabot:
     # The name of the job

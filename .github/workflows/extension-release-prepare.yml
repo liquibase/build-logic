@@ -2,10 +2,6 @@ name: Prepare release
 
 on:
   workflow_call:
-    inputs:
-      pushChanges:
-        required: true
-        type: string
 
 jobs:
   prepare-release:
@@ -31,7 +27,7 @@ jobs:
 
       - name: Prepare Maven Release
         run: |
-          mvn -B release:clean release:prepare -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=${{ inputs.pushChanges }}
+          mvn -B release:clean release:prepare -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
 
       - name: Save Release files
         uses: actions/upload-artifact@v3

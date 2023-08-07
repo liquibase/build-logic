@@ -2,7 +2,17 @@ name: Build and Test Extension
 
 on:
   workflow_call:
-
+    inputs:
+      java:
+        description: 'Java version to test'
+        required: true
+        default: '[8, 11, 17, 18]'
+        type: string
+      os:
+        description: 'Operating system to test'
+        required: true
+        default: '["ubuntu-latest", "windows-latest"]'
+        type: string
 jobs:
   build:
     name: Build & Package
@@ -44,8 +54,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ 8, 11, 17, 18 ]
-        os: [ ubuntu-latest, windows-latest ]
+        java: ${{ fromJSON(github.event.inputs.java)}}
+        os: ${{ fromJSON(github.event.inputs.os)}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build
@@ -78,5 +88,5 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.3.5
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.3.6
     secrets: inherit

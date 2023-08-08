@@ -28,6 +28,24 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/{workflow}.yml@main
 ```
 
+### Calling reusable workflows with parameters
+
+`os-extension-test.yml` and `pro-extension-test.yml` are triggered by a workflow call event and runs tests for Liquibase extensions (os/pro) on different Java versions and operating systems. The `java` input specifies the Java versions to test, and the `os` input specifies the operating systems to test. Both inputs are required and have default values.
+
+```yml
+name: {Job name}
+on:
+  pull_request:
+jobs:
+  {workflow}:
+    uses: liquibase/build-logic/.github/workflows/{workflow}.yml@main
+    with:
+      java: '[17, 18]'
+      os: '["ubuntu-latest", "windows-latest"]'
+```
+
+If inputs are not provided, `'[8, 11, 17, 18]'` and `'["ubuntu-latest", "windows-latest"]'` will be used as default values
+
 ## Example Build/Test/Release Extension Workflow
 
 ```mermaid

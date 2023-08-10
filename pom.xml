@@ -97,13 +97,6 @@
                         <enabled>true</enabled>
                     </snapshots>
                 </repository>
-                <repository>
-                    <id>liquibase-pro</id>
-                    <url>https://maven.pkg.github.com/liquibase/liquibase-pro</url>
-                    <snapshots>
-                        <enabled>true</enabled>
-                    </snapshots>
-                </repository>
             </repositories>
         </profile>
 	</profiles>

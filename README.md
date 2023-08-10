@@ -62,6 +62,7 @@ Please review the below table of reusable workflows and their descriptions:
 |-----------------------------------------|---------------------------------------------------------------------------------------|
 | `build-artifact.yml`                    | Runs maven build and saves artifacts                                                  |
 | `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                               |
+| `deb-packaging.yml`                     | Creates and uploads deb packages                                                      |
 | `extension-attach-artifact-release.yml` | Attaches a tested artifact to the draft release                                       |
 | `extension-release-published.yml`       | Publishes a release to Maven Central                                                  |
 | `extension-update-version.yml`          | Updates release and development `pom.xml` versions                                    |

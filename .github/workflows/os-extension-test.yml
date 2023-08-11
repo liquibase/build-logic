@@ -14,10 +14,6 @@ on:
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
 
-env:
-  JAVA_INPUT: ${{ github.event.inputs.java || '[8, 11, 17, 18]' }}
-  OS_INPUT: ${{ github.event.inputs.os || '["ubuntu-latest", "windows-latest"]' }}
-
 jobs:
   build:
     name: Build & Package
@@ -59,8 +55,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: ${{ fromJSON(env.JAVA_INPUT) }}
-        os: ${{ fromJSON(env.OS_INPUT) }}
+        java: ${{fromJson(env.INPUT_JAVA)}}
+        os: ${{fromJson(env.INPUT_OS)}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build

@@ -82,7 +82,7 @@ jobs:
 
         - name: Build ${{ inputs.artifactId }} deb package
           run: |
-            mvn clean package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
+            mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
 
         - name: Install deb-s3 gem
           run: gem install deb-s3

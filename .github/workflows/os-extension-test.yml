@@ -55,8 +55,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: ${{fromJson(env.INPUT_JAVA)}}
-        os: ${{fromJson(env.INPUT_OS)}}
+        java: ${{fromJson(github.event.inputs.java || '[8, 11, 17, 18]')}}
+        os: ${{fromJson(github.event.inputs.os || '["ubuntu-latest", "windows-latest"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build

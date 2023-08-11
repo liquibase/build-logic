@@ -49,7 +49,7 @@ jobs:
             distribution: 'temurin'
             cache: 'maven'
 
-        - name: Get Reusable pom.xml
+        - name: Get Reusable Maven Files
           run: |
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
@@ -77,8 +77,8 @@ jobs:
 
         - name: Download ${{ inputs.artifactId }} Release
           run: |
-            mkdir -p target
-            wget -q -O target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+            mkdir -p $PWD/.github/target
+            wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
 
         - name: Build ${{ inputs.artifactId }} deb package
           run: |
@@ -94,7 +94,7 @@ jobs:
             echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
             export GPG_TTY=$(tty)
             echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-            deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com target/${{ inputs.artifactId }}-${{ inputs.version }}.deb 
+            deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb 
                   
         
           

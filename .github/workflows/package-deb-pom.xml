@@ -79,25 +79,4 @@
 
 		</plugins>
 	</build>
-
-	<profiles>
-		<profile>
-            <id>remote-repositories</id>
-            <activation>
-                <property>
-                    <name>env.CI</name>
-                    <value>true</value>
-                </property>
-            </activation>
-            <repositories>
-                <repository>
-                    <id>liquibase</id>
-                    <url>https://maven.pkg.github.com/liquibase/liquibase</url>
-                    <snapshots>
-                        <enabled>true</enabled>
-                    </snapshots>
-                </repository>
-            </repositories>
-        </profile>
-	</profiles>
 </project>

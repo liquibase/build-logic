@@ -16,6 +16,7 @@ on:
         description: 'Value from the version field in pom.xml. i.e 4.23.0'
         required: true
 
+
 env:
   MAVEN_VERSION: '3.9.2'
 
@@ -38,33 +39,6 @@ jobs:
           uses: stCarolas/setup-maven@v4.5
           with:
             maven-version: ${{ env.MAVEN_VERSION }}
-
-      # look for dependencies in maven
-        - name: maven-settings-xml-action
-          uses: whelk-io/maven-settings-xml-action@v20
-          with:
-            repositories: |
-              [
-                {
-                  "id": "liquibase",
-                  "url": "https://maven.pkg.github.com/liquibase/liquibase",
-                  "releases": {
-                    "enabled": "false"
-                  },
-                  "snapshots": {
-                    "enabled": "true",
-                    "updatePolicy": "always"
-                  }
-                }
-              ]
-            servers: |
-              [
-                {
-                  "id": "liquibase",
-                  "username": "liquibot",
-                  "password": "${{ secrets.LIQUIBOT_PAT }}"
-                }
-              ]
 
         - name: Set up Ruby
           uses: ruby/setup-ruby@v1
@@ -98,4 +72,6 @@ jobs:
             export GPG_TTY=$(tty)
             echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
             deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com target/${{ inputs.artifactId }}-${{ inputs.version }}.deb 
+                  
+        
           

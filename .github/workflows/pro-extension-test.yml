@@ -5,12 +5,12 @@ on:
     inputs:
       java:
         description: 'Java version to test'
-        required: true
+        required: false
         default: '[8, 11, 17, 18]'
         type: string
       os:
         description: 'Operating system to test'
-        required: true
+        required: false
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
     secrets:
@@ -33,6 +33,8 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  JAVA_INPUT: ${{ github.event.inputs.java || '[8, 11, 17, 18]' }}
+  OS_INPUT: ${{ github.event.inputs.os || '["ubuntu-latest", "windows-latest"]' }}
 
 jobs:
   build:
@@ -75,8 +77,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: ${{ fromJSON(github.event.inputs.java)}}
-        os: ${{ fromJSON(github.event.inputs.os)}}
+        java: ${{ fromJSON(env.JAVA_INPUT) }}
+        os: ${{ fromJSON(env.OS_INPUT) }}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build

@@ -1,19 +1,33 @@
 name: DEB packaging
 on:
-  repository_dispatch:
-    types: [liquibase-release]
-  workflow_dispatch:
+  workflow_call:
     inputs:
       groupId:
         description: 'Value from the groupId field in pom.xml. i.e. org.liquibase'
         required: true
-        default: 'org.liquibase'
+        type: string
       artifactId:
         description: 'Value from the artifactId field in pom.xml. i.e. liquibase'
         required: true
-        default: 'liquibase'
+        type: string
       version:
         description: 'Value from the version field in pom.xml. i.e 4.23.0'
+        type: string
+    secrets:
+      AWS_PROD_ACCESS_KEY_ID:
+        description: 'AWS_PROD_ACCESS_KEY_ID from the caller workflow'
+        required: true
+      AWS_PROD_SECRET_ACCESS_KEY:
+        description: 'AWS_PROD_SECRET_ACCESS_KEY from the caller workflow'
+        required: true
+      GPG_SECRET:
+        description: 'GPG_SECRET from the caller workflow'
+        required: true
+      GPG_PASSPHRASE:
+        description: 'GPG_PASSPHRASE from the caller workflow'
+        required: true
+      GPG_SECRET_KEY_ID:
+        description: 'GPG_SECRET_KEY_ID from the caller workflow'
         required: true
 
 

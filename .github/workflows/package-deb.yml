@@ -48,7 +48,11 @@ jobs:
             java-version: '17'
             distribution: 'temurin'
             cache: 'maven'
-          
+
+        - name: Get Reusable pom.xml
+          run: |
+            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.3.7/.github/package-deb-pom.xml
+
         - name: Set up Maven
           uses: stCarolas/setup-maven@v4.5
           with:

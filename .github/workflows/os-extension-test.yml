@@ -5,12 +5,12 @@ on:
     inputs:
       java:
         description: 'Java version to test'
-        required: true
+        required: false
         default: '[8, 11, 17, 18]'
         type: string
       os:
         description: 'Operating system to test'
-        required: true
+        required: false
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
 jobs:
@@ -88,5 +88,5 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.3.6
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.3.8
     secrets: inherit

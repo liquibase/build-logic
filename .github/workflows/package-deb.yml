@@ -51,6 +51,7 @@ jobs:
 
         - name: Get Reusable Maven Files
           run: |
+            # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
             curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.3.7/src/${{ inputs.artifactId }}/deb/control/control
@@ -78,6 +79,7 @@ jobs:
         - name: Download ${{ inputs.artifactId }} Release
           run: |
             mkdir -p $PWD/.github/target
+            # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
             wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
 
         - name: Build ${{ inputs.artifactId }} deb package

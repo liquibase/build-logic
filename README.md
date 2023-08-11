@@ -46,6 +46,12 @@ jobs:
 
 If inputs are not provided, `'[8, 11, 17, 18]'` and `'["ubuntu-latest", "windows-latest"]'` will be used as default values
 
+`package-deb.yml` is triggered by a workflow call event and runs some Maven goals needed to create and distribute `deb` packages. It has several inputs:
+
+- **groupId**: Value from the `groupId` field in the pom file. i.e. `org.liquibase`
+- **artifactId**: Value from the `artifactId` field in the pom file. i.e. `liquibase`
+- **version**: Value from the `version` field in the pom file. i.e `4.23.1`
+
 ## Example Build/Test/Release Extension Workflow
 
 ```mermaid

@@ -4,17 +4,12 @@
 	<groupId>${groupId}</groupId>
 	<artifactId>${artifactId}</artifactId>
 	<version>${revision}</version>
-
     <description>Universal pom for deb packaging</description>
 
 	<properties>
 		<maven.antrun.version>3.1.0</maven.antrun.version>
 		<org.vafer.jdeb.version>1.10</org.vafer.jdeb.version>
 	</properties>
-
-	<dependencies>
-
-	</dependencies>
 
 	<build>
 		<plugins>
@@ -37,7 +32,6 @@
 					</execution>  
 				</executions>  
 			</plugin> 
-	
 			<plugin>
 				<groupId>org.vafer</groupId>
 				<artifactId>jdeb</artifactId>
@@ -76,7 +70,6 @@
 					</dataSet>
 				</configuration>
 			</plugin>
-
 		</plugins>
 	</build>
 </project>

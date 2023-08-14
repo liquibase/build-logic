@@ -28,6 +28,30 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/{workflow}.yml@main
 ```
 
+### Calling reusable workflows with parameters
+
+`os-extension-test.yml` and `pro-extension-test.yml` are triggered by a workflow call event and runs tests for Liquibase extensions (os/pro) on different Java versions and operating systems. The `java` input specifies the Java versions to test, and the `os` input specifies the operating systems to test. Both inputs are required and have default values.
+
+```yml
+name: {Job name}
+on:
+  pull_request:
+jobs:
+  {workflow}:
+    uses: liquibase/build-logic/.github/workflows/{workflow}.yml@main
+    with:
+      java: '[17, 18]'
+      os: '["ubuntu-latest", "windows-latest"]'
+```
+
+If inputs are not provided, `'[8, 11, 17, 18]'` and `'["ubuntu-latest", "windows-latest"]'` will be used as default values
+
+`package-deb.yml` is triggered by a workflow call event and runs some Maven goals needed to create and distribute `deb` packages. It has several inputs:
+
+- **groupId**: Value from the `groupId` field in the pom file. i.e. `org.liquibase`
+- **artifactId**: Value from the `artifactId` field in the pom file. i.e. `liquibase`
+- **version**: Value from the `version` field in the pom file. i.e `4.23.1`
+
 ## Example Build/Test/Release Extension Workflow
 
 ```mermaid
@@ -48,6 +72,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `extension-release-published.yml`       | Publishes a release to Maven Central                                                  |
 | `extension-update-version.yml`          | Updates release and development `pom.xml` versions                                    |
 | `os-extension-test.yml`                 | Unit tests across build matrix on previously built artifact                           |
+| `package-deb.yml`                       | Creates and uploads deb packages                                                      |
 | `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                 |
 | `sonar-pull-request.yml`                | Code Coverage Scan for PRs.  Requires branch name parameter                           |
 | `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter        |  

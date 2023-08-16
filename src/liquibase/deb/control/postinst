@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 LIQUIBASE_HOME=/opt/liquibase
 
@@ -6,4 +6,4 @@ LIQUIBASE_HOME=/opt/liquibase
 sudo echo "export LIQUIBASE_HOME=$LIQUIBASE_HOME" >> ~/.profile
 sudo echo "export PATH=\$PATH:\$LIQUIBASE_HOME" >> ~/.profile
 
-source ~/.profile
+. ~/.profile

@@ -5,6 +5,8 @@ LIQUIBASE_HOME=/opt/liquibase
 # Remove the liquibase-related lines from the profile
 sudo sed -i '/LIQUIBASE_HOME=/d' ~/.profile
 sudo sed -i '/export PATH=\$PATH:\$LIQUIBASE_HOME/d' ~/.profile
-
+path=$PATH
+path_without_liquibase=$(echo "$path" | sed 's/:\/opt\/liquibase//g')
+export PATH=$path_without_liquibase
 # Source the profile to apply changes immediately
 source ~/.profile

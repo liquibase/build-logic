@@ -1,8 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
-# Remove the lines added by the postinst script from the user's shell configuration file
-sed -i '/LIQUIBASE_HOME=\/opt\/liquibase/d' "$HOME/.bashrc"
-sed -i '/export PATH=\$PATH:\$LIQUIBASE_HOME/d' "$HOME/.bashrc"
+LIQUIBASE_HOME=/opt/liquibase
 
-# Load the updated configuration into the current shell session
-. "$HOME/.bashrc"
+# Remove the liquibase-related lines from the profile
+sudo sed -i '/LIQUIBASE_HOME=/d' /etc/profile
+sudo sed -i '/export PATH=\$PATH:\$LIQUIBASE_HOME/d' /etc/profile
+
+# Source the profile to apply changes immediately
+source /etc/profile

@@ -1,8 +1,11 @@
-#!/bin/sh
+#!/bin/bash
 
-# Modify the user's shell configuration file
-echo 'export LIQUIBASE_HOME=/opt/liquibase' >> "$HOME/.bashrc"
-echo 'export PATH=$PATH:$LIQUIBASE_HOME' >> "$HOME/.bashrc"
+LIQUIBASE_HOME=/opt/liquibase
 
-# Load the updated configuration into the current shell session
-. "$HOME/.bashrc"
+# Needed once the installation is complete. No need to open a new terminal
+sudo echo "export LIQUIBASE_HOME=$LIQUIBASE_HOME" >> sudo /etc/profile
+sudo echo "export PATH=\$PATH:\$LIQUIBASE_HOME" >> sudo /etc/profile
+
+echo "export PATH=\$PATH:\$LIQUIBASE_HOME" >> ~/.profile
+
+source /etc/profile

@@ -3,8 +3,8 @@
 LIQUIBASE_HOME=/opt/liquibase
 
 # Remove the liquibase-related lines from the profile
-sudo sed -i '/LIQUIBASE_HOME=/d' /etc/profile
-sudo sed -i '/export PATH=\$PATH:\$LIQUIBASE_HOME/d' /etc/profile
+sudo sed -i '/LIQUIBASE_HOME=/d' ~/.profile
+sudo sed -i '/export PATH=\$PATH:\$LIQUIBASE_HOME/d' ~/.profile
 
 # Source the profile to apply changes immediately
-source /etc/profile
+source ~/.profile

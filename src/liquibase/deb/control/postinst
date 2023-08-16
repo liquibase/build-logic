@@ -1,9 +1,22 @@
-#!/bin/sh
-set -x
-LIQUIBASE_HOME=/opt/liquibase
+#!/bin/bash
 
-# Needed once the installation is complete. No need to open a new terminal
-sudo echo "export LIQUIBASE_HOME=$LIQUIBASE_HOME" >> ~/.profile
-sudo echo "export PATH=\$PATH:\$LIQUIBASE_HOME" >> ~/.profile
+# Define LIQUIBASE_HOME
+LIQUIBASE_HOME="/opt/liquibase"
 
-. ~/.profile
+# Iterate through all user home directories
+for user_home in /home/*; do
+    if [ -d "$user_home" ]; then
+        user=$(basename "$user_home")
+        profile_file="$user_home/.profile"
+        
+        # Check if the .profile file exists for the user
+        if [ -f "$profile_file" ]; then
+            echo "Adding LIQUIBASE_HOME to .profile for user: $user"
+            echo "export LIQUIBASE_HOME=$LIQUIBASE_HOME" | sudo tee -a "$profile_file"
+            echo "export PATH=\$PATH:\$LIQUIBASE_HOME" | sudo tee -a "$profile_file"
+            . "$profile_file"
+        else
+            echo "No .profile found for user: $user"
+        fi
+    fi
+done

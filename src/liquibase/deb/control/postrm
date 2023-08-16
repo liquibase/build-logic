@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 LIQUIBASE_HOME=/opt/liquibase
 
@@ -9,4 +9,4 @@ path=$PATH
 path_without_liquibase=$(echo "$path" | sed 's/:\/opt\/liquibase//g')
 export PATH=$path_without_liquibase
 # Source the profile to apply changes immediately
-source ~/.profile
+. ~/.profile

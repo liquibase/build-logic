@@ -43,7 +43,7 @@ jobs:
       - name: Download Release Artifacts
         uses: robinraju/release-downloader@v1.6
         with:
-          tag: "${{ github.event.release.tag_name }}"
+          tag: "liquibase-neo4j-4.23.1"
           filename: "${{ env.artifact_id }}-*"
           out-file-path: "."
 

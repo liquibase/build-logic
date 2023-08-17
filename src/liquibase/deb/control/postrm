@@ -1,22 +1,5 @@
 #!/bin/bash
 
-# Define LIQUIBASE_HOME
-LIQUIBASE_HOME="/opt/liquibase"
+# unset LIQUIBASE_HOME
+unset LIQUIBASE_HOME
 
-# Iterate through all user home directories
-for user_home in /home/*; do
-    if [ -d "$user_home" ]; then
-        user=$(basename "$user_home")
-        profile_file="$user_home/.profile"
-        
-        # Check if the .profile file exists for the user
-        if [ -f "$profile_file" ]; then
-            echo "Removing LIQUIBASE_HOME from .profile for user: $user"
-            sed -i '/LIQUIBASE_HOME=/d' "$profile_file"
-            sed -i '/export PATH=\$PATH:\$LIQUIBASE_HOME/d' "$profile_file"
-            . "$profile_file"
-        else
-            echo "No .profile found for user: $user"
-        fi
-    fi
-done

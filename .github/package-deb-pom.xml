@@ -56,7 +56,7 @@
 							<type>directory</type>
 							<mapper>
 								<type>perm</type>
-								<prefix>/opt/liquibase</prefix>
+								<prefix>/usr/bin</prefix>
 								<filemode>755</filemode>
 							</mapper>
 						</data>

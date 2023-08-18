@@ -6,8 +6,8 @@ on:
       zip:
         description: 'Specify it if you want to attach a zip file to the release'
         required: false
-        default: false
-        type: boolean
+        default: 'false'
+        type: string
     secrets:
       BOT_TOKEN:
         description: 'BOT_TOKEN from the caller workflow'

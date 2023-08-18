@@ -2,6 +2,12 @@ name: Attach Artifact to Release
 
 on:
   workflow_call:
+    inputs:
+      zip:
+        description: 'Specify it if you want to attach a zip file to the release'
+        required: false
+        default: false
+        type: boolean
     secrets:
       BOT_TOKEN:
         description: 'BOT_TOKEN from the caller workflow'
@@ -89,6 +95,21 @@ jobs:
       - name: Attach Files to Draft Release
         id: upload-release-asset
         run: ./.github/upload_asset.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
+          ASSET_DIR: ./target
+
+      - name: Get upload_zip.sh Script File
+        if: ${{ github.event.inputs.zip == 'true' }}
+        run: |
+          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.9/.github/upload_zip.sh
+          chmod +x $PWD/.github/upload_zip.sh
+  
+      - name: Attach Zip File to Draft Release
+        if: ${{ github.event.inputs.zip == 'true' }}
+        id: upload-release-zip
+        run: ./.github/upload_zip.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"

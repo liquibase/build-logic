@@ -68,7 +68,7 @@ jobs:
           tag: ${{ env.release_tag }}
           fail-if-no-assets: false
           fail-if-no-release: false
-          assets: "${{ env.artifact_id }}-*"
+          assets: '*.*'
 
       - name: Import GPG key
         id: import_gpg

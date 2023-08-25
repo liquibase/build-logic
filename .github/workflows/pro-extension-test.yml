@@ -14,7 +14,7 @@ on:
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
       nigthly:
-        description: 'Specifies a nightly build against liquibase master-SNAPSHOT'
+        description: 'Specifies nightly builds against liquibase master-SNAPSHOT'
         required: false
         default: false
         type: boolean

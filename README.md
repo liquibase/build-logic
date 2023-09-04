@@ -75,6 +75,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `package-deb.yml`                       | Creates and uploads deb packages                                                                      |
 | `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                                 |
 | `sonar-pull-request.yml`                | Code Coverage Scan for PRs.  Requires branch name parameter                                           |
+| `sonar-test-scan.yml`                   | Code Coverage Scan for unit and integration tests                                                     |
 | `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                        |  
 | `snyk-nightly.yml`                      | Nightly Security Scans                                                                                |
 | various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets                 |

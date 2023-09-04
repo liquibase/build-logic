@@ -1,0 +1,162 @@
+name: Sonar Scan
+
+on:
+  workflow_call:
+    inputs:
+      thisBranchName:
+        description: 'The name of the branch to be scanned'
+        type: string
+        required: true
+      liquibaseBranchName:
+        description: 'The name of the liquibase branch to be scanned'
+        type: string
+        required: true
+      thisSha:
+        description: 'The sha of the branch to be scanned'
+        type: string
+        required: true
+      pullRequestNumber:
+        description: 'The pull request number to be scanned'
+        type: string
+        required: false
+      pullRequestBranchName:
+        description: 'The name of the pull request branch to be scanned'
+        type: string
+        required: false
+      pullRequestBaseBranchName:
+        description: 'The name of the pull request base branch to be scanned'
+        type: string
+        required: false
+      mavenArgs:
+        description: 'The maven arguments to be passed to the mvn command'
+        type: string
+        required: false
+
+env:
+  MAVEN_VERSION: '3.8.7'
+
+jobs:
+  sonar-push:
+    name: Sonar Scan
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: 11
+          distribution: 'temurin'
+          cache: 'maven'
+          overwrite-settings: false
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
+
+      - name: Install mvnd
+        run: |
+          wget https://github.com/apache/maven-mvnd/releases/download/1.0-m7/maven-mvnd-1.0-m7-m39-linux-amd64.zip
+          unzip maven-mvnd-1.0-m7-m39-linux-amd64.zip && mv maven-mvnd-1.0-m7-m39-linux-amd64 mvnd && chmod +x mvnd/bin/mvnd
+          ls -ltr
+          ls -ltr ./mvnd
+
+      - name: Set up Maven settings.xml
+        uses: whelk-io/maven-settings-xml-action@v20
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: liquibot
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Install sqlplus for Integration tests
+        run: |
+          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/linux/instantclient/215000/instantclient-sqlplus-linux.x64-21.5.0.0.0dbru.zip
+          unzip $HOME/instantclient-sqlplus-linux.x64-21.5.0.0.0dbru.zip -d $HOME
+          sleep 3
+          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/linux/instantclient/215000/instantclient-basiclite-linux.x64-21.5.0.0.0dbru.zip
+          unzip $HOME/instantclient-basiclite-linux.x64-21.5.0.0.0dbru.zip -d $HOME
+          chmod -R a+x $HOME/instantclient_21_5/
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Sonar Scan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+        run: |
+          export ORACLE_HOME=$ORACLE_HOME:$HOME/instantclient_21_5; export PATH=$PATH:$HOME/instantclient_21_5; export SQLPATH=$HOME/instantclient_21_5; export NLS_LANG=AMERICAN_AMERICA.UTF8; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/instantclient_21_5
+          ./mvnd/bin/mvnd -B clean verify sonar:sonar \
+          "${{ inputs.mavenArgs  }}" \
+          "-Dliquibase.version=${{ inputs.liquibaseBranchName  }}-SNAPSHOT" \
+          "-Dbuild.pro.number=${{ github.run_number }}" \
+          "-Dbuild.pro.commit=${{ inputs.thisSha }}" \
+          "-Dbuild.pro.branch=${{ inputs.thisBranchName }}" \
+          -Dsonar.scm.revision=${{ inputs.thisSha }} \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.java.coveragePlugin=jacoco \
+          -Dsonar.branch.name=${{ inputs.thisBranchName}} \
+          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber}} \
+          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName}} \
+          -Dsonar.pullrequest.base=${{ inputs.pullRequestBaseBranchName }} \
+          -Dsonar.pullrequest.provider=GitHub \
+          -Dsonar.pullrequest.github.repository="${{ github.repository_owner }}/${{ github.repository }}" \
+          -Dsonar.pullrequest.github.endpoint='https://api.github.com/' \
+          -Dsonar.qualitygate.wait=true \
+          -Dsonar.organization=${{ github.repository_owner }} \
+          -Dsonar.projectDescription='Liquibase Pro' \
+          -Dsonar.host.url='https://sonarcloud.io' \
+          -Dsonar.scm.provider=git \
+          -Daws.region="us-east-1" \
+          -T 1C

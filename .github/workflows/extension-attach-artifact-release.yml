@@ -37,6 +37,7 @@ jobs:
           chmod +x $PWD/.github/get_draft_release.sh
           chmod +x $PWD/.github/sign_artifact.sh
           chmod +x $PWD/.github/upload_asset.sh
+          chmod +x $PWD/.github/upload_zip.sh
 
       - name: Configure Git
         run: |
@@ -89,6 +90,15 @@ jobs:
       - name: Attach Files to Draft Release
         id: upload-release-asset
         run: ./.github/upload_asset.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
+          ASSET_DIR: ./target
+
+      - name: Attach Zip File to Draft Release
+        id: upload-release-zip
+        run: ./.github/upload_zip.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"

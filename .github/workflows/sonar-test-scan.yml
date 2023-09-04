@@ -137,7 +137,7 @@ jobs:
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
           export ORACLE_HOME=$ORACLE_HOME:$HOME/instantclient_21_5; export PATH=$PATH:$HOME/instantclient_21_5; export SQLPATH=$HOME/instantclient_21_5; export NLS_LANG=AMERICAN_AMERICA.UTF8; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/instantclient_21_5
-          ./mvnd/bin/mvnd -B clean verify sonar:sonar \
+          ./mvnd/bin/mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' \
           "${{ inputs.mavenArgs  }}" \
           "-Dliquibase.version=${{ inputs.liquibaseBranchName  }}-SNAPSHOT" \
           "-Dbuild.pro.number=${{ github.run_number }}" \

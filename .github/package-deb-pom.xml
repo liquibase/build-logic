@@ -56,16 +56,7 @@
 							<type>directory</type>
 							<mapper>
 								<type>perm</type>
-								<prefix>/opt/liquibase</prefix>
-								<filemode>755</filemode>
-							</mapper>
-						</data>
-						<data>
-							<src>${project.basedir}/src/${project.artifactId}/main/archive/${project.artifactId}-env.sh</src>
-							<type>file</type>
-							<mapper>
-								<type>perm</type>
-								<prefix>/etc/profile.d/</prefix>
+								<prefix>/usr/bin</prefix>
 								<filemode>755</filemode>
 							</mapper>
 						</data>

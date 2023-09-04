@@ -1,6 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
-# Needed once the installation is complete. No need to open a new terminal
-export LIQUIBASE_HOME=/opt/liquibase
-export PATH=$PATH:$LIQUIBASE_HOME
-exec $SHELL
+# Define LIQUIBASE_HOME
+LIQUIBASE_HOME="/usr/bin"

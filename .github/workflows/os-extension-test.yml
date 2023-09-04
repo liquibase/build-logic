@@ -13,6 +13,11 @@ on:
         required: false
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
+      nigthly:
+        description: 'Specifies nightly builds against liquibase master-SNAPSHOT'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build:
@@ -27,6 +32,10 @@ jobs:
           java-version: 17
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Set latest liquibase version
+        if: ${{ inputs.nigthly }} 
+        run: mvn versions:set-property -Dproperty=liquibase.version -DnewVersion=master-SNAPSHOT
 
       - name: Build and Package
         run: mvn -B dependency:go-offline clean package -DskipTests=true
@@ -89,5 +98,5 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.3.8
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.4.1
     secrets: inherit

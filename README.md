@@ -64,20 +64,20 @@ graph LR
 
 Please review the below table of reusable workflows and their descriptions:
 
-| Workflow                                | Description                                                                           |
-|-----------------------------------------|---------------------------------------------------------------------------------------|
-| `build-artifact.yml`                    | Runs maven build and saves artifacts                                                  |
-| `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                               |
-| `extension-attach-artifact-release.yml` | Attaches a tested artifact to the draft release                                       |
-| `extension-release-published.yml`       | Publishes a release to Maven Central                                                  |
-| `extension-update-version.yml`          | Updates release and development `pom.xml` versions                                    |
-| `os-extension-test.yml`                 | Unit tests across build matrix on previously built artifact                           |
-| `package-deb.yml`                       | Creates and uploads deb packages                                                      |
-| `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                 |
-| `sonar-pull-request.yml`                | Code Coverage Scan for PRs.  Requires branch name parameter                           |
-| `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter        |  
-| `snyk-nightly.yml`                      | Nightly Security Scans                                                                |
-| various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets |
+| Workflow                                | Description                                                                                           |
+|-----------------------------------------|-------------------------------------------------------------------------------------------------------|
+| `build-artifact.yml`                    | Runs maven build and saves artifacts                                                                  |
+| `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                                               |
+| `extension-attach-artifact-release.yml` | Attaches a tested artifact to the draft release. Receives a `zip` input to upload generated zip files |
+| `extension-release-published.yml`       | Publishes a release to Maven Central                                                                  |
+| `extension-update-version.yml`          | Updates release and development `pom.xml` versions                                                    |
+| `os-extension-test.yml`                 | Unit tests across build matrix on previously built artifact                                           |
+| `package-deb.yml`                       | Creates and uploads deb packages                                                                      |
+| `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                                 |
+| `sonar-pull-request.yml`                | Code Coverage Scan for PRs.  Requires branch name parameter                                           |
+| `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                        |  
+| `snyk-nightly.yml`                      | Nightly Security Scans                                                                                |
+| various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets                 |
 
 ## Requirements
 ### pom.xml

@@ -137,12 +137,8 @@ jobs:
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
           export ORACLE_HOME=$ORACLE_HOME:$HOME/instantclient_21_5; export PATH=$PATH:$HOME/instantclient_21_5; export SQLPATH=$HOME/instantclient_21_5; export NLS_LANG=AMERICAN_AMERICA.UTF8; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/instantclient_21_5
-          ./mvnd/bin/mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' \
+          ./mvnd/bin/mvnd -B clean package verify sonar:sonar -P 'testAll,!run-proguard' \
           ${{ inputs.mavenArgs  }} \
-          "-Dliquibase.version=${{ inputs.liquibaseBranchName  }}-SNAPSHOT" \
-          "-Dbuild.pro.number=${{ github.run_number }}" \
-          "-Dbuild.pro.commit=${{ inputs.thisSha }}" \
-          "-Dbuild.pro.branch=${{ inputs.thisBranchName }}" \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.login=$SONAR_TOKEN \
           -Dsonar.java.coveragePlugin=jacoco \
@@ -151,11 +147,10 @@ jobs:
           -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName}} \
           -Dsonar.pullrequest.base=${{ inputs.pullRequestBaseBranchName }} \
           -Dsonar.pullrequest.provider=GitHub \
-          -Dsonar.pullrequest.github.repository="${{ github.repository_owner }}/${{ github.repository }}" \
+          -Dsonar.pullrequest.github.repository="${{ github.repository }}" \
           -Dsonar.pullrequest.github.endpoint='https://api.github.com/' \
           -Dsonar.qualitygate.wait=true \
           -Dsonar.organization=${{ github.repository_owner }} \
-          -Dsonar.projectDescription='Liquibase Pro' \
           -Dsonar.host.url='https://sonarcloud.io' \
           -Dsonar.scm.provider=git \
           -Daws.region="us-east-1" \

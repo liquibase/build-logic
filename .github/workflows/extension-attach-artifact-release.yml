@@ -104,7 +104,7 @@ jobs:
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'
         run: |
-          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.9/.github/upload_zip.sh
+          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.4.1/.github/upload_zip.sh
           chmod +x $PWD/.github/upload_zip.sh
   
       - name: Attach Zip File to Draft Release

@@ -13,7 +13,7 @@ on:
         required: false
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
-      nigthly:
+      nightly:
         description: 'Specifies nightly builds against liquibase master-SNAPSHOT'
         required: false
         default: false

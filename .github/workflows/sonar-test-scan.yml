@@ -1,0 +1,168 @@
+name: Sonar Scan
+
+on:
+  workflow_call:
+    inputs:
+      thisBranchName:
+        description: 'The name of the branch to be scanned'
+        type: string
+        required: true
+      liquibaseBranchName:
+        description: 'The name of the liquibase branch to be scanned'
+        type: string
+        required: true
+      thisSha:
+        description: 'The sha of the branch to be scanned'
+        type: string
+        required: true
+      pullRequestNumber:
+        description: 'The pull request number to be scanned'
+        type: string
+        required: false
+      pullRequestBranchName:
+        description: 'The name of the pull request branch to be scanned'
+        type: string
+        required: false
+      pullRequestBaseBranchName:
+        description: 'The name of the pull request base branch to be scanned'
+        type: string
+        required: false
+      mavenArgs:
+        description: 'The maven arguments to be passed to the mvn command'
+        type: string
+        required: false
+
+env:
+  MAVEN_VERSION: '3.8.7'
+
+jobs:
+  sonar-push:
+    name: Sonar Scan
+    runs-on: macos-latest-xl
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: 11
+          distribution: 'temurin'
+          cache: 'maven'
+          overwrite-settings: false
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
+
+      - name: Install mvnd
+        run: |
+          brew install mvndaemon/homebrew-mvnd/mvnd
+
+      - name: Set up Maven settings.xml
+        uses: whelk-io/maven-settings-xml-action@v20
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
+
+      - name: Setup docker (missing on MacOS)
+        run: |
+          brew install docker
+          colima start
+          # For testcontainers to find the Colima socket
+          # https://github.com/abiosoft/colima/blob/main/docs/FAQ.md#cannot-connect-to-the-docker-daemon-at-unixvarrundockersock-is-the-docker-daemon-running
+          sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
+        
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: liquibot
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Install sqlplus for Integration tests
+        run: |
+          mkdir -p ~/bin/oracle
+          wget https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
+          unzip -d ~/bin/oracle instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
+          wget https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-basic-macos.x64-19.8.0.0.0dbru.zip
+          unzip -d ~/bin/oracle instantclient-basic-macos.x64-19.8.0.0.0dbru.zip
+          chmod -R a+x ${HOME}/bin/oracle/instantclient_19_8/
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Sonar Scan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+        run: |
+          export LD_LIBRARY_PATH=${HOME}/bin/oracle/instantclient_19_8:${LD_LIBRARY_PATH}
+          export PATH=${LD_LIBRARY_PATH}:${PATH}
+          export NLS_LANG=AMERICAN_AMERICA.UTF8
+          export SQLPATH=${HOME}/bin/oracle/instantclient_19_8
+          export PATH=$PATH:${HOME}/bin/oracle/instantclient_19_8
+          ORACLE_HOME=$ORACLE_HOME:${HOME}/bin/oracle/instantclient_19_8
+          source ~/.bash_profile
+          mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          ${{ inputs.mavenArgs  }} \
+          -Dsonar.scm.revision=${{ inputs.thisSha }} \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.java.coveragePlugin=jacoco \
+          -Dsonar.branch.name=${{ inputs.thisBranchName }} \
+          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber }} \
+          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName }} \
+          -Dsonar.pullrequest.base=${{ inputs.pullRequestBaseBranchName }} \
+          -Dsonar.pullrequest.provider=GitHub \
+          -Dsonar.pullrequest.github.repository="${{ github.repository }}" \
+          -Dsonar.pullrequest.github.endpoint='https://api.github.com/' \
+          -Dsonar.qualitygate.wait=true \
+          -Dsonar.organization=${{ github.repository_owner }} \
+          -Dsonar.host.url='https://sonarcloud.io' \
+          -Dsonar.scm.provider=git \
+          -Daws.region="us-east-1" \
+          -T 1C

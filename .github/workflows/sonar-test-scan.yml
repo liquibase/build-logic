@@ -104,6 +104,11 @@ jobs:
               }
             ]
 
+      - name: Setup docker (missing on MacOS)
+        run: |
+          brew install docker
+          colima start
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
@@ -119,7 +124,7 @@ jobs:
           wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip
           unzip $HOME/instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip -d $HOME
           chmod -R a+x $HOME/instantclient_19_8/
-          
+
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v3

@@ -123,9 +123,9 @@ jobs:
         run: |
           mkdir -p ~/bin/oracle
           wget https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
-          unzip -d -d ~/bin/oracle instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
+          unzip -d ~/bin/oracle instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
           wget https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-basic-macos.x64-19.8.0.0.0dbru.zip
-          unzip -d -d ~/bin/oracle instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip
+          unzip -d ~/bin/oracle instantclient-basic-macos.x64-19.8.0.0.0dbru.zip
           chmod -R a+x ${HOME}/bin/oracle/instantclient_19_8/
 
       - name: Cache SonarCloud packages
@@ -147,6 +147,8 @@ jobs:
           export SQLPATH=${HOME}/bin/oracle/instantclient_19_8
           export PATH=$PATH:${HOME}/bin/oracle/instantclient_19_8
           ORACLE_HOME=$ORACLE_HOME:${HOME}/bin/oracle/instantclient_19_8
+          source ~/.bash_profile
+          echo $PATH
           mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \

@@ -38,7 +38,7 @@ env:
 jobs:
   sonar-push:
     name: Sonar Scan
-    runs-on: macos-latest-xl
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v3
@@ -60,7 +60,10 @@ jobs:
 
       - name: Install mvnd
         run: |
-          brew install mvndaemon/homebrew-mvnd/mvnd
+          wget https://github.com/apache/maven-mvnd/releases/download/1.0-m7/maven-mvnd-1.0-m7-m39-linux-amd64.zip
+          unzip maven-mvnd-1.0-m7-m39-linux-amd64.zip && mv maven-mvnd-1.0-m7-m39-linux-amd64 mvnd && chmod +x mvnd/bin/mvnd
+          ls -ltr
+          ls -ltr ./mvnd
 
       - name: Set up Maven settings.xml
         uses: whelk-io/maven-settings-xml-action@v20
@@ -104,20 +107,21 @@ jobs:
               }
             ]
 
-      - name: Setup docker and sqlcmd
-        run: |
-          brew install docker sqlcmd
-          colima start
-          # For testcontainers to find the Colima socket
-          # https://github.com/abiosoft/colima/blob/main/docs/FAQ.md#cannot-connect-to-the-docker-daemon-at-unixvarrundockersock-is-the-docker-daemon-running
-          sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
-        
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: liquibot
           password: ${{ secrets.GHCR_PAT }}
+
+      - name: Install sqlplus for Integration tests
+        run: |
+          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/linux/instantclient/215000/instantclient-sqlplus-linux.x64-21.5.0.0.0dbru.zip
+          unzip $HOME/instantclient-sqlplus-linux.x64-21.5.0.0.0dbru.zip -d $HOME
+          sleep 3
+          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/linux/instantclient/215000/instantclient-basiclite-linux.x64-21.5.0.0.0dbru.zip
+          unzip $HOME/instantclient-basiclite-linux.x64-21.5.0.0.0dbru.zip -d $HOME
+          chmod -R a+x $HOME/instantclient_21_5/
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v3
@@ -132,14 +136,15 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
-          mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          export ORACLE_HOME=$ORACLE_HOME:$HOME/instantclient_21_5; export PATH=$PATH:$HOME/instantclient_21_5; export SQLPATH=$HOME/instantclient_21_5; export NLS_LANG=AMERICAN_AMERICA.UTF8; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/instantclient_21_5
+          ./mvnd/bin/mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.login=$SONAR_TOKEN \
           -Dsonar.java.coveragePlugin=jacoco \
-          -Dsonar.branch.name=${{ inputs.thisBranchName }} \
-          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber }} \
-          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName }} \
+          -Dsonar.branch.name=${{ inputs.thisBranchName}} \
+          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber}} \
+          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName}} \
           -Dsonar.pullrequest.base=${{ inputs.pullRequestBaseBranchName }} \
           -Dsonar.pullrequest.provider=GitHub \
           -Dsonar.pullrequest.github.repository="${{ github.repository }}" \

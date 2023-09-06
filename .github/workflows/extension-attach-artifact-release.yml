@@ -43,7 +43,6 @@ jobs:
           chmod +x $PWD/.github/get_draft_release.sh
           chmod +x $PWD/.github/sign_artifact.sh
           chmod +x $PWD/.github/upload_asset.sh
-          chmod +x $PWD/.github/upload_zip.sh
 
       - name: Configure Git
         run: |

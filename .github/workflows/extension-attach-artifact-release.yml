@@ -43,7 +43,6 @@ jobs:
           chmod +x $PWD/.github/get_draft_release.sh
           chmod +x $PWD/.github/sign_artifact.sh
           chmod +x $PWD/.github/upload_asset.sh
-          chmod +x $PWD/.github/upload_zip.sh
 
       - name: Configure Git
         run: |
@@ -102,13 +101,13 @@ jobs:
           ASSET_DIR: ./target
 
       - name: Get upload_zip.sh Script File
-        if: github.event.inputs.zip == 'true'
+        if: inputs.zip == 'true'
         run: |
-          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.3.9/.github/upload_zip.sh
+          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.4.1/.github/upload_zip.sh
           chmod +x $PWD/.github/upload_zip.sh
   
       - name: Attach Zip File to Draft Release
-        if: github.event.inputs.zip == 'true'
+        if: inputs.zip == 'true'
         id: upload-release-zip
         run: ./.github/upload_zip.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
         env:

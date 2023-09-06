@@ -3,6 +3,10 @@ name: Release rollback
 on:
   workflow_call:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   rollback-release:
     name: Release rollback
@@ -10,10 +14,23 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: main
+
       - name: Configure Git
         run: |
           git config user.name "liquibot"
           git config user.email "liquibot@liquibase.org"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'maven'
 
       - name: Download release files
         id: download-release-files
@@ -26,5 +43,6 @@ jobs:
           mvn -B release:rollback \
           -Dusername=liquibot -Dpassword=$GITHUB_TOKEN \
           -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
-          -DdevelopmentVersion =\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} \
-          -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git -Dtag=${{ github.event.inputs.liquibaseVersion }}
+          -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion}-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
+          -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git -Dtag=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
+          -DcheckModificationExcludeList=pom.xml

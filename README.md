@@ -75,6 +75,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `package-deb.yml`                       | Creates and uploads deb packages                                                                      |
 | `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                                 |
 | `sonar-pull-request.yml`                | Code Coverage Scan for PRs.  Requires branch name parameter                                           |
+| `sonar-test-scan.yml`                   | Code Coverage Scan for unit and integration tests                                                     |
 | `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                        |  
 | `snyk-nightly.yml`                      | Nightly Security Scans                                                                                |
 | various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets                 |
@@ -184,3 +185,253 @@ The Maven release plugin must be configured to allow extensions update `pom.xml`
 ### Docker Databases
 #### Requirements
 - Docker Compose file must be located in `src/test/resources/docker-compose.yml`
+
+## Liquibase test (unit & integration tests) + Sonar
+
+The `sonar-test-scan.yml` reusable workflow has been designed to execute unit and integration tests and deliver the Jacoco agregated report to Sonar. 
+Jacoco requires all generated reports to fulfill its merge goal. Running integration tests on separate runners complicates the aggregation of reports. This is why an optimized workflow has been created to launch all tests and generate a comprehensive aggregated report for Sonar. It utilizes [mvnd](https://github.com/apache/maven-mvnd) instead of `mvn`` to speed up the build and test process and it also creates one thread per core.
+
+`sonar-test-scan.yml` can be run in parallel to the rest of the workflow steps since it builds the application by itself. With this, we managed not to interfere with the total final build time.
+
+Here you can see an example for `liquibase-pro` executing all unit&integration for `-Dliquibase.sdk.testSystem.test=hub,h2,hsqldb,mssql,oracle`:
+
+![](./doc/img/sonar-test.png)
+
+### Configuration
+
+The project has to be configured with the following Maven plugins:
+
+- [Maven Surefire Plugin](https://maven.apache.org/surefire/maven-surefire-plugin): Runs unit tests
+- [Maven Failsafe Plugin](https://maven.apache.org/surefire/maven-failsafe-plugin/): Runs integration tests
+- [Jacoco Plugin](https://www.eclemma.org/jacoco/trunk/doc/maven.html): Generates test reports and it also agreggates and merges all of them into a single report
+
+For Maven multimodule projects it is recommended to follow this pattern from SonarSource where there is a specific module to leave the aggregated report:
+
+- [Multi-module Apache Maven example](https://github.com/SonarSource/sonar-scanning-examples/blob/master/sonarqube-scanner-maven/maven-multimodule/README.md)
+
+In the following example we demonstrate how `liquibase-pro` works:
+
+![](./doc/img/coverage-module.png)
+
+#### Parent pom.xml
+
+All modules need to specify where the final report will be generated setting the `sonar.coverage.jacoco.xmlReportPaths` property. In the parent pom there are 3 profiles to control which tests are executed and the required plugins are configured.
+
+```xml
+    <properties>
+        <maven-failsafe-plugin.version>3.0.0-M7</maven-failsafe-plugin.version>
+        <jacoco-maven-plugin.version>0.8.5</jacoco-maven-plugin.version>
+        <maven-surefire-plugin.version>3.0.0-M7</maven-surefire-plugin.version>
+        <code.coverage.project.folder>${basedir}/../</code.coverage.project.folder>
+        <code.coverage.overall.data.folder>${basedir}/target/</code.coverage.overall.data.folder>      
+        <skip.integration.tests>true</skip.integration.tests>
+        <skip.unit.tests>true</skip.unit.tests>
+        <itCoverageAgent></itCoverageAgent>
+        <sonar.coverage.jacoco.xmlReportPaths>liquibase-pro-coverage/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <skipTests>${skip.unit.tests}</skipTests>
+                    <excludes>
+                        <exclude>liquibase-pro-integration-tests/**/*IntegrationTest.java</exclude>
+                    </excludes>
+                    <forkCount>1</forkCount>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${maven-failsafe-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>integration-tests</id>
+                        <goals>
+                            <goal>integration-test</goal>
+                        <goal>verify</goal>
+                        </goals>
+                        <configuration>
+                            <skipTests>${skip.integration.tests}</skipTests>
+                            <includes>
+                                <include>**/*IntegrationTest.java</include>
+                            </includes>
+                            <reuseForks>true</reuseForks>
+                            <argLine>${itCoverageAgent}</argLine>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-unit-tests</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <!-- prepare agent before integration tests -->
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <phase>pre-integration-test</phase>
+                        <configuration>
+                            <propertyName>itCoverageAgent</propertyName>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>3.9.1.2184</version>
+                <executions>
+                    <execution>
+                        <id>sonar</id>
+                        <goals>
+                            <goal>sonar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+```
+
+```xml
+    <profile>
+        <id>unit</id>
+        <properties>
+            <skip.integration.tests>true</skip.integration.tests>
+            <skip.unit.tests>false</skip.unit.tests>
+        </properties>
+    </profile>
+    <profile>
+        <id>integration-test</id>
+        <properties>
+            <skip.integration.tests>false</skip.integration.tests>
+            <skip.unit.tests>true</skip.unit.tests>
+        </properties>
+    </profile>
+    <profile>
+        <id>testAll</id>
+        <properties>
+            <skip.integration.tests>false</skip.integration.tests>
+            <skip.unit.tests>false</skip.unit.tests>
+        </properties>
+    </profile>
+```
+
+#### modules with integration tests (pom.xml)
+
+`maven-surefire-plugin` had to be added here because `liquibase-pro` integration tests are not following the `*ITest.java` or `*IntegrationTest.java` naming for integration tests.
+
+```xml
+    <properties>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/../liquibase-pro-coverage/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <skipTests>${skip.integration.tests}</skipTests>
+                    <forkCount>1</forkCount>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+```
+
+#### Modules without integration tests (pom.xml)
+
+```xml
+    <properties>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/../liquibase-pro-coverage/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+    </properties>
+```
+
+#### Coverage module (pom.xml)
+
+Here the modules we want to generate and aggregate test reports must be specified as `dependencies`.
+
+```xml
+    <properties>
+        <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <code.coverage.project.folder>${basedir}/../</code.coverage.project.folder>
+        <code.coverage.overall.data.folder>${basedir}/target/</code.coverage.overall.data.folder>
+        <sonar.skip>true</sonar.skip>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>liquibase-commercial</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+            <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>liquibase-commercial-integration-tests</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <configuration>
+            <argLine>${argLine} -Xms256m -Xmx2048m</argLine>
+            <forkCount>1</forkCount>
+            <runOrder>random</runOrder>
+          </configuration>
+        </plugin>
+
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <executions>
+            <execution>
+              <id>report-aggregate</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>report-aggregate</goal>
+              </goals>
+            </execution>
+
+            <execution>
+              <id>merge-results</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>merge</goal>
+              </goals>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <directory>${code.coverage.project.folder}</directory>
+                    <includes>
+                      <include>**/target/jacoco.exec</include>
+                    </includes>
+                  </fileSet>
+                </fileSets>
+                <destFile>${code.coverage.overall.data.folder}/aggregate.exec</destFile>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </build>
+```

@@ -15,6 +15,18 @@ jobs:
           git config user.name "liquibot"
           git config user.email "liquibot@liquibase.org"
 
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: main
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'maven'
+
       - name: Download release files
         id: download-release-files
         uses: actions/download-artifact@v3
@@ -26,5 +38,5 @@ jobs:
           mvn -B release:rollback \
           -Dusername=liquibot -Dpassword=$GITHUB_TOKEN \
           -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
-          -DdevelopmentVersion =\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} \
-          -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git -Dtag=${{ github.event.inputs.liquibaseVersion }}
+          -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0 \
+          -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git -Dtag=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0

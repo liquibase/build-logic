@@ -54,7 +54,7 @@ jobs:
           cache: 'maven'
 
       - name: Set latest liquibase version
-        if: ${{ inputs.nigthly }} 
+        if: ${{ inputs.nightly }} 
         run: mvn versions:set-property -Dproperty=liquibase.version -DnewVersion=master-SNAPSHOT
 
       - name: Build and Package

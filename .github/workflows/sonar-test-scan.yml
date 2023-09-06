@@ -38,7 +38,7 @@ env:
 jobs:
   sonar-push:
     name: Sonar Scan
-    runs-on: ubuntu-22.04
+    runs-on: macos-latest-xl
 
     steps:
       - uses: actions/checkout@v3
@@ -60,10 +60,7 @@ jobs:
 
       - name: Install mvnd
         run: |
-          wget https://github.com/apache/maven-mvnd/releases/download/1.0-m7/maven-mvnd-1.0-m7-m39-linux-amd64.zip
-          unzip maven-mvnd-1.0-m7-m39-linux-amd64.zip && mv maven-mvnd-1.0-m7-m39-linux-amd64 mvnd && chmod +x mvnd/bin/mvnd
-          ls -ltr
-          ls -ltr ./mvnd
+          brew install mvndaemon/homebrew-mvnd/mvnd
 
       - name: Set up Maven settings.xml
         uses: whelk-io/maven-settings-xml-action@v20
@@ -116,12 +113,12 @@ jobs:
 
       - name: Install sqlplus for Integration tests
         run: |
-          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/linux/instantclient/215000/instantclient-sqlplus-linux.x64-21.5.0.0.0dbru.zip
-          unzip $HOME/instantclient-sqlplus-linux.x64-21.5.0.0.0dbru.zip -d $HOME
+          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
+          unzip $HOME/instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip -d $HOME
           sleep 3
-          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/linux/instantclient/215000/instantclient-basiclite-linux.x64-21.5.0.0.0dbru.zip
-          unzip $HOME/instantclient-basiclite-linux.x64-21.5.0.0.0dbru.zip -d $HOME
-          chmod -R a+x $HOME/instantclient_21_5/
+          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip
+          unzip $HOME/instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip -d $HOME
+          chmod -R a+x $HOME/instantclient_19_8/
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v3

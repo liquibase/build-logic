@@ -121,13 +121,12 @@ jobs:
 
       - name: Install sqlplus for Integration tests
         run: |
-          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
-          unzip $HOME/instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip -d $HOME
-          sleep 3
-          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip
-          unzip $HOME/instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip -d $HOME
-          chmod -R a+x $HOME/instantclient_19_8/
-
+          mkdir -p ~/bin/oracle
+          wget https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
+          unzip -d -d ~/bin/oracle instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
+          wget https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-basic-macos.x64-19.8.0.0.0dbru.zip
+          unzip -d -d ~/bin/oracle instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip
+          chmod -R a+x ${HOME}/bin/oracle/instantclient_19_8/
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v3
@@ -142,7 +141,12 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
-          export ORACLE_HOME=$ORACLE_HOME:$HOME/instantclient_19_8; export PATH=$PATH:$HOME/instantclient_19_8; export SQLPATH=$HOME/instantclient_19_8; export NLS_LANG=AMERICAN_AMERICA.UTF8; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/instantclient_19_8
+          export LD_LIBRARY_PATH=${HOME}/bin/oracle/instantclient_19_8:${LD_LIBRARY_PATH}
+          export PATH=${LD_LIBRARY_PATH}:${PATH}
+          export NLS_LANG=AMERICAN_AMERICA.UTF8
+          export SQLPATH=${HOME}/bin/oracle/instantclient_19_8
+          export PATH=$PATH:${HOME}/bin/oracle/instantclient_19_8
+          ORACLE_HOME=$ORACLE_HOME:${HOME}/bin/oracle/instantclient_19_8
           mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \

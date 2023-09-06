@@ -119,6 +119,7 @@ jobs:
           wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip
           unzip $HOME/instantclient-basiclite-macos.x64-19.8.0.0.0dbru.zip -d $HOME
           chmod -R a+x $HOME/instantclient_19_8/
+          
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v3
@@ -133,8 +134,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
-          export ORACLE_HOME=$ORACLE_HOME:$HOME/instantclient_21_5; export PATH=$PATH:$HOME/instantclient_21_5; export SQLPATH=$HOME/instantclient_21_5; export NLS_LANG=AMERICAN_AMERICA.UTF8; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/instantclient_21_5
-          ./mvnd/bin/mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' \
+          export ORACLE_HOME=$ORACLE_HOME:$HOME/instantclient_19_8; export PATH=$PATH:$HOME/instantclient_19_8; export SQLPATH=$HOME/instantclient_19_8; export NLS_LANG=AMERICAN_AMERICA.UTF8; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/instantclient_19_8
+          mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.login=$SONAR_TOKEN \

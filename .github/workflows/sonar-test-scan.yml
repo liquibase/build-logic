@@ -173,6 +173,9 @@ jobs:
           mv integration-tests/mysql/liquibase-pro-coverage/target/aggregate.exec ./reports/jacoco-mysql-aggregate.exec
           mv integration-tests/oracle/liquibase-pro-coverage/target/aggregate.exec ./reports/jacoco-oracle-aggregate.exec
           mv integration-tests/postgresql/liquibase-pro-coverage/target/aggregate.exec ./reports/jacoco-postgresql-aggregate.exec
+
+          ls -ltr ./reports
+          
           cd ${{ inputs.coverageModuleName }}
           mvn jacoco:report-aggregate@report-aggregate 
           mvn jacoco:merge@merge-results

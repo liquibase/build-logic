@@ -157,7 +157,6 @@ jobs:
           -T 1C
 
       - name: Save Test Results
-        if: ${{ inputs.archive_test_results == 'true' }}
         uses: actions/upload-artifact@v3
         with:
           name: liquibase-integration-test-results-${{ matrix.testSystem }}

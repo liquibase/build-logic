@@ -113,39 +113,34 @@ jobs:
             ]
 
       - name: Download unit tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.unitTestReportArtifactName }}
-          if_no_artifact_found: warn
           path: unit-tests
 
       - name: Download mssql integration tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-mssql
-          if_no_artifact_found: warn
-          path: integration-tests/mssql
+            name: ${{ inputs.integrationTestReportArtifactName }}-mssql
+            path: integration-tests/mssql
 
       - name: Download mysql integration tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-mysql
-          if_no_artifact_found: warn
-          path: integration-tests/mysql
+            name: ${{ inputs.integrationTestReportArtifactName }}-mysql
+            path: integration-tests/mysql
 
       - name: Download oracle integration tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-oracle
-          if_no_artifact_found: warn
           path: integration-tests/oracle
 
       - name: Download postgresql integration tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-postgresql
-          if_no_artifact_found: warn
-          path: integration-tests/postgresql
+            name: ${{ inputs.integrationTestReportArtifactName }}-postgresql
+            path: integration-tests/postgresql
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v3
@@ -175,7 +170,7 @@ jobs:
           mv integration-tests/postgresql/liquibase-pro-coverage/target/aggregate.exec ./reports/jacoco-postgresql-aggregate.exec
 
           ls -ltr ./reports
-          
+
           cd ${{ inputs.coverageModuleName }}
           mvn jacoco:report-aggregate@report-aggregate 
           mvn jacoco:merge@merge-results

@@ -31,6 +31,14 @@ on:
         description: 'The maven arguments to be passed to the mvn command'
         type: string
         required: false
+      unitTestReportArtifactName:
+        description: 'The name of the unit test report artifact'
+        type: string
+        required: false
+      integrationTestReportArtifactName:
+        description: 'The name of the integration test report artifact'
+        type: string
+        required: false
 
 env:
   MAVEN_VERSION: '3.8.7'
@@ -57,13 +65,6 @@ jobs:
         uses: stCarolas/setup-maven@v4.5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
-
-      - name: Install mvnd
-        run: |
-          wget https://github.com/apache/maven-mvnd/releases/download/1.0-m7/maven-mvnd-1.0-m7-m39-linux-amd64.zip
-          unzip maven-mvnd-1.0-m7-m39-linux-amd64.zip && mv maven-mvnd-1.0-m7-m39-linux-amd64 mvnd && chmod +x mvnd/bin/mvnd
-          ls -ltr
-          ls -ltr ./mvnd
 
       - name: Set up Maven settings.xml
         uses: whelk-io/maven-settings-xml-action@v20
@@ -107,21 +108,30 @@ jobs:
               }
             ]
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+      - name: Download unit tests report
+        uses: actions/download-artifact@v3
         with:
-          registry: ghcr.io
-          username: liquibot
-          password: ${{ secrets.GHCR_PAT }}
+          name: ${{ inputs.unitTestReportArtifactName }}
 
-      - name: Install sqlplus for Integration tests
-        run: |
-          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/linux/instantclient/215000/instantclient-sqlplus-linux.x64-21.5.0.0.0dbru.zip
-          unzip $HOME/instantclient-sqlplus-linux.x64-21.5.0.0.0dbru.zip -d $HOME
-          sleep 3
-          wget -nv --directory-prefix=$HOME -nc https://download.oracle.com/otn_software/linux/instantclient/215000/instantclient-basiclite-linux.x64-21.5.0.0.0dbru.zip
-          unzip $HOME/instantclient-basiclite-linux.x64-21.5.0.0.0dbru.zip -d $HOME
-          chmod -R a+x $HOME/instantclient_21_5/
+      - name: Download mssql integration tests report
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-test-results-mssql
+
+      - name: Download mysql integration tests report
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-test-results-mysql
+
+      - name: Download oracle integration tests report
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-test-results-oracle
+
+      - name: Download postgresql integration tests report
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-test-results-postgresql
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v3
@@ -130,14 +140,18 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      - name: Merge integration and unit tests reports
+        run: |
+          cd liquibase-pro-coverage
+          mvn -B jacoco:merge
+
       - name: Sonar Scan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
-          export ORACLE_HOME=$ORACLE_HOME:$HOME/instantclient_21_5; export PATH=$PATH:$HOME/instantclient_21_5; export SQLPATH=$HOME/instantclient_21_5; export NLS_LANG=AMERICAN_AMERICA.UTF8; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/instantclient_21_5
-          ./mvnd/bin/mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          mvn -B sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.login=$SONAR_TOKEN \

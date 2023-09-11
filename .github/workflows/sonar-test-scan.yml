@@ -39,6 +39,10 @@ on:
         description: 'The name of the integration test report artifact'
         type: string
         required: false
+      coverageModuleName:
+        description: 'The name of the coverage module'
+        type: string
+        required: false
 
 env:
   MAVEN_VERSION: '3.8.7'
@@ -142,7 +146,7 @@ jobs:
 
       - name: Merge integration and unit tests reports
         run: |
-          cd liquibase-pro-coverage
+          cd ${{ inputs.coverageModuleName }}
           mvn -B jacoco:merge
 
       - name: Sonar Scan

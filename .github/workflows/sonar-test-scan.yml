@@ -147,7 +147,8 @@ jobs:
       - name: Merge integration and unit tests reports
         run: |
           cd ${{ inputs.coverageModuleName }}
-          mvn -B jacoco:merge
+          mvn mvn jacoco:report-aggregate@report-aggregate 
+          mvn jacoco:merge@merge-results
 
       - name: Sonar Scan
         env:

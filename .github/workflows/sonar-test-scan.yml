@@ -159,7 +159,7 @@ jobs:
       - name: Save Test Results
         uses: actions/upload-artifact@v3
         with:
-          name: liquibase-integration-test-results-${{ matrix.testSystem }}
+          name: liquibase-integration-test-results
           path: |
             ./**/target/surefire-reports
             ./**/target/site

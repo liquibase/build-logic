@@ -66,7 +66,7 @@ jobs:
           ls -ltr ./mvnd
 
       - name: Set up Maven settings.xml
-        uses: whelk-io/maven-settings-xml-action@v20
+        uses: whelk-io/maven-settings-xml-action@v21
         with:
           repositories: |
             [

@@ -113,29 +113,34 @@ jobs:
             ]
 
       - name: Download unit tests report
-        uses: actions/download-artifact@v3
+        uses: dawidd6/action-download-artifact@v2.27.0
         with:
           name: ${{ inputs.unitTestReportArtifactName }}
+          if_no_artifact_found: warn
 
       - name: Download mssql integration tests report
-        uses: actions/download-artifact@v3
+        uses: dawidd6/action-download-artifact@v2.27.0
         with:
-          name: liquibase-integration-test-results-mssql
+          name: ${{ inputs.integrationTestReportArtifactName }}-mssql
+          if_no_artifact_found: warn
 
       - name: Download mysql integration tests report
-        uses: actions/download-artifact@v3
+        uses: dawidd6/action-download-artifact@v2.27.0
         with:
-          name: liquibase-integration-test-results-mysql
+          name: ${{ inputs.integrationTestReportArtifactName }}-mysql
+          if_no_artifact_found: warn
 
       - name: Download oracle integration tests report
-        uses: actions/download-artifact@v3
+        uses: dawidd6/action-download-artifact@v2.27.0
         with:
-          name: liquibase-integration-test-results-oracle
+          name: ${{ inputs.integrationTestReportArtifactName }}-oracle
+          if_no_artifact_found: warn
 
       - name: Download postgresql integration tests report
-        uses: actions/download-artifact@v3
+        uses: dawidd6/action-download-artifact@v2.27.0
         with:
-          name: liquibase-integration-test-results-postgresql
+          name: ${{ inputs.integrationTestReportArtifactName }}-postgresql
+          if_no_artifact_found: warn
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v3

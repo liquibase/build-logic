@@ -156,7 +156,7 @@ jobs:
         run: |
           mkdir ./${{ inputs.coverageModuleName }}/target
 
-          mv unit-tests/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-unit.exec
+          mv unit-tests/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-unit.exec
 
           mv integration-tests/mssql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
           mv integration-tests/mysql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mysql-aggregate.exec
@@ -164,8 +164,13 @@ jobs:
           mv integration-tests/postgresql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
 
           cd ${{ inputs.coverageModuleName }}
-          mvn -N jacoco:merge@merge-results
-          mvn jacoco:report-aggregate@report-aggregate
+          mvn jacoco:merge@cli-merge-results
+          mvn -B package -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
+          wget -q https://search.maven.org/remotecontent?filepath=org/jacoco/jacoco/0.8.10/jacoco-0.8.10.zip
+          unzip ./jacoco-0.8.10.zip
+          mv ./jacoco-0.8.10/lib/jacococli.jar ./${{ inputs.coverageModuleName }}/target/jacococli.jar
+          chmod +x ./${{ inputs.coverageModuleName }}/target/jacococli.jar
+          java -jar .target/jacococli.jar report aggregate.exec --classfiles=../../pro/target/ 
 
       - name: Save Jacoco Mixed Results
         uses: actions/upload-artifact@v3

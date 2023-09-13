@@ -156,12 +156,11 @@ jobs:
         run: |
           mkdir ./${{ inputs.coverageModuleName }}/target
 
-          mv unit-tests/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-unit.exec
-
-          mv integration-tests/mssql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
-          mv integration-tests/mysql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mysql-aggregate.exec
-          mv integration-tests/oracle/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-oracle-aggregate.exec
-          mv integration-tests/postgresql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
+          mv unit-tests/pro/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-unit.exec
+          mv integration-tests/mssql/liquibase-pro-integration-tests/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
+          mv integration-tests/mysql/liquibase-pro-integration-tests/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mysql-aggregate.exec
+          mv integration-tests/oracle/liquibase-pro-integration-tests/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-oracle-aggregate.exec
+          mv integration-tests/postgresql/liquibase-pro-integration-tests/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
 
           mvn -B package -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
           cd ${{ inputs.coverageModuleName }}

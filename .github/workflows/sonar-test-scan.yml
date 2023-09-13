@@ -169,7 +169,7 @@ jobs:
           chmod +x ./${{ inputs.coverageModuleName }}/target/jacococli.jar
           cd ${{ inputs.coverageModuleName }}
           mvn jacoco:merge@cli-merge-results
-          java -jar .target/jacococli.jar report aggregate.exec --classfiles=../../pro/target/ 
+          java -jar ./target/jacococli.jar report aggregate.exec --classfiles=../../pro/target/ 
 
       - name: Save Jacoco Mixed Results
         uses: actions/upload-artifact@v3

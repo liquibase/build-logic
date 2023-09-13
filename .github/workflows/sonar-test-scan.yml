@@ -165,9 +165,9 @@ jobs:
           mvn -B package -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
           cd ${{ inputs.coverageModuleName }}
           mvn jacoco:merge@cli-merge-results
-          wget -q https://search.maven.org/remotecontent?filepath=org/jacoco/jacoco/0.8.10/jacoco-0.8.10.zip
+          wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
           unzip ./jacoco-0.8.10.zip
-          mv ./jacoco-0.8.10/lib/jacococli.jar ./${{ inputs.coverageModuleName }}/target/jacococli.jar
+          mv ./lib/jacococli.jar ./${{ inputs.coverageModuleName }}/target/jacococli.jar
           chmod +x ./${{ inputs.coverageModuleName }}/target/jacococli.jar
           java -jar .target/jacococli.jar report aggregate.exec --classfiles=../../pro/target/ 
 

@@ -158,10 +158,10 @@ jobs:
 
           mv unit-tests/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-unit.exec
 
-          mv integration-tests/mssql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-mssql-aggregate.exec
-          mv integration-tests/mysql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-mysql-aggregate.exec
-          mv integration-tests/oracle/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-oracle-aggregate.exec
-          mv integration-tests/postgresql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-postgresql-aggregate.exec
+          mv integration-tests/mssql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
+          mv integration-tests/mysql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mysql-aggregate.exec
+          mv integration-tests/oracle/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-oracle-aggregate.exec
+          mv integration-tests/postgresql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
 
           cd ${{ inputs.coverageModuleName }}
           mvn -N jacoco:merge@merge-results

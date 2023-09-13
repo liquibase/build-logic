@@ -43,6 +43,14 @@ on:
         description: 'The name of the coverage module'
         type: string
         required: false
+      testedClassesModuleName:
+        description: 'The name of the tested classes module'
+        type: string
+        required: false
+      integrationTestsModuleName:
+        description: 'The name of the integration tests module'
+        type: string
+        required: false
 
 env:
   MAVEN_VERSION: '3.8.7'
@@ -156,13 +164,13 @@ jobs:
         run: |
           mkdir ./${{ inputs.coverageModuleName }}/target
 
-          mv unit-tests/pro/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-unit.exec
-          mv integration-tests/mssql/liquibase-pro-integration-tests/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
-          mv integration-tests/mysql/liquibase-pro-integration-tests/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mysql-aggregate.exec
-          mv integration-tests/oracle/liquibase-pro-integration-tests/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-oracle-aggregate.exec
-          mv integration-tests/postgresql/liquibase-pro-integration-tests/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
+          mv unit-tests/${{ inputs.testedClassesModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-unit.exec
+          mv integration-tests/mssql/${{ inputs.integrationTestsModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
+          mv integration-tests/mysql/${{ inputs.integrationTestsModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mysql-aggregate.exec
+          mv integration-tests/oracle/${{ inputs.integrationTestsModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-oracle-aggregate.exec
+          mv integration-tests/postgresql/${{ inputs.integrationTestsModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
 
-          mvn -B package -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
+          mvn -B verify -P 'unit,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
           unzip ./jacoco-0.8.10.zip
           mv ./lib/jacococli.jar ./${{ inputs.coverageModuleName }}/target/jacococli.jar
@@ -170,14 +178,15 @@ jobs:
           cd ${{ inputs.coverageModuleName }}
           mvn jacoco:merge@cli-merge-results
           cd ./target
-          java -jar jacococli.jar report aggregate.exec --classfiles=../../pro/target/classdumps
+          java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
 
       - name: Save Jacoco Mixed Results
         uses: actions/upload-artifact@v3
         with:
-          name: liquibase-jacoco-mixed-reports
+          name: liquibase-jacoco-mixed-report
           path: |
-            ./**/*.exec
+            ./${{ inputs.coverageModuleName }}/target/site
+
 
       - name: Sonar Scan
         env:

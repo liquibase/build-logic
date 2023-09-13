@@ -154,29 +154,27 @@ jobs:
 
       - name: Merge integration and unit tests reports
         run: |
-          ls -ltr
-          ls -ltr unit-tests
-          ls -ltr integration-tests
-          ls -ltr integration-tests/mssql
-          mkdir ./reports
+          mkdir ./${{ inputs.coverageModuleName }}/target/reports
 
-          mv unit-tests/liquibase-pro-coverage/target/jacoco.exec ./reports/jacoco-unit.exec
+          mv unit-tests/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-unit.exec
 
-          mv integration-tests/mssql/liquibase-pro-integration-tests/target/jacoco.exec ./reports/jacoco-mssql.exec
-          mv integration-tests/mysql/liquibase-pro-integration-tests/target/jacoco.exec ./reports/jacoco-mysql.exec
-          mv integration-tests/oracle/liquibase-pro-integration-tests/target/jacoco.exec ./reports/jacoco-oracle.exec
-          mv integration-tests/postgresql/liquibase-pro-integration-tests/target/jacoco.exec ./reports/jacoco-postgresql.exec
-
-          mv integration-tests/mssql/liquibase-pro-coverage/target/aggregate.exec./reports/jacoco-mssql-aggregate.exec
-          mv integration-tests/mysql/liquibase-pro-coverage/target/aggregate.exec ./reports/jacoco-mysql-aggregate.exec
-          mv integration-tests/oracle/liquibase-pro-coverage/target/aggregate.exec ./reports/jacoco-oracle-aggregate.exec
-          mv integration-tests/postgresql/liquibase-pro-coverage/target/aggregate.exec ./reports/jacoco-postgresql-aggregate.exec
+          mv integration-tests/mssql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-mssql-aggregate.exec
+          mv integration-tests/mysql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-mysql-aggregate.exec
+          mv integration-tests/oracle/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-oracle-aggregate.exec
+          mv integration-tests/postgresql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-postgresql-aggregate.exec
 
           ls -ltr ./reports
 
           cd ${{ inputs.coverageModuleName }}
-          mvn jacoco:report-aggregate@report-aggregate 
-          mvn jacoco:merge@merge-results
+          mvn -N jacoco:merge@merge-results
+          mvn jacoco:report-aggregate@report-aggregate
+
+      - name: Save Jacoco Mixed Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: liquibase-jacoco-mixed-reports
+          path: |
+            ./**/*.exec
 
       - name: Sonar Scan
         env:

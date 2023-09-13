@@ -170,7 +170,7 @@ jobs:
           cd ${{ inputs.coverageModuleName }}
           mvn jacoco:merge@cli-merge-results
           cd ./target
-          java -jar jacococli.jar report aggregate.exec --classfiles=../../pro/target/classes/
+          java -jar jacococli.jar report aggregate.exec --classfiles=../../pro/target/classdumps
 
       - name: Save Jacoco Mixed Results
         uses: actions/upload-artifact@v3

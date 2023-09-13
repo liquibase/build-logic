@@ -163,9 +163,9 @@ jobs:
           mv integration-tests/oracle/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-oracle-aggregate.exec
           mv integration-tests/postgresql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
 
+          mvn -B package -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
           cd ${{ inputs.coverageModuleName }}
           mvn jacoco:merge@cli-merge-results
-          mvn -B package -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
           wget -q https://search.maven.org/remotecontent?filepath=org/jacoco/jacoco/0.8.10/jacoco-0.8.10.zip
           unzip ./jacoco-0.8.10.zip
           mv ./jacoco-0.8.10/lib/jacococli.jar ./${{ inputs.coverageModuleName }}/target/jacococli.jar

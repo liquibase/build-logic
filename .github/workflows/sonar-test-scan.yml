@@ -163,12 +163,12 @@ jobs:
           mv integration-tests/postgresql/liquibase-pro-integration-tests/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
 
           mvn -B package -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
-          cd ${{ inputs.coverageModuleName }}
-          mvn jacoco:merge@cli-merge-results
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
           unzip ./jacoco-0.8.10.zip
           mv ./lib/jacococli.jar ./${{ inputs.coverageModuleName }}/target/jacococli.jar
           chmod +x ./${{ inputs.coverageModuleName }}/target/jacococli.jar
+          cd ${{ inputs.coverageModuleName }}
+          mvn jacoco:merge@cli-merge-results
           java -jar .target/jacococli.jar report aggregate.exec --classfiles=../../pro/target/ 
 
       - name: Save Jacoco Mixed Results

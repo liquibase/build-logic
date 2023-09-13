@@ -163,8 +163,6 @@ jobs:
           mv integration-tests/oracle/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-oracle-aggregate.exec
           mv integration-tests/postgresql/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-postgresql-aggregate.exec
 
-          ls -ltr ./reports
-
           cd ${{ inputs.coverageModuleName }}
           mvn -N jacoco:merge@merge-results
           mvn jacoco:report-aggregate@report-aggregate

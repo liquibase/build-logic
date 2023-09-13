@@ -154,7 +154,7 @@ jobs:
 
       - name: Merge integration and unit tests reports
         run: |
-          mkdir ./${{ inputs.coverageModuleName }}/target/reports
+          mkdir ./${{ inputs.coverageModuleName }}/target
 
           mv unit-tests/${{ inputs.coverageModuleName }}/target/aggregate.exec ./${{ inputs.coverageModuleName }}/target/reports/jacoco-unit.exec
 

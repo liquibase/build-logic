@@ -160,7 +160,7 @@ jobs:
           ls -ltr integration-tests/mssql
           mkdir ./reports
 
-          mv unit-tests/liquibase-pro-coverage/target/aggregate.exec ./reports/jacoco-unit.exec
+          mv unit-tests/liquibase-pro-coverage/target/jacoco.exec ./reports/jacoco-unit.exec
 
           mv integration-tests/mssql/liquibase-pro-integration-tests/target/jacoco.exec ./reports/jacoco-mssql.exec
           mv integration-tests/mysql/liquibase-pro-integration-tests/target/jacoco.exec ./reports/jacoco-mysql.exec

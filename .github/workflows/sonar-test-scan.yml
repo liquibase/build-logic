@@ -133,6 +133,8 @@ jobs:
         with:
           name: ${{ inputs.unitTestReportArtifactName }}
           path: unit-tests
+          workflow: build.yml
+          run_id: ${{ github.event.workflow_run.id }}
           if_no_artifact_found: warn
 
       - name: Download mssql integration tests report
@@ -140,6 +142,8 @@ jobs:
         with:
             name: ${{ inputs.integrationTestReportArtifactName }}-mssql
             path: integration-tests/mssql
+            workflow: build.yml
+            run_id: ${{ github.event.workflow_run.id }}
             if_no_artifact_found: warn
 
       - name: Download mysql integration tests report
@@ -147,6 +151,8 @@ jobs:
         with:
             name: ${{ inputs.integrationTestReportArtifactName }}-mysql
             path: integration-tests/mysql
+            workflow: build.yml
+            run_id: ${{ github.event.workflow_run.id }}
             if_no_artifact_found: warn
 
       - name: Download oracle integration tests report
@@ -154,6 +160,8 @@ jobs:
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-oracle
           path: integration-tests/oracle
+          workflow: build.yml
+          run_id: ${{ github.event.workflow_run.id }}
           if_no_artifact_found: warn
 
       - name: Download postgresql integration tests report
@@ -161,6 +169,8 @@ jobs:
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-postgresql
           path: integration-tests/postgresql
+          workflow: build.yml
+          run_id: ${{ github.event.workflow_run.id }}
           if_no_artifact_found: warn
 
       - name: Cache SonarCloud packages

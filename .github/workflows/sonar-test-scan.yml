@@ -163,7 +163,7 @@ jobs:
         run: |
           mkdir ./${{ inputs.coverageModuleName }}/target
 
-          mv unit-tests/${{ inputs.testedClassesModuleName }}/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-unit.exec
+          mv unit-tests/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-unit.exec
           if [ -d "integration-tests/mssql" ]; then
             mv integration-tests/mssql/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
           fi

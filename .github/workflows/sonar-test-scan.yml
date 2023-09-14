@@ -129,51 +129,41 @@ jobs:
             ]
 
       - name: Download unit tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.unitTestReportArtifactName }}
           path: unit-tests
-          workflow: build.yml
-          run_id: ${{ github.event.workflow_run.id }}
-          if_no_artifact_found: warn
 
       - name: Download mssql integration tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        if: always()
+        uses: actions/download-artifact@v3
         with:
             name: ${{ inputs.integrationTestReportArtifactName }}-mssql
             path: integration-tests/mssql
-            workflow: build.yml
-            run_id: ${{ github.event.workflow_run.id }}
-            if_no_artifact_found: warn
 
       - name: Download mysql integration tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        if: always()
+        uses: actions/download-artifact@v3
         with:
             name: ${{ inputs.integrationTestReportArtifactName }}-mysql
             path: integration-tests/mysql
-            workflow: build.yml
-            run_id: ${{ github.event.workflow_run.id }}
-            if_no_artifact_found: warn
 
       - name: Download oracle integration tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        if: always()
+        uses: actions/download-artifact@v3        
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-oracle
           path: integration-tests/oracle
-          workflow: build.yml
-          run_id: ${{ github.event.workflow_run.id }}
-          if_no_artifact_found: warn
 
       - name: Download postgresql integration tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        if: always()
+        uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-postgresql
           path: integration-tests/postgresql
-          workflow: build.yml
-          run_id: ${{ github.event.workflow_run.id }}
-          if_no_artifact_found: warn
 
       - name: Cache SonarCloud packages
+        if: always()
         uses: actions/cache@v3
         with:
           path: ~/.sonar/cache
@@ -181,6 +171,7 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
 
       - name: Merge integration and unit tests reports
+        if: always()
         run: |
           mkdir ./${{ inputs.coverageModuleName }}/target
 
@@ -209,6 +200,7 @@ jobs:
           java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
 
       - name: Save Jacoco Mixed Results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: liquibase-jacoco-mixed-report
@@ -216,6 +208,7 @@ jobs:
             ./${{ inputs.coverageModuleName }}/target/site
 
       - name: Sonar Scan
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

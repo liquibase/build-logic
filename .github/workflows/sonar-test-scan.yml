@@ -197,7 +197,7 @@ jobs:
           mvn -B package sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
-          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.token=$SONAR_TOKEN \
           -Dsonar.java.coveragePlugin=jacoco \
           -Dsonar.branch.name=${{ inputs.thisBranchName}} \
           -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber}} \

@@ -47,10 +47,6 @@ on:
         description: 'The name of the tested classes module'
         type: string
         required: false
-      integrationTestsModuleName:
-        description: 'The name of the integration tests module'
-        type: string
-        required: false
 
 env:
   MAVEN_VERSION: '3.8.7'
@@ -169,16 +165,16 @@ jobs:
 
           mv unit-tests/${{ inputs.testedClassesModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-unit.exec
           if [ -d "integration-tests/mssql" ]; then
-            mv integration-tests/mssql/${{ inputs.integrationTestsModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
+            mv integration-tests/mssql/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
           fi
           if [ -d "integration-tests/mysql" ]; then
-            mv integration-tests/mysql/${{ inputs.integrationTestsModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mysql-aggregate.exec
+            mv integration-tests/mysql/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mysql-aggregate.exec
           fi
           if [ -d "integration-tests/oracle" ]; then
-            mv integration-tests/oracle/${{ inputs.integrationTestsModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-oracle-aggregate.exec
+            mv integration-tests/oracle/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-oracle-aggregate.exec
           fi
           if [ -d "integration-tests/postgresql" ]; then
-            mv integration-tests/postgresql/${{ inputs.integrationTestsModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
+            mv integration-tests/postgresql/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
           fi
 
           mvn -B verify -P 'unit,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT -T 1C

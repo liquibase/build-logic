@@ -52,7 +52,7 @@ env:
   MAVEN_VERSION: '3.8.7'
 
 jobs:
-  sonar-push:
+  sonar-scan:
     name: Sonar Scan
     runs-on: ubuntu-22.04
 
@@ -186,14 +186,6 @@ jobs:
           mvn jacoco:merge@cli-merge-results
           cd ./target
           java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
-
-      - name: Save Jacoco Mixed Results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: liquibase-jacoco-mixed-report
-          path: |
-            ./${{ inputs.coverageModuleName }}/target/site
 
       - name: Sonar Scan
         if: always()

@@ -78,11 +78,6 @@ jobs:
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
-      - name: Install mvnd
-        run: |
-          wget https://github.com/apache/maven-mvnd/releases/download/1.0-m7/maven-mvnd-1.0-m7-m39-linux-amd64.zip
-          unzip maven-mvnd-1.0-m7-m39-linux-amd64.zip && mv maven-mvnd-1.0-m7-m39-linux-amd64 mvnd && chmod +x mvnd/bin/mvnd
-
       - name: Set up Maven settings.xml
         uses: whelk-io/maven-settings-xml-action@v21
         with:
@@ -186,13 +181,13 @@ jobs:
             mv integration-tests/postgresql/${{ inputs.integrationTestsModuleName }}/target/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
           fi
 
-          ./mvnd/bin/mvnd -B verify -P 'unit,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT -T 1C
+          mvn -B verify -P 'unit,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT -T 1C
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
           unzip ./jacoco-0.8.10.zip
           mv ./lib/jacococli.jar ./${{ inputs.coverageModuleName }}/target/jacococli.jar
           chmod +x ./${{ inputs.coverageModuleName }}/target/jacococli.jar
           cd ${{ inputs.coverageModuleName }}
-          ./mvnd/bin/mvnd jacoco:merge@cli-merge-results
+          mvn jacoco:merge@cli-merge-results
           cd ./target
           java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
 
@@ -211,7 +206,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
-          ./mvnd/bin/mvnd -B sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          mvn -B sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.login=$SONAR_TOKEN \

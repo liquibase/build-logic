@@ -54,13 +54,11 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN }}
         run: |
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)          
-          mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
+          mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy \
                       -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ \
                       -DrepositoryId=sonatype-nexus-staging \
                       -DpomFile=${{ env.artifact_id }}-${version}.pom \
-                      -DgeneratePom=false \
-                      -Dfile=${{ env.artifact_id }}-${version}.pom \
-                      -Dtypes=pom.asc \
+                      -DgeneratePom=false
 
   maven-release:
     needs: release

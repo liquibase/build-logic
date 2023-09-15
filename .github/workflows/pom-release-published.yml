@@ -1,4 +1,4 @@
-name: Release Extension to Sonatype
+name: Release POM to Sonatype
 
 on:
   workflow_call:
@@ -54,11 +54,17 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN }}
         run: |
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)          
-          mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy \
+          mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
                       -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ \
                       -DrepositoryId=sonatype-nexus-staging \
                       -DpomFile=${{ env.artifact_id }}-${version}.pom \
-                      -DgeneratePom=false
+                      -DgeneratePom=false \
+                      -Dfile=${{ env.artifact_id }}-${version}.pom \
+                      -Dsources=${{ env.artifact_id }}-${version}-sources.jar \
+                      -Djavadoc=${{ env.artifact_id }}-${version}-javadoc.jar \
+                      -Dfiles=${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
+                      -Dtypes=jar.asc,jar.asc,pom.asc \
+                      -Dclassifiers=sources,javadoc,
 
   maven-release:
     needs: release

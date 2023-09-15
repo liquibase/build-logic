@@ -59,10 +59,7 @@ jobs:
                       -DrepositoryId=sonatype-nexus-staging \
                       -DpomFile=${{ env.artifact_id }}-${version}.pom \
                       -DgeneratePom=false \
-                      -Dfile=${{ env.artifact_id }}-${version}.pom \
-                      -Dfiles=${{ env.artifact_id }}-${version}.pom.asc \
-                      -Dtypes=pom.asc \
-                      -Dclassifiers=,asc \
+                      -Dfile=${{ env.artifact_id }}-${version}.pom
 
   maven-release:
     needs: release

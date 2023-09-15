@@ -61,7 +61,8 @@ jobs:
                       -DgeneratePom=false \
                       -Dfile=${{ env.artifact_id }}-${version}.pom \
                       -Dtypes=pom.asc \
-                      -Dfiles=${{ env.artifact_id }}-${version}.pom.asc
+                      -Dfiles=${{ env.artifact_id }}-${version}.pom.asc \
+                      -Dclassifiers=pom.asc
 
   maven-release:
     needs: release

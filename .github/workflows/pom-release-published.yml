@@ -60,9 +60,7 @@ jobs:
                       -DpomFile=${{ env.artifact_id }}-${version}.pom \
                       -DgeneratePom=false \
                       -Dfile=${{ env.artifact_id }}-${version}.pom \
-                      -Dfiles=${{ env.artifact_id }}-${version}.pom.asc \
                       -Dtypes=pom.asc \
-                      -Dclassifiers=,sources,javadoc,
 
   maven-release:
     needs: release

@@ -4,7 +4,8 @@ name: Automerge Dependabot PRs
 # The event that triggers the workflow
 on:
   workflow_call:
-
+  workflow_dispatch:
+  
 jobs:
   dependabot:
     # The name of the job

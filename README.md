@@ -73,6 +73,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `extension-update-version.yml`          | Updates release and development `pom.xml` versions                                                    |
 | `os-extension-test.yml`                 | Unit tests across build matrix on previously built artifact                                           |
 | `package-deb.yml`                       | Creates and uploads deb packages                                                                      |
+| `pom-release-published.yml`             | Publishes a release pom to Maven Central                                                              |
 | `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                                 |
 | `sonar-pull-request.yml`                | Code Coverage Scan for PRs.  Requires branch name parameter                                           |
 | `sonar-test-scan.yml`                   | Code Coverage Scan for unit and integration tests                                                     |

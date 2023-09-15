@@ -56,13 +56,13 @@ jobs:
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)          
           mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
                       -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ \
-                      -DrepositoryId=sonatype-nexus-staging \
+                      -DrepositoryId=sonatype-nexus-staging
                       -DpomFile=${{ env.artifact_id }}-${version}.pom \
                       -DgeneratePom=false \
                       -Dfile=${{ env.artifact_id }}-${version}.pom \
+                      -Dfiles=${{ env.artifact_id }}-${version}.pom.asc \
                       -Dtypes=pom.asc \
-                      -Dfiles=${{ env.artifact_id }}-${version}.pom \
-                      -Dclassifiers=,
+                      -Dclassifiers=,sources,javadoc,
 
   maven-release:
     needs: release

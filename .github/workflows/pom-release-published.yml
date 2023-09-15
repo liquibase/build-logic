@@ -62,7 +62,7 @@ jobs:
                       -Dfile=${{ env.artifact_id }}-${version}.pom \
                       -Dtypes=pom.asc \
                       -Dfiles=${{ env.artifact_id }}-${version}.pom \
-                      -Dclassifiers=asc
+                      -Dclassifiers=,
 
   maven-release:
     needs: release

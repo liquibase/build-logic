@@ -60,9 +60,7 @@ jobs:
                       -DpomFile=${{ env.artifact_id }}-${version}.pom \
                       -DgeneratePom=false \
                       -Dfile=${{ env.artifact_id }}-${version}.pom \
-                      -Dfiles=${{ env.artifact_id }}-${version}.pom.asc \
-                      -Dtypes=pom.asc
-
+                      -Dtypes=pom.asc 
   maven-release:
     needs: release
     uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.4.2

@@ -1,4 +1,4 @@
-name: Release Extension to Sonatype
+name: Release POM to Sonatype
 
 on:
   workflow_call:
@@ -59,12 +59,12 @@ jobs:
                       -DrepositoryId=sonatype-nexus-staging \
                       -DpomFile=${{ env.artifact_id }}-${version}.pom \
                       -DgeneratePom=false \
-                      -Dfile=${{ env.artifact_id }}-${version}.jar \
+                      -Dfile=${{ env.artifact_id }}-${version}.pom \
                       -Dsources=${{ env.artifact_id }}-${version}-sources.jar \
                       -Djavadoc=${{ env.artifact_id }}-${version}-javadoc.jar \
-                      -Dfiles=${{ env.artifact_id }}-${version}.jar.asc,${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
-                      -Dtypes=jar.asc,jar.asc,jar.asc,pom.asc \
-                      -Dclassifiers=,sources,javadoc,
+                      -Dfiles=${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
+                      -Dtypes=jar.asc,jar.asc,pom.asc \
+                      -Dclassifiers=sources,javadoc,
 
   maven-release:
     needs: release

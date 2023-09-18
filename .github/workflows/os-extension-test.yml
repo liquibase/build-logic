@@ -34,7 +34,7 @@ jobs:
           cache: 'maven'
 
       - name: Set latest liquibase version
-        if: ${{ inputs.nigthly }} 
+        if: ${{ inputs.nightly }} 
         run: mvn versions:set-property -Dproperty=liquibase.version -DnewVersion=master-SNAPSHOT
 
       - name: Build and Package
@@ -98,5 +98,5 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.4.1
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.4.2
     secrets: inherit

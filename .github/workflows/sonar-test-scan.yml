@@ -175,6 +175,13 @@ jobs:
           name: ${{ inputs.integrationTestReportArtifactName }}-sqlite
           path: integration-tests/sqlite
 
+      - name: Download firebird integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-firebird
+          path: integration-tests/firebird
+
       - name: Cache SonarCloud packages
         if: always()
         uses: actions/cache@v3
@@ -212,6 +219,9 @@ jobs:
           fi
           if [ -d "integration-tests/sqlite" ]; then
             mv integration-tests/sqlite/jacoco.exec ./liquibase-coverage/target/jacoco-sqlite-aggregate.exec
+          fi
+          if [ -d "integration-tests/firebird" ]; then
+            mv integration-tests/firebird/jacoco.exec ./liquibase-coverage/target/jacoco-firebird-aggregate.exec
           fi
 
           mvn -B verify -P 'unit,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT -T 1C

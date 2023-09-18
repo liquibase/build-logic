@@ -147,6 +147,27 @@ jobs:
           name: ${{ inputs.integrationTestReportArtifactName }}-postgresql
           path: integration-tests/postgresql
 
+      - name: Download h2 integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-h2
+          path: integration-tests/h2
+
+      - name: Download hsqldb integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-hsqldb
+          path: integration-tests/hsqldb
+
+      - name: Download mariadb integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-mariadb
+          path: integration-tests/mariadb
+
       - name: Cache SonarCloud packages
         if: always()
         uses: actions/cache@v3
@@ -172,6 +193,15 @@ jobs:
           fi
           if [ -d "integration-tests/postgresql" ]; then
             mv integration-tests/postgresql/jacoco.exec ./liquibase-coverage/target/jacoco-postgresql-aggregate.exec
+          fi
+          if [ -d "integration-tests/h2" ]; then
+            mv integration-tests/h2/jacoco.exec ./liquibase-coverage/target/jacoco-h2-aggregate.exec
+          fi
+          if [ -d "integration-tests/hsqldb" ]; then
+            mv integration-tests/hsqldb/jacoco.exec ./liquibase-coverage/target/jacoco-hsqldb-aggregate.exec
+          fi
+          if [ -d "integration-tests/mariadb" ]; then
+            mv integration-tests/mariadb/jacoco.exec ./liquibase-coverage/target/jacoco-mariadb-aggregate.exec
           fi
 
           mvn -B verify -P 'unit,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT -T 1C

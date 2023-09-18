@@ -40,10 +40,6 @@ on:
         description: 'The name of the integration test report artifact'
         type: string
         required: false
-      coverageModuleName:
-        description: 'The name of the coverage module'
-        type: string
-        required: false
       testedClassesModuleName:
         description: 'The name of the tested classes module'
         type: string
@@ -162,28 +158,28 @@ jobs:
       - name: Merge integration and unit tests reports
         if: always()
         run: |
-          mkdir ./${{ inputs.coverageModuleName }}/target
+          mkdir ./liquibase-coverage/target
 
-          mv unit-tests/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-unit.exec
+          mv unit-tests/jacoco.exec ./liquibase-coverage/target/jacoco-unit.exec
           if [ -d "integration-tests/mssql" ]; then
-            mv integration-tests/mssql/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mssql-aggregate.exec
+            mv integration-tests/mssql/jacoco.exec ./liquibase-coverage/target/jacoco-mssql-aggregate.exec
           fi
           if [ -d "integration-tests/mysql" ]; then
-            mv integration-tests/mysql/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-mysql-aggregate.exec
+            mv integration-tests/mysql/jacoco.exec ./liquibase-coverage/target/jacoco-mysql-aggregate.exec
           fi
           if [ -d "integration-tests/oracle" ]; then
-            mv integration-tests/oracle/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-oracle-aggregate.exec
+            mv integration-tests/oracle/jacoco.exec ./liquibase-coverage/target/jacoco-oracle-aggregate.exec
           fi
           if [ -d "integration-tests/postgresql" ]; then
-            mv integration-tests/postgresql/jacoco.exec ./${{ inputs.coverageModuleName }}/target/jacoco-postgresql-aggregate.exec
+            mv integration-tests/postgresql/jacoco.exec ./liquibase-coverage/target/jacoco-postgresql-aggregate.exec
           fi
 
           mvn -B verify -P 'unit,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT -T 1C
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
           unzip ./jacoco-0.8.10.zip
-          mv ./lib/jacococli.jar ./${{ inputs.coverageModuleName }}/target/jacococli.jar
-          chmod +x ./${{ inputs.coverageModuleName }}/target/jacococli.jar
-          cd ${{ inputs.coverageModuleName }}
+          mv ./lib/jacococli.jar ./liquibase-coverage/target/jacococli.jar
+          chmod +x ./liquibase-coverage/target/jacococli.jar
+          cd liquibase-coverage
           mvn jacoco:merge@cli-merge-results
           cd ./target
           java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps

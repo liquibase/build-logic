@@ -168,6 +168,13 @@ jobs:
           name: ${{ inputs.integrationTestReportArtifactName }}-mariadb
           path: integration-tests/mariadb
 
+      - name: Download sqlite integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-sqlite
+          path: integration-tests/sqlite
+
       - name: Cache SonarCloud packages
         if: always()
         uses: actions/cache@v3
@@ -202,6 +209,9 @@ jobs:
           fi
           if [ -d "integration-tests/mariadb" ]; then
             mv integration-tests/mariadb/jacoco.exec ./liquibase-coverage/target/jacoco-mariadb-aggregate.exec
+          fi
+          if [ -d "integration-tests/sqlite" ]; then
+            mv integration-tests/sqlite/jacoco.exec ./liquibase-coverage/target/jacoco-sqlite-aggregate.exec
           fi
 
           mvn -B verify -P 'unit,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT -T 1C

@@ -44,6 +44,11 @@ on:
         description: 'The name of the tested classes module'
         type: string
         required: false
+      dbPlatforms:
+        description: 'The database platforms to be tested'
+        type: string
+        required: false
+        default: mssql,mysql,oracle,postgresql,hsqldb,
 
 env:
   MAVEN_VERSION: '3.8.7'
@@ -120,63 +125,63 @@ jobs:
           path: unit-tests
 
       - name: Download mssql integration tests report
-        if: always()
+        if: contains(inputs.dbPlatforms, 'mssql')
         uses: actions/download-artifact@v3
         with:
             name: ${{ inputs.integrationTestReportArtifactName }}-mssql
             path: integration-tests/mssql
 
       - name: Download mysql integration tests report
-        if: always()
+        if: contains(inputs.dbPlatforms, 'mysql')
         uses: actions/download-artifact@v3
         with:
             name: ${{ inputs.integrationTestReportArtifactName }}-mysql
             path: integration-tests/mysql
 
       - name: Download oracle integration tests report
-        if: always()
+        if: contains(inputs.dbPlatforms, 'oracle')
         uses: actions/download-artifact@v3        
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-oracle
           path: integration-tests/oracle
 
       - name: Download postgresql integration tests report
-        if: always()
+        if: contains(inputs.dbPlatforms, 'postgresql')
         uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-postgresql
           path: integration-tests/postgresql
 
       - name: Download h2 integration tests report
-        if: always()
+        if: contains(inputs.dbPlatforms, 'h2')
         uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-h2
           path: integration-tests/h2
 
       - name: Download hsqldb integration tests report
-        if: always()
+        if: contains(inputs.dbPlatforms, 'hsqldb')
         uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-hsqldb
           path: integration-tests/hsqldb
 
       - name: Download mariadb integration tests report
-        if: always()
+        if: contains(inputs.dbPlatforms, 'mariadb')
         uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-mariadb
           path: integration-tests/mariadb
 
       - name: Download sqlite integration tests report
-        if: always()
+        if: contains(inputs.dbPlatforms, 'sqlite')
         uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-sqlite
           path: integration-tests/sqlite
 
       - name: Download firebird integration tests report
-        if: always()
+        if: contains(inputs.dbPlatforms, 'firebird')
         uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.integrationTestReportArtifactName }}-firebird
@@ -241,7 +246,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
-          mvn -B package sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          mvn -B verify sonar:sonar -P 'no-test,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.token=$SONAR_TOKEN \

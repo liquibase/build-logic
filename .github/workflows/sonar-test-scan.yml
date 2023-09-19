@@ -242,7 +242,7 @@ jobs:
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
         
-          mvn -B package sonar:sonar -P '!unit,!integration-test,!testAll,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          mvn -B package sonar:sonar -P 'no-test,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.token=$SONAR_TOKEN \

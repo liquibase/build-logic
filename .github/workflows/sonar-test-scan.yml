@@ -31,14 +31,27 @@ on:
         description: 'The maven arguments to be passed to the mvn command'
         type: string
         required: false
+        default: -Dsonar.coverage.exclusions='**/test/**/*.*, **/pom.xml'
+      unitTestReportArtifactName:
+        description: 'The name of the unit test report artifact'
+        type: string
+        required: false
+      integrationTestReportArtifactName:
+        description: 'The name of the integration test report artifact'
+        type: string
+        required: false
+      testedClassesModuleName:
+        description: 'The name of the tested classes module'
+        type: string
+        required: false
 
 env:
   MAVEN_VERSION: '3.8.7'
 
 jobs:
-  sonar-push:
+  sonar-scan:
     name: Sonar Scan
-    runs-on: macos-latest-xl
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v3
@@ -48,7 +61,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          java-version: 11
+          java-version: 17
           distribution: 'temurin'
           cache: 'maven'
           overwrite-settings: false
@@ -57,10 +70,6 @@ jobs:
         uses: stCarolas/setup-maven@v4.5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
-
-      - name: Install mvnd
-        run: |
-          brew install mvndaemon/homebrew-mvnd/mvnd
 
       - name: Set up Maven settings.xml
         uses: whelk-io/maven-settings-xml-action@v21
@@ -104,58 +113,142 @@ jobs:
               }
             ]
 
-      - name: Setup docker (missing on MacOS)
-        run: |
-          brew install docker
-          colima start
-          # For testcontainers to find the Colima socket
-          # https://github.com/abiosoft/colima/blob/main/docs/FAQ.md#cannot-connect-to-the-docker-daemon-at-unixvarrundockersock-is-the-docker-daemon-running
-          sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
-        
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+      - name: Download unit tests report
+        uses: actions/download-artifact@v3
         with:
-          registry: ghcr.io
-          username: liquibot
-          password: ${{ secrets.GHCR_PAT }}
+          name: ${{ inputs.unitTestReportArtifactName }}
+          path: unit-tests
 
-      - name: Install sqlplus for Integration tests
-        run: |
-          mkdir -p ~/bin/oracle
-          wget https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
-          unzip -d ~/bin/oracle instantclient-sqlplus-macos.x64-19.8.0.0.0dbru.zip
-          wget https://download.oracle.com/otn_software/mac/instantclient/198000/instantclient-basic-macos.x64-19.8.0.0.0dbru.zip
-          unzip -d ~/bin/oracle instantclient-basic-macos.x64-19.8.0.0.0dbru.zip
-          chmod -R a+x ${HOME}/bin/oracle/instantclient_19_8/
+      - name: Download mssql integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+            name: ${{ inputs.integrationTestReportArtifactName }}-mssql
+            path: integration-tests/mssql
+
+      - name: Download mysql integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+            name: ${{ inputs.integrationTestReportArtifactName }}-mysql
+            path: integration-tests/mysql
+
+      - name: Download oracle integration tests report
+        if: always()
+        uses: actions/download-artifact@v3        
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-oracle
+          path: integration-tests/oracle
+
+      - name: Download postgresql integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-postgresql
+          path: integration-tests/postgresql
+
+      - name: Download h2 integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-h2
+          path: integration-tests/h2
+
+      - name: Download hsqldb integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-hsqldb
+          path: integration-tests/hsqldb
+
+      - name: Download mariadb integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-mariadb
+          path: integration-tests/mariadb
+
+      - name: Download sqlite integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-sqlite
+          path: integration-tests/sqlite
+
+      - name: Download firebird integration tests report
+        if: always()
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.integrationTestReportArtifactName }}-firebird
+          path: integration-tests/firebird
 
       - name: Cache SonarCloud packages
+        if: always()
         uses: actions/cache@v3
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      - name: Merge integration and unit tests reports
+        if: always()
+        run: |
+          mkdir ./liquibase-coverage/target
+
+          mv unit-tests/jacoco.exec ./liquibase-coverage/target/jacoco-unit.exec
+          if [ -d "integration-tests/mssql" ]; then
+            mv integration-tests/mssql/jacoco.exec ./liquibase-coverage/target/jacoco-mssql-aggregate.exec
+          fi
+          if [ -d "integration-tests/mysql" ]; then
+            mv integration-tests/mysql/jacoco.exec ./liquibase-coverage/target/jacoco-mysql-aggregate.exec
+          fi
+          if [ -d "integration-tests/oracle" ]; then
+            mv integration-tests/oracle/jacoco.exec ./liquibase-coverage/target/jacoco-oracle-aggregate.exec
+          fi
+          if [ -d "integration-tests/postgresql" ]; then
+            mv integration-tests/postgresql/jacoco.exec ./liquibase-coverage/target/jacoco-postgresql-aggregate.exec
+          fi
+          if [ -d "integration-tests/h2" ]; then
+            mv integration-tests/h2/jacoco.exec ./liquibase-coverage/target/jacoco-h2-aggregate.exec
+          fi
+          if [ -d "integration-tests/hsqldb" ]; then
+            mv integration-tests/hsqldb/jacoco.exec ./liquibase-coverage/target/jacoco-hsqldb-aggregate.exec
+          fi
+          if [ -d "integration-tests/mariadb" ]; then
+            mv integration-tests/mariadb/jacoco.exec ./liquibase-coverage/target/jacoco-mariadb-aggregate.exec
+          fi
+          if [ -d "integration-tests/sqlite" ]; then
+            mv integration-tests/sqlite/jacoco.exec ./liquibase-coverage/target/jacoco-sqlite-aggregate.exec
+          fi
+          if [ -d "integration-tests/firebird" ]; then
+            mv integration-tests/firebird/jacoco.exec ./liquibase-coverage/target/jacoco-firebird-aggregate.exec
+          fi
+
+          mvn -B verify -P 'unit,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT -T 1C
+          wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
+          unzip ./jacoco-0.8.10.zip
+          mv ./lib/jacococli.jar ./liquibase-coverage/target/jacococli.jar
+          chmod +x ./liquibase-coverage/target/jacococli.jar
+          cd liquibase-coverage
+          mvn jacoco:merge@cli-merge-results
+          cd ./target
+          java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
+
       - name: Sonar Scan
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
-          export LD_LIBRARY_PATH=${HOME}/bin/oracle/instantclient_19_8:${LD_LIBRARY_PATH}
-          export PATH=${LD_LIBRARY_PATH}:${PATH}
-          export NLS_LANG=AMERICAN_AMERICA.UTF8
-          export SQLPATH=${HOME}/bin/oracle/instantclient_19_8
-          export PATH=$PATH:${HOME}/bin/oracle/instantclient_19_8
-          ORACLE_HOME=$ORACLE_HOME:${HOME}/bin/oracle/instantclient_19_8
-          source ~/.bash_profile
-          mvnd -B clean verify sonar:sonar -P 'testAll,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          mvn -B package sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
-          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.token=$SONAR_TOKEN \
           -Dsonar.java.coveragePlugin=jacoco \
-          -Dsonar.branch.name=${{ inputs.thisBranchName }} \
-          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber }} \
-          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName }} \
+          -Dsonar.branch.name=${{ inputs.thisBranchName}} \
+          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber}} \
+          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName}} \
           -Dsonar.pullrequest.base=${{ inputs.pullRequestBaseBranchName }} \
           -Dsonar.pullrequest.provider=GitHub \
           -Dsonar.pullrequest.github.repository="${{ github.repository }}" \

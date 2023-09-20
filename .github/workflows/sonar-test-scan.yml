@@ -229,7 +229,7 @@ jobs:
             mv integration-tests/firebird/jacoco.exec ./liquibase-coverage/target/jacoco-firebird-aggregate.exec
           fi
 
-          mvn -B verify -P 'unit,!run-proguard' -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT -T 1C
+          mvn -B verify -P '!run-proguard' -DskipITs -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
           unzip ./jacoco-0.8.10.zip
           mv ./lib/jacococli.jar ./liquibase-coverage/target/jacococli.jar
@@ -239,19 +239,37 @@ jobs:
           cd ./target
           java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
 
-      - name: Sonar Scan
-        if: always()
+      - name: Sonar Branch Scan
+        if: always() && !github.event.pull_request
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
         run: |
-          mvn -B verify sonar:sonar -P '!run-proguard' -DskipTests=true -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          mvn -B verify sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.token=$SONAR_TOKEN \
           -Dsonar.java.coveragePlugin=jacoco \
           -Dsonar.branch.name=${{ inputs.thisBranchName}} \
+          -Dsonar.qualitygate.wait=true \
+          -Dsonar.organization=${{ github.repository_owner }} \
+          -Dsonar.host.url='https://sonarcloud.io' \
+          -Dsonar.scm.provider=git \
+          -Daws.region="us-east-1"
+
+      - name: Sonar PR Scan
+        if: always() && github.event.pull_request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+        run: |
+          mvn -B verify sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          ${{ inputs.mavenArgs  }} \
+          -Dsonar.scm.revision=${{ inputs.thisSha }} \
+          -Dsonar.token=$SONAR_TOKEN \
+          -Dsonar.java.coveragePlugin=jacoco \
           -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber}} \
           -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName}} \
           -Dsonar.pullrequest.base=${{ inputs.pullRequestBaseBranchName }} \
@@ -262,5 +280,4 @@ jobs:
           -Dsonar.organization=${{ github.repository_owner }} \
           -Dsonar.host.url='https://sonarcloud.io' \
           -Dsonar.scm.provider=git \
-          -Daws.region="us-east-1" \
-          -T 1C
+          -Daws.region="us-east-1"

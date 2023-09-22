@@ -79,6 +79,8 @@ Please review the below table of reusable workflows and their descriptions:
 | `sonar-test-scan.yml`                   | Code Coverage Scan for unit and integration tests                                                     |
 | `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                        |  
 | `snyk-nightly.yml`                      | Nightly Security Scans                                                                                |
+| `ci.yml`                                | Run unit, integrations tests against the new liquibase SNAPSHOT                                            |
+| `ci-report.yml`                         | Extract results obtained from ci.yml and generate a report                                            |
 | various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets                 |
 
 ## Requirements

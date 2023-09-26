@@ -237,7 +237,7 @@ jobs:
           cd liquibase-coverage
           mvn jacoco:merge@cli-merge-results
           cd ./target
-          java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
+          java -jar jacococli.jar report aggregate.exec
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request

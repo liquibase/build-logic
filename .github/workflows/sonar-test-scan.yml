@@ -195,46 +195,49 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      - name: Generate dump classes
+        run: |
+          mvn -B clean install surefire-report:report -P 'sonar,!run-proguard' "-Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT"
+        working-directory: ./${{ inputs.testedClassesModuleName }}
+
       - name: Merge integration and unit tests reports
         if: always()
         run: |
-          mkdir ./liquibase-coverage/target
 
-          mv unit-tests/jacoco.exec ./liquibase-coverage/target/jacoco-unit.exec
+          mv unit-tests/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-unit.exec
           if [ -d "integration-tests/mssql" ]; then
-            mv integration-tests/mssql/jacoco.exec ./liquibase-coverage/target/jacoco-mssql-aggregate.exec
+            mv integration-tests/mssql/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-mssql-aggregate.exec
           fi
           if [ -d "integration-tests/mysql" ]; then
-            mv integration-tests/mysql/jacoco.exec ./liquibase-coverage/target/jacoco-mysql-aggregate.exec
+            mv integration-tests/mysql/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-mysql-aggregate.exec
           fi
           if [ -d "integration-tests/oracle" ]; then
-            mv integration-tests/oracle/jacoco.exec ./liquibase-coverage/target/jacoco-oracle-aggregate.exec
+            mv integration-tests/oracle/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-oracle-aggregate.exec
           fi
           if [ -d "integration-tests/postgresql" ]; then
-            mv integration-tests/postgresql/jacoco.exec ./liquibase-coverage/target/jacoco-postgresql-aggregate.exec
+            mv integration-tests/postgresql/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-postgresql-aggregate.exec
           fi
           if [ -d "integration-tests/h2" ]; then
-            mv integration-tests/h2/jacoco.exec ./liquibase-coverage/target/jacoco-h2-aggregate.exec
+            mv integration-tests/h2/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-h2-aggregate.exec
           fi
           if [ -d "integration-tests/hsqldb" ]; then
-            mv integration-tests/hsqldb/jacoco.exec ./liquibase-coverage/target/jacoco-hsqldb-aggregate.exec
+            mv integration-tests/hsqldb/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-hsqldb-aggregate.exec
           fi
           if [ -d "integration-tests/mariadb" ]; then
-            mv integration-tests/mariadb/jacoco.exec ./liquibase-coverage/target/jacoco-mariadb-aggregate.exec
+            mv integration-tests/mariadb/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-mariadb-aggregate.exec
           fi
           if [ -d "integration-tests/sqlite" ]; then
-            mv integration-tests/sqlite/jacoco.exec ./liquibase-coverage/target/jacoco-sqlite-aggregate.exec
+            mv integration-tests/sqlite/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-sqlite-aggregate.exec
           fi
           if [ -d "integration-tests/firebird" ]; then
-            mv integration-tests/firebird/jacoco.exec ./liquibase-coverage/target/jacoco-firebird-aggregate.exec
+            mv integration-tests/firebird/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-firebird-aggregate.exec
           fi
-
-          mvn -B verify -P '!run-proguard' -DskipITs -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT
+          
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
-          unzip ./jacoco-0.8.10.zip
-          mv ./lib/jacococli.jar ./liquibase-coverage/target/jacococli.jar
-          chmod +x ./liquibase-coverage/target/jacococli.jar
-          cd liquibase-coverage
+          unzip -qq ./jacoco-0.8.10.zip
+          mv ./lib/jacococli.jar ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
+          chmod +x ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
+          cd ./${{ inputs.testedClassesModuleName }}
           mvn jacoco:merge@cli-merge-results
           cd ./target
           java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
@@ -245,8 +248,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+        working-directory: ./${{ inputs.testedClassesModuleName }}
         run: |
-          mvn -B verify sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.token=$SONAR_TOKEN \
@@ -264,8 +268,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+        working-directory: ./${{ inputs.testedClassesModuleName }}
         run: |
-          mvn -B verify sonar:sonar -P '!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.token=$SONAR_TOKEN \

@@ -203,7 +203,6 @@ jobs:
       - name: Merge integration and unit tests reports
         if: always()
         run: |
-          mkdir ./liquibase-coverage/target
 
           mv unit-tests/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-unit.exec
           if [ -d "integration-tests/mssql" ]; then
@@ -233,14 +232,17 @@ jobs:
           if [ -d "integration-tests/firebird" ]; then
             mv integration-tests/firebird/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-firebird-aggregate.exec
           fi
-
+          
+          ls -ltr
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
           unzip ./jacoco-0.8.10.zip
           mv ./lib/jacococli.jar ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
           chmod +x ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
           cd ./${{ inputs.testedClassesModuleName }}
+          ls -ltr
           mvn jacoco:merge@cli-merge-results
           cd ./target
+          ls -ltr
           java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
           lt -ltr
 

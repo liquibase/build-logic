@@ -236,8 +236,8 @@ jobs:
 
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
           unzip ./jacoco-0.8.10.zip
-          mv ./lib/jacococli.jar ./liquibase-coverage/target/jacococli.jar
-          chmod +x ./liquibase-coverage/target/jacococli.jar
+          mv ./lib/jacococli.jar ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
+          chmod +x ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
           cd ./${{ inputs.testedClassesModuleName }}
           mvn jacoco:merge@cli-merge-results
           cd ./target

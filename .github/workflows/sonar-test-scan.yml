@@ -281,3 +281,10 @@ jobs:
           -Dsonar.host.url='https://sonarcloud.io' \
           -Dsonar.scm.provider=git \
           -Daws.region="us-east-1"
+
+      - name: Save Jacoco Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: liquibase-sonar-reports
+          path: |
+            ./**/target/**

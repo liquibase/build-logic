@@ -235,6 +235,7 @@ jobs:
           
           cd ./${{ inputs.testedClassesModuleName }}
           mvn jacoco:merge@cli-merge-results
+          mvn jacoco:report@cli-post-merge-report
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request

@@ -233,14 +233,8 @@ jobs:
             mv integration-tests/firebird/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-firebird-aggregate.exec
           fi
           
-          wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
-          unzip -qq ./jacoco-0.8.10.zip
-          mv ./lib/jacococli.jar ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
-          chmod +x ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
           cd ./${{ inputs.testedClassesModuleName }}
           mvn jacoco:merge@cli-merge-results
-          cd ./target
-          java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/classdumps
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request

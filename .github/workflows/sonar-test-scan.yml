@@ -197,7 +197,7 @@ jobs:
 
       - name: Generate dump classes
         run: |
-          mvn -B clean install surefire-report:report -P 'sonar,!run-proguard' "-Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT"
+          mvn -B clean install -DskipTests -P 'sonar,!run-proguard' "-Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT"
         working-directory: ./${{ inputs.testedClassesModuleName }}
 
       - name: Merge integration and unit tests reports

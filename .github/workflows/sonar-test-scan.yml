@@ -41,6 +41,7 @@ on:
         description: 'The name of the tested classes module'
         type: string
         required: false
+        default: 'root'
       dbPlatforms:
         description: 'The database platforms to be tested'
         type: string
@@ -245,14 +246,14 @@ jobs:
           java -jar jacococli.jar merge *.exec --destfile merged.exec
 
 
-          if [ -n "${{ inputs.testedClassesModuleName }}" ]; then
+          if [ "${{ env.testedClassesModuleName }}" = "root" ]; then
             echo "Tested classes module name: root module"
             java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --xml jacoco.xml
             java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --html site
           else
-            echo "Tested classes module name: ${{ inputs.testedClassesModuleName }}"
-            java -jar jacococli.jar report merged.exec --classfiles ../${{ inputs.testedClassesModuleName }}/target/ --sourcefiles ../${{ inputs.testedClassesModuleName }}/src --xml jacoco.xml
-            java -jar jacococli.jar report merged.exec --classfiles ../${{ inputs.testedClassesModuleName }}/target/ --sourcefiles ../${{ inputs.testedClassesModuleName }}/src --html site
+            echo "Tested classes module name: ${{ env.testedClassesModuleName }}"
+            java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --xml jacoco.xml
+            java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --html site
           fi
 
       - name: Sonar Branch Scan
@@ -301,8 +302,6 @@ jobs:
       - name: Archive Jacoco Merged Results
         uses: actions/upload-artifact@v3
         with:
-          name: test
+          name: liquibase-jacoco-merged-results
           path: |
-            **/jacoco.xml
-            **/merged.exec
             **/site

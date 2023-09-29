@@ -206,6 +206,9 @@ jobs:
         env:
           testedClassesModuleName: ${{ inputs.testedClassesModuleName }}
         run: |
+
+          ls -ltr
+          
           mkdir -p target
 
           mv unit-tests/jacoco.exec target/jacoco-unit.exec

@@ -32,6 +32,11 @@ on:
         type: string
         required: false
         default: -Dsonar.coverage.exclusions='**/test/**/*.*, **/pom.xml'
+      sonarRootPath:
+        description: 'The name of the tested classes module'
+        type: string
+        required: false
+        default: .
       testedClassesModuleName:
         description: 'The name of the tested classes module'
         type: string
@@ -189,13 +194,15 @@ jobs:
 
       - name: Generate classes
         if: always()
-        working-directory: ./${{ inputs.testedClassesModuleName }}
+        working-directory: ./${{ inputs.sonarRootPath }}
         run: |
           mvn -B clean install -DskipTests -P 'sonar,!run-proguard' "-Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT"
 
       - name: Merge integration and unit tests reports
         if: always()
-        working-directory: ./${{ inputs.testedClassesModuleName }}
+        working-directory: ./${{ inputs.sonarRootPath }}
+        env:
+          testedClassesModuleName: ${{ inputs.testedClassesModuleName }}
         run: |
 
           mkdir -p target
@@ -235,8 +242,17 @@ jobs:
           mv lib/jacococli.jar target/jacococli.jar
           chmod +x target/jacococli.jar
           cd target
+
           java -jar jacococli.jar merge *.exec --destfile merged.exec
-          java -jar jacococli.jar report merged.exec --classfiles=../liquibase-standard/target/ --xml jacoco.xml
+          
+          ls -ltr
+          ls -ltr ../${{ inputs.testedClassesModuleName }}
+
+          if [ -z "${{ inputs.testedClassesModuleName }}" ]; then
+            java -jar jacococli.jar report merged.exec --classfiles=. --xml jacoco.xml
+          else
+            java -jar jacococli.jar report merged.exec --classfiles=../${{ inputs.testedClassesModuleName }}/target/ --xml jacoco.xml
+          fi
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request
@@ -244,7 +260,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
-        working-directory: ./${{ inputs.testedClassesModuleName }}
+        working-directory: ./${{ inputs.sonarRootPath }}
         run: |
           mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \
@@ -264,7 +280,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
-        working-directory: ./${{ inputs.testedClassesModuleName }}
+        working-directory: ./${{ inputs.sonarRootPath }}
         run: |
           mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
           ${{ inputs.mavenArgs  }} \

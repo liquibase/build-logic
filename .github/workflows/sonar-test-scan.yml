@@ -204,8 +204,6 @@ jobs:
         env:
           testedClassesModuleName: ${{ inputs.testedClassesModuleName }}
         run: |
-          pwd
-          ls -ltr
           mkdir -p target
 
           mv unit-tests/jacoco.exec target/jacoco-unit.exec
@@ -246,14 +244,14 @@ jobs:
 
           java -jar jacococli.jar merge *.exec --destfile merged.exec
 
-          ls -ltr
-          ls -ltr ../${{ inputs.testedClassesModuleName }}
+          echo "Tested classes module name: ${{ inputs.testedClassesModuleName }}"
 
           if [ -n "${{ inputs.testedClassesModuleName }}" ]; then
-            java -jar jacococli.jar report merged.exec --classfiles=. --xml jacoco.xml
+            java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --xml jacoco.xml
           else
-            java -jar jacococli.jar report merged.exec --classfiles=../${{ inputs.testedClassesModuleName }}/target/ --xml jacoco.xml
+            java -jar jacococli.jar report merged.exec --classfiles ../${{ inputs.testedClassesModuleName }}/target/ --sourcefiles ../${{ inputs.testedClassesModuleName }}/src --xml jacoco.xml
           fi
+          cat jacoco.xml
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request
@@ -297,10 +295,3 @@ jobs:
           -Dsonar.host.url='https://sonarcloud.io' \
           -Dsonar.scm.provider=git \
           -Daws.region="us-east-1"
-
-      - name: Save Jacoco Reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: liquibase-sonar-reports
-          path: |
-            ./**/target/**

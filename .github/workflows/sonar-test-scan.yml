@@ -248,11 +248,11 @@ jobs:
           if [ -n "${{ inputs.testedClassesModuleName }}" ]; then
             echo "Tested classes module name: root module"
             java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --xml jacoco.xml
-            java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --html
+            java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --html site
           else
             echo "Tested classes module name: ${{ inputs.testedClassesModuleName }}"
             java -jar jacococli.jar report merged.exec --classfiles ../${{ inputs.testedClassesModuleName }}/target/ --sourcefiles ../${{ inputs.testedClassesModuleName }}/src --xml jacoco.xml
-            java -jar jacococli.jar report merged.exec --classfiles ../${{ inputs.testedClassesModuleName }}/target/ --sourcefiles ../${{ inputs.testedClassesModuleName }}/src --html
+            java -jar jacococli.jar report merged.exec --classfiles ../${{ inputs.testedClassesModuleName }}/target/ --sourcefiles ../${{ inputs.testedClassesModuleName }}/src --html site
           fi
 
       - name: Sonar Branch Scan

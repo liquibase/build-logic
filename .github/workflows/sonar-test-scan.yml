@@ -201,7 +201,7 @@ jobs:
           ls -ltr
           ls -ltr unit-tests
 
-          mkdir -p ./${{ inputs.testedClassesModuleName }}/target
+          mkdir -p ${{ inputs.testedClassesModuleName }}/target
 
           mv unit-tests/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-unit.exec
 
@@ -234,10 +234,10 @@ jobs:
           fi
           
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
-          unzip -qq ./jacoco-0.8.10.zip
-          mv ./lib/jacococli.jar ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
-          chmod +x ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
-          cd ./${{ inputs.testedClassesModuleName }}/target
+          unzip -qq jacoco-0.8.10.zip
+          mv lib/jacococli.jar ${{ inputs.testedClassesModuleName }}/target/jacococli.jar
+          chmod +x ${{ inputs.testedClassesModuleName }}/target/jacococli.jar
+          cd ${{ inputs.testedClassesModuleName }}/target
           java -jar jacococli.jar merge *.exec --destfile merged.exec
           java -jar jacococli.jar report merged.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/ --xml jacoco.xml
 

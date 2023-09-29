@@ -48,12 +48,7 @@ on:
         description: 'The database platforms to be tested'
         type: string
         required: false
-        default: mssql,mysql,oracle,postgresql,hsqldb,
-      classesArtifactName:
-        description: 'The classes artifact name'
-        type: string
-        required: false
-        default: liquibase-jacoco-classes
+        default: mssql,mysql,oracle,postgresql,hsqldb
 
 env:
   MAVEN_VERSION: '3.8.7'
@@ -71,7 +66,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          java-version: 17
+          java-version: 11
           distribution: 'temurin'
           cache: 'maven'
           overwrite-settings: false
@@ -122,12 +117,6 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT }}"
               }
             ]
-
-      - name: Download classes
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ inputs.classesArtifactName }}
-          path: classes
 
       - name: Download unit tests report
         uses: actions/download-artifact@v3
@@ -214,39 +203,41 @@ jobs:
       - name: Merge integration and unit tests reports
         if: always()
         run: |
+
+          pwd
           ls -ltr
-          ls -ltr classes
-          mv unit-tests/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-unit.exec
-          mv classes ./${{ inputs.testedClassesModuleName }}/target/classes
-          ls -ltr ./${{ inputs.testedClassesModuleName }}/target
-          ls -ltr ./${{ inputs.testedClassesModuleName }}/target/classes
-          mv unit-tests/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-unit.exec
+          ls -ltr unit-tests
+
+          mkdir -p ./${{ inputs.testedClassesModuleName }}/target
+
+          mv unit-tests/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-unit.exec
+
           if [ -d "integration-tests/mssql" ]; then
-            mv integration-tests/mssql/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-mssql-aggregate.exec
+            mv integration-tests/mssql/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-mssql-aggregate.exec
           fi
           if [ -d "integration-tests/mysql" ]; then
-            mv integration-tests/mysql/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-mysql-aggregate.exec
+            mv integration-tests/mysql/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-mysql-aggregate.exec
           fi
           if [ -d "integration-tests/oracle" ]; then
-            mv integration-tests/oracle/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-oracle-aggregate.exec
+            mv integration-tests/oracle/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-oracle-aggregate.exec
           fi
           if [ -d "integration-tests/postgresql" ]; then
-            mv integration-tests/postgresql/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-postgresql-aggregate.exec
+            mv integration-tests/postgresql/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-postgresql-aggregate.exec
           fi
           if [ -d "integration-tests/h2" ]; then
-            mv integration-tests/h2/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-h2-aggregate.exec
+            mv integration-tests/h2/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-h2-aggregate.exec
           fi
           if [ -d "integration-tests/hsqldb" ]; then
-            mv integration-tests/hsqldb/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-hsqldb-aggregate.exec
+            mv integration-tests/hsqldb/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-hsqldb-aggregate.exec
           fi
           if [ -d "integration-tests/mariadb" ]; then
-            mv integration-tests/mariadb/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-mariadb-aggregate.exec
+            mv integration-tests/mariadb/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-mariadb-aggregate.exec
           fi
           if [ -d "integration-tests/sqlite" ]; then
-            mv integration-tests/sqlite/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-sqlite-aggregate.exec
+            mv integration-tests/sqlite/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-sqlite-aggregate.exec
           fi
           if [ -d "integration-tests/firebird" ]; then
-            mv integration-tests/firebird/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-firebird-aggregate.exec
+            mv integration-tests/firebird/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-firebird-aggregate.exec
           fi
           
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip

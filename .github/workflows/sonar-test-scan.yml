@@ -255,7 +255,7 @@ jobs:
           chmod +x ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
           cd ./${{ inputs.testedClassesModuleName }}/target
           java -jar jacococli.jar merge *.exec --destfile merged.exec
-          java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/ --xml jacoco.xml
+          java -jar jacococli.jar report merged.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/ --xml jacoco.xml
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request

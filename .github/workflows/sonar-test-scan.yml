@@ -32,14 +32,6 @@ on:
         type: string
         required: false
         default: -Dsonar.coverage.exclusions='**/test/**/*.*, **/pom.xml'
-      unitTestReportArtifactName:
-        description: 'The name of the unit test report artifact'
-        type: string
-        required: false
-      integrationTestReportArtifactName:
-        description: 'The name of the integration test report artifact'
-        type: string
-        required: false
       testedClassesModuleName:
         description: 'The name of the tested classes module'
         type: string
@@ -121,70 +113,70 @@ jobs:
       - name: Download unit tests report
         uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.unitTestReportArtifactName }}
+          name: liquibase-jacoco-test-results
           path: unit-tests
 
       - name: Download mssql integration tests report
         if: contains(inputs.dbPlatforms, 'mssql')
         uses: actions/download-artifact@v3
         with:
-            name: ${{ inputs.integrationTestReportArtifactName }}-mssql
+            name: liquibase-integration-jacoco-test-results-mssql
             path: integration-tests/mssql
 
       - name: Download mysql integration tests report
         if: contains(inputs.dbPlatforms, 'mysql')
         uses: actions/download-artifact@v3
         with:
-            name: ${{ inputs.integrationTestReportArtifactName }}-mysql
+            name: liquibase-integration-jacoco-test-results-mysql
             path: integration-tests/mysql
 
       - name: Download oracle integration tests report
         if: contains(inputs.dbPlatforms, 'oracle')
         uses: actions/download-artifact@v3        
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-oracle
+          name: liquibase-integration-jacoco-test-results-oracle
           path: integration-tests/oracle
 
       - name: Download postgresql integration tests report
         if: contains(inputs.dbPlatforms, 'postgresql')
         uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-postgresql
+          name: liquibase-integration-jacoco-test-results-postgresql
           path: integration-tests/postgresql
 
       - name: Download h2 integration tests report
         if: contains(inputs.dbPlatforms, 'h2')
         uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-h2
+          name: liquibase-integration-jacoco-test-results-h2
           path: integration-tests/h2
 
       - name: Download hsqldb integration tests report
         if: contains(inputs.dbPlatforms, 'hsqldb')
         uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-hsqldb
+          name: liquibase-integration-jacoco-test-results-hsqldb
           path: integration-tests/hsqldb
 
       - name: Download mariadb integration tests report
         if: contains(inputs.dbPlatforms, 'mariadb')
         uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-mariadb
+          name: liquibase-integration-jacoco-test-results-mariadb
           path: integration-tests/mariadb
 
       - name: Download sqlite integration tests report
         if: contains(inputs.dbPlatforms, 'sqlite')
         uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-sqlite
+          name: liquibase-integration-jacoco-test-results-sqlite
           path: integration-tests/sqlite
 
       - name: Download firebird integration tests report
         if: contains(inputs.dbPlatforms, 'firebird')
         uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.integrationTestReportArtifactName }}-firebird
+          name: liquibase-integration-jacoco-test-results-firebird
           path: integration-tests/firebird
 
       - name: Cache SonarCloud packages

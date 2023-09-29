@@ -198,47 +198,43 @@ jobs:
         working-directory: ./${{ inputs.testedClassesModuleName }}
         run: |
 
-          pwd
-          ls -ltr
-          ls -ltr unit-tests
+          mkdir -p target
 
-          mkdir -p ${{ inputs.testedClassesModuleName }}/target
-
-          mv unit-tests/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-unit.exec
+          mv unit-tests/jacoco.exec target/jacoco-unit.exec
 
           if [ -d "integration-tests/mssql" ]; then
-            mv integration-tests/mssql/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-mssql-aggregate.exec
+            mv integration-tests/mssql/jacoco.exec target/jacoco-mssql-aggregate.exec
           fi
           if [ -d "integration-tests/mysql" ]; then
-            mv integration-tests/mysql/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-mysql-aggregate.exec
+            mv integration-tests/mysql/jacoco.exec target/jacoco-mysql-aggregate.exec
           fi
           if [ -d "integration-tests/oracle" ]; then
-            mv integration-tests/oracle/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-oracle-aggregate.exec
+            mv integration-tests/oracle/jacoco.exec target/jacoco-oracle-aggregate.exec
           fi
           if [ -d "integration-tests/postgresql" ]; then
-            mv integration-tests/postgresql/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-postgresql-aggregate.exec
+            mv integration-tests/postgresql/jacoco.exec target/jacoco-postgresql-aggregate.exec
           fi
           if [ -d "integration-tests/h2" ]; then
-            mv integration-tests/h2/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-h2-aggregate.exec
+            mv integration-tests/h2/jacoco.exec target/jacoco-h2-aggregate.exec
           fi
           if [ -d "integration-tests/hsqldb" ]; then
-            mv integration-tests/hsqldb/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-hsqldb-aggregate.exec
+            mv integration-tests/hsqldb/jacoco.exec target/jacoco-hsqldb-aggregate.exec
           fi
           if [ -d "integration-tests/mariadb" ]; then
-            mv integration-tests/mariadb/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-mariadb-aggregate.exec
+            mv integration-tests/mariadb/jacoco.exec target/jacoco-mariadb-aggregate.exec
           fi
           if [ -d "integration-tests/sqlite" ]; then
-            mv integration-tests/sqlite/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-sqlite-aggregate.exec
+            mv integration-tests/sqlite/jacoco.exec target/jacoco-sqlite-aggregate.exec
           fi
           if [ -d "integration-tests/firebird" ]; then
-            mv integration-tests/firebird/jacoco.exec ${{ inputs.testedClassesModuleName }}/target/jacoco-firebird-aggregate.exec
+            mv integration-tests/firebird/jacoco.exec target/jacoco-firebird-aggregate.exec
           fi
           
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
           unzip -qq jacoco-0.8.10.zip
-          mv lib/jacococli.jar ${{ inputs.testedClassesModuleName }}/target/jacococli.jar
-          chmod +x ${{ inputs.testedClassesModuleName }}/target/jacococli.jar
-          cd ${{ inputs.testedClassesModuleName }}/target
+          mv lib/jacococli.jar target/jacococli.jar
+          chmod +x target/jacococli.jar
+          cd target
           java -jar jacococli.jar merge *.exec --destfile merged.exec
           java -jar jacococli.jar report merged.exec --classfiles=target/ --xml jacoco.xml
 

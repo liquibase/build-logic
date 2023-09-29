@@ -236,7 +236,7 @@ jobs:
           chmod +x target/jacococli.jar
           cd target
           java -jar jacococli.jar merge *.exec --destfile merged.exec
-          java -jar jacococli.jar report merged.exec --classfiles=target/ --xml jacoco.xml
+          java -jar jacococli.jar report merged.exec --classfiles=../liquibase-standard/target/ --xml jacoco.xml
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request

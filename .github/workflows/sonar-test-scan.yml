@@ -51,12 +51,13 @@ on:
 env:
   MAVEN_VERSION: '3.8.7'
 
-  working-directory: ./${{ inputs.sonarRootPath }}
-
 jobs:
   sonar-scan:
     name: Sonar Scan
     runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ./${{ inputs.sonarRootPath }}
 
     steps:
       - uses: actions/checkout@v3

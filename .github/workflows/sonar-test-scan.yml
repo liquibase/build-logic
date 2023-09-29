@@ -251,6 +251,9 @@ jobs:
           else
             java -jar jacococli.jar report merged.exec --classfiles ../${{ inputs.testedClassesModuleName }}/target/ --sourcefiles ../${{ inputs.testedClassesModuleName }}/src --xml jacoco.xml
           fi
+
+          pwd
+          ls -ltr
           cat jacoco.xml
 
       - name: Sonar Branch Scan
@@ -295,3 +298,10 @@ jobs:
           -Dsonar.host.url='https://sonarcloud.io' \
           -Dsonar.scm.provider=git \
           -Daws.region="us-east-1"
+
+      - name: Archive Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test
+          path: |
+            **/jacoco.xml

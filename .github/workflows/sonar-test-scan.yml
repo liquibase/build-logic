@@ -49,6 +49,11 @@ on:
         type: string
         required: false
         default: mssql,mysql,oracle,postgresql,hsqldb,
+      classesArtifactName:
+        description: 'The classes artifact name'
+        type: string
+        required: false
+        default: liquibase-jacoco-classes
 
 env:
   MAVEN_VERSION: '3.8.7'
@@ -117,6 +122,12 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT }}"
               }
             ]
+
+      - name: Download classes
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.classesArtifactName }}
+          path: classes
 
       - name: Download unit tests report
         uses: actions/download-artifact@v3
@@ -203,7 +214,12 @@ jobs:
       - name: Merge integration and unit tests reports
         if: always()
         run: |
-
+          ls -ltr
+          ls -ltr classes
+          mv unit-tests/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-unit.exec
+          mv classes ./${{ inputs.testedClassesModuleName }}/target/classes
+          ls -ltr ./${{ inputs.testedClassesModuleName }}/target
+          ls -ltr ./${{ inputs.testedClassesModuleName }}/target/classes
           mv unit-tests/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-unit.exec
           if [ -d "integration-tests/mssql" ]; then
             mv integration-tests/mssql/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-mssql-aggregate.exec
@@ -233,9 +249,13 @@ jobs:
             mv integration-tests/firebird/jacoco.exec ./${{ inputs.testedClassesModuleName }}/target/jacoco-firebird-aggregate.exec
           fi
           
-          cd ./${{ inputs.testedClassesModuleName }}
-          mvn jacoco:merge@cli-merge-results
-          mvn jacoco:report@cli-post-merge-report
+          wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
+          unzip -qq ./jacoco-0.8.10.zip
+          mv ./lib/jacococli.jar ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
+          chmod +x ./${{ inputs.testedClassesModuleName }}/target/jacococli.jar
+          cd ./${{ inputs.testedClassesModuleName }}/target
+          java -jar jacococli.jar merge *.exec --destfile merged.exec
+          java -jar jacococli.jar report aggregate.exec --classfiles=../../${{ inputs.testedClassesModuleName }}/target/ --xml jacoco.xml
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request

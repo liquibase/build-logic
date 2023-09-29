@@ -250,8 +250,8 @@ jobs:
 
           if [ "${{ env.testedClassesModuleName }}" = "root" ]; then
             echo "Tested classes module name: root module"
-            java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --xml jacoco.xml
-            java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --html site
+            java -jar jacococli.jar report merged.exec --classfiles ./classes --sourcefiles src --xml jacoco.xml
+            java -jar jacococli.jar report merged.exec --classfiles ./classes --sourcefiles src --html site
           else
             echo "Tested classes module name: ${{ env.testedClassesModuleName }}"
             java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --xml jacoco.xml

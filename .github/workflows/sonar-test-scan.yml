@@ -244,17 +244,16 @@ jobs:
 
           java -jar jacococli.jar merge *.exec --destfile merged.exec
 
-          echo "Tested classes module name: ${{ inputs.testedClassesModuleName }}"
 
           if [ -n "${{ inputs.testedClassesModuleName }}" ]; then
+            echo "Tested classes module name: root module"
             java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --xml jacoco.xml
+            java -jar jacococli.jar report merged.exec --classfiles . --sourcefiles src --html
           else
+            echo "Tested classes module name: ${{ inputs.testedClassesModuleName }}"
             java -jar jacococli.jar report merged.exec --classfiles ../${{ inputs.testedClassesModuleName }}/target/ --sourcefiles ../${{ inputs.testedClassesModuleName }}/src --xml jacoco.xml
+            java -jar jacococli.jar report merged.exec --classfiles ../${{ inputs.testedClassesModuleName }}/target/ --sourcefiles ../${{ inputs.testedClassesModuleName }}/src --html
           fi
-
-          pwd
-          ls -ltr
-          cat jacoco.xml
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request
@@ -299,9 +298,11 @@ jobs:
           -Dsonar.scm.provider=git \
           -Daws.region="us-east-1"
 
-      - name: Archive Test Results
+      - name: Archive Jacoco Merged Results
         uses: actions/upload-artifact@v3
         with:
           name: test
           path: |
             **/jacoco.xml
+            **/merged.exec
+            **/site

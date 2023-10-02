@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Master Branch
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Run Snyk Test
         uses: snyk/actions/maven-3-jdk-11@master

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Define LIQUIBASE_HOME
+LIQUIBASE_HOME="/usr/bin"

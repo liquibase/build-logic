@@ -3,6 +3,10 @@ name: Prepare release
 on:
   workflow_call:
 
+permissions:
+  contents: write
+  pull-requests: write
+  
 jobs:
   prepare-release:
     name: Prepare release
@@ -12,13 +16,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: main
 
       - name: Set up JDK
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           java-version: 17
           distribution: 'temurin'
           cache: 'maven'
+          overwrite-settings: false
 
       - name: Configure Git
         run: |
@@ -27,7 +34,11 @@ jobs:
 
       - name: Prepare Maven Release
         run: |
-          mvn -B release:clean release:prepare -Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }}
+          mvn -B build-helper:parse-version versions:set release:clean release:prepare \
+          -Dusername=liquibot -Dpassword=$GITHUB_TOKEN \
+          -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
+          -DcheckModificationExcludeList=pom.xml
 
       - name: Save Release files
         uses: actions/upload-artifact@v3
@@ -36,3 +47,9 @@ jobs:
           path: |
             **/pom.xml.*
             **/release.properties
+
+  release-rollback:
+    needs: prepare-release
+    if: ${{ always() && contains(needs.*.result, 'failure') }}
+    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@v0.4.5
+    secrets: inherit

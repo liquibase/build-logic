@@ -40,7 +40,7 @@ jobs:
       name: Upload ${{ inputs.artifactId }} deb package
       runs-on: ubuntu-22.04
       steps:
-        - uses: actions/checkout@v3
+        - uses: actions/checkout@v4
 
         - name: Set up Java
           uses: actions/setup-java@v3

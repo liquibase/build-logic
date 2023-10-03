@@ -2,6 +2,22 @@ name: Build and Test Extension
 
 on:
   workflow_call:
+    inputs:
+      java:
+        description: 'Java version to test'
+        required: false
+        default: '[8, 11, 17, 18]'
+        type: string
+      os:
+        description: 'Operating system to test'
+        required: false
+        default: '["ubuntu-latest", "windows-latest"]'
+        type: string
+      nightly:
+        description: 'Specifies nightly builds against liquibase master-SNAPSHOT'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build:
@@ -16,6 +32,10 @@ jobs:
           java-version: 17
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Set latest liquibase version
+        if: ${{ inputs.nightly }} 
+        run: mvn versions:set-property -Dproperty=liquibase.version -DnewVersion=master-SNAPSHOT
 
       - name: Build and Package
         run: mvn -B dependency:go-offline clean package -DskipTests=true
@@ -44,8 +64,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ 8, 11, 17, 18 ]
-        os: [ ubuntu-latest, windows-latest ]
+        java: ${{fromJson(inputs.java || '[8, 11, 17, 18]')}}
+        os: ${{fromJson(inputs.os || '["ubuntu-latest", "windows-latest"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build
@@ -78,5 +98,5 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.3.2
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.4.5
     secrets: inherit

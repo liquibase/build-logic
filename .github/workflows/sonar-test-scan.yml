@@ -1,0 +1,302 @@
+name: Sonar Scan
+
+on:
+  workflow_call:
+    inputs:
+      thisBranchName:
+        description: 'The name of the branch to be scanned'
+        type: string
+        required: true
+      liquibaseBranchName:
+        description: 'The name of the liquibase branch to be scanned'
+        type: string
+        required: true
+      thisSha:
+        description: 'The sha of the branch to be scanned'
+        type: string
+        required: true
+      pullRequestNumber:
+        description: 'The pull request number to be scanned'
+        type: string
+        required: false
+      pullRequestBranchName:
+        description: 'The name of the pull request branch to be scanned'
+        type: string
+        required: false
+      pullRequestBaseBranchName:
+        description: 'The name of the pull request base branch to be scanned'
+        type: string
+        required: false
+      mavenArgs:
+        description: 'The maven arguments to be passed to the mvn command'
+        type: string
+        required: false
+        default: -Dsonar.coverage.exclusions='**/test/**/*.*, **/pom.xml'
+      sonarRootPath:
+        description: 'The name of the tested classes module'
+        type: string
+        required: false
+        default: .
+      testedClassesModuleName:
+        description: 'The name of the tested classes module'
+        type: string
+        required: false
+        default: 'root'
+      dbPlatforms:
+        description: 'The database platforms to be tested'
+        type: string
+        required: false
+        default: mysql
+
+env:
+  MAVEN_VERSION: '3.8.7'
+
+jobs:
+  sonar-scan:
+    name: Sonar Scan
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ./${{ inputs.sonarRootPath }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: 11
+          distribution: 'temurin'
+          cache: 'maven'
+          overwrite-settings: false
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
+
+      - name: Set up Maven settings.xml
+        uses: whelk-io/maven-settings-xml-action@v21
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
+
+      - name: Download unit tests report
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-jacoco-test-results
+          path: ${{ inputs.sonarRootPath }}/unit-tests
+
+      - name: Download mssql integration tests report
+        if: contains(inputs.dbPlatforms, 'mssql')
+        uses: actions/download-artifact@v3
+        with:
+            name: liquibase-integration-jacoco-test-results-mssql
+            path: ${{ inputs.sonarRootPath }}/integration-tests/mssql
+
+      - name: Download mysql integration tests report
+        if: contains(inputs.dbPlatforms, 'mysql')
+        uses: actions/download-artifact@v3
+        with:
+            name: liquibase-integration-jacoco-test-results-mysql
+            path: ${{ inputs.sonarRootPath }}/integration-tests/mysql
+
+      - name: Download oracle integration tests report
+        if: contains(inputs.dbPlatforms, 'oracle')
+        uses: actions/download-artifact@v3        
+        with:
+          name: liquibase-integration-jacoco-test-results-oracle
+          path: ${{ inputs.sonarRootPath }}/integration-tests/oracle
+
+      - name: Download postgresql integration tests report
+        if: contains(inputs.dbPlatforms, 'postgresql')
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-jacoco-test-results-postgresql
+          path: ${{ inputs.sonarRootPath }}/integration-tests/postgresql
+
+      - name: Download h2 integration tests report
+        if: contains(inputs.dbPlatforms, 'h2')
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-jacoco-test-results-h2
+          path: ${{ inputs.sonarRootPath }}/integration-tests/h2
+
+      - name: Download hsqldb integration tests report
+        if: contains(inputs.dbPlatforms, 'hsqldb')
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-jacoco-test-results-hsqldb
+          path: ${{ inputs.sonarRootPath }}/integration-tests/hsqldb
+
+      - name: Download mariadb integration tests report
+        if: contains(inputs.dbPlatforms, 'mariadb')
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-jacoco-test-results-mariadb
+          path: ${{ inputs.sonarRootPath }}/integration-tests/mariadb
+
+      - name: Download sqlite integration tests report
+        if: contains(inputs.dbPlatforms, 'sqlite')
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-jacoco-test-results-sqlite
+          path: ${{ inputs.sonarRootPath }}/integration-tests/sqlite
+
+      - name: Download firebird integration tests report
+        if: contains(inputs.dbPlatforms, 'firebird')
+        uses: actions/download-artifact@v3
+        with:
+          name: liquibase-integration-jacoco-test-results-firebird
+          path: ${{ inputs.sonarRootPath }}/integration-tests/firebird
+
+      - name: Cache SonarCloud packages
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Generate classes
+        if: always()
+        run: |
+          mvn -B clean install -DskipTests -P 'sonar,!run-proguard' "-Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT"
+
+      - name: Merge integration and unit tests reports
+        if: always()
+        env:
+          testedClassesModuleName: ${{ inputs.testedClassesModuleName }}
+        run: |
+          
+          mkdir -p target
+
+          mv unit-tests/jacoco.exec target/jacoco-unit.exec
+
+          if [ -d "integration-tests/mssql" ]; then
+            mv integration-tests/mssql/jacoco.exec target/jacoco-mssql-aggregate.exec
+          fi
+          if [ -d "integration-tests/mysql" ]; then
+            mv integration-tests/mysql/jacoco.exec target/jacoco-mysql-aggregate.exec
+          fi
+          if [ -d "integration-tests/oracle" ]; then
+            mv integration-tests/oracle/jacoco.exec target/jacoco-oracle-aggregate.exec
+          fi
+          if [ -d "integration-tests/postgresql" ]; then
+            mv integration-tests/postgresql/jacoco.exec target/jacoco-postgresql-aggregate.exec
+          fi
+          if [ -d "integration-tests/h2" ]; then
+            mv integration-tests/h2/jacoco.exec target/jacoco-h2-aggregate.exec
+          fi
+          if [ -d "integration-tests/hsqldb" ]; then
+            mv integration-tests/hsqldb/jacoco.exec target/jacoco-hsqldb-aggregate.exec
+          fi
+          if [ -d "integration-tests/mariadb" ]; then
+            mv integration-tests/mariadb/jacoco.exec target/jacoco-mariadb-aggregate.exec
+          fi
+          if [ -d "integration-tests/sqlite" ]; then
+            mv integration-tests/sqlite/jacoco.exec target/jacoco-sqlite-aggregate.exec
+          fi
+          if [ -d "integration-tests/firebird" ]; then
+            mv integration-tests/firebird/jacoco.exec target/jacoco-firebird-aggregate.exec
+          fi
+          
+          wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.10/jacoco-0.8.10.zip
+          unzip -qq jacoco-0.8.10.zip
+          mv lib/jacococli.jar target/jacococli.jar
+          chmod +x target/jacococli.jar
+          cd target
+
+          java -jar jacococli.jar merge *.exec --destfile merged.exec
+
+
+          if [ "${{ env.testedClassesModuleName }}" = "root" ]; then
+            echo "Tested classes module name: root module"
+            java -jar jacococli.jar report merged.exec --classfiles ./classes --sourcefiles src --xml jacoco.xml
+            java -jar jacococli.jar report merged.exec --classfiles ./classes --sourcefiles src --html site
+          else
+            echo "Tested classes module name: ${{ env.testedClassesModuleName }}"
+            java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --xml jacoco.xml
+            java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --html site
+          fi
+
+      - name: Sonar Branch Scan
+        if: always() && !github.event.pull_request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+        run: |
+          mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          ${{ inputs.mavenArgs  }} \
+          -Dsonar.scm.revision=${{ inputs.thisSha }} \
+          -Dsonar.token=$SONAR_TOKEN \
+          -Dsonar.java.coveragePlugin=jacoco \
+          -Dsonar.branch.name=${{ inputs.thisBranchName}} \
+          -Dsonar.qualitygate.wait=true \
+          -Dsonar.organization=${{ github.repository_owner }} \
+          -Dsonar.host.url='https://sonarcloud.io' \
+          -Dsonar.scm.provider=git \
+          -Daws.region="us-east-1"
+
+      - name: Sonar PR Scan
+        if: always() && github.event.pull_request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+        run: |
+          mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
+          ${{ inputs.mavenArgs  }} \
+          -Dsonar.scm.revision=${{ inputs.thisSha }} \
+          -Dsonar.token=$SONAR_TOKEN \
+          -Dsonar.java.coveragePlugin=jacoco \
+          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber}} \
+          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName}} \
+          -Dsonar.pullrequest.base=${{ inputs.pullRequestBaseBranchName }} \
+          -Dsonar.pullrequest.provider=GitHub \
+          -Dsonar.pullrequest.github.repository="${{ github.repository }}" \
+          -Dsonar.pullrequest.github.endpoint='https://api.github.com/' \
+          -Dsonar.qualitygate.wait=true \
+          -Dsonar.organization=${{ github.repository_owner }} \
+          -Dsonar.host.url='https://sonarcloud.io' \
+          -Dsonar.scm.provider=git \
+          -Daws.region="us-east-1"

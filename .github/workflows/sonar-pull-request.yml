@@ -43,7 +43,7 @@ jobs:
           AWS_REGION: "us-east-1"
         run: |
           mvn -B -Daws.region="us-east-1" -Dsonar.login=$SONAR_TOKEN \
-              -Dsonar.pullrequest.key=${{ github.event.pull_request.id }} \
+              -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
               -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} \
               -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }} \
               -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }} \

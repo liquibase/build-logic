@@ -2,10 +2,10 @@ name: Create Release
 
 on:
   workflow_call:
-
+  
 jobs:
   sonar:
-    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@v0.3.1
+    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@v0.4.5
     secrets: inherit
               
   create-release:

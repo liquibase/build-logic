@@ -65,10 +65,10 @@ jobs:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
           ref: ${{ github.event.pull_request.head.sha || github.event.after}}
 
-      - name: Set up JDK
+      - name: Set up JDK for Build
         uses: actions/setup-java@v3
         with:
-          java-version: 17
+          java-version: 11
           distribution: 'temurin'
           cache: 'maven'
           overwrite-settings: false
@@ -258,6 +258,14 @@ jobs:
             java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --xml jacoco.xml
             java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --html site
           fi
+
+      - name: Set up JDK for Sonar
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'maven'
+          overwrite-settings: false
 
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request

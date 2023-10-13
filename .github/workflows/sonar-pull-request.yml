@@ -36,6 +36,22 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      - name: Get Artifact ID
+        id: get-artifact-id
+        run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
+
+      - name: Download Test Results Artifact
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          github_token: ${{secrets.BOT_TOKEN}}
+          workflow: test.yml
+          name: ${{ env.artifact_id }}-artifacts
+          repo: ${{ github.repository }}
+          path: ./target
+          if_no_artifact_found: warn
+          workflow_conclusion: ""
+
       - name: Sonar Scan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -47,4 +63,4 @@ jobs:
               -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} \
               -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }} \
               -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }} \
-              clean verify sonar:sonar
+              sonar:sonar

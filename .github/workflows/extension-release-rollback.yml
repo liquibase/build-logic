@@ -43,6 +43,5 @@ jobs:
           mvn -B release:rollback \
           -Dusername=liquibot -Dpassword=$GITHUB_TOKEN \
           -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
-          -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion}-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
-          -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git -Dtag=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
+          -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git \
           -DcheckModificationExcludeList=pom.xml

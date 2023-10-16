@@ -41,14 +41,16 @@ jobs:
           -DcheckModificationExcludeList=pom.xml
 
       - name: Save Release files
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: release-files
           path: |
-            **/pom.xml*
+            **/pom.xml.releaseBackup
             **/release.properties
 
   release-rollback:
     needs: prepare-release
     if: ${{ always() && contains(needs.*.result, 'failure') }}
-    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@DAT-15862
+    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@v0.4.9
+    secrets: inherit

@@ -45,11 +45,10 @@ jobs:
         with:
           name: release-files
           path: |
-            **/pom.xml.*
+            **/pom.xml*
             **/release.properties
 
   release-rollback:
     needs: prepare-release
     if: ${{ always() && contains(needs.*.result, 'failure') }}
-    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@v0.4.9
-    secrets: inherit
+    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@DAT-15862

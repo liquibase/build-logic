@@ -102,12 +102,13 @@ jobs:
               }
             ]
 
-      - name: Set latest liquibase version
+      - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }} 
-        run: mvn versions:set-property -Dproperty=liquibase.version -DnewVersion=master-SNAPSHOT
+        run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
 
       - name: Build and Package
-        run: mvn -B dependency:go-offline clean package -DskipTests=true
+        if: ${{ !inputs.nightly }} 
+        run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
 
       - name: Get Artifact ID
         id: get-artifact-id

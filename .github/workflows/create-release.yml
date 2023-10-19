@@ -5,7 +5,7 @@ on:
   
 jobs:
   sonar:
-    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@v0.5.0
+    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@v0.5.1
     secrets: inherit
               
   create-release:

@@ -32,7 +32,7 @@ on:
 
 
 env:
-  MAVEN_VERSION: '3.9.2'
+  MAVEN_VERSION: '3.9.5'
 
 jobs:
 

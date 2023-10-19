@@ -49,7 +49,7 @@ on:
         default: mysql
 
 env:
-  MAVEN_VERSION: '3.8.7'
+  MAVEN_VERSION: '3.9.5'
 
 jobs:
   sonar-scan:

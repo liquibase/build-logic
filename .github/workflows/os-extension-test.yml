@@ -19,6 +19,9 @@ on:
         default: false
         type: boolean
 
+env:
+  MAVEN_VERSION: '3.9.5'
+
 jobs:
   build:
     name: Build & Package
@@ -32,6 +35,11 @@ jobs:
           java-version: 17
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
 
       - name: Set latest liquibase version
         if: ${{ inputs.nightly }} 
@@ -78,6 +86,11 @@ jobs:
           java-version: ${{ matrix.java }}
           distribution: 'temurin'
           cache: 'maven'
+      
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
 
       - uses: actions/download-artifact@v3
         with:

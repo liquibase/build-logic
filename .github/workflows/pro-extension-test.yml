@@ -38,6 +38,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  MAVEN_VERSION: '3.9.5'
 
 jobs:
   build:
@@ -52,6 +53,11 @@ jobs:
           java-version: 17
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
@@ -141,6 +147,11 @@ jobs:
           java-version: ${{ matrix.java }}
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
 
       # look for dependencies in maven
       - name: maven-settings-xml-action

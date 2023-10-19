@@ -108,7 +108,7 @@ jobs:
 
       - name: Build and Package
         if: ${{ !inputs.nightly }} 
-        run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
+        run: mvn -B dependency:go-offline clean package -DskipTests=true
 
       - name: Get Artifact ID
         id: get-artifact-id

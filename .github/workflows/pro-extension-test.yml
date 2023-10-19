@@ -202,6 +202,17 @@ jobs:
           name: ${{needs.build.outputs.artifact_id}}-artifacts
           path: ./target
 
+      - name: Setup Vault token
+        env:
+          VAULT_ADDR: https://liquibase-vault-dev-public-vault-634c5cf6.601dd768.z1.hashicorp.cloud:8200/
+        uses: hashicorp/vault-action@v2
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          namespace: admin
+          method: github
+          githubToken: ${{ secrets.BOT_TOKEN }}
+          exportToken: true
+
       - name: Run Tests
         run: mvn -B jacoco:prepare-agent surefire:test
 

@@ -19,6 +19,9 @@ on:
         default: false
         type: boolean
 
+env:
+  MAVEN_VERSION: '3.9.5'
+
 jobs:
   build:
     name: Build & Package
@@ -33,9 +36,18 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Set latest liquibase version
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
+
+      - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }} 
-        run: mvn versions:set-property -Dproperty=liquibase.version -DnewVersion=master-SNAPSHOT
+        run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
+
+      - name: Build and Package
+        if: ${{ !inputs.nightly }} 
+        run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
 
       - name: Build and Package
         run: mvn -B dependency:go-offline clean package -DskipTests=true
@@ -78,6 +90,11 @@ jobs:
           java-version: ${{ matrix.java }}
           distribution: 'temurin'
           cache: 'maven'
+      
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
 
       - uses: actions/download-artifact@v3
         with:
@@ -98,5 +115,5 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.0
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.1
     secrets: inherit

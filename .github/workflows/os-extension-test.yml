@@ -107,9 +107,6 @@ jobs:
         if: ${{ !inputs.nightly }} 
         run: mvn -B dependency:go-offline clean package -DskipTests=true
 
-      - name: Build and Package
-        run: mvn -B dependency:go-offline clean package -DskipTests=true
-
       - name: Get Artifact ID
         id: get-artifact-id
         run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"

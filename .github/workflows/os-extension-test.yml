@@ -18,6 +18,11 @@ on:
         required: false
         default: false
         type: boolean
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
 
 env:
   MAVEN_VERSION: '3.9.5'
@@ -84,6 +89,11 @@ jobs:
               }
             ]
                       
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
+
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }} 
         run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
@@ -144,6 +154,11 @@ jobs:
           name: ${{needs.build.outputs.artifact_id}}-artifacts
           path: ./target
 
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
+
       - name: Run Tests
         run: mvn -B jacoco:prepare-agent surefire:test
 
@@ -158,5 +173,7 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.1
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.2
     secrets: inherit
+    with:
+      extraCommand: ${{ inputs.extraCommand }} 

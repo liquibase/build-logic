@@ -54,10 +54,10 @@ jobs:
             # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.5.1/src/${{ inputs.artifactId }}/deb/control/control
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.5.1/src/${{ inputs.artifactId }}/deb/control/postinst
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.1/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.5.1/.github/package-deb-pom.xml
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.5.2/src/${{ inputs.artifactId }}/deb/control/control
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.5.2/src/${{ inputs.artifactId }}/deb/control/postinst
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.2/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
+            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.5.2/.github/package-deb-pom.xml
 
         - name: Set up Maven
           uses: stCarolas/setup-maven@v4.5

@@ -2,6 +2,12 @@ name: Release Extension to Sonatype
 
 on:
   workflow_call:
+    inputs:
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
     secrets:
       SONATYPE_USERNAME:
         description: 'SONATYPE_USERNAME from the caller workflow'
@@ -74,6 +80,11 @@ jobs:
           git config user.name "liquibot"
           git config user.email "liquibot@liquibase.org"
 
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
+
       - name: Build release artifacts
         id: build-release-artifacts
         run: |
@@ -111,5 +122,7 @@ jobs:
 
   maven-release:
     needs: release
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.5.1
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.5.2
     secrets: inherit
+    with:
+      extraCommand: ${{ inputs.extraCommand }} 

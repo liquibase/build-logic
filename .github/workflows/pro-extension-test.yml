@@ -23,6 +23,11 @@ on:
         required: false
         default: ''
         type: string
+      extraMavenArgs:
+        description: 'Specify it if you want to run an extra maven argument'
+        required: false
+        default: ''
+        type: string
     secrets:
       SONAR_TOKEN:
         description: 'SONAR_TOKEN from the caller workflow'
@@ -218,7 +223,7 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Run Tests
-        run: mvn -B jacoco:prepare-agent surefire:test
+        run: mvn -B jacoco:prepare-agent surefire:test ${{ inputs.extraMavenArgs }}
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}

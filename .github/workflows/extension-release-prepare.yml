@@ -2,6 +2,12 @@ name: Prepare release
 
 on:
   workflow_call:
+    inputs:
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -75,6 +81,11 @@ jobs:
           git config user.name "liquibot"
           git config user.email "liquibot@liquibase.org"
 
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
+
       - name: Prepare Maven Release
         run: |
           mvn -B build-helper:parse-version release:clean release:prepare \
@@ -95,5 +106,7 @@ jobs:
   release-rollback:
     needs: prepare-release
     if: ${{ always() && contains(needs.*.result, 'failure') }}
-    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@v0.5.1
+    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@v0.5.2
     secrets: inherit
+    with:
+      extraCommand: ${{ inputs.extraCommand }}

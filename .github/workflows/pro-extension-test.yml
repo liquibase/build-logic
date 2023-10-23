@@ -18,6 +18,16 @@ on:
         required: false
         default: false
         type: boolean
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
+      extraMavenArgs:
+        description: 'Specify it if you want to run an extra maven argument'
+        required: false
+        default: ''
+        type: string
     secrets:
       SONAR_TOKEN:
         description: 'SONAR_TOKEN from the caller workflow'
@@ -38,6 +48,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  MAVEN_VERSION: '3.9.5'
 
 jobs:
   build:
@@ -53,9 +64,14 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
+
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v20
+        uses: whelk-io/maven-settings-xml-action@v21
         with:
           repositories: |
             [
@@ -96,11 +112,17 @@ jobs:
               }
             ]
 
-      - name: Set latest liquibase version
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
+
+      - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }} 
-        run: mvn versions:set-property -Dproperty=liquibase.version -DnewVersion=master-SNAPSHOT
+        run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
 
       - name: Build and Package
+        if: ${{ !inputs.nightly }} 
         run: mvn -B dependency:go-offline clean package -DskipTests=true
 
       - name: Get Artifact ID
@@ -142,9 +164,14 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
+
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v20
+        uses: whelk-io/maven-settings-xml-action@v21
         with:
           repositories: |
             [
@@ -190,8 +217,13 @@ jobs:
           name: ${{needs.build.outputs.artifact_id}}-artifacts
           path: ./target
 
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
+
       - name: Run Tests
-        run: mvn -B jacoco:prepare-agent surefire:test
+        run: mvn -B jacoco:prepare-agent surefire:test ${{ inputs.extraMavenArgs }}
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}
@@ -204,5 +236,7 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.4.8
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.2
     secrets: inherit
+    with:
+      extraCommand: ${{ inputs.extraCommand }}

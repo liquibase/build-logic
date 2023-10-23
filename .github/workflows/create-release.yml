@@ -2,11 +2,19 @@ name: Create Release
 
 on:
   workflow_call:
+    inputs:
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
   
 jobs:
   sonar:
-    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@v0.5.1
+    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@v0.5.2
     secrets: inherit
+    with:
+      extraCommand: ${{ inputs.extraCommand }}
               
   create-release:
     name: Create Release

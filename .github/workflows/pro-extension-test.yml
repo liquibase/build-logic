@@ -18,6 +18,16 @@ on:
         required: false
         default: false
         type: boolean
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
+      extraMavenArgs:
+        description: 'Specify it if you want to run an extra maven argument'
+        required: false
+        default: ''
+        type: string
     secrets:
       SONAR_TOKEN:
         description: 'SONAR_TOKEN from the caller workflow'
@@ -101,6 +111,11 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT }}"
               }
             ]
+
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }} 
@@ -202,8 +217,13 @@ jobs:
           name: ${{needs.build.outputs.artifact_id}}-artifacts
           path: ./target
 
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
+
       - name: Run Tests
-        run: mvn -B jacoco:prepare-agent surefire:test
+        run: mvn -B jacoco:prepare-agent surefire:test ${{ inputs.extraMavenArgs }}
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}
@@ -216,5 +236,7 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.1
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.2
     secrets: inherit
+    with:
+      extraCommand: ${{ inputs.extraCommand }}

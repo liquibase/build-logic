@@ -2,6 +2,12 @@ name: Release rollback
 
 on:
   workflow_call:
+    inputs:
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -26,7 +32,7 @@ jobs:
           git config user.email "liquibot@liquibase.org"
 
       - name: Set up JDK
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           java-version: 17
           distribution: 'temurin'
@@ -80,6 +86,11 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: release-files
+
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
 
       - name: Perform Maven Release Rollback
         run: |

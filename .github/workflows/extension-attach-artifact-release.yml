@@ -8,6 +8,11 @@ on:
         required: false
         default: 'false'
         type: string
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
     secrets:
       BOT_TOKEN:
         description: 'BOT_TOKEN from the caller workflow'
@@ -35,11 +40,54 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      # look for dependencies in maven
+      - name: maven-settings-xml-action
+        uses: whelk-io/maven-settings-xml-action@v20
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
+            
       - name: Get Reusable Script Files
         run: |
-          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.4.8/.github/get_draft_release.sh
-          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.4.8/.github/sign_artifact.sh
-          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.4.8/.github/upload_asset.sh
+          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.2/.github/get_draft_release.sh
+          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.2/.github/sign_artifact.sh
+          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.2/.github/upload_asset.sh
           chmod +x $PWD/.github/get_draft_release.sh
           chmod +x $PWD/.github/sign_artifact.sh
           chmod +x $PWD/.github/upload_asset.sh
@@ -48,6 +96,11 @@ jobs:
         run: |
           git config user.name "liquibot"
           git config user.email "liquibot@liquibase.org"
+
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
 
       - name: Build release artifacts
         id: build-release-artifacts
@@ -115,7 +168,7 @@ jobs:
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'
         run: |
-          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.4.8/.github/upload_zip.sh
+          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.2/.github/upload_zip.sh
           chmod +x $PWD/.github/upload_zip.sh
   
       - name: Attach Zip File to Draft Release

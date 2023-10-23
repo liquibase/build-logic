@@ -2,6 +2,12 @@ name: Release Extension to Sonatype
 
 on:
   workflow_call:
+    inputs:
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
     secrets:
       SONATYPE_USERNAME:
         description: 'SONATYPE_USERNAME from the caller workflow'
@@ -25,11 +31,59 @@ jobs:
           server-id: sonatype-nexus-staging
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
+          
+      # look for dependencies in maven
+      - name: maven-settings-xml-action
+        uses: whelk-io/maven-settings-xml-action@v20
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
 
       - name: Configure Git
         run: |
           git config user.name "liquibot"
           git config user.email "liquibot@liquibase.org"
+
+      - name: Run extra command
+        if: inputs.extraCommand != ''
+        run: |
+          ${{ inputs.extraCommand }}
 
       - name: Build release artifacts
         id: build-release-artifacts
@@ -68,5 +122,7 @@ jobs:
 
   maven-release:
     needs: release
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.4.8
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.5.2
     secrets: inherit
+    with:
+      extraCommand: ${{ inputs.extraCommand }} 

@@ -17,7 +17,7 @@ on:
       languages:
         description: 'Languages to analyze'
         required: false
-        default: '[java]'
+        default: '["java"]'
         type: string
 
 jobs:

@@ -106,7 +106,7 @@ jobs:
   release-rollback:
     needs: prepare-release
     if: ${{ always() && contains(needs.*.result, 'failure') }}
-    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@v0.5.4
+    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@v0.5.5
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

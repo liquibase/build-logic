@@ -162,7 +162,7 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Run Tests
-        run: mvn -B jacoco:prepare-agent surefire:test ${{ inputs.extraMavenArgs }}
+        run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }}
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}

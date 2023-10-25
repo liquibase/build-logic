@@ -115,4 +115,4 @@ jobs:
         run: |
           mvn -B -Daws.region="us-east-1" -Dsonar.login=$SONAR_TOKEN \
               -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }} \
-              sonar:sonar
+              package -DskipTests sonar:sonar

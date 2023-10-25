@@ -232,7 +232,7 @@ jobs:
           name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
           path: |
             **/target/surefire-reports
-            **/target/jacoco.exec
+            **/target/site/jacoco/jacoco.xml
 
   sonar-pr:
     needs: [ unit-test ]

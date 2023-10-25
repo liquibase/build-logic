@@ -56,7 +56,6 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: test-reports-jdk-17-ubuntu-latest
-          path: ./target
           
       # look for dependencies in maven
       - name: maven-settings-xml-action

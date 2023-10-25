@@ -98,7 +98,6 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: test-reports-jdk-17-ubuntu-latest
-          path: ./target
 
       - name: Sonar Scan
         env:

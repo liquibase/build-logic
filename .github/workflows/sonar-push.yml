@@ -52,17 +52,11 @@ jobs:
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
-      - name: Download Test Results Artifact
-        id: download-artifact
-        uses: dawidd6/action-download-artifact@v2
+      - name: Download unit tests report
+        uses: actions/download-artifact@v3
         with:
-          github_token: ${{secrets.BOT_TOKEN}}
-          workflow: test.yml
           name: test-reports-jdk-17-ubuntu-latest
-          repo: ${{ github.repository }}
           path: ./target
-          if_no_artifact_found: warn
-          workflow_conclusion: ""
           
       # look for dependencies in maven
       - name: maven-settings-xml-action

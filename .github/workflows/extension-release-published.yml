@@ -28,7 +28,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
-          
+
       # look for dependencies in maven
       - name: maven-settings-xml-action
         uses: whelk-io/maven-settings-xml-action@v21
@@ -55,6 +55,16 @@ jobs:
                 "snapshots": {
                   "enabled": "true",
                   "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "sonatype-nexus-staging",
+                "url": "https://oss.sonatype.org/service/local/staging/deploy/maven2/",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "false"
                 }
               }
             ]

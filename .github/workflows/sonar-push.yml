@@ -60,7 +60,6 @@ jobs:
           workflow: test.yml
           name: test-reports-jdk-17-ubuntu-latest
           repo: ${{ github.repository }}
-          path: ./target
           if_no_artifact_found: warn
           workflow_conclusion: ""
           
@@ -113,6 +112,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           AWS_REGION: "us-east-1"
         run: |
-          mvn -B -Daws.region="us-east-1" -Dsonar.login=$SONAR_TOKEN \
+          mvn -B -Daws.region="us-east-1" -Dsonar.token=$SONAR_TOKEN \
               -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }} \
               package -DskipTests sonar:sonar

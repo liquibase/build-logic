@@ -28,9 +28,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
-          server-id: sonatype-nexus-staging
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_PASSWORD
           
       # look for dependencies in maven
       - name: maven-settings-xml-action
@@ -72,6 +69,11 @@ jobs:
                 "id": "liquibase",
                 "username": "liquibot",
                 "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "sonatype-nexus-staging",
+                "username": "${{ secrets.SONATYPE_USERNAME }}",
+                "password": "${{ secrets.SONATYPE_TOKEN }}"
               }
             ]
 

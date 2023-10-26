@@ -95,7 +95,6 @@ jobs:
       - name: Perform Maven Release Rollback
         run: |
           mvn -B versions:revert release:rollback \
-          -Dusername=liquibot -Dpassword=$GITHUB_TOKEN \
-          -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git \
           -DcheckModificationExcludeList=pom.xml

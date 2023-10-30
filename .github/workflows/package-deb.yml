@@ -59,11 +59,6 @@ jobs:
           with:
             ruby-version: 3.1.4
 
-        - name: Set up Python
-          uses: actions/setup-python@v2
-          with:
-            python-version: 3.11.6
-
         - name: Get Reusable Files
           run: |
             # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
@@ -108,7 +103,10 @@ jobs:
         - name: Convert deb to rpm
           run: |
             sudo apt-get update
-            sudo apt-get install -y alien curl libcurl4-openssl-dev rpm ninja-build
+            sudo apt-get install -y alien curl libcurl4-openssl-dev rpm ninja-build createrepo debugedit deltarpm libdw1 \
+            liblua5.2-0 libpython2-stdlib libpython2.7 libpython2.7-minimal libpython2.7-stdlib librpm8 librpmbuild8 \
+            librpmio8 librpmsign8 libsqlite0 python-deltarpm python-is-python2 python-libxml2 python-lzma python-pycurl \
+            python-rpm python-sqlite python-sqlitecachec python-urlgrabber python2 python2-minimal python2.7 python2.7-minimal rpm-common rpm2cpio yum
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
         - name: Import GPG key
@@ -125,10 +123,8 @@ jobs:
 
         - name: Upload rpm package
           run: |
-            pip install --upgrade pip
-            pip install rpm cmake createrepo-c
             mkdir -p $PWD/yum/noarch
             mv $PWD/*.rpm $PWD/yum/noarch
-            createrepo-c –deltas noarch
+            createrepo –deltas noarch
             aws s3 sync –recursive $PWD/yum s3://repoyum.liquibase.com
 

@@ -133,6 +133,7 @@ jobs:
             cd ../../..
             mkdir -p $PWD/yum/noarch
             mv $PWD/*.rpm $PWD/yum/noarch
-            /opt/createrepo –deltas $PWD/yum/noarch
+            ls -ltr
+            /opt/createrepo $PWD/yum/noarch
             aws s3 sync –recursive $PWD/yum s3://repoyum.liquibase.com
 

@@ -101,7 +101,9 @@ jobs:
         - name: Convert deb to rpm
           run: |
             sudo apt-get install alien
-            sudo alien -r $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+            sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+            curl https://git.savannah.gnu.org/cgit/guix.git/plain/etc/guix-install.sh | sudo bash
+            guix install createrepo-c
                   
         
           

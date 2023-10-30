@@ -121,6 +121,7 @@ jobs:
           run: |
             mkdir -p $PWD/yumrepo/noarch
             mv $PWD/*.rpm $PWD/yumrepo/noarch
-            guix install createrepo-
-            createrepo –deltas noarch
+            guix pull
+            guix install createrepo-c
+            createrepo-c –deltas noarch
 

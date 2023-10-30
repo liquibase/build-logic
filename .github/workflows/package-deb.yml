@@ -49,18 +49,6 @@ jobs:
             distribution: 'temurin'
             cache: 'maven'
 
-        - name: Get Reusable Files
-          run: |
-            # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
-            mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
-            mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/src/${{ inputs.artifactId }}/deb/control/control
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/src/${{ inputs.artifactId }}/deb/control/postinst
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/package-deb-pom.xml
-            curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/sign_artifact.sh
-            chmod +x $PWD/.github/sign_artifact.sh
-
         - name: Set up Maven
           uses: stCarolas/setup-maven@v4.5
           with:
@@ -75,6 +63,18 @@ jobs:
           uses: actions/setup-python@v2
           with:
             python-version: 3.11.6
+
+        - name: Get Reusable Files
+          run: |
+            # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
+            mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
+            mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/src/${{ inputs.artifactId }}/deb/control/control
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/src/${{ inputs.artifactId }}/deb/control/postinst
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
+            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/package-deb-pom.xml
+            curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/sign_artifact.sh
+            chmod +x $PWD/.github/sign_artifact.sh
 
         - name: Configure AWS credentials
           uses: aws-actions/configure-aws-credentials@v4
@@ -107,7 +107,8 @@ jobs:
 
         - name: Convert deb to rpm
           run: |
-            sudo apt-get install alien curl libcurl4-openssl-dev rpm
+            sudo apt-get update
+            sudo apt-get install -y alien curl libcurl4-openssl-dev rpm
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
         - name: Import GPG key

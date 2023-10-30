@@ -49,7 +49,7 @@ jobs:
             distribution: 'temurin'
             cache: 'maven'
 
-        - name: Get Reusable Maven Files
+        - name: Get Reusable Files
           run: |
             # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
@@ -58,6 +58,8 @@ jobs:
             curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/src/${{ inputs.artifactId }}/deb/control/postinst
             curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
             curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/package-deb-pom.xml
+            curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/sign_artifact.sh
+            chmod +x $PWD/.github/sign_artifact.sh
 
         - name: Set up Maven
           uses: stCarolas/setup-maven@v4.5
@@ -102,8 +104,24 @@ jobs:
           run: |
             sudo apt-get install alien
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+
+        - name: Import GPG key
+          id: import_gpg
+          uses: crazy-max/ghaction-import-gpg@v6
+          with:
+            gpg_private_key: ${{ secrets.GPG_SECRET }}
+            passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+        - name: Sign rpm package
+          run: |
+            gpg -K
+            ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}.noarch.rpm
+
+        - name: Upload rpm package
+          run: |
+            mkdir -p $PWD/yumrepo/noarch
+            mv $PWD/*.rpm $PWD/yumrepo/noarch
             curl https://git.savannah.gnu.org/cgit/guix.git/plain/etc/guix-install.sh | sudo bash
             guix install createrepo-c
-                  
-        
-          
+            createrepo-c –deltas noarch
+            

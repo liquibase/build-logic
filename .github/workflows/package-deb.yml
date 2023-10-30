@@ -135,5 +135,5 @@ jobs:
             mv $PWD/*.rpm $PWD/yum/noarch
             ls -ltr
             /opt/createrepo $PWD/yum/noarch
-            aws s3 sync $PWD/yum s3://repoyum.liquibase.com/yum
+            aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 

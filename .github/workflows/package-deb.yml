@@ -135,6 +135,8 @@ jobs:
             aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
             mv $PWD/*.rpm $PWD/yum/noarch
             /opt/createrepo -h
-            /opt/createrepo -dp $PWD/yum/noarch 
+            /opt/createrepo -dp $PWD/yum/noarch
+            gpg -K
+            ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
             aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 

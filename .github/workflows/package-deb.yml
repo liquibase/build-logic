@@ -115,11 +115,10 @@ jobs:
 
         - name: Sign rpm package
           run: |
-            gpg -K
             ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
             echo "%_gpg_name Liquibase <support@liquibase.org>" > github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
-            rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+            sudo rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
 
         - name: Upload rpm package
@@ -143,7 +142,6 @@ jobs:
             mv $PWD/*.sha1 $PWD/yum/noarch
             /opt/createrepo -h
             /opt/createrepo -dp $PWD/yum/noarch
-            gpg -K
             ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
             aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 

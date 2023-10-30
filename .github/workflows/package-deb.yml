@@ -115,7 +115,7 @@ jobs:
         - name: Sign rpm package
           run: |
             gpg -K
-            ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}.noarch.rpm
+            ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package
           run: |
@@ -124,4 +124,4 @@ jobs:
             curl https://git.savannah.gnu.org/cgit/guix.git/plain/etc/guix-install.sh | sudo bash
             guix install createrepo-c
             createrepo-c –deltas noarch
-            
+

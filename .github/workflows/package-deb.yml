@@ -120,7 +120,7 @@ jobs:
 
         - name: Upload rpm package
           run: |
-            sudo apt-get install -y alien libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python cmake
+            sudo apt-get install -y alien libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
             mkdir createrepo_folder
             cd createrepo_folder
             git clone https://github.com/rpm-software-management/createrepo_c

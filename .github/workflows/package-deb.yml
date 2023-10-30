@@ -132,6 +132,7 @@ jobs:
             cp src/createrepo_c  /opt/createrepo
             cd ../../..
             mkdir -p $PWD/yum/noarch
+            aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} /local/directory/$PWD/yum/noarch
             mv $PWD/*.rpm $PWD/yum/noarch
             ls -ltr
             /opt/createrepo $PWD/yum/noarch

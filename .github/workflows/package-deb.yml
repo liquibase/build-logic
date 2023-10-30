@@ -71,6 +71,11 @@ jobs:
           with:
             ruby-version: 3.1.4
 
+        - name: Set up Python
+          uses: actions/setup-python@v2
+          with:
+            python-version: 3.11
+
         - name: Configure AWS credentials
           uses: aws-actions/configure-aws-credentials@v4
           with:
@@ -102,7 +107,7 @@ jobs:
 
         - name: Convert deb to rpm
           run: |
-            sudo apt-get install alien guix
+            sudo apt-get install alien
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
         - name: Import GPG key
@@ -119,10 +124,9 @@ jobs:
 
         - name: Upload rpm package
           run: |
-            mkdir -p $PWD/yumrepo/noarch
-            mv $PWD/*.rpm $PWD/yumrepo/noarch
-            guix pull
-            guix install createrepo-c
+            pip install createrepo-c
+            mkdir -p $PWD/yum/noarch
+            mv $PWD/*.rpm $PWD/yum/noarch
             createrepo-c –deltas noarch
-            aws s3 sync –recursive $PWD/yumrepo s3://repoyum.liquibase.com
+            aws s3 sync –recursive $PWD/yum s3://repoyum.liquibase.com
 

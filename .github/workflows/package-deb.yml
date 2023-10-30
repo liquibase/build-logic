@@ -108,7 +108,7 @@ jobs:
         - name: Convert deb to rpm
           run: |
             sudo apt-get update
-            sudo apt-get install -y alien curl libcurl4-openssl-dev rpm
+            sudo apt-get install -y alien curl libcurl4-openssl-dev rpm ninja-build
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
         - name: Import GPG key

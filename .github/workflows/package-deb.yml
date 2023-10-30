@@ -102,7 +102,7 @@ jobs:
 
         - name: Convert deb to rpm
           run: |
-            sudo apt-get install alien guix
+            sudo apt-get install alien
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
         - name: Import GPG key
@@ -119,9 +119,11 @@ jobs:
 
         - name: Upload rpm package
           run: |
+            wget https://git.savannah.gnu.org/cgit/guix.git/plain/etc/guix-install.sh
+            chmod +x guix-install.sh
+            ./guix-install.sh
             mkdir -p $PWD/yumrepo/noarch
             mv $PWD/*.rpm $PWD/yumrepo/noarch
-            guix pull
-            guix install createrepo-c
             createrepo-c –deltas noarch
+            aws s3 sync –recursive $PWD/yumrepo s3://repoyum.liquibase.com
 

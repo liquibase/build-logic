@@ -124,7 +124,7 @@ jobs:
 
         - name: Upload rpm package
           run: |
-            pip install createrepo-c
+            pip install rpm cmake createrepo-c
             mkdir -p $PWD/yum/noarch
             mv $PWD/*.rpm $PWD/yum/noarch
             createrepo-c –deltas noarch

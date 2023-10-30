@@ -103,10 +103,7 @@ jobs:
         - name: Convert deb to rpm
           run: |
             sudo apt-get update
-            sudo apt-get install -y alien curl libcurl4-openssl-dev rpm ninja-build createrepo debugedit deltarpm libdw1 \
-            liblua5.2-0 libpython2-stdlib libpython2.7 libpython2.7-minimal libpython2.7-stdlib librpm8 librpmbuild8 \
-            librpmio8 librpmsign8 libsqlite0 python-deltarpm python-is-python2 python-libxml2 python-lzma python-pycurl \
-            python-rpm python-sqlite python-sqlitecachec python-urlgrabber python2 python2-minimal python2.7 python2.7-minimal rpm-common rpm2cpio yum
+            sudo apt-get install -y alien libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3.9-dev cmake
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
         - name: Import GPG key

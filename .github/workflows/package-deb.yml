@@ -134,6 +134,9 @@ jobs:
             mkdir -p $PWD/yum/noarch
             aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
             mv $PWD/*.rpm $PWD/yum/noarch
+            mv $PWD/*.asc $PWD/yum/noarch
+            mv $PWD/*.md5 $PWD/yum/noarch
+            mv $PWD/*.sha1 $PWD/yum/noarch
             /opt/createrepo -h
             /opt/createrepo -dp $PWD/yum/noarch
             gpg -K

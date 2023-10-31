@@ -123,8 +123,7 @@ jobs:
             echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf
             gpg-connect-agent reloadagent /bye
             keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | awk '{print $3}')
-            echo "keygrip: $keygrip"
-            echo "${{ secrets.GPG_PASSPHRASE }}"
+            echo "gpg-connect-agent 'preset_passphrase $keygrip -1 ${{ secrets.GPG_PASSPHRASE }}' /bye"
             gpg-connect-agent 'preset_passphrase $keygrip -1 ${{ secrets.GPG_PASSPHRASE }}' /bye
             #"$(gpgconf --list-dirs libexecdir)"/gpg-preset-passphrase --verbose --passphrase ${{ secrets.GPG_PASSPHRASE }} --preset $keygrip
             #sudo rpm --define "_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" --define "_gpg_name [ unknown] Liquibase <support@liquibase.org>" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm

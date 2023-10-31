@@ -119,7 +119,7 @@ jobs:
 
         - name: Sign rpm package
           run: |
-            #echo "%_gpg_name Liquibase <support@liquibase.org>" > github_action_macros
+            #echo "%__gpg_name Liquibase <support@liquibase.org>" > github_action_macros
             echo "%__gpg_sign_cmd %{__gpg} gpg --no-verbose --no-armor --batch --pinentry-mode loopback %{?_gpg_digest_algo:--digest-algo %{_gpg_digest_algo}} --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}" >> github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
             export GPG_TTY=$(tty)

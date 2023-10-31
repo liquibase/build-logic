@@ -120,6 +120,10 @@ jobs:
             echo "%_gpg_name Liquibase <support@liquibase.org>" > github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
             echo "pinentry-mode loopback" >> $HOME/.gnupg/gpg.conf
+            echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf
+            gpg-connect-agent reloadagent /bye
+            keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | awk '{print $3}')
+            gpg-preset-passphrase --passphrase ${{ secrets.GPG_PASSPHRASE }} --preset $keygrip
             sudo rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

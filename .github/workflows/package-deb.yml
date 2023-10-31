@@ -123,7 +123,7 @@ jobs:
             echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf
             gpg-connect-agent reloadagent /bye
             gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} 
-            keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | awk '{print $3}')
+            keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | awk '/^Keygrip/ {print $3; exit}')
             echo "keygrip: $keygrip"
             echo "gpg-connect-agent 'preset_passphrase $keygrip -1 ${{ secrets.GPG_PASSPHRASE }}' /bye"
             gpg-connect-agent 'preset_passphrase $keygrip -1 ${{ secrets.GPG_PASSPHRASE }}' /bye

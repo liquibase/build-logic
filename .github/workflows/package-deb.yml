@@ -122,6 +122,7 @@ jobs:
             echo "%_gpg_name Liquibase <support@liquibase.org> _gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" > github_action_macros
             #echo "%_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" >> github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
+            export GPG_TTY=$(tty)
             echo "use-agent" >> $HOME/.gnupg/gpg.conf
             echo "pinentry-mode loopback" >> $HOME/.gnupg/gpg.conf
             echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf
@@ -131,6 +132,9 @@ jobs:
             hexpassphrase=$(echo -n ${{ secrets.GPG_PASSPHRASE }} | hexdump -v -e '/1 "%02X"'; echo)
             gpg-connect-agent "preset_passphrase $keygrip -1 $hexpassphrase" /bye
             #sudo rpm --define "_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" --define "_gpg_name [ unknown] Liquibase <support@liquibase.org>" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+            DISPLAY_SAVE=$DISPLAY
+            unset DISPLAY
+            gpg --version
             sudo rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

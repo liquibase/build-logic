@@ -91,14 +91,14 @@ jobs:
         - name: Install deb-s3 gem
           run: gem install deb-s3
 
-        # - name: Upload ${{ inputs.artifactId }} deb package
-        #   run: |
-        #     sudo apt install pinentry-tty
-        #     echo "2" | sudo update-alternatives --config pinentry
-        #     echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
-        #     export GPG_TTY=$(tty)
-        #     echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-        #     deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+        - name: Upload ${{ inputs.artifactId }} deb package
+          run: |
+            sudo apt install pinentry-tty
+            echo "2" | sudo update-alternatives --config pinentry
+            echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+            export GPG_TTY=$(tty)
+            echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
+            #deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
         - name: Convert deb to rpm
           run: |
@@ -123,8 +123,7 @@ jobs:
             echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf
             gpg-connect-agent reloadagent /bye
             keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | awk '{print $3}')
-            echo $keygrip
-            "$(gpgconf --list-dirs libexecdir)"/gpg-preset-passphrase --verbose --passphrase ${{ secrets.GPG_PASSPHRASE }} $keygrip
+            "$(gpgconf --list-dirs libexecdir)"/gpg-preset-passphrase --verbose --passphrase ${{ secrets.GPG_PASSPHRASE }} --preset $keygrip
             sudo rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

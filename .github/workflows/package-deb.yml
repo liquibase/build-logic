@@ -115,7 +115,7 @@ jobs:
 
         - name: Sign rpm package
           run: |
-            echo "%_gpg_name "Liquibase <support@liquibase.org>" _gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" > github_action_macros
+            echo "%_gpg_name Liquibase <support@liquibase.org> _gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" > github_action_macros
             echo "%_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" >> github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
             export GPG_TTY=$(tty)

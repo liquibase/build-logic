@@ -117,9 +117,9 @@ jobs:
           run: |
             echo "%_gpg_name Liquibase <support@liquibase.org>" > github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
-            cat $HOME/.gnupg/gpg.conf
             echo "pinentry-mode loopback" >> $HOME/.gnupg/gpg.conf
             export GPG_TTY=$(tty)
+            export DISPLAY=:0.0
             sudo rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

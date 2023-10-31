@@ -115,7 +115,7 @@ jobs:
 
         - name: Sign rpm package
           run: |
-            echo "%_gpg_name Liquibase <support@liquibase.org> _gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" > github_action_macros
+            echo "%_gpg_name "[ unknown] Liquibase <support@liquibase.org>" _gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" > github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
             export GPG_TTY=$(tty)
             echo "pinentry-mode loopback" >> $HOME/.gnupg/gpg.conf
@@ -123,11 +123,7 @@ jobs:
             gpg-connect-agent reloadagent /bye
             keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | awk '{print $3}')
             #"$(gpgconf --list-dirs libexecdir)"/gpg-preset-passphrase --verbose --passphrase ${{ secrets.GPG_PASSPHRASE }} --preset $keygrip
-            gpg --list-secret-keys
-            gpg --export-secret-key -a > secretkey.asc
-            gpg --import secretkey.asc
-            sudo rpm --import secretkey.asc
-            sudo rpm --define "_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" --define "_gpg_name Liquibase <support@liquibase.org>" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+            sudo rpm --define "_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" --define "_gpg_name [ unknown] Liquibase <support@liquibase.org>" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
             #sudo rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

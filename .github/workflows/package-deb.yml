@@ -119,10 +119,11 @@ jobs:
             #echo "%_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" >> github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
             export GPG_TTY=$(tty)
+            echo "use-agent" >> $HOME/.gnupg/gpg.conf
             echo "pinentry-mode loopback" >> $HOME/.gnupg/gpg.conf
             echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf
+            echo "allow-loopback-pinentry" >> $HOME/.gnupg/gpg-agent.conf
             gpg-connect-agent reloadagent /bye
-            gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} 
             keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | head -1 | awk '{print $3}')
             hexpassphrase=$(echo -n ${{ secrets.GPG_PASSPHRASE }} | hexdump -v -e '/1 "%02X"'; echo)
             gpg-connect-agent "preset_passphrase $keygrip -1 $hexpassphrase" /bye
@@ -144,10 +145,6 @@ jobs:
             cd ../../..
             mkdir -p $PWD/yum/noarch
             aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-            mv $PWD/*.rpm $PWD/yum/noarch
-            mv $PWD/*.asc $PWD/yum/noarch
-            mv $PWD/*.md5 $PWD/yum/noarch
-            mv $PWD/*.sha1 $PWD/yum/noarch
             /opt/createrepo -h
             /opt/createrepo -dp $PWD/yum/noarch
             ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml

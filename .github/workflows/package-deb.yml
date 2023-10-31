@@ -114,11 +114,12 @@ jobs:
             passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
         - name: Sign rpm package
+          env:
+            GPG_TTY: ${{ runner.workspace }}/tty
           run: |
             echo "%_gpg_name Liquibase <support@liquibase.org>" > github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
             echo "pinentry-mode loopback" >> $HOME/.gnupg/gpg.conf
-            gpgconf --list-options gpg-agent
             sudo rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

@@ -123,7 +123,8 @@ jobs:
             echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf
             gpg-connect-agent reloadagent /bye
             keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | awk '{print $3}')
-            "$(gpgconf --list-dirs libexecdir)"/gpg-preset-passphrase --verbose --passphrase ${{ secrets.GPG_PASSPHRASE }} --preset $keygrip KEYGRIP
+            echo $keygrip
+            "$(gpgconf --list-dirs libexecdir)"/gpg-preset-passphrase --verbose --passphrase ${{ secrets.GPG_PASSPHRASE }} $keygrip
             sudo rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

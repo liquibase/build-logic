@@ -126,8 +126,7 @@ jobs:
             keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | head -1 | awk '{print $3}')
             hexpassphrase=$(echo -n ${{ secrets.GPG_PASSPHRASE }} | hexdump -v -e '/1 "%02X"'; echo)
             echo "keygrip: $keygrip"
-            echo "gpg-connect-agent 'PRESET_PASSPHRASE $keygrip -1 $hexpassphrase' /bye"
-            gpg-connect-agent 'PRESET_PASSPHRASE $keygrip -1 $hexpassphrase' /bye
+            gpg-connect-agent "preset_passphrase $keygrip -1 $hexpassphrase" /bye
             #"$(gpgconf --list-dirs libexecdir)"/gpg-preset-passphrase --verbose --passphrase ${{ secrets.GPG_PASSPHRASE }} --preset $keygrip
             #sudo rpm --define "_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" --define "_gpg_name [ unknown] Liquibase <support@liquibase.org>" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
             #sudo rpmsign --macros=$RPM_MACROS_PATH --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm

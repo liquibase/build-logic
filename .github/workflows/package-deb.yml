@@ -48,6 +48,10 @@ jobs:
             java-version: '17'
             distribution: 'temurin'
             cache: 'maven'
+            gpg-private-key: ${{ secrets.GPG_PRIVGPG_SECRETTE_KEY }}
+            gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          env:
+            GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
         - name: Set up Maven
           uses: stCarolas/setup-maven@v4.5
@@ -118,7 +122,6 @@ jobs:
             echo "%_gpg_name Liquibase <support@liquibase.org> _gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" > github_action_macros
             #echo "%_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}" >> github_action_macros
             export RPM_MACROS_PATH=$(pwd)/github_action_macros
-            export GPG_TTY=$(tty)
             echo "use-agent" >> $HOME/.gnupg/gpg.conf
             echo "pinentry-mode loopback" >> $HOME/.gnupg/gpg.conf
             echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf

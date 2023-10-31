@@ -114,9 +114,8 @@ jobs:
             passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
         - name: Sign rpm package
-          env:
-            GPG_TTY: ${{ runner.workspace }}/tty
           run: |
+            export GPG_TTY=$(tty)
             echo "pinentry-mode loopback" >> $HOME/.gnupg/gpg.conf
             echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf
             gpg-connect-agent reloadagent /bye

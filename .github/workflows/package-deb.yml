@@ -131,6 +131,12 @@ jobs:
             keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | head -1 | awk '{print $3}')
             hexpassphrase=$(echo -n ${{ secrets.GPG_PASSPHRASE }} | hexdump -v -e '/1 "%02X"'; echo)
             gpg-connect-agent "preset_passphrase $keygrip -1 $hexpassphrase" /bye
+
+            gpg --export-secret-key -a > secretkey.asc
+            gpg --import secretkey.asc
+            ./rpm-sign.exp ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+
+
             sudo rpmsign --define "_gpg_sign_cmd_extra_args --pinentry-mode loopback" --define "_gpg_name support@liquibase.org" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

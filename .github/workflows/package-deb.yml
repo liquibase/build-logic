@@ -135,7 +135,7 @@ jobs:
             ./rpm-sign.exp ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
 
-            sudo rpmsign --define "_gpg_sign_cmd_extra_args --pinentry-mode loopback" --define "_gpg_name support@liquibase.org" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+            sudo rpmsign --define "_gpg_sign_cmd_extra_args --pinentry-mode loopback" --define "_gpg_name ${{ secrets.GPG_SECRET_KEY_ID }}" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package
           run: |

@@ -135,7 +135,16 @@ jobs:
             rpm --import liquibase.asc
             rpm -qa gpg-pubkey*
             rpm -q gpg-pubkey --qf '%{name} --> %{summary}\n'
-            sudo rpm --define "_gpg_sign_cmd_extra_args --batch --pinentry-mode loopback" --define "_gpg_name Liquibase <support@liquibase.org>" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+            
+            touch ~/.rpmmacros
+            echo "%_signature gpg" >> ~/.rpmmacros
+            echo "%_gpg_path /root/.gnupg" >> ~/.rpmmacros
+            echo "%_gpg_name Liquibase <support@liquibase.org>" >> ~/.rpmmacros
+            echo "%_gpgbin /usr/bin/gpg" >> ~/.rpmmacros
+            echo "%_gpg_digest_algo sha256" >> ~/.rpmmacros
+            echo "%_gpg_sign_cmd %{__gpg} gpg --no-verbose --no-armor --batch --pinentry-mode loopback %{?_gpg_digest_algo:--digest-algo %{_gpg_digest_algo}} --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}" >> ~/.rpmmacros
+
+            sudo rpm --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package
           run: |

@@ -145,7 +145,7 @@ jobs:
             echo '%__gpg_sign_cmd %{__gpg} gpg --force-v3-sigs --batch --verbose --no-armor --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} --digest-algo sha256 %{__plaintext_filename}' >> ~/.rpmmacros
             cat ~/.rpmmacros
             export RPM_MACROS_PATH=~/.rpmmacros
-            sudo rpm --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+            sudo rpmsign --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package
           run: |

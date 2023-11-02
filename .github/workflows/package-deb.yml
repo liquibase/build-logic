@@ -73,7 +73,9 @@ jobs:
             curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
             curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/package-deb-pom.xml
             curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/sign_artifact.sh
+            curl -o $PWD/.github/rpm_sign.exp https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/rpm_sign.exp 
             chmod +x $PWD/.github/sign_artifact.sh
+            chmod +x $PWD/.github/rpm_sign.exp
 
         - name: Configure AWS credentials
           uses: aws-actions/configure-aws-credentials@v4

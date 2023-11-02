@@ -48,10 +48,6 @@ jobs:
             java-version: '17'
             distribution: 'temurin'
             cache: 'maven'
-            gpg-private-key: ${{ secrets.GPG_PRIVGPG_SECRETTE_KEY }}
-            gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          env:
-            GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
         - name: Set up Maven
           uses: stCarolas/setup-maven@v4.5
@@ -74,6 +70,13 @@ jobs:
             curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/package-deb-pom.xml
             curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.5.5/.github/sign_artifact.sh
             chmod +x $PWD/.github/sign_artifact.sh
+
+        - name: Import GPG key
+          id: import_gpg
+          uses: crazy-max/ghaction-import-gpg@v6
+          with:
+            gpg_private_key: ${{ secrets.GPG_SECRET }}
+            passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
         - name: Configure AWS credentials
           uses: aws-actions/configure-aws-credentials@v4
@@ -110,20 +113,10 @@ jobs:
             sudo apt-get install -y alien
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-        - name: Import GPG key
-          id: import_gpg
-          uses: crazy-max/ghaction-import-gpg@v6
-          with:
-            gpg_private_key: ${{ secrets.GPG_SECRET }}
-            passphrase: ${{ secrets.GPG_PASSPHRASE }}
-
-        - name: Sign rpm package
-          run: |
-            ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
-
         - name: Upload rpm package
           run: |
             sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
+            ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
             mkdir createrepo_folder
             cd createrepo_folder
             git clone https://github.com/rpm-software-management/createrepo_c
@@ -139,5 +132,6 @@ jobs:
             /opt/createrepo -h
             /opt/createrepo -dp $PWD/yum/noarch
             ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+            mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
             aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 

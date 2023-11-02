@@ -1,4 +1,4 @@
-name: DEB packaging
+name: Linux packaging
 on:
   workflow_call:
     inputs:
@@ -36,8 +36,8 @@ env:
 
 jobs:
 
-  upload_deb:
-      name: Upload ${{ inputs.artifactId }} deb package
+  upload_packages:
+      name: Upload ${{ inputs.artifactId }} linux packages
       runs-on: ubuntu-22.04
       steps:
         - uses: actions/checkout@v4

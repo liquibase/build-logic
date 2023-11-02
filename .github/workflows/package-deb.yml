@@ -134,7 +134,7 @@ jobs:
             gpg --export -a ${{ secrets.GPG_SECRET_KEY_ID }} > liquibase.asc
             rpm --import liquibase.asc
             rpm -qa gpg-pubkey*
-            rpm -q gpg-pubkey --qf '%{name}-%{version}-%{release} --> %{summary}\n'
+            rpm -q gpg-pubkey --qf '%{name} --> %{summary}\n'
             sudo rpm --define "_gpg_sign_cmd_extra_args --batch --pinentry-mode loopback" --define "_gpg_name liquibase" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

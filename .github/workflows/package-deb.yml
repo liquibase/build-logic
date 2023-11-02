@@ -132,8 +132,6 @@ jobs:
             hexpassphrase=$(echo -n ${{ secrets.GPG_PASSPHRASE }} | hexdump -v -e '/1 "%02X"'; echo)
             gpg-connect-agent "preset_passphrase $keygrip -1 $hexpassphrase" /bye
 
-            gpg --export-secret-key -a > secretkey.asc
-            gpg --import secretkey.asc
             ./rpm-sign.exp ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
 

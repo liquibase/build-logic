@@ -99,7 +99,7 @@ jobs:
 
         - name: Upload ${{ inputs.artifactId }} deb package
           run: |
-            sudo apt install pinentry-tty
+            sudo apt install pinentry-tty expect
             echo "2" | sudo update-alternatives --config pinentry
             echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
             export GPG_TTY=$(tty)

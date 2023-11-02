@@ -132,11 +132,9 @@ jobs:
             #hexpassphrase=$(echo -n ${{ secrets.GPG_PASSPHRASE }} | hexdump -v -e '/1 "%02X"'; echo)
             #gpg-connect-agent "preset_passphrase $keygrip -1 $hexpassphrase" /bye
             gpg --list-keys --keyid-format SHORT
-
-            curl -o $PWD/.github/rpm_sign.exp https://raw.githubusercontent.com/liquibase/build-logic/DAT-4562/.github/rpm_sign.exp
-            chmod +x $PWD/.github/rpm_sign.exp
-            cat ./.github/rpm_sign.exp
-            sh ./.github/rpm_sign.exp '${{ secrets.GPG_PASSPHRASE }}' ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm"
+            ls -ltr
+            cat ../rpm_sign.exp
+            sh ../rpm_sign.exp '${{ secrets.GPG_PASSPHRASE }}' ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm"
 
             sudo rpmsign --define "_gpg_sign_cmd_extra_args --pinentry-mode loopback" --define "_gpg_name 'Liquibase <support@liquibase.org>'" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 

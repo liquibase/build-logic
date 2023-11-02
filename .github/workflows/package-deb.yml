@@ -107,7 +107,7 @@ jobs:
         - name: Convert deb to rpm
           run: |
             sudo apt-get update
-            sudo apt-get install -y alien gnupg-agent
+            sudo apt-get install -y alien
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
         - name: Import GPG key
@@ -119,20 +119,7 @@ jobs:
 
         - name: Sign rpm package
           run: |
-            echo "use-agent" >> $HOME/.gnupg/gpg.conf
-            echo "pinentry-mode loopback" >> $HOME/.gnupg/gpg.conf
-            echo "allow-preset-passphrase" >> $HOME/.gnupg/gpg-agent.conf
-            echo "allow-loopback-pinentry" >> $HOME/.gnupg/gpg-agent.conf
-            gpg-connect-agent reloadagent /bye
-            keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | head -1 | awk '{print $3}')
-            hexpassphrase=$(echo -n ${{ secrets.GPG_PASSPHRASE }} | hexdump -v -e '/1 "%02X"'; echo)
-            gpg-connect-agent "preset_passphrase $keygrip -1 $hexpassphrase" /bye
-            gpg --export -a ${{ secrets.GPG_SECRET_KEY_ID }} > liquibase.asc
-            sudo rpm --import liquibase.asc
-            sudo rpm -q gpg-pubkey --qf '%{name}-%{version}-%{release} --> %{summary}\n'
-            touch ~/.rpmmacros
-            export GPG_TTY=$(tty)
-            sudo rpm --define "_gpg_name Liquibase <support@liquibase.org>" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+            ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package
           run: |

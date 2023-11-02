@@ -131,7 +131,9 @@ jobs:
             keygrip=$(gpg --with-keygrip -K ${{ secrets.GPG_SECRET_KEY_ID }} | grep 'Keygrip' | head -1 | awk '{print $3}')
             hexpassphrase=$(echo -n ${{ secrets.GPG_PASSPHRASE }} | hexdump -v -e '/1 "%02X"'; echo)
             gpg-connect-agent "preset_passphrase $keygrip -1 $hexpassphrase" /bye
-            sudo rpm -q --queryformat "%{SUMMARY}\n" $(rpm -q gpg-pubkey)
+            gpg --export -a ${{ secrets.GPG_SECRET_KEY_ID }} > public.key
+            rpm --import public.key
+            rpm -qa gpg-pubkey*
             sudo rpm --define "_gpg_sign_cmd_extra_args --batch --pinentry-mode loopback" --define "_gpg_name ${{ secrets.GPG_SECRET_KEY_ID }}" --addsign ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
 
         - name: Upload rpm package

@@ -39,8 +39,6 @@ jobs:
 
       - name: Test Reporter # Generate a test report using the Test Reporter action
         uses: dorny/test-reporter@v1.7.0
-        env:
-          LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.ENV_PRO_LICENSE_KEY }} # Set the environment variable for the Liquibase Pro license key
         if: always() # Run the action even if the previous steps fail
         with:
           name: Liquibase Test Harness - ${{ matrix.liquibase-support-level }} Reports # Set the name of the test report

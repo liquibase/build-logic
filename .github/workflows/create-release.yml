@@ -11,7 +11,7 @@ on:
   
 jobs:
   sonar:
-    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@v0.5.7
+    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@vDAT-14350
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

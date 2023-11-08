@@ -10,7 +10,7 @@ permissions:
 jobs:
   liquibase-test-harness:
     name: Liquibase Test Harness
-    environment: TH
+    environment: OS
     runs-on: ubuntu-latest
 
     strategy:

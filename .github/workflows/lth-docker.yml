@@ -2,16 +2,11 @@ name: Liquibase Test Harness on Docker-Based Databases
 
 on:
   workflow_call:
-    secrets:
-        PRO_LICENSE_KEY:
-            description: 'Liquibase Pro license key'
-            required: false
-env:
-  LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
 
 jobs:
   liquibase-test-harness:
     name: Liquibase Test Harness
+    environment: TH
     runs-on: ubuntu-latest
 
     strategy:
@@ -39,7 +34,7 @@ jobs:
       - name: Run ${{ matrix.liquibase-support-level }} Liquibase Test Harness # Run the Liquibase test harness at each test level
         continue-on-error: true # Continue to run the action even if the previous steps fail
         env:
-          LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }} # Set the environment variable for the Liquibase Pro license key
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.ENV_PRO_LICENSE_KEY }} # Set the environment variable for the Liquibase Pro license key
         run: mvn -ntp -Dtest=${{ matrix.liquibase-support-level }}ExtensionHarnessSuite test # Run the Liquibase test harness at each test level
 
       - name: Test Reporter # Generate a test report using the Test Reporter action

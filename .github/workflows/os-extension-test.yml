@@ -35,7 +35,6 @@ env:
 jobs:
   build:
     name: Build & Package
-    environment: OS
     runs-on: ubuntu-latest
     
     steps:
@@ -90,12 +89,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.ENV_LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.ENV_LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
               }
             ]
                       

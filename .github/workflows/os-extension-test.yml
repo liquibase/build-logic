@@ -38,20 +38,8 @@ env:
   MAVEN_VERSION: '3.9.5'
 
 jobs:
-  approve:
-    runs-on: ubuntu-latest
-    environment:
-      name: 'Integrate Forked PR'
-    steps:
-    - name: Check trigger event
-      run: echo ${{ inputs.trigger }} 
-    - name: Approve
-      if: contains(inputs.trigger, 'pull_request_target')
-      run: echo For security reasons, all pull requests need to be approved first before running any automated CI.
-
   build:
     name: Build & Package
-    needs: approve
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

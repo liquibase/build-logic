@@ -36,11 +36,7 @@ jobs:
   build:
     name: Build & Package
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Approve
-        run: echo For security reasons, all pull requests need to be approved first before running any automated CI.
-
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17

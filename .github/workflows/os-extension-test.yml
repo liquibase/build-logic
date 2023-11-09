@@ -28,13 +28,28 @@ on:
         required: false
         default: ''
         type: string
+      trigger:
+        description: 'Specify the caller trigger event'
+        required: false
+        default: ''
+        type: string
 
 env:
   MAVEN_VERSION: '3.9.5'
 
 jobs:
+  approve:
+    if: inputs.trigger == 'pull_request_target'
+    runs-on: ubuntu-latest
+    environment:
+      name: FORK
+    steps:
+    - name: Approve
+      run: echo For security reasons, all pull requests need to be approved first before running any automated CI.
+
   build:
     name: Build & Package
+    needs: approve
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -39,8 +39,8 @@ env:
 
 jobs:
   approve:
-    if: ${{ inputs.trigger }} == 'pull_request_target'
     runs-on: ubuntu-latest
+    if: ${{ inputs.trigger }} == 'pull_request_target'
     environment:
       name: 'Integrate Forked PR'
     steps:

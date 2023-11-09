@@ -42,7 +42,7 @@ jobs:
     if: inputs.trigger == 'pull_request_target'
     runs-on: ubuntu-latest
     environment:
-      name: FORK
+      name: 'Integrate Forked PR'
     steps:
     - name: Approve
       run: echo For security reasons, all pull requests need to be approved first before running any automated CI.

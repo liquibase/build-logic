@@ -28,11 +28,6 @@ on:
         required: false
         default: ''
         type: string
-      trigger:
-        description: 'Specify the caller trigger event'
-        required: false
-        default: ''
-        type: string
 
 env:
   MAVEN_VERSION: '3.9.5'

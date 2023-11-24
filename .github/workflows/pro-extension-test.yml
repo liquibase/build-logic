@@ -6,7 +6,7 @@ on:
       java:
         description: 'Java version to test'
         required: false
-        default: '[8, 11, 17, 18]'
+        default: '[11, 17, 21]'
         type: string
       os:
         description: 'Operating system to test'
@@ -236,7 +236,7 @@ jobs:
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.5
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.7
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

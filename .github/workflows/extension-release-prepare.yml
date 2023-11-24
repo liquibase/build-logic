@@ -89,8 +89,7 @@ jobs:
       - name: Prepare Maven Release
         run: |
           mvn -B build-helper:parse-version release:clean release:prepare \
-          -Dusername=liquibot -Dpassword=$GITHUB_TOKEN \
-          -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
           -DcheckModificationExcludeList=pom.xml
 
@@ -106,7 +105,7 @@ jobs:
   release-rollback:
     needs: prepare-release
     if: ${{ always() && contains(needs.*.result, 'failure') }}
-    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@v0.5.3
+    uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@v0.5.7
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

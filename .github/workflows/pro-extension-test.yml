@@ -6,7 +6,7 @@ on:
       java:
         description: 'Java version to test'
         required: false
-        default: '[8, 11, 17, 18]'
+        default: '[11, 17, 21]'
         type: string
       os:
         description: 'Operating system to test'
@@ -223,7 +223,7 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Run Tests
-        run: mvn -B jacoco:prepare-agent surefire:test ${{ inputs.extraMavenArgs }}
+        run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }}
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}
@@ -232,11 +232,11 @@ jobs:
           name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
           path: |
             **/target/surefire-reports
-            **/target/jacoco.exec
+            **/target/site/jacoco/jacoco.xml
 
   sonar-pr:
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.3
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.7
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

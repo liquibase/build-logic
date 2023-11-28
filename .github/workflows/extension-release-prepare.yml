@@ -104,7 +104,6 @@ jobs:
           force_with_lease: true
           branch: ${{ github.head_ref }}
           repository: ${{ github.repository }}
-          force: true
           tags: true
 
       - name: Save Release files

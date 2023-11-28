@@ -25,6 +25,7 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+          fetch-depth: 0
           token: ${{ secrets.BOT_TOKEN }}
 
       - name: Set up JDK

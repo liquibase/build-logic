@@ -134,7 +134,7 @@ jobs:
 
   maven-release:
     needs: release
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.5.7
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@DAT-16350
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }} 

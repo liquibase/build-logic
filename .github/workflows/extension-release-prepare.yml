@@ -23,7 +23,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.head_ref }}
           persist-credentials: false
           fetch-depth: 0
           token: ${{ secrets.BOT_TOKEN }}
@@ -101,7 +101,10 @@ jobs:
         with:
           github_token: ${{ secrets.BOT_TOKEN }}
           force_with_lease: true
-          branch: main
+          branch: ${{ github.head_ref }}
+          repository: ${{ github.repository }}
+          force: true
+          tags: true
 
       - name: Save Release files
         if: always()

@@ -78,8 +78,8 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config user.name "liquibotApp[bot]"
-          git config user.email "656660+liquibotApp[bot]@users.noreply.github.com"
+          git config user.name "liquibot-app[bot]"
+          git config user.email "656660+liquibot-app[bot]@users.noreply.github.com"
 
       - name: Run extra command
         if: inputs.extraCommand != ''
@@ -89,7 +89,7 @@ jobs:
       - name: Prepare Maven Release
         run: |
           mvn -B build-helper:parse-version release:clean release:prepare \
-          -Darguments="-Dusername=liquibotApp[bot] -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -Darguments="-Dusername=liquibot-app[bot] -Dpassword=ghu_zx5a2Y5HYZypKJ8gysQZ312inq3KTq0r5Euh -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
           -DcheckModificationExcludeList=pom.xml
 

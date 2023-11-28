@@ -95,11 +95,8 @@ jobs:
           
       - name: Push bumped pom
         run: |
-          git add pom.xml
-          git commit -m "[maven-release-plugin] Set pom to next development version"
           git push https://liquibot-app[bot]:$GITHUB_TOKEN@github.com/liquibase/liquibase-extension-testing.git main
           
-
       - name: Save Release files
         if: always()
         uses: actions/upload-artifact@v3

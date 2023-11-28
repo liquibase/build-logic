@@ -89,9 +89,16 @@ jobs:
       - name: Prepare Maven Release
         run: |
           mvn -B build-helper:parse-version release:clean release:prepare \
-          -Darguments="-Dusername=liquibot-app[bot] -Dpassword=ghu_zx5a2Y5HYZypKJ8gysQZ312inq3KTq0r5Euh -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -Darguments="-Dusername=liquibot-app[bot] -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
-          -DcheckModificationExcludeList=pom.xml
+          -DcheckModificationExcludeList=pom.xml -DpushChanges=false
+          
+      - name: Push bumped pom
+        run: |
+          git add pom.xml
+          git commit -m "[maven-release-plugin] Set pom to next development version"
+          git push https://liquibot-app[bot]:$GITHUB_TOKEN@github.com/liquibase/liquibase-extension-testing.git main
+          
 
       - name: Save Release files
         if: always()

@@ -80,8 +80,6 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config user.name "liquibot"
-          git config user.email "64099989+liquibot@users.noreply.github.com"
           git config --local user.email "64099989+liquibot@users.noreply.github.com"
           git config --local user.name "liquibot"
 
@@ -95,16 +93,7 @@ jobs:
           mvn -B build-helper:parse-version release:clean release:prepare \
           -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
-          -DcheckModificationExcludeList=pom.xml -DpushChanges=false
-
-      - name: Push changes
-        uses: ad-m/github-push-action@v0.8.0
-        with:
-          github_token: ${{ secrets.BOT_TOKEN }}
-          force_with_lease: true
-          branch: ${{ github.head_ref }}
-          repository: ${{ github.repository }}
-          tags: true
+          -DcheckModificationExcludeList=pom.xml
 
       - name: Save Release files
         if: always()

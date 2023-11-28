@@ -97,10 +97,11 @@ jobs:
           -DcheckModificationExcludeList=pom.xml -DpushChanges=false
 
       - name: Push changes
-        uses: ad-m/github-push-action@master
+        uses: ad-m/github-push-action@v0.8.0
         with:
           github_token: ${{ secrets.BOT_TOKEN }}
           force_with_lease: true
+          branch: main
 
       - name: Save Release files
         if: always()

@@ -130,7 +130,7 @@ jobs:
       - name: Publish OSS Extensions
         run: |
           closed_nexus_repos_file=closed_nexus_repos.txt
-          api_output=$(curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" "https://oss.sonatype.org/service/local/staging/profile_repositories")
+          api_output=$(curl -v -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" "https://oss.sonatype.org/service/local/staging/profile_repositories")
           # Extract ids of repositories-item containing the string "liquibase"
           repositories=$(echo "$api_output" | grep -B 8 "liquibase" | grep "<repositoryId>" | awk -F"<|>" '{print $3}')
           echo "Repository IDs containing 'liquibase': $repositories"

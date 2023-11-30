@@ -72,6 +72,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `extension-attach-artifact-release.yml` | Attaches a tested artifact to the draft release. Receives a `zip` input to upload generated zip files |
 | `extension-release-published.yml`       | Publishes a release to Maven Central                                                                  |
 | `extension-update-version.yml`          | Updates release and development `pom.xml` versions                                                    |
+| `os-extension-automated-release.yml`    | Publishes draft releases and closes Nexus stagging repositories                                       |
 | `os-extension-test.yml`                 | Unit tests across build matrix on previously built artifact                                           |
 | `package-deb.yml`                       | Creates and uploads deb packages                                                                      |
 | `pom-release-published.yml`             | Publishes a release pom to Maven Central                                                              |

@@ -1,0 +1,144 @@
+name: Automated OS Extension Release 
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release (4.26.0, 4.26.1, etc.))'
+        required: true
+        type: string
+      repositories:
+        description: 'Comma-separated list of repositories'
+        required: false
+        default: 'liquibase-bigquery,liquibase-cache,liquibase-cassandra,liquibase-cosmosdb,liquibase-db2i,liquibase-filechangelog,liquibase-nochangeloglock,liquibase-hanadb,liquibase-maxdb,liquibase-modify-column,liquibase-mssql,liquibase-oracle,liquibase-postgresql,liquibase-redshift,liquibase-sqlfire,liquibase-teradata,liquibase-vertica,liquibase-yugabytedb,liquibase-hibernate'
+        type: string
+
+jobs:
+  check-security-vulnerabilities:
+    # 1. Parse the input repositories into an array.
+    # 2. Initialize a flag to track if there are security vulnerabilities.
+    # 3. Loop through each repository and check for open Dependabot security alerts.
+    # 4. Print the status of security vulnerabilities for each repository.
+    # 5. Set the flag if security vulnerabilities are found in any repository.
+    # 6. If security vulnerabilities are found in any repository, print an error message and exit with an error code.
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check Security Vulnerabilities
+      run: |
+        repositories=($(echo ${{ inputs.repositories }} | tr ',' '\n'))
+        security_fail=false
+        for repo in "${repositories[@]}"; do
+          echo "Checking repository: $repo"
+          security_url="https://api.github.com/repos/liquibase/${repo}/dependabot/alerts?state=open"
+          response=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" $security_url | jq length)
+          echo "Open Alerts: $response"
+          if [[ $response == "0" ]]; then
+            echo "Security vulnerabilities for $repo are addressed."
+          else
+            echo "Security vulnerabilities for $repo are not addressed."
+            security_fail=true
+          fi
+        done
+        if [[ $security_fail == true ]]; then
+          echo "Security vulnerabilities are not addressed for some of the repositories."
+          exit 1
+        fi
+
+  run-liquibase-dependabot:
+    # The job starts by installing the Dependabot CLI.
+    # This step runs Dependabot to check for and update dependencies in the Liquibase/Liquibase repository.
+    needs: check-security-vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Dependabot CLI
+      run: |
+        #https://github.com/dependabot/cli
+        wget https://github.com/dependabot/cli/releases/download/v1.39.0/dependabot-v1.39.0-linux-amd64.tar.gz
+        tar xvzf dependabot-v1.39.0-linux-amd64.tar.gz
+        sudo mv dependabot /usr/local/bin/
+
+    - name: Run dependabot on liquibase/liquibase
+      run: |
+        #dependabot update maven liquibase/liquibase
+
+
+  release-draft-releases:
+    # 1. Initialize a flag to track if the specified version is found.
+    # 2. Loop through each repository and check for draft releases.
+    # 3. If draft releases are found, check if they contain the specified version to release.
+    # 4. If the version is found publish it as the latest release.
+    # 5. Print relevant information about the process.
+    needs: run-liquibase-dependabot
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check for Artifact in Draft Releases
+      run: |
+          found=false
+          for REPO in $(echo ${{ inputs.repositories }} | tr "," "\n"); do
+            echo "Checking repository: $REPO"
+            assets=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/liquibase/$REPO/releases" | jq -r '.[] | select(.draft == true)' | jq -r '.assets[]')
+            echo "Assets: $assets"
+            # check if assests are empty
+            if [ -z "$assets" ]; then
+              echo "No assets found"
+            else
+              if echo "$assets" | jq -e '.name | contains("${{ inputs.version }}")' > /dev/null; then
+                found=true
+                echo "Found an asset containing '${{ inputs.version }}'"
+              else
+                echo "No asset containing '${{ inputs.version }}' found"
+              fi
+              if [ "$found" = true ] ; then
+                # Get the draft release ID
+                RELEASE_ID=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/liquibase/$REPO/releases" | jq -r '.[] | select(.draft == true) | .id')
+                echo "Draft release ID: $RELEASE_ID"
+                RELEASE_TITLE="v${{ inputs.version }}"
+                # Update the release title
+                # echo "Updating release title to $RELEASE_TITLE... for $REPO"
+                # curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'"}' "https://api.github.com/repos/liquibase/$REPO/releases/$RELEASE_ID"
+                # Publish the draft release as the latest release
+                echo "Publishing the draft release as the latest release to https://api.github.com/repos/liquibase/$REPO/releases/$RELEASE_ID"
+                curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -d '{"draft": false}' "https://api.github.com/repos/liquibase/$REPO/releases/$RELEASE_ID"
+                echo "Draft release published as the latest release for $REPO"
+              else
+                echo "No artifact containing '${{ inputs.version }}' found in the last draft release."
+              fi
+            fi
+          done
+
+  create-and-close-nexus-stagging:
+    # 1. This job pauses the workflow for 60 seconds, allowing time for Sonatype Nexus stagging repos to be ready.
+    # 2. The job uses the Sonatype Nexus API to retrieve information about staging repositories.
+    # 3. It extracts the IDs of repositories containing the string "liquibase."
+    # 4. For each repository, it checks if it is an extension by examining its relative path.
+    # 5. If an extension is detected, the repository is closed using the Sonatype Nexus API.
+    # 6. A sleep of 120 seconds follows the closure before the final release step (commented out for safety).
+    needs: release-draft-releases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Sonatype Nexus
+        run: sleep 60
+
+      - name: Publish OSS Extensions
+        run: |
+          api_output=$(curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" "https://oss.sonatype.org/service/local/staging/profile_repositories")
+          # Extract ids of repositories-item containing the string "liquibase"
+          repositories=$(echo "$api_output" | grep -B 8 "liquibase" | grep "<repositoryId>" | awk -F"<|>" '{print $3}')
+          echo "Repository IDs containing 'liquibase': $repositories"
+          # Loop through each repository and close it
+          for repo_id in $repositories; do
+            echo "Check if $repo_id repository is an extension"
+            api_output=$(curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" "https://oss.sonatype.org/service/local/repositories/$repo_id/content/org/liquibase/")
+            relative_path=$(echo "$api_output" | grep -oP '<relativePath>\K[^<]+' | awk 'NR==1')
+            echo "Relative path: $relative_path"
+            if [[ "$relative_path" == *"/org/liquibase/ext/"* ]]; then
+                echo "Relative path contains '/org/liquibase/ext/'. It is an extension."
+                curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" -H "Accept: application/json" -H "Content-Type: application/json" -d '{"data":{"stagedRepositoryIds":["'"$repo_id"'"],"description":"Closing '"$repo_id"'."}}' https://oss.sonatype.org/service/local/staging/bulk/close
+                sleep 120
+                #curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" -H "Accept: application/json" -H "Content-Type: application/json" -d '{"data":{"stagedRepositoryIds":["'"$repo_id"'"],"description":"Releasing '"$repo_id"'."}}' https://oss.sonatype.org/service/local/staging/bulk/promote
+                #echo "Released repository: $repo_id"
+            else
+                echo "Relative path does not contain '/org/liquibase/ext/'. It is not an extension."
+            fi
+          done
+          

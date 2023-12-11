@@ -59,8 +59,11 @@ jobs:
 
     - name: Run dependabot on liquibase/liquibase
       run: |
-        #dependabot update maven liquibase/liquibase
-
+        repositories=($(echo ${{ inputs.repositories }} | tr ',' '\n'))
+        for repo in "${repositories[@]}"; do
+          echo "Running Dependabot on repository: $repo"
+          dependabot update maven "liquibase/${repo}"
+        done
 
   release-draft-releases:
     # 1. Initialize a flag to track if the specified version is found.

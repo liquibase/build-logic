@@ -109,12 +109,13 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_MESSAGE: 'View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          SLACK_MESSAGE: 'View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} @filipelautert'
           SLACK_TITLE: '❌ ${{ github.repository }} ❌ Build failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}'
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ':robot_face:'
           SLACK_FOOTER: '${{ github.repository }}'
+          SLACK_LINK_NAMES: true
 
       - name: Build and Package
         if: ${{ !inputs.nightly }} 
@@ -182,12 +183,13 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_MESSAGE: 'View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          SLACK_MESSAGE: 'View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} @filipelautert'
           SLACK_TITLE: '❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}'
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ':robot_face:'
           SLACK_FOOTER: '${{ github.repository }}'
+          SLACK_LINK_NAMES: true
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}

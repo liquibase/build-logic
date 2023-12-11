@@ -131,6 +131,7 @@ jobs:
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ':robot_face:'
+          SLACK_FOOTER: '${{ github.repository }}'
 
       - name: Build and Package
         if: ${{ !inputs.nightly }} 

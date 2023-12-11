@@ -174,8 +174,9 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   sonar-pr:
+    if: ${{ !inputs.nightly }} 
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.7
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.5.8
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }} 

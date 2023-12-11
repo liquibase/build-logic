@@ -122,7 +122,7 @@ jobs:
         run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
 
       - name: Notify Slack on Build Failure
-        if: failure() && ${{ inputs.nightly }}
+        if: ${{ failure() && inputs.nightly }}
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: ${{ job.status }}
@@ -237,7 +237,7 @@ jobs:
         run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }}
 
       - name: Notify Slack on Build Failure
-        if: failure() && ${{ inputs.nightly }}
+        if: ${{ failure() && inputs.nightly }}
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: ${{ job.status }}

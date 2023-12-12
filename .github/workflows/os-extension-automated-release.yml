@@ -22,25 +22,25 @@ jobs:
     # 5. Set the flag if security vulnerabilities are found in any repository.
     # 6. If security vulnerabilities are found in any repository, print an error message and exit with an error code.
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repository: ${{ fromJson(inputs.repositories) }}
     steps:
     - name: Check Security Vulnerabilities
       run: |
-        repositories=($(echo ${{ inputs.repositories }} | tr ',' '\n'))
         security_fail=false
-        for repo in "${repositories[@]}"; do
-          echo "Checking repository: $repo"
-          security_url="https://api.github.com/repos/liquibase/${repo}/dependabot/alerts?state=open"
-          response=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" $security_url | jq length)
-          echo "Open Alerts: $response"
-          if [[ $response == "0" ]]; then
-            echo "Security vulnerabilities for $repo are addressed."
-          else
-            echo "Security vulnerabilities for $repo are not addressed."
-            security_fail=true
-          fi
-        done
+        echo "Checking repository: ${{ matrix.repository }}"
+        security_url="https://api.github.com/repos/liquibase/${{ matrix.repository }}/dependabot/alerts?state=open"
+        response=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" $security_url | jq length)
+        echo "Open Alerts: $response"
+        if [[ $response == "0" ]]; then
+          echo "Security vulnerabilities for ${{ matrix.repository }} are addressed."
+        else
+          echo "Security vulnerabilities for ${{ matrix.repository }} are not addressed."
+          security_fail=true
+        fi
         if [[ $security_fail == true ]]; then
-          echo "Security vulnerabilities are not addressed for some of the repositories."
+          echo "Security vulnerabilities are not addressed for ${{ matrix.repository }}"
           exit 1
         fi
 
@@ -49,6 +49,9 @@ jobs:
     # This step runs Dependabot to check for and update dependencies in the Liquibase/Liquibase repository.
     needs: check-security-vulnerabilities
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repository: ${{ fromJson(inputs.repositories) }}
     steps:
     - name: Install Dependabot CLI
       run: |
@@ -57,14 +60,11 @@ jobs:
         tar xvzf dependabot-v1.39.0-linux-amd64.tar.gz
         sudo mv dependabot /usr/local/bin/
 
-    - name: Run dependabot on extensions
+    - name: Run dependabot on extension
       run: |
-        repositories=($(echo ${{ inputs.repositories }} | tr ',' '\n'))
-        for repo in "${repositories[@]}"; do
-          echo "Running Dependabot on repository: $repo"
-          dependabot update maven "liquibase/${repo}"
-        done
-
+        echo "Running Dependabot on repository: ${{ matrix.repository }}"
+        dependabot update maven "liquibase/${{ matrix.repository }}"
+        
   update-pom:
     needs: check-security-vulnerabilities
     runs-on: ubuntu-latest
@@ -100,43 +100,45 @@ jobs:
     # 5. Print relevant information about the process.
     needs: update-pom
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repository: ${{ fromJson(inputs.repositories) }}
     steps:
     - name: Check for Artifact in Draft Releases
       run: |
           published_drafts_file=published_drafts.txt
           found=false
-          for REPO in $(echo ${{ inputs.repositories }} | tr "," "\n"); do
-            echo "Checking repository: $REPO"
-            assets=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/liquibase/$REPO/releases" | jq -r '.[] | select(.draft == true)' | jq -r '.assets[]')
-            echo "Assets: $assets"
-            # check if assests are empty
-            if [ -z "$assets" ]; then
-              echo "No assets found"
+          echo "Checking repository: ${{ matrix.repository }}"
+          assets=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases" | jq -r '.[] | select(.draft == true)' | jq -r '.assets[]')
+          echo "Assets: $assets"
+          # check if assests are empty
+          if [ -z "$assets" ]; then
+            echo "No assets found"
+          else
+            if echo "$assets" | jq -e '.name | contains("${{ inputs.version }}")' > /dev/null; then
+              found=true
+              echo "Found an asset containing '${{ inputs.version }}'"
             else
-              if echo "$assets" | jq -e '.name | contains("${{ inputs.version }}")' > /dev/null; then
-                found=true
-                echo "Found an asset containing '${{ inputs.version }}'"
-              else
-                echo "No asset containing '${{ inputs.version }}' found"
-              fi
-              if [ "$found" = true ] ; then
-                # Get the draft release ID
-                RELEASE_ID=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/liquibase/$REPO/releases" | jq -r '.[] | select(.draft == true) | .id')
-                echo "Draft release ID: $RELEASE_ID"
-                RELEASE_TITLE="v${{ inputs.version }}"
-                # Update the release title
-                # echo "Updating release title to $RELEASE_TITLE... for $REPO"
-                # curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'"}' "https://api.github.com/repos/liquibase/$REPO/releases/$RELEASE_ID"
-                # Publish the draft release as the latest release
-                echo "Publishing the draft release as the latest release to https://api.github.com/repos/liquibase/$REPO/releases/$RELEASE_ID"
-                curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -d '{"draft": false}' "https://api.github.com/repos/liquibase/$REPO/releases/$RELEASE_ID"
-                echo "Draft release published as the latest release for $REPO"
-                echo "$REPO: v${{ inputs.version }}" >> $published_drafts_file
-              else
-                echo "No artifact containing '${{ inputs.version }}' found in the last draft release."
-              fi
+              echo "No asset containing '${{ inputs.version }}' found"
             fi
-          done
+            if [ "$found" = true ] ; then
+              # Get the draft release ID
+              RELEASE_ID=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases" | jq -r '.[] | select(.draft == true) | .id')
+              echo "Draft release ID: $RELEASE_ID"
+              RELEASE_TITLE="v${{ inputs.version }}"
+              # Update the release title
+              # echo "Updating release title to $RELEASE_TITLE... for ${{ matrix.repository }}"
+              # curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'"}' "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
+              # Publish the draft release as the latest release
+              echo "Publishing the draft release as the latest release to https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
+              curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -d '{"draft": false}' "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
+              echo "Draft release published as the latest release for ${{ matrix.repository }}"
+              echo "${{ matrix.repository }}: v${{ inputs.version }}" >> $published_drafts_file
+            else
+              echo "No artifact containing '${{ inputs.version }}' found in the last draft release."
+            fi
+          fi
+          
 
     - name: Archive published_drafts.txt
       uses: actions/upload-artifact@v3

@@ -77,6 +77,17 @@ jobs:
         repository: ${{ fromJson(inputs.repositories) }}
     
     steps:
+
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        repository: "liquibase/${{ matrix.repository }}"
+
+    - name: Set up Git
+      run: |
+        git config --local user.email "64099989+liquibot@users.noreply.github.com"
+        git config --local user.name "liquibot"
+
     - name: Clone repository
       run: |
         echo "Cloning ${{ matrix.repository }}"
@@ -85,8 +96,6 @@ jobs:
     - name: Update pom.xml
       run: |
         cd ${{ matrix.repository }}
-        git config --local user.email "64099989+liquibot@users.noreply.github.com"
-        git config --local user.name "liquibot"
         sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
         git add pom.xml
         git commit -m "Update liquibase.version to ${{ inputs.version }}"

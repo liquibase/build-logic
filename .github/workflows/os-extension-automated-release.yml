@@ -90,7 +90,6 @@ jobs:
 
     - name: Update pom.xml
       run: |
-        cd ${{ matrix.repository }}
         sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
         git add pom.xml
         git commit -m "Update liquibase.version to ${{ inputs.version }}"

@@ -65,13 +65,40 @@ jobs:
           dependabot update maven "liquibase/${repo}"
         done
 
+  update-pom:
+    needs: check-security-vulnerabilities
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        repository: ${{ fromJson(inputs.repositories) }}
+    
+    steps:
+    - name: Set up Git
+      run: |
+        git config --local user.email "64099989+liquibot@users.noreply.github.com"
+        git config --local user.name "liquibot"
+
+    - name: Clone repository
+      run: |
+        echo "Cloning ${{ matrix.repository }}"
+        git clone "https://github.com/your-username/${{ matrix.repository }}.git"
+
+    - name: Update pom.xml
+      run: |
+        cd ${{ matrix.repository }}
+        sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
+        git add pom.xml
+        git commit -m "Update liquibase.version to ${{ inputs.version }}"
+        git push
+
   release-draft-releases:
     # 1. Initialize a flag to track if the specified version is found.
     # 2. Loop through each repository and check for draft releases.
     # 3. If draft releases are found, check if they contain the specified version to release.
     # 4. If the version is found publish it as the latest release.
     # 5. Print relevant information about the process.
-    needs: run-liquibase-dependabot
+    needs: update-pom
     runs-on: ubuntu-latest
     steps:
     - name: Check for Artifact in Draft Releases

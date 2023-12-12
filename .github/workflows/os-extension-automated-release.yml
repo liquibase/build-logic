@@ -89,6 +89,8 @@ jobs:
         git config --local user.name "liquibot"
 
     - name: Update pom.xml
+      env:
+        GH_TOKEN: ${{ secrets.BOT_TOKEN }}
       run: |
         sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
         git add pom.xml

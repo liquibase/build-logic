@@ -22,11 +22,12 @@ jobs:
     # 5. Set the flag if security vulnerabilities are found in any repository.
     # 6. If security vulnerabilities are found in any repository, print an error message and exit with an error code.
     runs-on: ubuntu-latest
+    name: Check Security Vulnerabilities
     strategy:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:
-    - name: Check Security Vulnerabilities
+    - name: Security
       run: |
         security_fail=false
         echo "Checking repository: ${{ matrix.repository }}"
@@ -49,6 +50,7 @@ jobs:
     # This step runs Dependabot to check for and update dependencies in the Liquibase/Liquibase repository.
     needs: check-security-vulnerabilities
     runs-on: ubuntu-latest
+    name: Dependabot
     strategy:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
@@ -68,17 +70,13 @@ jobs:
   update-pom:
     needs: check-security-vulnerabilities
     runs-on: ubuntu-latest
+    name: Update pom.xml
 
     strategy:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
     
     steps:
-    - name: Set up Git
-      run: |
-        git config --local user.email "64099989+liquibot@users.noreply.github.com"
-        git config --local user.name "liquibot"
-
     - name: Clone repository
       run: |
         echo "Cloning ${{ matrix.repository }}"
@@ -87,6 +85,8 @@ jobs:
     - name: Update pom.xml
       run: |
         cd ${{ matrix.repository }}
+        git config --local user.email "64099989+liquibot@users.noreply.github.com"
+        git config --local user.name "liquibot"
         sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
         git add pom.xml
         git commit -m "Update liquibase.version to ${{ inputs.version }}"
@@ -100,6 +100,7 @@ jobs:
     # 5. Print relevant information about the process.
     needs: update-pom
     runs-on: ubuntu-latest
+    name: Release Draft
     strategy:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
@@ -155,6 +156,7 @@ jobs:
     # 6. A sleep of 120 seconds follows the closure before the final release step (commented out for safety).
     needs: release-draft-releases
     runs-on: ubuntu-latest
+    name: Nexus
     steps:
       - name: Wait for Sonatype Nexus
         run: sleep 60

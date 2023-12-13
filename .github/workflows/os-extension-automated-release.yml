@@ -77,12 +77,11 @@ jobs:
         repository: ${{ fromJson(inputs.repositories) }}
     
     steps:
-
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
         repository: "liquibase/${{ matrix.repository }}"
-        token:  ${{ secrets.BOT_TOKEN }}
+        token: ${{ secrets.BOT_TOKEN }}
 
     - name: Set up Git
       run: |
@@ -97,6 +96,7 @@ jobs:
         sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
         git add pom.xml
         git commit -m "Update liquibase.version to ${{ inputs.version }}"
+        git remote set-url origin https://liquibot:${{ secrets.BOT_TOKEN }}@github.com/liquibase/${{ matrix.repository }}.git
         git push
 
   release-draft-releases:

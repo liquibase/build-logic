@@ -114,6 +114,7 @@ jobs:
     steps:
     - name: Check for Artifact in Draft Releases
       run: |
+          sleep 120
           published_drafts_file=published_drafts.txt
           found=false
           echo "Checking repository: ${{ matrix.repository }}"

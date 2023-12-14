@@ -17,7 +17,7 @@ jobs:
   check-security-vulnerabilities:
     # 1. Parse the input repositories into an array.
     # 2. Initialize a flag to track if there are security vulnerabilities.
-    # 3. Loop through each repository and check for open Dependabot security alerts.
+    # 3. Check for open Dependabot security alerts.
     # 4. Print the status of security vulnerabilities for each repository.
     # 5. Set the flag if security vulnerabilities are found in any repository.
     # 6. If security vulnerabilities are found in any repository, print an error message and exit with an error code.
@@ -45,9 +45,7 @@ jobs:
           exit 1
         fi
 
-  run-liquibase-dependabot:
-    # The job starts by installing the Dependabot CLI.
-    # This step runs Dependabot to check for and update dependencies in the Liquibase/Liquibase repository.
+  run-extensions-dependabot:
     needs: check-security-vulnerabilities
     runs-on: ubuntu-latest
     name: Dependabot
@@ -71,7 +69,6 @@ jobs:
     needs: check-security-vulnerabilities
     runs-on: ubuntu-latest
     name: Update pom.xml
-
     strategy:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
@@ -145,10 +142,9 @@ jobs:
 
   release-draft-releases:
     # 1. Initialize a flag to track if the specified version is found.
-    # 2. Loop through each repository and check for draft releases.
-    # 3. If draft releases are found, check if they contain the specified version to release.
-    # 4. If the version is found publish it as the latest release.
-    # 5. Print relevant information about the process.
+    # 2. If draft releases are found, check if they contain the specified version to release.
+    # 3. If the version is found publish it as the latest release.
+    # 4. Print relevant information about the process.
     needs: update-pom
     runs-on: ubuntu-latest
     name: Release Draft

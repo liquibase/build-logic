@@ -17,6 +17,13 @@ on:
         required: true
 
 jobs:
+  maven-release:
+    needs: release
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.5.8
+    secrets: inherit
+    with:
+      extraCommand: ${{ inputs.extraCommand }}
+      
   release:
     runs-on: ubuntu-latest
     steps:
@@ -131,10 +138,3 @@ jobs:
                       -Dfiles=${{ env.artifact_id }}-${version}.jar.asc,${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
                       -Dtypes=jar.asc,jar.asc,jar.asc,pom.asc \
                       -Dclassifiers=,sources,javadoc,
-
-  maven-release:
-    needs: release
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.5.7
-    secrets: inherit
-    with:
-      extraCommand: ${{ inputs.extraCommand }} 

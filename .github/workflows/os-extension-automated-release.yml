@@ -136,9 +136,14 @@ jobs:
         mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
         sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
         git add pom.xml
-        git commit -m "Update liquibase.version to ${{ inputs.version }}"
-        git remote set-url origin https://liquibot:${{ secrets.BOT_TOKEN }}@github.com/liquibase/${{ matrix.repository }}.git
-        git push
+        # Check if there are changes before committing
+        if git diff-index --quiet HEAD --; then
+          echo "No changes to commit."
+        else
+          git commit -m "Update liquibase.version to ${{ inputs.version }}"
+          git remote set-url origin https://liquibot:${{ secrets.BOT_TOKEN }}@github.com/liquibase/${{ matrix.repository }}.git
+          git push
+        fi
 
   release-draft-releases:
     # 1. Initialize a flag to track if the specified version is found.
@@ -154,7 +159,7 @@ jobs:
     steps:
     - name: Check for Artifact in Draft Releases
       run: |
-          sleep 120
+          sleep 180
           published_drafts_file=published_drafts.txt
           found=false
           echo "Checking repository: ${{ matrix.repository }}"
@@ -207,7 +212,7 @@ jobs:
     name: Nexus
     steps:
       - name: Wait for Sonatype Nexus
-        run: sleep 60
+        run: sleep 120
 
       - name: Publish OSS Extensions
         run: |

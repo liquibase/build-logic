@@ -75,7 +75,7 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: "liquibase/${{ matrix.repository }}"
         token: ${{ secrets.BOT_TOKEN }}

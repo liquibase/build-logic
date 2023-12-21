@@ -95,7 +95,7 @@ jobs:
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
       - name: Download unit tests report
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: test-reports-jdk-17-ubuntu-latest
 

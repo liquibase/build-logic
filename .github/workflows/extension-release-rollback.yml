@@ -84,7 +84,7 @@ jobs:
 
       - name: Download release files
         id: download-release-files
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: release-files
 

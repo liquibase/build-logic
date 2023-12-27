@@ -106,6 +106,7 @@ jobs:
 
       - name: Build release artifacts
         id: build-release-artifacts
+        continue-on-error: true
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
           git reset HEAD~ --hard

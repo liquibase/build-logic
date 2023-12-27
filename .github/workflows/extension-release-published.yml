@@ -153,8 +153,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           # Relative path under $GITHUB_WORKSPACE to place the repository
-          path: liquibase-${{ inputs.extraCommand }}
-          repository: "liquibase/liquibase-${{ inputs.extraCommand }}"
+          path: liquibase-${{ inputs.nameSpace }}
+          repository: "liquibase/liquibase-${{ inputs.nameSpace }}"
 
       - name: Upload to s3
         env:
@@ -163,26 +163,26 @@ jobs:
           AWS_DEFAULT_REGION: us-east-1
         # aws s3 sync syncs directories and S3 prefixes.
         run: |
-          aws s3 sync liquibase-${{ inputs.extraCommand }}/src/main/resources/www.liquibase.org/xml/ns/${{ inputs.extraCommand }}/ s3://liquibaseorg-origin/xml/ns/${{ inputs.extraCommand }}/ --content-type application/octet-stream --only-show-errors
+          aws s3 sync liquibase-${{ inputs.nameSpace }}/src/main/resources/www.liquibase.org/xml/ns/${{ inputs.nameSpace }}/ s3://liquibaseorg-origin/xml/ns/${{ inputs.nameSpace }}/ --content-type application/octet-stream --only-show-errors
       - name: Index.htm file upload
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         # List all xsd and htm files in repository. Copy index.htm to temporary folder
-        # Add links for all xsd files to index.htm file (except liquibase-${{ inputs.extraCommand }}-latest.xsd and index.htm)
+        # Add links for all xsd files to index.htm file (except liquibase-${{ inputs.nameSpace }}-latest.xsd and index.htm)
         # Sync index.htm with the s3
         run: |
-          search_dir=liquibase-${{ inputs.extraCommand }}/src/main/resources/www.liquibase.org/xml/ns/${{ inputs.extraCommand }}
+          search_dir=liquibase-${{ inputs.nameSpace }}/src/main/resources/www.liquibase.org/xml/ns/${{ inputs.nameSpace }}
           filenames=`ls -1 $search_dir`
           mkdir index-file
           cp $search_dir/index.htm index-file/
           for entry in $filenames
           do
-            if [[ "$entry" != "liquibase-${{ inputs.extraCommand }}-latest.xsd" ]] && [[ "$entry" != "index.htm" ]] ;then
-              sed -ie "s/<\/ul>/  <li><a href=\"\/xml\/ns\/${{ inputs.extraCommand }}\/${entry}\">${entry}<\/a><\/li>\n<\/ul>/" index-file/index.htm
+            if [[ "$entry" != "liquibase-${{ inputs.nameSpace }}-latest.xsd" ]] && [[ "$entry" != "index.htm" ]] ;then
+              sed -ie "s/<\/ul>/  <li><a href=\"\/xml\/ns\/${{ inputs.nameSpace }}\/${entry}\">${entry}<\/a><\/li>\n<\/ul>/" index-file/index.htm
             fi
           done
           
-          aws s3 sync index-file s3://liquibaseorg-origin/xml/ns/${{ inputs.extraCommand }}/ --only-show-errors
+          aws s3 sync index-file s3://liquibaseorg-origin/xml/ns/${{ inputs.nameSpace }}/ --only-show-errors
                     

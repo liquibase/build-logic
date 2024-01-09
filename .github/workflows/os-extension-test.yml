@@ -126,14 +126,14 @@ jobs:
         run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
 
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-artifacts
           path: |
             target/*
 
       - name: Save Event File
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: Event File
           path: ${{ github.event_path }}
@@ -165,7 +165,7 @@ jobs:
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v3
         with:
           name: ${{needs.build.outputs.artifact_id}}-artifacts
           path: ./target
@@ -193,7 +193,7 @@ jobs:
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
           path: |

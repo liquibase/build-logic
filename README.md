@@ -81,7 +81,6 @@ Please review the below table of reusable workflows and their descriptions:
 | `sonar-pull-request.yml`                | Code Coverage Scan for PRs.  Requires branch name parameter                                                             |
 | `sonar-test-scan.yml`                   | Code Coverage Scan for unit and integration tests                                                                       |
 | `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                                          |  
-| `snyk-nightly.yml`                      | Nightly Security Scans                                                                                                  |
 | various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets                                   |
 
 ## Requirements

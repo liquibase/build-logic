@@ -19,6 +19,11 @@ on:
         required: false
         default: '["java"]'
         type: string
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   analyze:
@@ -55,7 +60,11 @@ jobs:
         # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         queries: security-extended,security-and-quality
 
-
+    - name: Run extra command
+      if: inputs.extraCommand != ''
+      run: |
+        ${{ inputs.extraCommand }}
+        
     # Autobuild attempts to build any compiled languages  (C/C++, C#, Go, or Java).
     # If this step fails, then you should remove it and run the build manually (see below)
     - name: Autobuild

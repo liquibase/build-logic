@@ -203,7 +203,7 @@ jobs:
   sonar-pr:
     if: ${{ !inputs.nightly }} 
     needs: [ unit-test ]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.6.0
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.6.1
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }} 

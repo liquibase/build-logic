@@ -14,12 +14,6 @@ on:
         description: 'Value from the version field in pom.xml. i.e 4.23.0'
         type: string
     secrets:
-      AWS_PROD_ACCESS_KEY_ID:
-        description: 'AWS_PROD_ACCESS_KEY_ID from the caller workflow'
-        required: true
-      AWS_PROD_SECRET_ACCESS_KEY:
-        description: 'AWS_PROD_SECRET_ACCESS_KEY from the caller workflow'
-        required: true
       GPG_SECRET:
         description: 'GPG_SECRET from the caller workflow'
         required: true

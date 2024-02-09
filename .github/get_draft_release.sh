@@ -36,7 +36,7 @@ case $KEY in
         ;;
     UPLOAD_URL)
         UPLOAD_URL=$(echo $RELEASE | jq -r ".upload_url")
-        echo "GENERATED_UPLOAD_URL: $UPLOAD_URL"
         echo "${UPLOAD_URL//{?name,label\}}"
+        echo "GENERATED_UPLOAD_URL: $UPLOAD_URL"
         ;;
 esac

@@ -26,6 +26,8 @@ fi
 _DIR=$(dirname "$0")
 UPLOAD_URL=$($_DIR/get_draft_release.sh UPLOAD_URL)
 
+echo "UPLOAD_URL: $UPLOAD_URL"
+
 upload_asset() {
     local file=$1
     local size=$2

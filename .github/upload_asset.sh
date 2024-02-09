@@ -26,13 +26,14 @@ fi
 _DIR=$(dirname "$0")
 UPLOAD_URL=$($_DIR/get_draft_release.sh UPLOAD_URL)
 
+echo "_DIR: $_DIR"
 echo "UPLOAD_URL: $UPLOAD_URL"
 
 upload_asset() {
     local file=$1
     local size=$2
     local content_type=$3
-    
+
     echo "Uploading $file..."
     echo "Size: $size"
     echo "Content-Type: $content_type"

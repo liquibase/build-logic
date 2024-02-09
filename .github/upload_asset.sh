@@ -32,7 +32,6 @@ upload_asset() {
     local file=$1
     local size=$2
     local content_type=$3
-
     curl \
       -H "Authorization: token $GITHUB_TOKEN" \
       -H "Content-Length: $size"\

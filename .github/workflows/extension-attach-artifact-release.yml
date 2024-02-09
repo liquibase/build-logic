@@ -84,9 +84,9 @@ jobs:
             
       - name: Get Reusable Script Files
         run: |
-          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.1/.github/get_draft_release.sh
-          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.1/.github/sign_artifact.sh
-          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.1/.github/upload_asset.sh
+          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/DAT-16880/.github/get_draft_release.sh
+          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/DAT-16880/.github/sign_artifact.sh
+          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/DAT-16880/.github/upload_asset.sh
           chmod +x $PWD/.github/get_draft_release.sh
           chmod +x $PWD/.github/sign_artifact.sh
           chmod +x $PWD/.github/upload_asset.sh
@@ -175,7 +175,7 @@ jobs:
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'
         run: |
-          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.1/.github/upload_zip.sh
+          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/DAT-16880/.github/upload_zip.sh
           chmod +x $PWD/.github/upload_zip.sh
   
       - name: Attach Zip File to Draft Release

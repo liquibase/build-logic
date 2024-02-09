@@ -146,6 +146,7 @@ jobs:
                       -Dclassifiers=,sources,javadoc,
 
   deploy_xsd:
+    if: inputs.nameSpace != ''
     name: Upload xsds
     runs-on: ubuntu-20.04
     steps:

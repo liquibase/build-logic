@@ -14,15 +14,11 @@ if [[ -z "$GITHUB_REPOSITORY" ]]; then
   exit 1
 fi
 
-echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
-
 RELEASE=$(curl -s \
   -H "Authorization: token $GITHUB_TOKEN" \
   -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" |
     jq -r ".[] | select(.draft == true)")
-
-echo "RELEASE: $RELEASE"
 
 if [[ "${#RELEASE}" -eq 0 ]]; then
     echo "Draft release not found."
@@ -37,6 +33,5 @@ case $KEY in
     UPLOAD_URL)
         UPLOAD_URL=$(echo $RELEASE | jq -r ".upload_url")
         echo "${UPLOAD_URL//{?name,label\}}"
-        echo "GENERATED_UPLOAD_URL: $UPLOAD_URL"
         ;;
 esac

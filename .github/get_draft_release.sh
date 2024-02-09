@@ -31,7 +31,7 @@ case $KEY in
         echo "$HTML_URL" | rev | cut -d "/" -f1 | rev
         ;;
     UPLOAD_URL)
-        UPLOAD_URL=$(echo $RELEASE | jq -r ".upload_url")
+        UPLOAD_URL=$(echo $RELEASE | jq -r 'first(.upload_url)')
         echo "${UPLOAD_URL//{?name,label\}}"
         ;;
 esac

@@ -33,10 +33,6 @@ upload_asset() {
     local size=$2
     local content_type=$3
 
-    echo "Uploading $file..."
-    echo "Size: $size"
-    echo "Content-Type: $content_type"
-
     curl \
       -H "Authorization: token $GITHUB_TOKEN" \
       -H "Content-Length: $size"\

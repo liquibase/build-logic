@@ -68,5 +68,5 @@ jobs:
 
   maven-release:
     needs: release
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.6.1
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.6.2
     secrets: inherit

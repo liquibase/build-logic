@@ -192,13 +192,6 @@ jobs:
               echo "No artifact containing '${{ inputs.version }}' found in the last draft release."
             fi
           fi
-          
-
-    - name: Archive published_drafts.txt
-      uses: actions/upload-artifact@v3
-      with:
-        name: published_drafts
-        path: published_drafts.txt
 
   create-and-close-nexus-stagging:
     # 1. This job pauses the workflow for 60 seconds, allowing time for Sonatype Nexus stagging repos to be ready.
@@ -246,4 +239,3 @@ jobs:
         with:
           name: closed_nexus_repos
           path: closed_nexus_repos.txt
-          

@@ -18,7 +18,7 @@ RELEASE=$(curl -s \
   -H "Authorization: token $GITHUB_TOKEN" \
   -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" |
-    jq -r 'if .[].draft == true then .[].id else empty end')
+    jq -r 'if .[].draft == true then .[] else empty end')
 
 if [[ "${#RELEASE}" -eq 0 ]]; then
     echo "Draft release not found."

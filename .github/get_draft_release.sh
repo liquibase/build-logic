@@ -18,7 +18,7 @@ RELEASE=$(curl -s \
   -H "Authorization: token $GITHUB_TOKEN" \
   -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" |
-    jq -r ".[] | select(.draft == true)")
+    jq -r --arg VERSION "$VERSION" '.[] | select(.draft == true and .name == $VERSION)')
 
 if [[ "${#RELEASE}" -eq 0 ]]; then
     echo "Draft release not found."
@@ -31,7 +31,7 @@ case $KEY in
         echo "$HTML_URL" | rev | cut -d "/" -f1 | rev
         ;;
     UPLOAD_URL)
-        UPLOAD_URL=$(echo $RELEASE | jq -r 'first(.upload_url)')
+        UPLOAD_URL=$(echo $RELEASE | jq -r '.upload_url')
         echo "${UPLOAD_URL//{?name,label\}}"
         ;;
 esac

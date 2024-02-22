@@ -24,13 +24,12 @@ on:
         description: 'GPG_SECRET_KEY_ID from the caller workflow'
         required: true
 
-
 env:
   MAVEN_VERSION: '3.9.5'
 
 jobs:
 
-  upload_packages:
+  upload_linux_packages:
       name: Upload ${{ inputs.artifactId }} linux packages
       runs-on: ubuntu-22.04
       permissions:
@@ -61,11 +60,11 @@ jobs:
             # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.6.2/src/${{ inputs.artifactId }}/deb/control/control
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.6.2/src/${{ inputs.artifactId }}/deb/control/postinst
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.2/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.6.2/.github/package-deb-pom.xml
-            curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.2/.github/sign_artifact.sh
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/deb/control/control
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/deb/control/postinst
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
+            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/.github/package-deb-pom.xml
+            curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/.github/sign_artifact.sh
             chmod +x $PWD/.github/sign_artifact.sh
 
         - name: Import GPG key
@@ -109,7 +108,7 @@ jobs:
             sudo apt-get install -y alien
             sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-        - name: Upload rpm package
+        - name: Upload ${{ inputs.artifactId }} rpm package
           run: |
             sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
             ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
@@ -131,3 +130,9 @@ jobs:
             mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
             aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
+  upload_windows_package:
+    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+          

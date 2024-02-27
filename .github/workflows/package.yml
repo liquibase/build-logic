@@ -130,6 +130,17 @@ jobs:
             mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
             aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
+        - name: Update Homebrew formula for ${{ inputs.artifactId }}
+          uses: dawidd6/action-homebrew-bump-formula@v3
+          # Will set the following for the first time, then we can the line
+          continue-on-error: true
+          with:
+            token: ${{ secrets.BOT_TOKEN }}
+            no_fork: true
+            formula: liquibase
+            tag: "${{ github.event.release.tag_name }}"
+            force: true
+
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
     secrets: inherit

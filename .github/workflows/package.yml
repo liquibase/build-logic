@@ -3,147 +3,156 @@ on:
   workflow_call:
     inputs:
       groupId:
-        description: 'Value from the groupId field in pom.xml. i.e. org.liquibase'
+        description: "Value from the groupId field in pom.xml. i.e. org.liquibase"
         required: true
         type: string
       artifactId:
-        description: 'Value from the artifactId field in pom.xml. i.e. liquibase'
+        description: "Value from the artifactId field in pom.xml. i.e. liquibase"
         required: true
         type: string
       version:
-        description: 'Value from the version field in pom.xml. i.e 4.23.0'
+        description: "Value from the version field in pom.xml. i.e 4.23.0"
         type: string
     secrets:
       GPG_SECRET:
-        description: 'GPG_SECRET from the caller workflow'
+        description: "GPG_SECRET from the caller workflow"
         required: true
       GPG_PASSPHRASE:
-        description: 'GPG_PASSPHRASE from the caller workflow'
+        description: "GPG_PASSPHRASE from the caller workflow"
         required: true
       GPG_SECRET_KEY_ID:
-        description: 'GPG_SECRET_KEY_ID from the caller workflow'
+        description: "GPG_SECRET_KEY_ID from the caller workflow"
         required: true
 
 env:
-  MAVEN_VERSION: '3.9.5'
+  MAVEN_VERSION: "3.9.5"
 
 jobs:
+  upload_packages:
+    name: Upload ${{ inputs.artifactId }} packages
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
 
-  upload_linux_packages:
-      name: Upload ${{ inputs.artifactId }} linux packages
-      runs-on: ubuntu-22.04
-      permissions:
-        id-token: write
-        contents: read
-      steps:
-        - uses: actions/checkout@v4
+      # - name: Set up Java
+      #   uses: actions/setup-java@v4
+      #   with:
+      #     java-version: "17"
+      #     distribution: "temurin"
+      #     cache: "maven"
 
-        - name: Set up Java
-          uses: actions/setup-java@v4
-          with:
-            java-version: '17'
-            distribution: 'temurin'
-            cache: 'maven'
+      # - name: Set up Maven
+      #   uses: stCarolas/setup-maven@v4.5
+      #   with:
+      #     maven-version: ${{ env.MAVEN_VERSION }}
 
-        - name: Set up Maven
-          uses: stCarolas/setup-maven@v4.5
-          with:
-            maven-version: ${{ env.MAVEN_VERSION }}
+      # - name: Set up Ruby
+      #   uses: ruby/setup-ruby@v1
+      #   with:
+      #     ruby-version: 3.1.4
 
-        - name: Set up Ruby
-          uses: ruby/setup-ruby@v1
-          with:
-            ruby-version: 3.1.4
+      # - name: Get Reusable Files
+      #   run: |
+      #     # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
+      #     mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
+      #     mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
+      #     curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/deb/control/control
+      #     curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/deb/control/postinst
+      #     curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
+      #     curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/.github/package-deb-pom.xml
+      #     curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/.github/sign_artifact.sh
+      #     chmod +x $PWD/.github/sign_artifact.sh
 
-        - name: Get Reusable Files
-          run: |
-            # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
-            mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
-            mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/deb/control/control
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/deb/control/postinst
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/.github/package-deb-pom.xml
-            curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/.github/sign_artifact.sh
-            chmod +x $PWD/.github/sign_artifact.sh
+      # - name: Import GPG key
+      #   id: import_gpg
+      #   uses: crazy-max/ghaction-import-gpg@v6
+      #   with:
+      #     gpg_private_key: ${{ secrets.GPG_SECRET }}
+      #     passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-        - name: Import GPG key
-          id: import_gpg
-          uses: crazy-max/ghaction-import-gpg@v6
-          with:
-            gpg_private_key: ${{ secrets.GPG_SECRET }}
-            passphrase: ${{ secrets.GPG_PASSPHRASE }}
+      # - name: Configure AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+      #     aws-region: us-east-1
 
-        - name: Configure AWS credentials
-          uses: aws-actions/configure-aws-credentials@v4
-          with:
-            role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
-            aws-region: us-east-1
+      # - name: Download ${{ inputs.artifactId }} Release
+      #   run: |
+      #     mkdir -p $PWD/.github/target
+      #     # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
+      #     wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
 
-        - name: Download ${{ inputs.artifactId }} Release
-          run: |
-            mkdir -p $PWD/.github/target
-            # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
-            wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+      # - name: Build ${{ inputs.artifactId }} deb package
+      #   run: |
+      #     mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
 
-        - name: Build ${{ inputs.artifactId }} deb package
-          run: |
-            mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
+      # - name: Install deb-s3 gem
+      #   run: gem install deb-s3
 
-        - name: Install deb-s3 gem
-          run: gem install deb-s3
+      # - name: Upload ${{ inputs.artifactId }} deb package
+      #   run: |
+      #     sudo apt install pinentry-tty
+      #     echo "2" | sudo update-alternatives --config pinentry
+      #     echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+      #     export GPG_TTY=$(tty)
+      #     echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
+      #     deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-        - name: Upload ${{ inputs.artifactId }} deb package
-          run: |
-            sudo apt install pinentry-tty
-            echo "2" | sudo update-alternatives --config pinentry
-            echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
-            export GPG_TTY=$(tty)
-            echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-            deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+      # - name: Convert deb to rpm
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y alien
+      #     sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-        - name: Convert deb to rpm
-          run: |
-            sudo apt-get update
-            sudo apt-get install -y alien
-            sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+      # - name: Upload ${{ inputs.artifactId }} rpm package
+      #   run: |
+      #     sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
+      #     ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+      #     mkdir createrepo_folder
+      #     cd createrepo_folder
+      #     git clone https://github.com/rpm-software-management/createrepo_c
+      #     cd createrepo_c
+      #     mkdir build
+      #     cd build
+      #     cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
+      #     make -j
+      #     cp src/createrepo_c  /opt/createrepo
+      #     cd ../../..
+      #     mkdir -p $PWD/yum/noarch
+      #     aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
+      #     /opt/createrepo -h
+      #     /opt/createrepo -dp $PWD/yum/noarch
+      #     ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+      #     mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
+      #     aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
-        - name: Upload ${{ inputs.artifactId }} rpm package
-          run: |
-            sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-            ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
-            mkdir createrepo_folder
-            cd createrepo_folder
-            git clone https://github.com/rpm-software-management/createrepo_c
-            cd createrepo_c
-            mkdir build
-            cd build
-            cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
-            make -j
-            cp src/createrepo_c  /opt/createrepo
-            cd ../../..
-            mkdir -p $PWD/yum/noarch
-            aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-            /opt/createrepo -h
-            /opt/createrepo -dp $PWD/yum/noarch
-            ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
-            mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
-            aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
+      # - name: Update Homebrew formula for ${{ inputs.artifactId }}
+      #   uses: dawidd6/action-homebrew-bump-formula@v3
+      #   # Will set the following for the first time, then we can the line
+      #   continue-on-error: true
+      #   with:
+      #     token: ${{ secrets.BOT_TOKEN }}
+      #     no_fork: true
+      #     formula: liquibase
+      #     tag: "${{ github.event.release.tag_name }}"
+      #     force: true
 
-        - name: Update Homebrew formula for ${{ inputs.artifactId }}
-          uses: dawidd6/action-homebrew-bump-formula@v3
-          # Will set the following for the first time, then we can the line
-          continue-on-error: true
-          with:
-            token: ${{ secrets.BOT_TOKEN }}
-            no_fork: true
-            formula: liquibase
-            tag: "${{ github.event.release.tag_name }}"
-            force: true
+      - name: Update SDKMAN version for ${{ inputs.artifactId }}
+        run: |
+          wget https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.zip
+          mkdir -p liquibase-${{ inputs.version }}/bin/internal
+          unzip liquibase-${{ inputs.version }}.zip
+          mv ./liquibase-${{ inputs.version }}/liquibase ./liquibase-${{ inputs.version }}/bin/
+          mv ./liquibase-${{ inputs.version }}/internal ./liquibase-${{ inputs.version }}/bin/
+          cd liquibase-${{ inputs.version }} && zip -r ../liquibase-${{ inputs.version }}-sdkman.zip ./
+          ls -ltr
+          # TODO sendzip to sdkman
 
-  upload_windows_package:
-    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-          
+  # upload_windows_package:
+  #   uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
+  #   secrets: inherit
+  #   with:
+  #     version: ${{ inputs.version }}

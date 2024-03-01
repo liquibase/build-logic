@@ -142,9 +142,10 @@ jobs:
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         run: |
-          wget https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.zip
+          wget -q https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.zip
           mkdir -p liquibase-${{ inputs.version }}/bin/internal
           unzip liquibase-${{ inputs.version }}.zip
+          ls -ltr
           mv ./liquibase-${{ inputs.version }}/liquibase ./liquibase-${{ inputs.version }}/bin/
           mv ./liquibase-${{ inputs.version }}/internal ./liquibase-${{ inputs.version }}/bin/
           cd liquibase-${{ inputs.version }} && zip -r ../liquibase-${{ inputs.version }}-sdkman.zip ./

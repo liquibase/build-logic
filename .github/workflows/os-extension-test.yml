@@ -101,7 +101,7 @@ jobs:
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
+        run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -181,7 +181,7 @@ jobs:
 
       - name: Run Tests
         if: ${{ inputs.nightly }}
-        run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }} -Dliquibase.version=master-SNAPSHOT
+        run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

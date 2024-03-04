@@ -4,42 +4,42 @@ on:
   workflow_call:
     inputs:
       java:
-        description: 'Java version to test'
+        description: "Java version to test"
         required: false
-        default: '[11, 17, 21]'
+        default: "[11, 17, 21]"
         type: string
       os:
-        description: 'Operating system to test'
+        description: "Operating system to test"
         required: false
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
       nightly:
-        description: 'Specifies nightly builds against liquibase master-SNAPSHOT'
+        description: "Specifies nightly builds against liquibase master-SNAPSHOT"
         required: false
         default: false
         type: boolean
       extraCommand:
-        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        description: "Specify it if you want to run an extra command before attaching the artifact"
         required: false
-        default: ''
+        default: ""
         type: string
       extraMavenArgs:
-        description: 'Specify it if you want to run an extra maven argument'
+        description: "Specify it if you want to run an extra maven argument"
         required: false
-        default: ''
+        default: ""
         type: string
     secrets:
       SONAR_TOKEN:
-        description: 'SONAR_TOKEN from the caller workflow'
+        description: "SONAR_TOKEN from the caller workflow"
         required: true
       PRO_LICENSE_KEY:
-        description: 'PRO_LICENSE_KEY from the caller workflow'
+        description: "PRO_LICENSE_KEY from the caller workflow"
         required: true
       GHA_AWS_KEY_ID:
-        description: 'GHA_AWS_KEY_ID from the caller workflow'
+        description: "GHA_AWS_KEY_ID from the caller workflow"
         required: true
       GHA_AWS_KEY:
-        description: 'GHA_AWS_KEY from the caller workflow'
+        description: "GHA_AWS_KEY from the caller workflow"
         required: true
 
 env:
@@ -48,7 +48,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MAVEN_VERSION: '3.9.5'
+  MAVEN_VERSION: "3.9.5"
 
 jobs:
   build:
@@ -61,8 +61,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: 17
-          distribution: 'temurin'
-          cache: 'maven'
+          distribution: "temurin"
+          cache: "maven"
 
       - name: Set up Maven
         uses: stCarolas/setup-maven@v4.5
@@ -118,7 +118,7 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Build and Package latest liquibase version
-        if: ${{ inputs.nightly }} 
+        if: ${{ inputs.nightly }}
         run: mvn -B dependency:go-offline clean package -DskipTests=true -Dliquibase.version=master-SNAPSHOT
 
       - name: Notify Slack on Build Failure
@@ -126,16 +126,16 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_MESSAGE: 'View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>'
-          SLACK_TITLE: '❌ ${{ github.repository }} ❌ Build failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}'
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
+          SLACK_TITLE: "❌ ${{ github.repository }} ❌ Build failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
-          SLACK_ICON_EMOJI: ':robot_face:'
-          SLACK_FOOTER: '${{ github.repository }}'
+          SLACK_ICON_EMOJI: ":robot_face:"
+          SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
 
       - name: Build and Package
-        if: ${{ !inputs.nightly }} 
+        if: ${{ !inputs.nightly }}
         run: mvn -B dependency:go-offline clean package -DskipTests=true
 
       - name: Get Artifact ID
@@ -174,8 +174,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java }}
-          distribution: 'temurin'
-          cache: 'maven'
+          distribution: "temurin"
+          cache: "maven"
 
       - name: Set up Maven
         uses: stCarolas/setup-maven@v4.5
@@ -224,7 +224,7 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT }}"
               }
             ]
-            
+
       - uses: actions/download-artifact@v3
         with:
           name: ${{needs.build.outputs.artifact_id}}-artifacts
@@ -236,19 +236,24 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Run Tests
+        if: ${{ !inputs.nightly }}
         run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }}
+
+      - name: Run Tests
+        if: ${{ inputs.nightly }}
+        run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }} -Dliquibase.version=master-SNAPSHOT
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_MESSAGE: 'View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>'
-          SLACK_TITLE: '❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}'
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
+          SLACK_TITLE: "❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
-          SLACK_ICON_EMOJI: ':robot_face:'
-          SLACK_FOOTER: '${{ github.repository }}'
+          SLACK_ICON_EMOJI: ":robot_face:"
+          SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
 
       - name: Archive Test Results - ${{ matrix.os }}
@@ -261,8 +266,8 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   sonar-pr:
-    if: ${{ !inputs.nightly }} 
-    needs: [ unit-test ]
+    if: ${{ !inputs.nightly }}
+    needs: [unit-test]
     uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.6.3
     secrets: inherit
     with:

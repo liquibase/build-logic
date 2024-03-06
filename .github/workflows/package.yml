@@ -146,4 +146,10 @@ jobs:
     secrets: inherit
     with:
       version: ${{ inputs.version }}
+
+  upload_node_package:
+    uses: liquibase/node-liquibase/.github/workflows/generate.yml@master
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
           

@@ -1,4 +1,4 @@
-name: Sonar Scan for Premier
+name: Sonar Scan for jest
 
 on:
   workflow_call:

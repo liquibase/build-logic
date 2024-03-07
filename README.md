@@ -448,3 +448,7 @@ Here the modules we want to generate and aggregate test reports must be specifie
       </plugins>
     </build>
 ```
+
+### Releasing a new version of build-logic
+
+When you want to release new version of `build-logic`, it is important to update all the occurrences of previous version eg: `v0.6.3` with the new version eg : `v0.6.4` in all the files. As, the code for the new version internally refers to the old version.   

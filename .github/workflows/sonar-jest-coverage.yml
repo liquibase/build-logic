@@ -9,16 +9,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
-          fetch-depth: 0
+          node-version: '18.5'
+
+      - name: Set up npm registry and authentication
+        run: |
+          npm config set @liquibase:registry https://npm.pkg.github.com
+          npm config set //npm.pkg.github.com/:_authToken ${{ secrets.NPM_TOKEN }}
 
       - name: Install dependencies
-        run: yarn
+        run: |
+          npm cache clean --force
+          npm install
 
-      - name: Test and coverage
-        run: yarn jest --coverage
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Run Jest with coverage
+        run: npm test -- --coverage

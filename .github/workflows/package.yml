@@ -154,31 +154,8 @@ jobs:
           cd liquibase-${{ inputs.version }} && zip -r ../liquibase-${{ inputs.version }}-sdkman.zip ./
           cd ..
           # Upload the release to Artifactory
-          curl -u ${{ secrets.ARTIFACTORY_USER }}:$ARTIFACTORY_TOKEN -T liquibase-${{ inputs.version }}-sdkman.zip  ${{ secrets.ARTIFACTORY_SDKMAN_URL }}/liquibase-${{ inputs.version }}-sdkman.zip
-          # Send the release to SDKMAN
-          curl -X POST \
-          -H "Consumer-Key: ${{ secrets.SDKMAN_CONSUMER_KEY }}" \
-          -H "Consumer-Token: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "${{ inputs.version }}", "url": "${{ secrets.ARTIFACTORY_SDKMAN_URL }}/liquibase-${{ inputs.version }}-sdkman.zip"}' \
-          https://vendors.sdkman.io/release
-          # Set the default version for SDKMAN
-          curl -X PUT \
-          -H "Consumer-Key: ${{ secrets.SDKMAN_CONSUMER_KEY }}" \
-          -H "Consumer-Token: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "${{ inputs.version }}"}' \
-          https://vendors.sdkman.io/default
-          # Announce the release to SDKMAN
-          curl -X POST \
-          -H "Consumer-Key: ${{ secrets.SDKMAN_CONSUMER_KEY }}" \
-          -H "Consumer-Token: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "${{ inputs.version }}", "url": "https://git.io/release"}' \
-          https://vendors.sdkman.io/announce/struct
+          curl -u $ARTIFACTORY_USER:$ARTIFACTORY_TOKEN -T liquibase-${{ inputs.version }}-sdkman.zip  $ARTIFACTORY_URL/liquibase-${{ inputs.version }}-sdkman.zip
+
 
 
   # upload_windows_package:

@@ -154,7 +154,7 @@ jobs:
           cd liquibase-${{ inputs.version }} && zip -r ../liquibase-${{ inputs.version }}-sdkman.zip ./
           cd ..
           # Upload the release to Artifactory
-          curl -v -u ${{ secrets.ARTIFACTORY_USER }}:$ARTIFACTORY_TOKEN -T liquibase-${{ inputs.version }}-sdkman.zip  $ARTIFACTORY_URL/sdkman/liquibase-${{ inputs.version }}-sdkman.zip
+          curl -u ${{ secrets.ARTIFACTORY_USER }}:$ARTIFACTORY_TOKEN -T liquibase-${{ inputs.version }}-sdkman.zip  https://artifactory.datical.net/artifactory/sdkman/liquibase-${{ inputs.version }}-sdkman.zip
 
 
 

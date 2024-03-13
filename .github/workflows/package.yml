@@ -167,7 +167,7 @@ jobs:
           -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
           -H "Content-Type: application/json" \
           -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "'"$ARTIFACTORY_URL'"/liquibase-'"$VERSION'".zip"}' \
+          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "'"$ARTIFACTORY_URL"'/liquibase-'"$VERSION"'.zip"}' \
           https://vendors.sdkman.io/release
           echo "Sent liquibase-$VERSION.zip to SDKMAN"
           # Set the default version for SDKMAN

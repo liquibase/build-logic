@@ -142,12 +142,10 @@ jobs:
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         env:
-          ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
-          ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
-          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_SDKMAN_URL }}
           SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
           SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
           VERSION: ${{ inputs.version }}
+          S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com/sdkman
         run: |
           wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
           mkdir -p liquibase-$VERSION/bin/internal
@@ -158,16 +156,16 @@ jobs:
           mv ./liquibase-$VERSION/internal ./liquibase-$VERSION/bin/
           cd liquibase-$VERSION && zip -r ../liquibase-$VERSION.zip ./
           cd ..
-          # Upload the release to Artifactory
-          curl -s -u $ARTIFACTORY_USER:$ARTIFACTORY_TOKEN -T liquibase-$VERSION.zip  $ARTIFACTORY_URL/liquibase-$VERSION.zip
-          echo "Uploaded liquibase-$VERSION.zip to $ARTIFACTORY_URL"
+          # Upload the release to S3
+          aws s3 cp liquibase-$VERSION.zip $S3_WEB_URL
+          echo "Uploaded liquibase-$VERSION.zip to s3"
           # Send the release to SDKMAN
           curl -s -X POST \
           -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
           -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
           -H "Content-Type: application/json" \
           -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "'"$ARTIFACTORY_URL"'/liquibase-'"$VERSION"'.zip"}' \
+          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "'"$S3_WEB_URL"'/liquibase-'"$VERSION"'.zip"}' \
           https://vendors.sdkman.io/release
           echo "Sent liquibase-$VERSION.zip to SDKMAN"
           # Set the default version for SDKMAN

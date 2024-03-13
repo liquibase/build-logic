@@ -159,6 +159,7 @@ jobs:
           cd ..
           # Upload the release to Artifactory
           curl -u $ARTIFACTORY_USER:$ARTIFACTORY_TOKEN -T liquibase-$VERSION.zip  $ARTIFACTORY_URL/liquibase-$VERSION.zip
+          echo "Uploaded liquibase-$VERSION.zip to $ARTIFACTORY_URL"
           # Send the release to SDKMAN
           curl -X POST \
           -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
@@ -167,6 +168,7 @@ jobs:
           -H "Accept: application/json" \
           -d '{"candidate": "liquibase", "version": "$VERSION", "url": "$ARTIFACTORY_URL/liquibase-$VERSION.zip"}' \
           https://vendors.sdkman.io/release
+          echo "Sent liquibase-$VERSION.zip to SDKMAN"
           # Set the default version for SDKMAN
           curl -X PUT \
           -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
@@ -175,6 +177,7 @@ jobs:
           -H "Accept: application/json" \
           -d '{"candidate": "liquibase", "version": "$VERSION"}' \
           https://vendors.sdkman.io/default
+          echo "Set liquibase-$VERSION.zip as default version for SDKMAN"
           # Announce the release to SDKMAN
           curl -X POST \
           -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
@@ -183,6 +186,7 @@ jobs:
           -H "Accept: application/json" \
           -d '{"candidate": "liquibase", "version": "$VERSION", "url": "https://github.com/liquibase/liquibase/releases/tag/v$VERSION"}' \
           https://vendors.sdkman.io/announce/struct
+          echo "Announced liquibase-$VERSION.zip to SDKMAN"
 
 
   # upload_windows_package:

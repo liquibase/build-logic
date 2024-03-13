@@ -158,10 +158,10 @@ jobs:
           cd liquibase-$VERSION && zip -r ../liquibase-$VERSION.zip ./
           cd ..
           # Upload the release to Artifactory
-          curl -u $ARTIFACTORY_USER:$ARTIFACTORY_TOKEN -T liquibase-$VERSION.zip  $ARTIFACTORY_URL/liquibase-$VERSION.zip
+          curl -s -u $ARTIFACTORY_USER:$ARTIFACTORY_TOKEN -T liquibase-$VERSION.zip  $ARTIFACTORY_URL/liquibase-$VERSION.zip
           echo "Uploaded liquibase-$VERSION.zip to $ARTIFACTORY_URL"
           # Send the release to SDKMAN
-          curl -X POST \
+          curl -s -X POST \
           -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
           -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
           -H "Content-Type: application/json" \
@@ -170,7 +170,7 @@ jobs:
           https://vendors.sdkman.io/release
           echo "Sent liquibase-$VERSION.zip to SDKMAN"
           # Set the default version for SDKMAN
-          curl -X PUT \
+          curl -s -X PUT \
           -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
           -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
           -H "Content-Type: application/json" \
@@ -179,7 +179,7 @@ jobs:
           https://vendors.sdkman.io/default
           echo "Set liquibase-$VERSION.zip as default version for SDKMAN"
           # Announce the release to SDKMAN
-          curl -X POST \
+          curl -s -X POST \
           -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
           -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
           -H "Content-Type: application/json" \

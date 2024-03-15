@@ -73,11 +73,11 @@ jobs:
       #     gpg_private_key: ${{ secrets.GPG_SECRET }}
       #     passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      # - name: Configure AWS credentials
-      #   uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
-      #     aws-region: us-east-1
+       - name: Configure AWS credentials
+         uses: aws-actions/configure-aws-credentials@v4
+         with:
+           role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+           aws-region: us-east-1
 
       # - name: Download ${{ inputs.artifactId }} Release
       #   run: |

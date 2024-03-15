@@ -154,7 +154,7 @@ jobs:
           rm -rf liquibase-$VERSION.zip
           mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
           mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
-          zip -r ../liquibase-$VERSION.zip ./
+          zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
           # Upload the release to S3
           aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
           echo "Uploaded liquibase-$VERSION.zip to s3"

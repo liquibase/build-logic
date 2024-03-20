@@ -60,11 +60,11 @@ jobs:
             # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
             mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.6.5/src/${{ inputs.artifactId }}/deb/control/control
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.6.5/src/${{ inputs.artifactId }}/deb/control/postinst
-            curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.5/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.6.5/.github/package-deb-pom.xml
-            curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.5/.github/sign_artifact.sh
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.6.6/src/${{ inputs.artifactId }}/deb/control/control
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.6.6/src/${{ inputs.artifactId }}/deb/control/postinst
+            curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.6/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
+            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.6.6/.github/package-deb-pom.xml
+            curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.6/.github/sign_artifact.sh
             chmod +x $PWD/.github/sign_artifact.sh
 
         - name: Import GPG key
@@ -143,6 +143,12 @@ jobs:
 
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+
+  upload_ansible_role:
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
     secrets: inherit
     with:
       version: ${{ inputs.version }}

@@ -23,7 +23,7 @@ on:
 
 jobs:
   maven-release:
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.6.4
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.6.6
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
@@ -149,6 +149,10 @@ jobs:
     if: inputs.nameSpace != ''
     name: Upload xsds
     runs-on: ubuntu-20.04
+    # These permissions are needed to interact with GitHub's OIDC Token endpoint.
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Download xsd files
         uses: actions/checkout@v4

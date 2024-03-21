@@ -19,7 +19,7 @@ on:
         default: false
         type: boolean
       extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact"
+        description: "Specify it if you want to run an extra command before attaching the artifact. This runs on both Linux and Windows runners."
         required: false
         default: ""
         type: string

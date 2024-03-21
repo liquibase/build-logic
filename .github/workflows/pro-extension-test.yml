@@ -19,7 +19,17 @@ on:
         default: false
         type: boolean
       extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact"
+        description: "Specify it if you want to run an extra command before attaching the artifact. This runs on both Linux and Windows runners."
+        required: false
+        default: ""
+        type: string
+      extraLinuxCommand:
+        description: "Specify it if you want to run an extra command before attaching the artifact on Linux."
+        required: false
+        default: ""
+        type: string
+      extraWindowsCommand:
+        description: "Specify it if you want to run an extra command before attaching the artifact on Windows."
         required: false
         default: ""
         type: string
@@ -116,6 +126,11 @@ jobs:
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
+
+      - name: Run extra Linux command
+        if: inputs.extraLinuxCommand != ''
+        run: |
+          ${{ inputs.extraLinuxCommand }}
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
@@ -234,6 +249,16 @@ jobs:
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
+
+      - name: Run extra Linux command
+        if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
+        run: |
+          ${{ inputs.extraLinuxCommand }}
+
+      - name: Run extra Windows command
+        if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
+        run: |
+          ${{ inputs.extraWindowsCommand }}
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}

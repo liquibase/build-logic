@@ -70,33 +70,52 @@ jobs:
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
         fossa test
 
-    - name: FOSSA PR Decoration
+    - name: FOSSA Snippets Detection Decoration
+      if: github.event_name == 'pull_request' && ${{ inputs.check_snippets }}
       uses: actions/github-script@v6
       continue-on-error: true        
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
-          const run_link = '<a href="' + run_url + '">Run details</a>.'
-          const output = `#### FOSSA Snippets Detection 🤖\`${{ steps.snippets.outcome }}\`
-          <details><summary>FOSSA Snippets Detection Output</summary>
+          const run_link = '<a href="' + run_url + '">Actions</a>.'
+          const output = `#### FOSSA Snippets Detection  🖌\`${{ steps.snippets.outcome }}\`
+          <details><summary>Snippets Detection Output</summary>
 
           \`\`\`\n
-          ${{ steps.snippets.outputs }}
+          ${{ steps.snippets.stdout }}
           \`\`\`
 
           </details>
-          
-          #### FOSSA Test 🖌\`${{ steps.test.outcome }}\`
-          <details><summary>FOSSA Test Output</summary>
+
+          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
+            
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          })
+
+    - name: FOSSA Test Decoration
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      continue-on-error: true        
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
+          const run_link = '<a href="' + run_url + '">Actions</a>.'
+          const output = `#### FOSSA Test  🖌\`${{ steps.test.outcome }}\`
+          <details><summary>Test Output</summary>
 
           \`\`\`\n
-          ${{ steps.test.outputs }}
+          ${{ steps.test.stdout }}
           \`\`\`
 
           </details>
-          *Run: ${run_link}
-          *Pusher: @${{ github.actor }}, Action: ${{ github.event_name }}, Working Directory: ${{ github.workspace }}, Workflow: ${{ github.workflow }}*`;
+
+          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
             
           github.rest.issues.createComment({
             issue_number: context.issue.number,

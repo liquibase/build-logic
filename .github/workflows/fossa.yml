@@ -43,7 +43,7 @@ jobs:
       id: snippets
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
-        fossa snippets analyze -o snippets -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee snippets.out
+        fossa snippets analyze -o snippets 2>&1 | tee snippets.out
 
     - name: Generate Snippet Dependencies
       if: ${{ inputs.check_snippets }}
@@ -63,7 +63,7 @@ jobs:
       id: analyze
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze 2>&1 | tee analyze.out
+        fossa analyze -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze.out
 
     - name: Run FOSSA Test
       id: test

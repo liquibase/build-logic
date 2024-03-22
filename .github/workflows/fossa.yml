@@ -190,4 +190,13 @@ jobs:
       if: ${{ inputs.generate_sbom }}
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-        # fossa report attribution --format spdx
+        fossa report attribution --format html
+        ls -ltr
+        ls -ltr .fossa
+
+    - name: Archive FOSSA SBOM Report
+      if: ${{ inputs.generate_sbom }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: fossa-sbom
+        path: .fossa/report.html

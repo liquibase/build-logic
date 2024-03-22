@@ -52,17 +52,18 @@ jobs:
         fossa snippets commit --analyze-output snippets --overwrite-fossa-deps --format yml
 
     - name: Run FOSSA Analyze with AI Generated Code Detection
+      id: analyze-ai
       if: ${{ inputs.check_ai_generated_code }}
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze -c $PWD/.github/.fossa.yml -b ${{ github.ref_name }} 2>&1 | tee analyze.out
+        fossa analyze -c $PWD/.github/.fossa.yml 2>&1 | tee analyze.out
 
     - name: Run FOSSA Analyze
       if: ${{ !inputs.check_ai_generated_code }}
       id: analyze
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze -b ${{ github.ref_name }} 2>&1 | tee analyze.out
+        fossa analyze 2>&1 | tee analyze.out
 
     - name: Run FOSSA Test
       id: test
@@ -148,7 +149,7 @@ jobs:
           const analyze_file = fs.readFileSync('analyze.out', 'utf8')
           const analyze = analyze_file.length > 65000 ? analyze_file.toString().substring(0, 65000) + " ..." : analyze_file
           const truncated_message = analyze_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
-          const output = `#### FOSSA AI Detection 🤖\`${{ steps.analyze.outcome }}\`
+          const output = `#### FOSSA AI Detection 🤖\`${{ steps.analyze-ai.outcome }}\`
           <details><summary>AI detection Output</summary>
 
           \`\`\`\n
@@ -190,13 +191,11 @@ jobs:
       if: ${{ inputs.generate_sbom }}
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-        fossa report attribution --format html
-        ls -ltr
-        ls -ltr .fossa
+        fossa report attribution --format html 2>&1 | tee sbom.html
 
     - name: Archive FOSSA SBOM Report
       if: ${{ inputs.generate_sbom }}
       uses: actions/upload-artifact@v3
       with:
-        name: fossa-sbom
-        path: .fossa/report.html
+        name: sbom
+        path: sbom.html

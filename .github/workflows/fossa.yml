@@ -34,9 +34,14 @@ jobs:
     - name: Run FOSSA Analyze
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze -c $PWD/.github/.fossa.yml -b ${{ github.ref_name }}
+        fossa analyze -c $PWD/.github/.fossa.yml -b ${{ github.ref_name }} --json --output
 
     - name: Run FOSSA Report
+      run: |
+        # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
+        fossa report --format markdown
+
+    - name: Run FOSSA SBOM Report
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
         fossa report attribution --format spdx

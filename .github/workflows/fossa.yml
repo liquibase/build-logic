@@ -6,17 +6,17 @@ on:
       check_snippets:
         description: "Run FOSSA Snippets Detection"
         required: false
-        default: true
+        default: false
         type: boolean
       check_ai_generated_code:
         description: "Run FOSSA AI Generated Code Detection"
         required: false
-        default: true
+        default: false
         type: boolean
       generate_sbom:
         description: "Generate FOSSA SBOM Report"
         required: false
-        default: true
+        default: false
         type: boolean
 jobs:
   fossa-scan:

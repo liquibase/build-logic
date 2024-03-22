@@ -86,6 +86,7 @@ jobs:
           \`\`\`
 
           </details>
+          
           #### FOSSA Test 🖌\`${{ steps.test.outcome }}\`
           <details><summary>FOSSA Test Output</summary>
 

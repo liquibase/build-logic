@@ -1,0 +1,34 @@
+name: FOSSA License Compliance and Security Check
+
+on:
+  workflow_call:
+
+jobs:
+  fossa-scan:
+    runs-on: ubuntu-latest
+    env:
+      FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Get Fossa Configuration
+      run: |
+        curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/DAT-17080/.github/.fossa.yml
+
+    - name: Install FOSSA CLI
+      run: |
+        curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
+
+    - name: Run FOSSA Snippets Detection
+      run: |
+        fossa snippets analyze -c $PWD/.github/.fossa.yml -o snippets
+
+    - name: Generate Snippet Dependencies
+      run: |
+        fossa commit --analyze-output-dir snippets --overwrite-fossa-deps --format yml
+
+    - name: Run FOSSA Analyze
+      run: |
+        fossa analyze -c $PWD/.github/.fossa.yml

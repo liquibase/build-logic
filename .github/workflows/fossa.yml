@@ -70,6 +70,31 @@ jobs:
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
         # fossa test
 
+    - uses: actions/github-script@v6
+      continue-on-error: true        
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '👋 Thanks for reporting!'
+          })
+
+    - uses: mshick/add-pr-comment@v2
+      continue-on-error: true        
+      with:
+        message: |
+          **Hello**
+          🌏
+          !
+          
+    - name: Comment PR
+      uses: thollander/actions-comment-pull-request@v2
+      with:
+        message: |
+          Hello world ! :wave:
+
     - name: FOSSA PR Decoration
       uses: actions/github-script@v6
       continue-on-error: true        

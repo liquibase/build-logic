@@ -101,4 +101,4 @@ jobs:
       if: ${{ inputs.generate_sbom }}
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-        fossa report attribution --format spdx
+        # fossa report attribution --format spdx

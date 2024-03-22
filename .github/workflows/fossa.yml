@@ -29,7 +29,7 @@ jobs:
     - name: Generate Snippet Dependencies
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/commit.md
-        fossa snippets commit --analyze-output-dir snippets --overwrite-fossa-deps --format yml
+        fossa snippets commit --analyze-output snippets --overwrite-fossa-deps --format yml
 
     - name: Run FOSSA Analyze
       run: |

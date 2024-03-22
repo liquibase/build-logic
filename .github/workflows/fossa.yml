@@ -91,7 +91,7 @@ jobs:
           *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
             
           github.rest.issues.createComment({
-            issue_number: context.payload.pull_request.number,
+            issue_number: context.payload.pull_request,
             owner: context.repo.owner,
             repo: context.repo.repo,
             body: output

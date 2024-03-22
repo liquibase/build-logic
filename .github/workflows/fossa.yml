@@ -77,12 +77,12 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
-          const run_link = '<a href="' + run_url + '">Actions</a>.'
+          const run_link = '<a href="' + run_url + '">Run details</a>.'
           const output = `#### FOSSA Snippets Detection 🤖\`${{ steps.snippets.outcome }}\`
           <details><summary>FOSSA Snippets Detection Output</summary>
 
           \`\`\`\n
-          ${{ steps.snippets.outputs.stdout }}
+          ${{ steps.snippets.outputs }}
           \`\`\`
 
           </details>
@@ -90,12 +90,12 @@ jobs:
           <details><summary>FOSSA Test Output</summary>
 
           \`\`\`\n
-          ${{ steps.test.outputs.stdout }}
+          ${{ steps.test.outputs }}
           \`\`\`
 
           </details>
           *Run: ${run_link}
-          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
+          *Pusher: @${{ github.actor }}, Action: ${{ github.event_name }}, Working Directory: ${{ github.workspace }}, Workflow: ${{ github.workflow }}*`;
             
           github.rest.issues.createComment({
             issue_number: context.issue.number,

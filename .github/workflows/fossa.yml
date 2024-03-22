@@ -61,7 +61,7 @@ jobs:
       if: ${{ !inputs.check_ai_generated_code }}
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze -b ${{ github.ref_name }}
+        fossa analyze -b ${{ github.ref_name }} 2>&1 | tee analyze.out
 
     - name: Run FOSSA Test
       id: test
@@ -133,6 +133,23 @@ jobs:
             repo: context.repo.repo,
             body: output
           })
+
+    - name: Label PR with AI label
+      if: ${{ inputs.check_ai_generated_code }}
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs')
+          const analyze_file = fs.readFileSync('analyze.out', 'utf8')
+          if (analyze_file.includes('GitHub Copilot generated code')) {
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['AI Generated Code']
+            })
+          }
 
     - name: Run FOSSA SBOM Report
       if: ${{ inputs.generate_sbom }}

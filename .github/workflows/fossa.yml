@@ -78,8 +78,15 @@ jobs:
         script: |
           const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
           const run_link = '<a href="' + run_url + '">Actions</a>.'
-          const output = `#### FOSSA Snippets Detection 🖌\`${{ steps.snippets.outcome }}\`
-          #### FOSSA Test 🤖\`${{ steps.test.outcome }}\`
+          const output = `#### FOSSA Snippets Detection 🤖\`${{ steps.snippets.outcome }}\`
+          <details><summary>FOSSA Snippets Detection Output</summary>
+
+          \`\`\`\n
+          ${{ steps.snippets.outputs.stdout }}
+          \`\`\`
+
+          </details>
+          #### FOSSA Test 🖌\`${{ steps.test.outcome }}\`
           <details><summary>FOSSA Test Output</summary>
 
           \`\`\`\n

@@ -22,6 +22,7 @@ jobs:
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
 
     - name: Run FOSSA Snippets Detection
+      id: snippets
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
         fossa snippets analyze -o snippets
@@ -37,9 +38,38 @@ jobs:
         fossa analyze -c $PWD/.github/.fossa.yml -b ${{ github.ref_name }}
 
     - name: Run FOSSA Test
+      id: test
+      continue-on-error: true 
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
         fossa test
+
+    - name: FOSSA Test PR Decoration
+      uses: actions/github-script@v6
+      continue-on-error: true        
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
+          const run_link = '<a href="' + run_url + '">Actions</a>.'
+          const output = `#### FOSSA Snippets Detection 🖌\`${{ steps.snippets.outcome }}\`
+          #### FOSSA Test 🤖\`${{ steps.test.outcome }}\`
+          <details><summary>FOSSA Test Output</summary>
+
+          \`\`\`\n
+          ${{ steps.test.outputs.stdout }}
+          \`\`\`
+
+          </details>
+          *Run: ${run_link}
+          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
+            
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          })
 
     - name: Run FOSSA SBOM Report
       run: |

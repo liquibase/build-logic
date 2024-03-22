@@ -23,7 +23,7 @@ jobs:
 
     - name: Run FOSSA Snippets Detection
       run: |
-        fossa snippets analyze -c $PWD/.github/.fossa.yml -o snippets
+        fossa snippets analyze -o snippets
 
     - name: Generate Snippet Dependencies
       run: |

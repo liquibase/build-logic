@@ -186,6 +186,14 @@ jobs:
               labels: ['AI Generated Code']
             })
           }
+          else {
+            github.rest.issues.removeLabel({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'AI Generated Code'
+            })
+          }
 
     - name: Run FOSSA SBOM Report
       if: ${{ inputs.generate_sbom }}

@@ -67,7 +67,6 @@ jobs:
 
     - name: Run FOSSA Test
       id: test
-      continue-on-error: true 
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
         fossa test 2>&1 | tee test.out

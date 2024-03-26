@@ -1,0 +1,5 @@
+version: 3
+
+experimentalKeywordSearch:
+  - matchCriteria: Copilot
+    name: GitHub Copilot generated code

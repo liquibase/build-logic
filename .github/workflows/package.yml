@@ -28,6 +28,7 @@ env:
   MAVEN_VERSION: "3.9.5"
 
 jobs:
+
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
@@ -191,3 +192,10 @@ jobs:
     secrets: inherit
     with:
       version: ${{ inputs.version }}
+
+  upload_ansible_role:
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+          

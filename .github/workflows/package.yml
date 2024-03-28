@@ -88,15 +88,14 @@ jobs:
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
         uses: mislav/bump-homebrew-formula-action@v3
-        # Will set the following for the first time, then we can the line
-        continue-on-error: true
         with:
           formula-name: liquibase
-          tag-name: "v${{ inputs.version }}"
-          download-url: https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.tar.gz
+          formula-path: Formula/l/liquibase.rb
+          homebrew-tap: Homebrew/homebrew-core
+          download-url: "https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.tar.gz"
           commit-message: |
             {{formulaName}} {{version}}
 
-            For additional details see https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}
+            Created by https://github.com/mislav/bump-homebrew-formula-action
         env:
-          COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}  
+          COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}

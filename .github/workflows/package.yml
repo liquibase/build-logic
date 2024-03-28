@@ -94,6 +94,6 @@ jobs:
           token: ${{ secrets.BOT_TOKEN }}
           formula: liquibase
           tag: "v${{ inputs.version }}"
-          force: true
+          livecheck: true
 
           

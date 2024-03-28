@@ -92,7 +92,6 @@ jobs:
         continue-on-error: true
         with:
           token: ${{ secrets.BOT_TOKEN }}
-          no_fork: true
           formula: liquibase
           tag: "v${{ inputs.version }}"
           force: true

@@ -92,6 +92,7 @@ jobs:
           formula-name: liquibase
           formula-path: Formula/l/liquibase.rb
           homebrew-tap: Homebrew/homebrew-core
+          base-branch: master
           download-url: "https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.tar.gz"
           commit-message: |
             {{formulaName}} {{version}}

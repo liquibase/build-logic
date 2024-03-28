@@ -87,13 +87,16 @@ jobs:
           wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
-        uses: dawidd6/action-homebrew-bump-formula@v3
+        uses: mislav/bump-homebrew-formula-action@v3
         # Will set the following for the first time, then we can the line
         continue-on-error: true
         with:
-          token: ${{ secrets.BOT_TOKEN }}
-          formula: liquibase
-          tag: "v${{ inputs.version }}"
-          livecheck: true
+          formula-name: liquibase
+          tag-name: "v${{ inputs.version }}"
+          download-url: https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.tar.gz
+          commit-message: |
+            {{formulaName}} {{version}}
 
-          
+            For additional details see https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}
+        env:
+          COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}  

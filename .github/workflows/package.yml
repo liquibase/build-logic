@@ -125,15 +125,4 @@ jobs:
         run: |
           aws s3api put-bucket-policy --bucket repo.liquibase.com --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"arn:aws:s3:::repo.liquibase.com/*"}]}'
 
-  upload_windows_package:
-    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-
-  upload_ansible_role:
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
           

@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Check Security Vulnerabilities
     strategy:
+      fail-fast: false # Continue running jobs even if one fails
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:

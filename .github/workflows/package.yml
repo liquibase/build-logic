@@ -123,5 +123,5 @@ jobs:
 
       - name: Ensure s3 bucket public access is enabled
         run: |
-          aws s3api put-bucket-acl --bucket repo.liquibase.com --acl public-read --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
+          aws s3api put-bucket-acl --bucket repo.liquibase.com --acl public-read
           

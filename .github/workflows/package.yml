@@ -93,15 +93,6 @@ jobs:
       - name: Install deb-s3 gem
         run: gem install deb-s3
 
-      - name: Upload ${{ inputs.artifactId }} deb package
-        run: |
-          sudo apt install pinentry-tty
-          echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
-          export GPG_TTY=$(tty)
-          echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
-
       - name: Convert deb to rpm
         run: |
           sudo apt-get update
@@ -130,66 +121,9 @@ jobs:
           mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
           aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
-      - name: Update Homebrew formula for ${{ inputs.artifactId }}
-        uses: mislav/bump-homebrew-formula-action@v3
-        with:
-          formula-name: liquibase
-          formula-path: Formula/l/liquibase.rb
-          homebrew-tap: Homebrew/homebrew-core
-          tag-name: ${{ inputs.version }}
-          download-url: "https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.tar.gz"
-          commit-message: |
-            {{formulaName}} {{version}}
-
-            Created by https://github.com/mislav/bump-homebrew-formula-action
-        env:
-          COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}
-          
-      - name: Update SDKMAN version for ${{ inputs.artifactId }}
-        env:
-          SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
-          SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
-          VERSION: ${{ inputs.version }}
-          S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com/sdkman
-          S3_BUCKET: s3://repo.liquibase.com/sdkman/
+      - name: Ensure s3 bucket public access is enabled
         run: |
-          wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
-          mkdir -p liquibase-$VERSION/bin/internal
-          unzip liquibase-$VERSION.zip -d liquibase-$VERSION
-          rm -rf liquibase-$VERSION.zip
-          mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
-          mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
-          zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
-          # Upload the release to S3
-          aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
-          echo "Uploaded liquibase-$VERSION.zip to s3"
-          # Send the release to SDKMAN
-          curl -s -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "'"$S3_WEB_URL"'/liquibase-'"$VERSION"'.zip"}' \
-          https://vendors.sdkman.io/release
-          echo "Sent liquibase-$VERSION.zip to SDKMAN"
-          # Set the default version for SDKMAN
-          curl -s -X PUT \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "'"$VERSION"'"}' \
-          https://vendors.sdkman.io/default
-          echo "Set liquibase-$VERSION.zip as default version for SDKMAN"
-          # Announce the release to SDKMAN
-          curl -s -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
-          https://vendors.sdkman.io/announce/struct
-          echo "Announced liquibase-$VERSION.zip to SDKMAN"
+          aws s3api put-bucket-policy --bucket repo.liquibase.com --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"arn:aws:s3:::repo.liquibase.com/*"}]}'
 
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master

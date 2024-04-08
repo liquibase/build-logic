@@ -131,16 +131,20 @@ jobs:
           aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
-        uses: dawidd6/action-homebrew-bump-formula@v3
-        # Will set the following for the first time, then we can the line
-        continue-on-error: true
+        uses: mislav/bump-homebrew-formula-action@v3
         with:
-          token: ${{ secrets.BOT_TOKEN }}
-          no_fork: true
-          formula: liquibase
-          tag: "${{ github.event.release.tag_name }}"
-          force: true
+          formula-name: liquibase
+          formula-path: Formula/l/liquibase.rb
+          homebrew-tap: Homebrew/homebrew-core
+          tag-name: ${{ inputs.version }}
+          download-url: "https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.tar.gz"
+          commit-message: |
+            {{formulaName}} {{version}}
 
+            Created by https://github.com/mislav/bump-homebrew-formula-action
+        env:
+          COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}
+          
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         env:
           SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
@@ -186,6 +190,10 @@ jobs:
           -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
           https://vendors.sdkman.io/announce/struct
           echo "Announced liquibase-$VERSION.zip to SDKMAN"
+
+      - name: Ensure s3 bucket public access is enabled
+        run: |
+          aws s3api put-bucket-acl --bucket repo.liquibase.com  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
 
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master

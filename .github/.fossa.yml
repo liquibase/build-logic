@@ -6,3 +6,7 @@ experimentalKeywordSearch:
     name: GitHub Copilot generated code
   - matchCriteria: AI
     name: AI generated code
+
+paths:
+  exclude:
+    - ./.git

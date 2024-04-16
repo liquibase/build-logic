@@ -4,9 +4,5 @@ version: 3
 experimentalKeywordSearch:
   - matchCriteria: (?i)Copilot
     name: GitHub Copilot generated code
-  - matchCriteria: AI
+  - matchCriteria: \bAI\b
     name: AI generated code
-
-paths:
-  exclude:
-    - .git

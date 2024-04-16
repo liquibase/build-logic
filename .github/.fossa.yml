@@ -1,5 +1,8 @@
 version: 3
-
+# https://github.com/fossas/fossa-cli/blob/master/docs/features/custom-license-and-keyword-searches.md
+# https://github.com/fossas/fossa-cli/blob/master/docs/features/custom-license-and-keyword-search-regular-expression-syntax.md
 experimentalKeywordSearch:
   - matchCriteria: (?i)Copilot
     name: GitHub Copilot generated code
+  - matchCriteria: AI
+    name: AI generated code

@@ -58,7 +58,7 @@ jobs:
       if: ${{ inputs.check_ai_generated_code }}
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze --exclude-path=$PWD/.git -c $PWD/.github/.fossa.yml -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze.out
+        fossa analyze --exclude-path $PWD/.git -c $PWD/.github/.fossa.yml -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze.out
 
     - name: Run FOSSA Analyze
       if: ${{ !inputs.check_ai_generated_code }}

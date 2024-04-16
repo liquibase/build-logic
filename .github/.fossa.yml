@@ -9,4 +9,4 @@ experimentalKeywordSearch:
 
 paths:
   exclude:
-    - ./.git
+    - .git

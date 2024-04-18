@@ -66,11 +66,11 @@ jobs:
         experimentalKeywordSearch:
         - matchCriteria: (?i)Copilot
           name: GitHub Copilot generated code
-        - matchCriteria: AI
+        - matchCriteria: \bAI\b
           name: AI generated code
         END
         # Export the full content of changed files to 'patch.zip'
-        git archive -o patch.zip HEAD $(git diff --name-only --diff-filter=d HEAD^..HEAD)
+        git diff-tree -r --no-commit-id --name-only --diff-filter=ACMRT HEAD~1..HEAD | xargs zip patch.zip
         # Unzip 'patch.zip' into the 'patch' directory
         unzip patch.zip -d patch/
         # Analyze the changes using FOSSA and redirect output to /dev/null

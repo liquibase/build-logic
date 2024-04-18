@@ -70,7 +70,7 @@ jobs:
           name: AI generated code
         END
         # Export the full content of changed files to 'patch.zip'
-        git diff-tree -r --no-commit-id --name-only --diff-filter=ACMRT HEAD~1..HEAD | xargs zip patch.zip
+        git diff --name-only --diff-filter=ACMRT $(git log -1 --pretty=format:%H)~1..$(git log -1 --pretty=format:%H) | xargs zip patch.zip
         # Unzip 'patch.zip' into the 'patch' directory
         unzip patch.zip -d patch/
         # Analyze the changes using FOSSA and redirect output to /dev/null

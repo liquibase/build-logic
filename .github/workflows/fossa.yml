@@ -78,11 +78,10 @@ jobs:
         fossa analyze patch -o 2>&1 | tee analyze.out
 
     - name: Run FOSSA Analyze
-      if: ${{ !inputs.check_ai_generated_code }}
       id: analyze
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze.out
+        fossa analyze -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze_no_ai.out
 
     - name: Run FOSSA Test
       id: test

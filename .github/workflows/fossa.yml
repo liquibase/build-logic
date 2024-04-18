@@ -61,15 +61,7 @@ jobs:
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
         # Create a directory named 'patch'
         mkdir patch
-        # Create or append to .fossa.yml file
-        cat << END >> patch/.fossa.yml
-        version: 3
-        experimentalKeywordSearch:
-        - matchCriteria: (?i)Copilot
-          name: GitHub Copilot generated code
-        - matchCriteria: \bAI\b
-          name: AI generated code
-        END
+        cp $PWD/.github/.fossa.yml patch/.fossa.yml
         # Export the full content of changed files to 'patch.zip'
         git diff --name-only HEAD~1 HEAD | xargs zip patch.zip
         # Unzip 'patch.zip' into the 'patch' directory

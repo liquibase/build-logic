@@ -58,7 +58,23 @@ jobs:
       if: ${{ inputs.check_ai_generated_code }}
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze -c $PWD/.github/.fossa.yml -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze.out
+        # Create a directory named 'patch'
+        mkdir patch
+        # Create or append to .fossa.yml file
+        cat << END >> patch/.fossa.yml
+        version: 3
+        experimentalKeywordSearch:
+        - matchCriteria: (?i)Copilot
+          name: GitHub Copilot generated code
+        - matchCriteria: AI
+          name: AI generated code
+        END
+        # Export the full content of changed files to 'patch.zip'
+        git archive -o patch.zip HEAD $(git diff --name-only --diff-filter=d HEAD^..HEAD)
+        # Unzip 'patch.zip' into the 'patch' directory
+        unzip patch.zip -d patch/
+        # Analyze the changes using FOSSA and redirect output to /dev/null
+        fossa analyze patch -o 2>&1 | tee analyze.out
 
     - name: Run FOSSA Analyze
       if: ${{ !inputs.check_ai_generated_code }}

@@ -202,6 +202,13 @@ jobs:
         run: |
           mvn -B clean install -DskipTests -P 'sonar,!run-proguard' "-Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT"
 
+      - name: Upload initial Jacoco report
+        if: always()  # This step always runs
+        uses: actions/upload-artifact@v2
+        with:
+          name: jacoco-exec-initial
+          path: unit-tests/jacoco.exec
+
       - name: Merge integration and unit tests reports
         if: always()
         env:
@@ -211,7 +218,7 @@ jobs:
           mkdir -p target
 
           mv unit-tests/jacoco.exec target/jacoco-unit.exec
-
+          
           if [ -d "integration-tests/mssql" ]; then
             mv integration-tests/mssql/jacoco.exec target/jacoco-mssql-aggregate.exec
           fi
@@ -258,6 +265,13 @@ jobs:
             java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --xml jacoco.xml
             java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --html site
           fi
+
+      - name: Upload merged Jacoco report
+        if: always()  # This step always runs
+        uses: actions/upload-artifact@v2
+        with:
+          name: jacoco-exec-merged
+          path: target/merged.exec
 
       - name: Set up JDK for Sonar
         uses: actions/setup-java@v4

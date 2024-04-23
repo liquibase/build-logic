@@ -29,7 +29,8 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.head.sha || github.ref }}
+        ref: ${{ github.ref }}
+        fetch-depth: 0
 
     - name: Get Fossa Configuration
       if: ${{ inputs.check_ai_generated_code }}
@@ -58,14 +59,20 @@ jobs:
       if: ${{ inputs.check_ai_generated_code }}
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze -c $PWD/.github/.fossa.yml -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze.out
+        mkdir patch
+        cp $PWD/.github/.fossa.yml patch/.fossa.yml
+        # Export the full content of changed files to 'patch.zip'
+        git diff --name-only HEAD~1 HEAD | xargs zip patch.zip
+        unzip patch.zip -d patch/
+        # Analyze the changes using FOSSA and redirect output to analyze.out
+        fossa analyze patch -o 2>&1 | tee analyze.out
 
     - name: Run FOSSA Analyze
-      if: ${{ !inputs.check_ai_generated_code }}
       id: analyze
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        fossa analyze -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze.out
+        # Run the full analyze on the current branch to be checked by the test command
+        fossa analyze -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze_no_ai.out
 
     - name: Run FOSSA Test
       id: test

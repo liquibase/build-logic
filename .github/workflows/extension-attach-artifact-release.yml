@@ -13,6 +13,11 @@ on:
         required: false
         default: ''
         type: string
+      mavenProfiles:
+        description: "Specify it if you want to run different Maven profiles from the default (coverage).  mavenProfiles example: 'coverage,run-proguard'"
+        required: false
+        default: ""
+        type: string
     secrets:
       BOT_TOKEN:
         description: 'BOT_TOKEN from the caller workflow'
@@ -104,9 +109,9 @@ jobs:
       - name: Build release artifacts
         id: build-release-artifacts
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
+          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
           git reset HEAD~ --hard
-          mvn clean install -DskipTests
+          mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}'
 
       - name: Get Artifact ID
         id: get-artifact-id

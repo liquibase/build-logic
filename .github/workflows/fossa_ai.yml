@@ -57,7 +57,7 @@ jobs:
         script: |
           # execute the following code only if '0 matches' is not present in snippets.out
           const fs = require('fs');
-          if (!fs.readFileSync('snippets.out', 'utf8').includes('0 matches')) {
+          #if (!fs.readFileSync('snippets.out', 'utf8').includes('0 matches')) {
             const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
             const run_link = '<a href="' + run_url + '">Actions</a>.'
             const snippets_file = fs.readFileSync('snippets.out', 'utf8')
@@ -81,7 +81,7 @@ jobs:
               repo: context.repo.repo,
               body: output
             })
-          }
+          #}
 
     - name: Generate Snippet Dependencies
       if: ${{ inputs.check_snippets }}

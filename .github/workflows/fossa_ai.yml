@@ -49,7 +49,7 @@ jobs:
         fossa snippets analyze -o snippets 2>&1 | tee snippets.out
 
     - name: FOSSA Snippets Detection Decoration
-      if: ${{ failure() }} && ${{ inputs.check_snippets }}
+      if: failure() && ${{ inputs.check_snippets }}
       uses: actions/github-script@v6
       continue-on-error: true        
       with:
@@ -100,7 +100,7 @@ jobs:
         fossa analyze patch -o 2>&1 | tee analyze.out
 
     - name: FOSSA AI Detection Decoration
-      if: ${{ failure() }} && ${{ inputs.check_ai_generated_code }}
+      if: failure() && ${{ inputs.check_ai_generated_code }}
       uses: actions/github-script@v6
       continue-on-error: true        
       with:
@@ -147,7 +147,7 @@ jobs:
         fossa test 2>&1 | tee test.out
 
     - name: FOSSA Test Decoration
-      if: ${{ failure() }}
+      if: failure()
       uses: actions/github-script@v6
       continue-on-error: true        
       with:

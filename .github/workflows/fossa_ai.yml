@@ -62,7 +62,7 @@ jobs:
         fi
 
     - name: FOSSA Snippets Detection Decoration
-      if: ${{ env.FOSSA_DECORATION }} && ${{ inputs.check_snippets }}
+      if: ${{ inputs.check_snippets }} && env.FOSSA_DECORATION == 'true'
       uses: actions/github-script@v6
       continue-on-error: true        
       with:

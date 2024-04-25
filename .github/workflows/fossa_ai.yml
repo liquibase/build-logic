@@ -49,6 +49,7 @@ jobs:
         fossa snippets analyze -o snippets 2>&1 | tee snippets.out
         # fail the job if snippets.out does not contain '0 matches'
         if ! grep -q '0 matches' snippets.out; then
+          echo "FOSSA Snippets Detection failed"
           exit 1
         fi
 

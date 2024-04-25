@@ -38,6 +38,11 @@ on:
         required: false
         default: ""
         type: string
+      mavenProfiles:
+        description: "Specify it if you want to run different Maven profiles from the default (coverage).  mavenProfiles example: 'coverage,run-proguard'"
+        required: false
+        default: "coverage"
+        type: string
     secrets:
       SONAR_TOKEN:
         description: "SONAR_TOKEN from the caller workflow"
@@ -262,11 +267,11 @@ jobs:
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}
-        run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }}
+        run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${{ inputs.extraMavenArgs }}
 
       - name: Run Tests
         if: ${{ inputs.nightly }}
-        run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -293,7 +298,7 @@ jobs:
   sonar-pr:
     if: ${{ !inputs.nightly }}
     needs: [unit-test]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.7.3
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.7.4
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

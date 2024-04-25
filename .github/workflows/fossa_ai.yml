@@ -44,42 +44,44 @@ jobs:
     - name: Run FOSSA Snippets Detection
       if: ${{ inputs.check_snippets }}
       id: snippets
-      run: |
-        # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
-        fossa snippets analyze -o snippets 2>&1 | tee snippets.out
-
-    - name: FOSSA Snippets Detection Decoration
-      if: failure() && ${{ inputs.check_snippets }}
       uses: actions/github-script@v6
       continue-on-error: true        
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
-          const run_link = '<a href="' + run_url + '">Actions</a>.'
-          const fs = require('fs')
-          const snippets_file = fs.readFileSync('snippets.out', 'utf8')
-          const snippets = snippets_file.length > 65000 ? snippets_file.toString().substring(0, 65000) + " ..." : snippets_file
-          const truncated_message = snippets_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
-          const output = `#### FOSSA Snippets Detection 🤖\`${{ steps.snippets.outcome }}\`
-          <details><summary>Snippets Detection Output</summary>
-
-          \`\`\`\n
-          ${snippets}
-          \`\`\`
-
-          </details>
-          ${truncated_message}
-
-          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
-            
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: output
-          })
-
+          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
+          fossa snippets analyze -o snippets 2>&1 | tee snippets.out
+          # if snippets.out contains '0 matches' then decorate the PR with the output
+          if grep -q '0 matches' snippets.out; then
+            echo "No snippets detected"
+          else
+            echo "Snippets detected"
+            const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
+            const run_link = '<a href="' + run_url + '">Actions</a>.'
+            const fs = require('fs')
+            const snippets_file = fs.readFileSync('snippets.out', 'utf8')
+            const snippets = snippets_file.length > 65000 ? snippets_file.toString().substring(0, 65000) + " ..." : snippets_file
+            const truncated_message = snippets_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
+            const output = `#### FOSSA Snippets Detection 🤖\`${{ steps.snippets.outcome }}\`
+            <details><summary>Snippets Detection Output</summary>
+  
+            \`\`\`\n
+            ${snippets}
+            \`\`\`
+  
+            </details>
+            ${truncated_message}
+  
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
+              
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+          fi
+          
     - name: Generate Snippet Dependencies
       if: ${{ inputs.check_snippets }}
       run: |

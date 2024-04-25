@@ -35,7 +35,7 @@ jobs:
     - name: Get Fossa Configuration
       if: ${{ inputs.check_ai_generated_code }}
       run: |
-        curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/v0.7.4/.github/.fossa.yml
+        curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/v0.7.5/.github/.fossa.yml
 
     - name: Install FOSSA CLI
       run: |
@@ -44,18 +44,19 @@ jobs:
     - name: Run FOSSA Snippets Detection
       if: ${{ inputs.check_snippets }}
       id: snippets
+      run: |
+        # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
+        fossa snippets analyze -o snippets 2>&1 | tee snippets.out
+
+    - name: FOSSA Snippets Detection Decoration
+      if: ${{ inputs.check_snippets }}
       uses: actions/github-script@v6
       continue-on-error: true        
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
-          fossa snippets analyze -o snippets 2>&1 | tee snippets.out
-          # if snippets.out contains '0 matches' then decorate the PR with the output
-          if grep -q '0 matches' snippets.out; then
-            echo "No snippets detected"
-          else
-            echo "Snippets detected"
+          # execute the following code only if '0 matches' is not present in snippets.out
+          if (!fs.readFileSync('snippets.out', 'utf8').includes('0 matches')) {
             const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
             const run_link = '<a href="' + run_url + '">Actions</a>.'
             const fs = require('fs')
@@ -64,14 +65,14 @@ jobs:
             const truncated_message = snippets_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
             const output = `#### FOSSA Snippets Detection 🤖\`${{ steps.snippets.outcome }}\`
             <details><summary>Snippets Detection Output</summary>
-  
+
             \`\`\`\n
             ${snippets}
             \`\`\`
-  
+
             </details>
             ${truncated_message}
-  
+
             *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
               
             github.rest.issues.createComment({
@@ -80,7 +81,7 @@ jobs:
               repo: context.repo.repo,
               body: output
             })
-          fi
+          }
 
     - name: Generate Snippet Dependencies
       if: ${{ inputs.check_snippets }}
@@ -91,22 +92,25 @@ jobs:
     - name: Run FOSSA Analyze with AI Generated Code Detection
       id: analyze-ai
       if: ${{ inputs.check_ai_generated_code }}
+      run: |
+        # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
+        mkdir patch
+        cp $PWD/.github/.fossa.yml patch/.fossa.yml
+        # Export the full content of changed files to 'patch.zip'
+        git diff --name-only HEAD~1 HEAD | xargs zip patch.zip
+        unzip patch.zip -d patch/
+        # Analyze the changes using FOSSA and redirect output to analyze.out
+        fossa analyze patch -o 2>&1 | tee analyze.out
+
+    - name: FOSSA AI Detection Decoration
+      if: failure() && ${{ inputs.check_ai_generated_code }}
       uses: actions/github-script@v6
       continue-on-error: true        
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-          mkdir patch
-          cp $PWD/.github/.fossa.yml patch/.fossa.yml
-          # Export the full content of changed files to 'patch.zip'
-          git diff --name-only HEAD~1 HEAD | xargs zip patch.zip
-          unzip patch.zip -d patch/
-          # Analyze the changes using FOSSA and redirect output to analyze.out
-          fossa analyze patch -o 2>&1 | tee analyze.out
-          # if analyze.out contains 'AI generated code' then decorate the PR with the output
-          if grep -q 'AI generated code' analyze.out; then
-            echo "AI generated code detected"
+          # execute the following code only if 'AI generated code' is present in analyze.out
+          if (fs.readFileSync('snippets.out', 'utf8').includes('AI generated code')) {
             const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
             const run_link = '<a href="' + run_url + '">Actions</a>.'
             const fs = require('fs')
@@ -115,14 +119,14 @@ jobs:
             const truncated_message = analyze_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
             const output = `#### FOSSA AI Detection 🤖\`${{ steps.analyze-ai.outcome }}\`
             <details><summary>AI detection Output</summary>
-  
+
             \`\`\`\n
             ${analyze}
             \`\`\`
-  
+
             </details>
             ${truncated_message}
-  
+
             *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
             
             if (analyze_file.includes('GitHub Copilot generated code')) {
@@ -133,9 +137,7 @@ jobs:
                 body: output
               })
             }
-          else
-            echo "No AI generated code detected"
-          fi
+          }
 
     - name: Run FOSSA Analyze
       id: analyze
@@ -146,18 +148,19 @@ jobs:
 
     - name: Run FOSSA Test
       id: test
+      run: |
+        # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
+        fossa test 2>&1 | tee test.out
+
+    - name: FOSSA Test Decoration
+      if: failure()
       uses: actions/github-script@v6
       continue-on-error: true        
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
-          fossa test 2>&1 | tee test.out
-          # if test.out contains '0 issues found' skip PR decoration
-          if grep -q '0 issues found' test.out; then
-            echo "No issues found"
-          else
-            echo "Issues found"
+          # execute the following code only if 'Test passed' is not present in test.out
+          if (!fs.readFileSync('test.out', 'utf8').includes('Test passed')) {
             const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
             const run_link = '<a href="' + run_url + '">Actions</a>.'
             const fs = require('fs')
@@ -166,14 +169,14 @@ jobs:
             const truncated_message = test_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
             const output = `#### FOSSA Test 🧪\`${{ steps.test.outcome }}\`
             <details><summary>Test Output</summary>
-  
+
             \`\`\`\n
             ${test}
             \`\`\`
-  
+
             </details>
             ${truncated_message}
-  
+
             *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
               
             github.rest.issues.createComment({
@@ -182,7 +185,7 @@ jobs:
               repo: context.repo.repo,
               body: output
             })
-          fi
+          }
 
     - name: Label PR with AI label
       if: ${{ inputs.check_ai_generated_code }}

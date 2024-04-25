@@ -46,52 +46,7 @@ jobs:
       id: snippets
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
-        echo "FOSSA_DECORATION=false" >> $GITHUB_ENV
         fossa snippets analyze -o snippets 2>&1 | tee snippets.out
-        FILE="snippets.out"
-        # Check if the file exists
-        if [ -f "$FILE" ]; then
-            if grep -q "0 matches" "$FILE"; then
-                echo "The file '$FILE' contains '0 matches'."
-            else
-                echo "The file '$FILE' does not contain '0 matches'."
-                echo "FOSSA_DECORATION=true" >> $GITHUB_ENV
-            fi
-        else
-            echo "Error: The file '$FILE' does not exist."
-        fi
-
-    - name: FOSSA Snippets Detection Decoration
-      if: ${{ inputs.check_snippets }} && env.FOSSA_DECORATION == 'true'
-      uses: actions/github-script@v6
-      continue-on-error: true        
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
-          const run_link = '<a href="' + run_url + '">Actions</a>.'
-          const fs = require('fs')
-          const snippets_file = fs.readFileSync('snippets.out', 'utf8')
-          const snippets = snippets_file.length > 65000 ? snippets_file.toString().substring(0, 65000) + " ..." : snippets_file
-          const truncated_message = snippets_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
-          const output = `#### FOSSA Snippets Detection 🤖\`${{ steps.snippets.outcome }}\`
-          <details><summary>Snippets Detection Output</summary>
-
-          \`\`\`\n
-          ${snippets}
-          \`\`\`
-
-          </details>
-          ${truncated_message}
-
-          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
-            
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: output
-          })
 
     - name: Generate Snippet Dependencies
       if: ${{ inputs.check_snippets }}
@@ -124,72 +79,6 @@ jobs:
       run: |
         # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
         fossa test 2>&1 | tee test.out
-
-    - name: FOSSA Test Decoration
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v6
-      continue-on-error: true        
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
-          const run_link = '<a href="' + run_url + '">Actions</a>.'
-          const fs = require('fs')
-          const test_file = fs.readFileSync('test.out', 'utf8')
-          const test = test_file.length > 65000 ? test_file.toString().substring(0, 65000) + " ..." : test_file
-          const truncated_message = test_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
-          const output = `#### FOSSA Test 🧪\`${{ steps.test.outcome }}\`
-          <details><summary>Test Output</summary>
-
-          \`\`\`\n
-          ${test}
-          \`\`\`
-
-          </details>
-          ${truncated_message}
-
-          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
-            
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: output
-          })
-
-    - name: FOSSA AI Detection Decoration
-      if: github.event_name == 'pull_request' && ${{ inputs.check_ai_generated_code }}
-      uses: actions/github-script@v6
-      continue-on-error: true        
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
-          const run_link = '<a href="' + run_url + '">Actions</a>.'
-          const fs = require('fs')
-          const analyze_file = fs.readFileSync('analyze.out', 'utf8')
-          const analyze = analyze_file.length > 65000 ? analyze_file.toString().substring(0, 65000) + " ..." : analyze_file
-          const truncated_message = analyze_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
-          const output = `#### FOSSA AI Detection 🤖\`${{ steps.analyze-ai.outcome }}\`
-          <details><summary>AI detection Output</summary>
-
-          \`\`\`\n
-          ${analyze}
-          \`\`\`
-
-          </details>
-          ${truncated_message}
-
-          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
-          
-          if (analyze_file.includes('GitHub Copilot generated code')) {
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            })
-          }
 
     - name: Label PR with AI label
       if: ${{ inputs.check_ai_generated_code }}

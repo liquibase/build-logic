@@ -57,24 +57,24 @@ jobs:
         script: |
           # execute the following code only if '0 matches' is not present in snippets.out
           const fs = require('fs');
-          if (!fs.readFileSync('snippets.out', 'utf8').includes('0 matches')) {
-            const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
-            const run_link = '<a href="' + run_url + '">Actions</a>.'
-            const snippets_file = fs.readFileSync('snippets.out', 'utf8')
-            const snippets = snippets_file.length > 65000 ? snippets_file.toString().substring(0, 65000) + " ..." : snippets_file
-            const truncated_message = snippets_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
-            const output = `#### FOSSA Snippets Detection 🤖\`${{ steps.snippets.outcome }}\`
-            <details><summary>Snippets Detection Output</summary>
+          const run_url = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + process.env.GITHUB_RUN_ID
+          const run_link = '<a href="' + run_url + '">Actions</a>.'
+          const snippets_file = fs.readFileSync('snippets.out', 'utf8')
+          const snippets = snippets_file.length > 65000 ? snippets_file.toString().substring(0, 65000) + " ..." : snippets_file
+          const truncated_message = snippets_file.length > 65000 ? "Output is too long and was truncated. You can read full log in " + run_link + "<br /><br />" : ""
+          const output = `#### FOSSA Snippets Detection 🤖\`${{ steps.snippets.outcome }}\`
+          <details><summary>Snippets Detection Output</summary>
 
-            \`\`\`\n
-            ${snippets}
-            \`\`\`
+          \`\`\`\n
+          ${snippets}
+          \`\`\`
 
-            </details>
-            ${truncated_message}
+          </details>
+          ${truncated_message}
 
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
-              
+          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.workspace }}\`, Workflow: \`${{ github.workflow }}\`*`;
+          # call this only if output does not contain '0 matches'
+          if (!snippets_file.includes('0 matches')) {
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -82,6 +82,7 @@ jobs:
               body: output
             })
           }
+          
 
     - name: Generate Snippet Dependencies
       if: ${{ inputs.check_snippets }}

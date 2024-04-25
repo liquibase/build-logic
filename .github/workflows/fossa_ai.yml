@@ -35,7 +35,7 @@ jobs:
     - name: Get Fossa Configuration
       if: ${{ inputs.check_ai_generated_code }}
       run: |
-        curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/v0.7.4/.github/.fossa.yml
+        curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/v0.7.5/.github/.fossa.yml
 
     - name: Install FOSSA CLI
       run: |
@@ -111,7 +111,7 @@ jobs:
         script: |
           const fs = require('fs')
           const analyze_file = fs.readFileSync('analyze.out', 'utf8')
-          if (analyze_file.includes('GitHub Copilot generated code') || analyze_file.includes('AI generated code') {
+          if (analyze_file.includes('GitHub Copilot generated code') || analyze_file.includes('AI generated code')) {
             github.rest.issues.addLabels({
               issue_number: context.issue.number,
               owner: context.repo.owner,

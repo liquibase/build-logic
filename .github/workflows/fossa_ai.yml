@@ -47,10 +47,17 @@ jobs:
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
         fossa snippets analyze -o snippets 2>&1 | tee snippets.out
-        # fail the job if snippets.out does not contain '0 matches'
-        if ! grep -q '0 matches' snippets.out; then
-          echo "FOSSA Snippets Detection failed"
-          exit 1
+        FILE="snippets.out"
+        # Check if the file exists
+        if [ -f "$FILE" ]; then
+            if grep -q "0 matches" "$FILE"; then
+                echo "The file '$FILE' contains '0 matches'."
+            else
+                echo "The file '$FILE' does not contain '0 matches'."
+                exit 1
+            fi
+        else
+            echo "Error: The file '$FILE' does not exist."
         fi
 
     - name: FOSSA Snippets Detection Decoration

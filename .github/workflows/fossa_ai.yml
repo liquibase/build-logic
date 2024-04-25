@@ -46,6 +46,7 @@ jobs:
       id: snippets
       run: |
         # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
+        echo "FOSSA_DECORATION=false" >> $GITHUB_ENV
         fossa snippets analyze -o snippets 2>&1 | tee snippets.out
         FILE="snippets.out"
         # Check if the file exists
@@ -54,14 +55,14 @@ jobs:
                 echo "The file '$FILE' contains '0 matches'."
             else
                 echo "The file '$FILE' does not contain '0 matches'."
-                exit 1
+                echo "FOSSA_DECORATION=true" >> $GITHUB_ENV
             fi
         else
             echo "Error: The file '$FILE' does not exist."
         fi
 
     - name: FOSSA Snippets Detection Decoration
-      if: failure() && ${{ inputs.check_snippets }}
+      if: ${{ env.FOSSA_DECORATION }} && ${{ inputs.check_snippets }}
       uses: actions/github-script@v6
       continue-on-error: true        
       with:

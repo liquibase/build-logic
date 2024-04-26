@@ -132,7 +132,7 @@ jobs:
         if: ${{ inputs.generate_sbom }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-          fossa report attribution --format html 2>&1 | tee sbom.html
+          fossa report -p ${{ github.event.repository.name }} attribution --format html 2>&1 | tee sbom.html
 
       - name: Archive FOSSA SBOM Report
         if: ${{ inputs.generate_sbom }}

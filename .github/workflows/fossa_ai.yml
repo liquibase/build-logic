@@ -46,7 +46,7 @@ jobs:
         id: snippets
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
-          fossa snippets analyze -p ${{ github.event.repository.name }} -o snippets 2>&1 | tee snippets.out
+          fossa snippets analyze -o snippets 2>&1 | tee snippets.out
           FILE="snippets.out"
           if [ -f "$FILE" ]; then
               if grep -q "0 matches" "$FILE"; then

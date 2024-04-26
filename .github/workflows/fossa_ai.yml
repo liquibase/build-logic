@@ -26,117 +26,117 @@ jobs:
       FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref }}
-        fetch-depth: 0
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
 
-    - name: Get Fossa Configuration
-      if: ${{ inputs.check_ai_generated_code }}
-      run: |
-        curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/v0.7.5/.github/.fossa.yml
+      - name: Get Fossa Configuration
+        if: ${{ inputs.check_ai_generated_code }}
+        run: |
+          curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/v0.7.5/.github/.fossa.yml
 
-    - name: Install FOSSA CLI
-      run: |
-        curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
+      - name: Install FOSSA CLI
+        run: |
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
 
-    - name: Run FOSSA Snippets Detection
-      if: ${{ inputs.check_snippets }}
-      id: snippets
-      run: |
-        # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
-        fossa snippets analyze -o snippets 2>&1 | tee snippets.out
-        FILE="snippets.out"
-        if [ -f "$FILE" ]; then
-            if grep -q "0 matches" "$FILE"; then
-                echo "The file '$FILE' contains '0 matches'."
-            else
-                echo "The file '$FILE' does not contain '0 matches'."
-                exit 1
-            fi
-        else
-            echo "Error: The file '$FILE' does not exist."
-        fi
+      - name: Run FOSSA Snippets Detection
+        if: ${{ inputs.check_snippets }}
+        id: snippets
+        run: |
+          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
+          fossa snippets analyze -p ${{ github.event.repository.name }} -o snippets 2>&1 | tee snippets.out
+          FILE="snippets.out"
+          if [ -f "$FILE" ]; then
+              if grep -q "0 matches" "$FILE"; then
+                  echo "The file '$FILE' contains '0 matches'."
+              else
+                  echo "The file '$FILE' does not contain '0 matches'."
+                  exit 1
+              fi
+          else
+              echo "Error: The file '$FILE' does not exist."
+          fi
 
-    - name: Generate Snippet Dependencies
-      if: ${{ inputs.check_snippets }}
-      run: |
-        # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/commit.md
-        fossa snippets commit --analyze-output snippets --overwrite-fossa-deps --format yml
+      - name: Generate Snippet Dependencies
+        if: ${{ inputs.check_snippets }}
+        run: |
+          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/commit.md
+          fossa snippets commit -p ${{ github.event.repository.name }} --analyze-output snippets --overwrite-fossa-deps --format yml
 
-    - name: Run FOSSA Analyze with AI Generated Code Detection
-      id: analyze-ai
-      if: ${{ inputs.check_ai_generated_code }}
-      run: |
-        # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        mkdir patch
-        cp $PWD/.github/.fossa.yml patch/.fossa.yml
-        # Export the full content of changed files to 'patch.zip'
-        git diff --name-only HEAD~1 HEAD | xargs zip patch.zip
-        unzip patch.zip -d patch/
-        # Analyze the changes using FOSSA and redirect output to analyze.out
-        fossa analyze patch -o 2>&1 | tee analyze.out
+      - name: Run FOSSA Analyze with AI Generated Code Detection
+        id: analyze-ai
+        if: ${{ inputs.check_ai_generated_code }}
+        run: |
+          # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
+          mkdir patch
+          cp $PWD/.github/.fossa.yml patch/.fossa.yml
+          # Export the full content of changed files to 'patch.zip'
+          git diff --name-only HEAD~1 HEAD | xargs zip patch.zip
+          unzip patch.zip -d patch/
+          # Analyze the changes using FOSSA and redirect output to analyze.out
+          fossa analyze -p ${{ github.event.repository.name }} patch -o 2>&1 | tee analyze.out
 
-    - name: Run FOSSA Analyze
-      id: analyze
-      run: |
-        # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
-        # Run the full analyze on the current branch to be checked by the test command
-        fossa analyze -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze_no_ai.out
+      - name: Run FOSSA Analyze
+        id: analyze
+        run: |
+          # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
+          # Run the full analyze on the current branch to be checked by the test command
+          fossa analyze -p ${{ github.event.repository.name }} -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze_no_ai.out
 
-    - name: Run FOSSA Test
-      id: test
-      run: |
-        # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
-        fossa test 2>&1 | tee test.out
-        FILE="test.out"
-        if [ -f "$FILE" ]; then
-            if grep -q "Test passed" "$FILE"; then
-                echo "The file '$FILE' contains 'Test passed'."
-            else
-                echo "The file '$FILE' does not contain 'Test passed'."
-                exit 1
-            fi
-        else
-            echo "Error: The file '$FILE' does not exist."
-        fi
+      - name: Run FOSSA Test
+        id: test
+        run: |
+          # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
+          fossa test -p ${{ github.event.repository.name }} 2>&1 | tee test.out
+          FILE="test.out"
+          if [ -f "$FILE" ]; then
+              if grep -q "Test passed" "$FILE"; then
+                  echo "The file '$FILE' contains 'Test passed'."
+              else
+                  echo "The file '$FILE' does not contain 'Test passed'."
+                  exit 1
+              fi
+          else
+              echo "Error: The file '$FILE' does not exist."
+          fi
 
-    - name: Label PR with AI label
-      if: ${{ inputs.check_ai_generated_code }}
-      uses: actions/github-script@v6
-      continue-on-error: true
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const fs = require('fs')
-          const analyze_file = fs.readFileSync('analyze.out', 'utf8')
-          if (analyze_file.includes('GitHub Copilot generated code') || analyze_file.includes('AI generated code')) {
-            github.rest.issues.addLabels({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              labels: ['AI Generated Code']
-            })
-          }
-          else {
-            github.rest.issues.removeLabel({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'AI Generated Code'
-            })
-          }
+      - name: Label PR with AI label
+        if: ${{ inputs.check_ai_generated_code }}
+        uses: actions/github-script@v6
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs')
+            const analyze_file = fs.readFileSync('analyze.out', 'utf8')
+            if (analyze_file.includes('GitHub Copilot generated code') || analyze_file.includes('AI generated code')) {
+              github.rest.issues.addLabels({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ['AI Generated Code']
+              })
+            }
+            else {
+              github.rest.issues.removeLabel({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'AI Generated Code'
+              })
+            }
 
-    - name: Run FOSSA SBOM Report
-      if: ${{ inputs.generate_sbom }}
-      run: |
-        # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-        fossa report attribution --format html 2>&1 | tee sbom.html
+      - name: Run FOSSA SBOM Report
+        if: ${{ inputs.generate_sbom }}
+        run: |
+          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
+          fossa report attribution --format html 2>&1 | tee sbom.html
 
-    - name: Archive FOSSA SBOM Report
-      if: ${{ inputs.generate_sbom }}
-      uses: actions/upload-artifact@v3
-      with:
-        name: sbom
-        path: sbom.html
+      - name: Archive FOSSA SBOM Report
+        if: ${{ inputs.generate_sbom }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom
+          path: sbom.html

@@ -63,7 +63,7 @@ jobs:
         if: ${{ inputs.check_snippets }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/commit.md
-          fossa snippets commit -p ${{ github.event.repository.name }} --analyze-output snippets --overwrite-fossa-deps --format yml
+          fossa snippets ${{ github.event.repository.name }} --analyze-output snippets --overwrite-fossa-deps --format yml
 
       - name: Run FOSSA Analyze with AI Generated Code Detection
         id: analyze-ai

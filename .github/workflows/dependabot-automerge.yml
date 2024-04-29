@@ -22,7 +22,7 @@ jobs:
       - name: Dependabot metadata
         id: dependabot-metadata
         # Use 'dependabot/fetch-metadata' to fetch the metadata about the update
-        uses: dependabot/fetch-metadata@v1.6.0
+        uses: dependabot/fetch-metadata@v2.1.0
 
       - name: Approve patch and minor updates
         # Conditional statement to run the steps only when the update type is a patch or minor

@@ -29,6 +29,11 @@ on:
         required: false
         default: 'manual'
         type: string
+      buildCommand:
+        description: 'Custom build command'
+        required: false
+        default: 'mvn clean install'
+        type: string
 
 jobs:
   analyze:
@@ -79,16 +84,13 @@ jobs:
       run: |
         ${{ inputs.extraCommand }}
         
-    # If the analyze step fails for one of the languages you are analyzing with
-    # "We were unable to automatically build your code", modify the matrix above
-    # to set the build mode to "manual" for that language. Then modify this step
-    # to build your code.
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
+    # users can specify the custom build command via the buildCommand input.
+    # If no custom command is provided, it will default to `mvn clean install`.
+
     - name: Build
       if: ${{ inputs.buildMode }} == 'manual'
       run: |
-        mvn clean install
+        ${{ inputs.buildCommand }}
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3

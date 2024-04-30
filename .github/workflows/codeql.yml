@@ -8,7 +8,8 @@
 # We have attempted to detect the languages in your repository. Please check
 # the `language` matrix defined below to confirm you have the correct set of
 # supported CodeQL languages.
-#
+# TODO: Add support for handling multiple languages in the CodeQL workflow
+
 name: "CodeQL"
 
 on:
@@ -21,6 +22,11 @@ on:
         type: string
       extraCommand:
         description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
+      buildCommand:
+        description: 'Custom build command'
         required: false
         default: ''
         type: string
@@ -39,6 +45,7 @@ jobs:
       fail-fast: false
       matrix:
         language: ${{fromJson(inputs.languages)}}
+
         # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby', 'swift' ]
         # Use only 'java' to analyze code written in Java, Kotlin or both
         # Use only 'javascript' to analyze code written in JavaScript, TypeScript or both
@@ -48,11 +55,24 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: set build mode
+      id: set-build-mode
+      run: |
+        if ${{ inputs.buildCommand }} != ''
+        then
+          echo "Build command is provided. Setting buildMode to 'manual'
+          echo "buildMode='manual'" >> $GITHUB_OUTPUT
+        else
+            echo "Build command is not provided. Setting buildMode to 'autobuild'
+            echo "buildMode='autobuild'" >> $GITHUB_OUTPUT
+        fi
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
+        build-mode: ${{ steps.set-build-mode.outputs.buildMode }}
         # If you wish to specify custom queries, you can do so here or in a config file.
         # By default, queries listed here will override any specified in a config file.
         # Prefix the list here with "+" to use these queries and those in the config file.
@@ -73,20 +93,13 @@ jobs:
       run: |
         ${{ inputs.extraCommand }}
 
-    # Autobuild attempts to build any compiled languages  (C/C++, C#, Go, or Java).
-    # If this step fails, then you should remove it and run the build manually (see below)
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
+    # users can specify the custom build command via the buildCommand input.
+    # If no custom command is provided, it will be 'autobuild' by codeql in step set-build-mode  .
 
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-
-    #   If the Autobuild fails above, remove it and uncomment the following three lines.
-    #   modify them (or add more) to build your code if your project, please refer to the EXAMPLE below for guidance.
-
-    # - run: |
-    #     echo "Run, Build Application using script"
-    #     ./location_of_script_within_repo/buildscript.sh
+    - name: Build
+      if: ${{ steps.set-build-mode.outputs.buildMode }} == 'manual'
+      run: |
+        ${{ inputs.buildCommand }}
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3

@@ -24,15 +24,10 @@ on:
         required: false
         default: ''
         type: string
-      buildMode:
-        description: 'Build mode'
-        required: false
-        default: 'autobuild'
-        type: string
       buildCommand:
         description: 'Custom build command'
         required: false
-        default: 'mvn clean install'
+        default: ''
         type: string
 
 jobs:
@@ -59,12 +54,24 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: set build mode
+      id: set-build-mode
+      run: |
+        if ${{ inputs.buildCommand }} != ''
+        then
+          echo "Build command is provided. Setting buildMode to 'manual'
+          echo "buildMode='manual'" >> $GITHUB_OUTPUT
+        else
+            echo "Build command is not provided. Setting buildMode to 'autobuild'
+            echo "buildMode='autobuild'" >> $GITHUB_OUTPUT
+        fi
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
-        build-mode: ${{ inputs.buildMode }}
+        build-mode: ${{ steps.set-build-mode.outputs.buildMode }}
         # If you wish to specify custom queries, you can do so here or in a config file.
         # By default, queries listed here will override any specified in a config file.
         # Prefix the list here with "+" to use these queries and those in the config file.
@@ -84,12 +91,12 @@ jobs:
       if: inputs.extraCommand != ''
       run: |
         ${{ inputs.extraCommand }}
-        
+
     # users can specify the custom build command via the buildCommand input.
-    # If no custom command is provided, it will default to `mvn clean install`.
+    # If no custom command is provided, it will be 'autobuild' by codeql in step set-build-mode  .
 
     - name: Build
-      if: ${{ inputs.buildMode }} == 'manual'
+      if: ${{ steps.set-build-mode.outputs.buildMode }} == 'manual'
       run: |
         ${{ inputs.buildCommand }}
 

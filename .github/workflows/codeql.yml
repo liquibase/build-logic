@@ -28,7 +28,7 @@ on:
       buildCommands:
         description: 'Custom build command'
         required: false
-        default: '[]'
+        default: ''
         type: string
 
 jobs:
@@ -45,7 +45,6 @@ jobs:
       fail-fast: false
       matrix:
         language: ${{fromJson(inputs.languages)}}
-        buildCommand: ${{fromJson(inputs.buildCommands)}}
 
         # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby', 'swift' ]
         # Use only 'java' to analyze code written in Java, Kotlin or both
@@ -59,7 +58,7 @@ jobs:
     - name: set build mode
       id: set-build-mode
       run: |
-        if ${{ matrix.buildCommand }} != ''
+        if ${{ inputs.buildCommand }} != ''
         then
           echo "Build command is provided. Setting buildMode to manual"
           echo "buildMode=manual" >> $GITHUB_OUTPUT

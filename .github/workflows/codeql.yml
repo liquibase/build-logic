@@ -59,14 +59,17 @@ jobs:
       id: set-build-mode
       run: |
         if [[ -n "${{ inputs.buildCommand }}" ]]
+        buildMode=''
         then
           echo "Build command is provided. Setting buildMode to manual"
-          echo "buildMode=manual" >> $GITHUB_OUTPUT
+          buildMode='manual'
+          echo "buildMode=$buildMode" >> $GITHUB_OUTPUT
         else
             echo "Build command is not provided. Setting buildMode to autobuild"
-            echo "buildMode=autobuild" >> $GITHUB_OUTPUT
+            buildMode='autobuild'
+            echo "buildMode=$buildMode" >> $GITHUB_OUTPUT
         fi
-
+        echo $buildMode
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -97,9 +100,9 @@ jobs:
     # If no custom command is provided, it will be 'autobuild' by codeql in step set-build-mode  .
 
     - name: Build
-      if: ${{ steps.set-build-mode.outputs.buildMode }} == manual
+      if: ${{ steps.set-build-mode.outputs.buildMode }} == 'manual'
       run: |
-        echo "${{ steps.set-build-mode.outputs.buildMode }}"
+        echo ${{ steps.set-build-mode.outputs.buildMode }}
         ${{ inputs.buildCommand }}
 
     - name: Perform CodeQL Analysis

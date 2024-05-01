@@ -55,17 +55,20 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # setting a build mode based on whether a buildCommand is provided or not.
+    # If a buildCommand is provided, it sets the build mode to "manual"; otherwise, it sets it to "autobuild".
     - name: set build mode
       id: set-build-mode
       run: |
-        if ${{ inputs.buildCommand }} != ''
+        if [[ -n "${{ inputs.buildCommand }}" ]]
         then
-          echo "Build command is provided. Setting buildMode to 'manual'
-          echo "buildMode='manual'" >> $GITHUB_OUTPUT
+          echo "Build command is provided. Setting buildMode to manual"
+          buildMode='manual'
         else
-            echo "Build command is not provided. Setting buildMode to 'autobuild'
-            echo "buildMode='autobuild'" >> $GITHUB_OUTPUT
+            echo "Build command is not provided. Setting buildMode to autobuild"
+            buildMode='autobuild'
         fi
+        echo "buildMode=$buildMode" >> $GITHUB_OUTPUT
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
@@ -97,7 +100,7 @@ jobs:
     # If no custom command is provided, it will be 'autobuild' by codeql in step set-build-mode  .
 
     - name: Build
-      if: ${{ steps.set-build-mode.outputs.buildMode }} == 'manual'
+      if: steps.set-build-mode.outputs.buildMode  == 'manual'
       run: |
         ${{ inputs.buildCommand }}
 

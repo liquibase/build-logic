@@ -97,11 +97,13 @@ jobs:
         ${{ inputs.extraCommand }}
 
     - name: Set up Maven
+      if: matrix.language == 'java'
       uses: stCarolas/setup-maven@v4.5
       with:
         maven-version: "3.9.5"
     # look for dependencies in maven
     - name: maven-settings-xml-action
+      if: matrix.language == 'java'
       uses: whelk-io/maven-settings-xml-action@v21
       with:
         repositories: |

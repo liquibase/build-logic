@@ -58,7 +58,7 @@ jobs:
     - name: set build mode
       id: set-build-mode
       run: |
-        if [[ -n ${{ inputs.buildCommand }} ]]
+        if [[ -n "${{ inputs.buildCommand }}" ]]
         then
           echo "Build command is provided. Setting buildMode to manual"
           echo "buildMode=manual" >> $GITHUB_OUTPUT

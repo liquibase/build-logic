@@ -63,13 +63,12 @@ jobs:
         then
           echo "Build command is provided. Setting buildMode to manual"
           buildMode='manual'
-          echo "buildMode=$buildMode" >> $GITHUB_OUTPUT
         else
             echo "Build command is not provided. Setting buildMode to autobuild"
             buildMode='autobuild'
-            echo "buildMode=$buildMode" >> $GITHUB_OUTPUT
         fi
-        echo $buildMode
+        echo "buildMode=$buildMode" >> $GITHUB_OUTPUT
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3

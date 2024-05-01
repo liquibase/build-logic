@@ -25,7 +25,7 @@ on:
         required: false
         default: ''
         type: string
-      buildCommands:
+      buildCommand:
         description: 'Custom build command'
         required: false
         default: ''

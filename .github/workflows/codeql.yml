@@ -101,7 +101,6 @@ jobs:
     - name: Build
       if: steps.set-build-mode.outputs.buildMode  == 'manual'
       run: |
-        echo ${{ steps.set-build-mode.outputs.buildMode }}
         ${{ inputs.buildCommand }}
 
     - name: Perform CodeQL Analysis

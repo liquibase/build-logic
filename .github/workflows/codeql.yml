@@ -97,7 +97,7 @@ jobs:
     # If no custom command is provided, it will be 'autobuild' by codeql in step set-build-mode  .
 
     - name: Build
-      if: ${{ steps.set-build-mode.outputs.buildMode }} == 'manual'
+      if: ${{ steps.set-build-mode.outputs.buildMode }} == manual
       run: |
         echo "${{ steps.set-build-mode.outputs.buildMode }}"
         ${{ inputs.buildCommand }}

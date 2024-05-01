@@ -55,6 +55,8 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # setting a build mode based on whether a buildCommand is provided or not.
+    # If a buildCommand is provided, it sets the build mode to "manual"; otherwise, it sets it to "autobuild".
     - name: set build mode
       id: set-build-mode
       run: |

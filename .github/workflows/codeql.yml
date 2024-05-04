@@ -96,6 +96,55 @@ jobs:
       run: |
         ${{ inputs.extraCommand }}
 
+    - name: Set up Maven
+      if: matrix.language == 'java'
+      uses: stCarolas/setup-maven@v4.5
+      with:
+        maven-version: "3.9.5"
+    # look for dependencies in maven
+    - name: maven-settings-xml-action
+      if: matrix.language == 'java'
+      uses: whelk-io/maven-settings-xml-action@v21
+      with:
+        repositories: |
+          [
+            {
+              "id": "liquibase",
+              "url": "https://maven.pkg.github.com/liquibase/liquibase",
+              "releases": {
+                "enabled": "true"
+              },
+              "snapshots": {
+                "enabled": "true",
+                "updatePolicy": "always"
+              }
+            },
+            {
+              "id": "liquibase-pro",
+              "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+              "releases": {
+                "enabled": "true"
+              },
+              "snapshots": {
+                "enabled": "true",
+                "updatePolicy": "always"
+              }
+            }
+          ]
+        servers: |
+          [
+            {
+              "id": "liquibase-pro",
+              "username": "liquibot",
+              "password": "${{ secrets.LIQUIBOT_PAT }}"
+            },
+            {
+              "id": "liquibase",
+              "username": "liquibot",
+              "password": "${{ secrets.LIQUIBOT_PAT }}"
+            }
+          ]
+
     # users can specify the custom build command via the buildCommand input.
     # If no custom command is provided, it will be 'autobuild' by codeql in step set-build-mode  .
 

@@ -392,7 +392,7 @@ Here the modules we want to generate and aggregate test reports must be specifie
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>liquibase-commercial</artifactId>
-            <version>${project.version}</version>
+            <version>DAT-16671-SNAPSHOT</version>
         </dependency>
             <dependency>
             <groupId>${project.groupId}</groupId>

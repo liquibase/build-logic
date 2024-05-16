@@ -1,0 +1,21 @@
+name: Slack Notification
+
+jobs:
+    slack-notification:
+        runs-on: ubuntu-latest
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+
+        - name: Notify Slack on Build Failure
+          if: ${{ failure() && inputs.nightly }}
+          uses: rtCamp/action-slack-notify@v2
+          env:
+            SLACK_COLOR: ${{ job.status }}
+            SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
+            SLACK_TITLE: "❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
+            SLACK_USERNAME: liquibot
+            SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+            SLACK_ICON_EMOJI: ":robot_face:"
+            SLACK_FOOTER: "${{ github.repository }}"
+            SLACK_LINK_NAMES: true

@@ -1,14 +1,14 @@
 name: Slack Notification
 
 on:
-  workflow_call:
+  repository_dispatch:
+    types: [ test-failure ]
 
 jobs:
     slack-notification:
         runs-on: ubuntu-latest
         steps:
         - name: Notify Slack on Build Failure
-          if: ${{ failure() }}
           uses: rtCamp/action-slack-notify@v2
           env:
             SLACK_COLOR: ${{ job.status }}

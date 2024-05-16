@@ -1,5 +1,8 @@
 name: Slack Notification
 
+on:
+  workflow_call:
+
 jobs:
     slack-notification:
         runs-on: ubuntu-latest

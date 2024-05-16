@@ -7,11 +7,8 @@ jobs:
     slack-notification:
         runs-on: ubuntu-latest
         steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-
         - name: Notify Slack on Build Failure
-          if: ${{ failure() && inputs.nightly }}
+          if: ${{ failure() }}
           uses: rtCamp/action-slack-notify@v2
           env:
             SLACK_COLOR: ${{ job.status }}

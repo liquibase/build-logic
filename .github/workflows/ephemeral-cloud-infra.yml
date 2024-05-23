@@ -64,6 +64,13 @@ jobs:
             terraform apply -auto-approve
             echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
             echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
+        
+      - name: Upload Terraform state as artifact
+        if: ${{ inputs.deploy }}
+        uses: actions/upload-artifact@v3
+        with:
+            name: terraform-state
+            path: test-automation-ephemeral/stack/terraform.tfstate
 
       - name: Create ephemeral infra
         working-directory: test-automation-ephemeral/infra
@@ -76,6 +83,13 @@ jobs:
         working-directory: test-automation-ephemeral/infra
         run: |
             spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -auto-approve"
+
+      - name: Download Terraform state
+        if: ${{ inputs.destroy }}
+        uses: actions/download-artifact@v3
+        with:
+            name: terraform-state
+            path: test-automation-ephemeral/stack
 
       - name: Destroy ephemeral stack
         if: ${{ inputs.destroy }}

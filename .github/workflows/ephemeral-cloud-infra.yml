@@ -3,10 +3,13 @@ name: Ephemeral Cloud Infrastructure
 on:
  workflow_call:
     inputs:
+        deploy:
+            description: 'Deploy the ephemeral cloud infrastructure'
+            required: false
+            type: boolean
         destroy:
             description: 'Destroy the ephemeral cloud infrastructure'
             required: false
-            default: false
             type: boolean
         dynamodb:
             description: 'Deploy or destroy the dynamodb table'
@@ -43,7 +46,7 @@ jobs:
         run: terraform init
 
       - name: Create ephemeral stack
-        if: ${{ inputs.destroy }} == false
+        if: ${{ inputs.deploy }}
         working-directory: test-automation-ephemeral/stack
         run: |
             terraform apply -auto-approve
@@ -52,7 +55,7 @@ jobs:
 
       - name: Create ephemeral infra
         working-directory: test-automation-ephemeral/infra
-        if: ${{ inputs.destroy }} == false
+        if: ${{ inputs.deploy }}
         run: |
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
     

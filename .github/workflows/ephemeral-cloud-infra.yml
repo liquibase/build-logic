@@ -23,7 +23,7 @@ jobs:
       - name: Checkout branch with draft redirects
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: DAT-16824
           repository: liquibase/liquibase-infrastructure
 
       - name: Install spacectl

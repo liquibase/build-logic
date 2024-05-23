@@ -1,0 +1,66 @@
+# Terraform Action to lint and apply updated redirects
+name: Ephemeral Cloud Infrastructure
+on:
+ workflow_call:
+    inputs:
+        action:
+            description: 'Deploy or destroy the ephemeral cloud infrastructure'
+            required: true
+            type: string
+            default: 'deploy'
+
+jobs:
+  ephemeral-cloud-infra:
+    name: ${{ inputs.action}} Ephemeral Cloud Infrastructure
+    runs-on: ubuntu-latest
+    permissions: write-all
+    env:
+      SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
+      SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}
+      SPACELIFT_API_KEY_SECRET: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
+
+    steps:
+      - name: Checkout branch with draft redirects
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          repository: liquibase/liquibase-infrastructure
+
+      - name: Install spacectl
+        uses: spacelift-io/setup-spacectl@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Terraform Format
+        working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral
+        id: fmt
+        run: terraform fmt
+
+      - name: Terraform Init
+        working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral
+        id: init
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Preview infrastructure
+        working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral
+        run: |
+          terraform plan
+          #spacectl stack local-preview --id liquibase-docs-staging
+
+      - name: Deploy infrastructure
+        if: ${{ inputs.action }} == 'deploy'
+        run: |
+            terraform apply -auto-approve
+            #spacectl stack set-current-commit --id liquibase-docs-staging --sha ${{ github.sha }}
+            #spacectl stack deploy --id liquibase-docs-staging --auto-confirm
+
+      - name: Destroy infrastructure
+        if: ${{ inputs.action }} == 'destroy'
+        run: |
+            terraform destroy -auto-approve
+            #spacectl stack destroy --id liquibase-docs-staging --auto-confirm

@@ -26,6 +26,8 @@ jobs:
     name: ${{ inputs.action}} Ephemeral Cloud Infrastructure
     runs-on: ubuntu-latest
     permissions: write-all
+    outputs:
+      EPHEMERAL_STACK_ID: ${{ steps.create_stack.outputs.EPHEMERAL_STACK_ID }}
     env:
       SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
       SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}
@@ -50,12 +52,12 @@ jobs:
         run: terraform init
 
       - name: Create ephemeral stack
+        id: create_stack
         if: ${{ inputs.deploy }}
         working-directory: test-automation-ephemeral/stack
         run: |
             terraform apply -auto-approve
             echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
-            echo "The ephemeral stack ID is $EPHEMERAL_STACK_ID"
             echo "::set-output name=EPHEMERAL_STACK_ID::$(terraform output -raw ephemeral_stack_id)"
 
       - name: Create ephemeral infra

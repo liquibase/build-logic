@@ -8,6 +8,11 @@ on:
             required: true
             type: string
             default: 'deploy'
+        dynamodb:
+            description: 'Deploy or destroy the dynamodb table'
+            required: false
+            type: boolean
+            default: false
 
 jobs:
   ephemeral-cloud-infra:
@@ -55,7 +60,7 @@ jobs:
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.action }} == 'destroy'
         run: |
-            spacectl stack task --id $EPHEMERAL_STACK_ID "terraform destroy -auto-approve"
+            spacectl stack task --id $EPHEMERAL_STACK_ID --tail "terraform destroy -auto-approve"
 
       - name: Destroy ephemeral stack
         working-directory: test-automation-ephemeral/stack

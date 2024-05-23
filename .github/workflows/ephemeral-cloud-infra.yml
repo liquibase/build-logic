@@ -44,12 +44,21 @@ jobs:
             terraform apply -auto-approve
             echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
             echo "The ephemeral stack ID is $EPHEMERAL_STACK_ID"
-            #spacectl stack set-current-commit --id liquibase-docs-staging --sha ${{ github.sha }}
-            #spacectl stack deploy --id liquibase-docs-staging --auto-confirm
+
+      - name: Create ephemeral infra
+        working-directory: test-automation-ephemeral/infra
+        if: ${{ inputs.action }} == 'deploy'
+        run: |
+            spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
+    
+      - name: Destroy ephemeral infra
+        working-directory: test-automation-ephemeral/infra
+        if: ${{ inputs.action }} == 'destroy'
+        run: |
+            spacectl stack destroy --id $EPHEMERAL_STACK_ID --auto-confirm
 
       - name: Destroy ephemeral stack
         working-directory: test-automation-ephemeral/stack
-        if: ${{ inputs.action }} == 'deploy'
+        if: ${{ inputs.action }} == 'destroy'
         run: |
             terraform destroy -auto-approve
-            #spacectl stack destroy --id liquibase-docs-staging --auto-confirm

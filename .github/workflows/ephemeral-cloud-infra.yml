@@ -55,7 +55,7 @@ jobs:
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.action }} == 'destroy'
         run: |
-            spacectl stack destroy --id $EPHEMERAL_STACK_ID --auto-confirm
+            spacectl stack task --id $EPHEMERAL_STACK_ID "terraform destroy -auto-approve"
 
       - name: Destroy ephemeral stack
         working-directory: test-automation-ephemeral/stack

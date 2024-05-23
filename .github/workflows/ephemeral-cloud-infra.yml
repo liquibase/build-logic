@@ -20,6 +20,10 @@ on:
             description: 'The stack ID to destroy'
             required: false
             type: string
+    outputs:
+        stack_id:
+            description: 'The stack ID of the ephemeral cloud infrastructure'
+            value: ${{ jobs.ephemeral-cloud-infra.outputs.stack_id }}
 
 jobs:
   ephemeral-cloud-infra:

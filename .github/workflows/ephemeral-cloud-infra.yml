@@ -16,6 +16,10 @@ on:
             required: false
             type: boolean
             default: false
+        stack_id:
+            description: 'The stack ID to destroy'
+            required: false
+            type: string
 
 jobs:
   ephemeral-cloud-infra:
@@ -52,6 +56,7 @@ jobs:
             terraform apply -auto-approve
             echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
             echo "The ephemeral stack ID is $EPHEMERAL_STACK_ID"
+            echo "::set-output name=EPHEMERAL_STACK_ID::$(terraform output -raw ephemeral_stack_id)"
 
       - name: Create ephemeral infra
         working-directory: test-automation-ephemeral/infra
@@ -63,7 +68,7 @@ jobs:
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |
-            spacectl stack task --id $EPHEMERAL_STACK_ID --tail "terraform destroy -auto-approve"
+            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -auto-approve"
 
       - name: Destroy ephemeral stack
         if: ${{ inputs.destroy }}

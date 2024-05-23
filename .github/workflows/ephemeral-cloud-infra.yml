@@ -35,7 +35,9 @@ jobs:
       - name: Terraform Format
         working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral
         id: fmt
-        run: terraform fmt
+        run: |
+            ls -ltr
+            terraform fmt
 
       - name: Terraform Init
         working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral

@@ -25,11 +25,12 @@ jobs:
         with:
           ref: DAT-16824
           repository: liquibase/liquibase-infrastructure
+          token: ${{ secrets.BOT_TOKEN }}
 
       - name: Install spacectl
         uses: spacelift-io/setup-spacectl@main
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
 
       - name: Terraform Format
         working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral

@@ -32,24 +32,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
 
-      - name: Terraform Format
-        id: fmt
-        run: |
-            ls -ltr
-            terraform fmt
-
       - name: Terraform Init
-        working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral
+        working-directory: test-automation-ephemeral
         id: init
         run: terraform init
 
-      - name: Terraform Validate
-        working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral
-        id: validate
-        run: terraform validate -no-color
-
       - name: Preview infrastructure
-        working-directory: liquibase/liquibase-infrastructure/test-automation-ephemeral
+        working-directory: test-automation-ephemeral
         run: |
           terraform plan
           #spacectl stack local-preview --id liquibase-docs-staging

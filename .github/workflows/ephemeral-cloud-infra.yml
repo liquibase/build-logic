@@ -18,6 +18,9 @@ jobs:
       SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
       SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}
       SPACELIFT_API_KEY_SECRET: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
+      TF_VAR_SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
+      TF_VAR_SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}
+      TF_VAR_SPACELIFT_API_KEY_SECRET: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
 
     steps:
       - name: Checkout branch with draft redirects
@@ -33,25 +36,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
 
       - name: Terraform Init
-        working-directory: test-automation-ephemeral
+        working-directory: test-automation-ephemeral/stack
         id: init
         run: terraform init
 
-      - name: Preview infrastructure
-        working-directory: test-automation-ephemeral
-        run: |
-          terraform plan
-          #spacectl stack local-preview --id liquibase-docs-staging
-
-      - name: Deploy infrastructure
+      - name: Create ephemeral stack
+        working-directory: test-automation-ephemeral/stack
         if: ${{ inputs.action }} == 'deploy'
         run: |
             terraform apply -auto-approve
+            echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
+            echo "The ephemeral stack ID is $EPHEMERAL_STACK_ID"
             #spacectl stack set-current-commit --id liquibase-docs-staging --sha ${{ github.sha }}
             #spacectl stack deploy --id liquibase-docs-staging --auto-confirm
 
-      - name: Destroy infrastructure
-        if: ${{ inputs.action }} == 'destroy'
+      - name: Destroy ephemeral stack
+        working-directory: test-automation-ephemeral/stack
+        if: ${{ inputs.action }} == 'deploy'
         run: |
             terraform destroy -auto-approve
             #spacectl stack destroy --id liquibase-docs-staging --auto-confirm

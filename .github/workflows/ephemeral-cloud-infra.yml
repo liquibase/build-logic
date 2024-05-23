@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: write-all
     outputs:
-      EPHEMERAL_STACK_ID: ${{ steps.create_stack.outputs.EPHEMERAL_STACK_ID }}
+      stack_id: ${{ steps.create_stack.outputs.stack_id }}
     env:
       SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
       SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}
@@ -58,7 +58,7 @@ jobs:
         run: |
             terraform apply -auto-approve
             echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
-            echo "::set-output name=EPHEMERAL_STACK_ID::$(terraform output -raw ephemeral_stack_id)"
+            echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
 
       - name: Create ephemeral infra
         working-directory: test-automation-ephemeral/infra

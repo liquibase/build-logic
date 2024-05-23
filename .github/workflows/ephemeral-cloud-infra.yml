@@ -29,7 +29,9 @@ jobs:
   ephemeral-cloud-infra:
     name: ${{ inputs.action}} Ephemeral Cloud Infrastructure
     runs-on: ubuntu-latest
-    permissions: write-all
+    permissions: 
+        contents: read
+        id-token: write
     outputs:
       stack_id: ${{ steps.create_stack.outputs.stack_id }}
     env:
@@ -49,7 +51,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-            role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+            role-to-assume: ${{ secrets.AWS_DEV_GITHUB_OIDC_ROLE_ARN_SIMPLE_JAVA_MAVEN_APP }}
             aws-region: us-east-1
 
       - name: Install spacectl

@@ -73,12 +73,16 @@ jobs:
             path: test-automation-ephemeral/stack/terraform.tfstate
 
       - name: Create ephemeral infra
+        env:
+            TF_VAR_stack_id: ${{ steps.create_stack.outputs.stack_id }}
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.deploy }}
         run: |
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
     
       - name: Destroy ephemeral infra
+        env:
+            TF_VAR_stack_id: ${{ inputs.stack_id }}
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |

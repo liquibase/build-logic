@@ -90,6 +90,7 @@ jobs:
         run: |
             ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5)
             echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
+            echo "resources_id: $ID"
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm

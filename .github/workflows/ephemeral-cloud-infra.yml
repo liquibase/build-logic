@@ -83,7 +83,7 @@ jobs:
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.deploy }}
         run: |
-            ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 4)
+            ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5)
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm

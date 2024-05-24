@@ -85,6 +85,7 @@ jobs:
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.deploy }}
         run: |
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $EPHEMERAL_STACK_ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
     

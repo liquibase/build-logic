@@ -12,7 +12,7 @@ on:
             required: false
             type: boolean
         dynamodb:
-            description: 'Deploy or destroy the dynamodb table'
+            description: 'Deploy or destroy the dynamodb infrastructure'
             required: false
             type: boolean
             default: false

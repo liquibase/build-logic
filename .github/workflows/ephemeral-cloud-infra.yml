@@ -80,12 +80,11 @@ jobs:
             path: test-automation-ephemeral/stack/terraform.tfstate
 
       - name: Create ephemeral infra
-        env:
-            TF_VAR_stack_id: ${{ steps.create_stack.outputs.stack_id }}
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.deploy }}
         run: |
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $EPHEMERAL_STACK_ID
+            ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 4)
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
     

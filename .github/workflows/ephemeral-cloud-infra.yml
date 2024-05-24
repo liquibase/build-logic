@@ -24,6 +24,9 @@ on:
         stack_id:
             description: 'The stack ID of the ephemeral cloud infrastructure'
             value: ${{ jobs.ephemeral-cloud-infra.outputs.stack_id }}
+        resources_id:
+          description: 'The resources ID of the ephemeral cloud infrastructure'
+          value: ${{ jobs.ephemeral-cloud-infra.outputs.resources_id }}
 
 jobs:
   ephemeral-cloud-infra:
@@ -34,6 +37,7 @@ jobs:
         id-token: write
     outputs:
       stack_id: ${{ steps.create_stack.outputs.stack_id }}
+      resources_id: ${{ steps.create_infra.outputs.resources_id }}
     env:
       SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
       SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}
@@ -80,10 +84,12 @@ jobs:
             path: test-automation-ephemeral/stack/terraform.tfstate
 
       - name: Create ephemeral infra
+        id: create_infra
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.deploy }}
         run: |
             ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5)
+            echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm

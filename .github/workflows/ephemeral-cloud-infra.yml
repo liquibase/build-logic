@@ -16,6 +16,11 @@ on:
             required: false
             type: boolean
             default: false
+        documentdb:
+          description: 'Deploy or destroy the documentdb infrastructure'
+          required: false
+          type: boolean
+          default: false
         stack_id:
             description: 'The stack ID to destroy'
             required: false
@@ -92,6 +97,7 @@ jobs:
             echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }} 
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
     
       - name: Destroy ephemeral infra

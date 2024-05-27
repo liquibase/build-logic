@@ -70,6 +70,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `build-artifact.yml`                    | Runs maven build and saves artifacts                                                                                    |
 | `codeql.yml`                            | Runs CodeQL scanning                                                                                                    |
 | `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                                                                 |
+| `ephemeral-cloud-infra.yml`             | Creates/Destroys test automation cloud infrastructure                                                                   |
 | `extension-attach-artifact-release.yml` | Attaches a tested artifact to the draft release. Receives a `zip` input to upload generated zip files                   |
 | `extension-release-published.yml`       | Publishes a release to Maven Central                                                                                    |
 | `extension-update-version.yml`          | Updates release and development `pom.xml` versions                                                                      |

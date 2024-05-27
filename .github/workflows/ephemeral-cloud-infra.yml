@@ -36,8 +36,8 @@ jobs:
         contents: read
         id-token: write
     outputs:
-      stack_id: ${{ steps.create_stack.outputs.stack_id }}
-      resources_id: ${{ steps.create_infra.outputs.resources_id }}
+      stack_id: ${{ steps.create_stack.outputs.stack_id }} # Used to reference the stack created in the ephemeral infra
+      resources_id: ${{ steps.create_infra.outputs.resources_id }} # Used to reference the resources created in the ephemeral infra
     env:
       SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
       SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}

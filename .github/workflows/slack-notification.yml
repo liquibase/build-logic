@@ -12,7 +12,7 @@ jobs:
           uses: rtCamp/action-slack-notify@v2
           env:
             SLACK_COLOR: ${{ job.status }}
-            SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>. Triggered by repository: ${{ github.event.repository.full_name }} and job: ${{ github.job }}"
+            SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>. Triggered by repository: ${{ github.event.client_payload.repository }} and job: ${{ github.job }}"
             SLACK_TITLE: "❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
             SLACK_USERNAME: liquibot
             SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}

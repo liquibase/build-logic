@@ -21,6 +21,16 @@ on:
           required: false
           type: boolean
           default: false
+        snowflake_oss:
+          description: 'Deploy or destroy the snowflake OSS infrastructure'
+          required: false
+          type: boolean
+          default: false
+        snowflake_pro:
+          description: 'Deploy or destroy the snowflake PRO infrastructure'
+          required: false
+          type: boolean
+          default: false
         stack_id:
             description: 'The stack ID to destroy'
             required: false
@@ -97,7 +107,9 @@ jobs:
             echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }} 
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_oss ${{ inputs.snowflake_oss }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_pro ${{ inputs.snowflake_pro }} 
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
             spacectl stack disable --id $EPHEMERAL_STACK_ID
     

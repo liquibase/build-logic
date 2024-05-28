@@ -101,12 +101,13 @@ jobs:
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
     
       - name: Destroy ephemeral infra
+        continue-on-error: true
         env:
             TF_VAR_stack_id: ${{ inputs.stack_id }}
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |
-            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -auto-approve"
+            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve"
 
       - name: Download Terraform state
         if: ${{ inputs.destroy }}

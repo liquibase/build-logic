@@ -99,6 +99,7 @@ jobs:
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }} 
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
+            spacectl stack disable --id $EPHEMERAL_STACK_ID
     
       - name: Destroy ephemeral infra
         continue-on-error: true
@@ -107,7 +108,9 @@ jobs:
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |
+            spacectl stack enable --id $EPHEMERAL_STACK_ID
             spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve"
+            spacectl stack disable --id $EPHEMERAL_STACK_ID
 
       - name: Download Terraform state
         if: ${{ inputs.destroy }}
@@ -120,4 +123,5 @@ jobs:
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/stack
         run: |
+            spacectl stack enable --id $EPHEMERAL_STACK_ID
             terraform destroy -auto-approve

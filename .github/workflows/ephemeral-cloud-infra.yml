@@ -12,10 +12,15 @@ on:
             required: false
             type: boolean
         dynamodb:
-            description: 'Deploy or destroy the dynamodb table'
+            description: 'Deploy or destroy the dynamodb infrastructure'
             required: false
             type: boolean
             default: false
+        documentdb:
+          description: 'Deploy or destroy the documentdb infrastructure'
+          required: false
+          type: boolean
+          default: false
         stack_id:
             description: 'The stack ID to destroy'
             required: false
@@ -36,8 +41,8 @@ jobs:
         contents: read
         id-token: write
     outputs:
-      stack_id: ${{ steps.create_stack.outputs.stack_id }}
-      resources_id: ${{ steps.create_infra.outputs.resources_id }}
+      stack_id: ${{ steps.create_stack.outputs.stack_id }} # Used to reference the stack created in the ephemeral infra
+      resources_id: ${{ steps.create_infra.outputs.resources_id }} # Used to reference the resources created in the ephemeral infra
     env:
       SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
       SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}
@@ -47,7 +52,7 @@ jobs:
       - name: Checkout liquibase-infrastructure
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: DAT-16824
           repository: liquibase/liquibase-infrastructure
           token: ${{ secrets.BOT_TOKEN }}
 
@@ -78,7 +83,7 @@ jobs:
         
       - name: Upload Terraform state as artifact
         if: ${{ inputs.deploy }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
             name: terraform-state
             path: test-automation-ephemeral/stack/terraform.tfstate
@@ -88,23 +93,25 @@ jobs:
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.deploy }}
         run: |
-            ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5 | tr '[:lower:]' '[:upper:]')
+            ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5)
             echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }} 
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
     
       - name: Destroy ephemeral infra
+        continue-on-error: true
         env:
             TF_VAR_stack_id: ${{ inputs.stack_id }}
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |
-            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -auto-approve"
+            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve"
 
       - name: Download Terraform state
         if: ${{ inputs.destroy }}
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
             name: terraform-state
             path: test-automation-ephemeral/stack

@@ -11,7 +11,7 @@ jobs:
         - name: Notify Slack on Build Failure
           uses: rtCamp/action-slack-notify@v2
           env:
-            SLACK_COLOR: ${{ github.event.action == 'test-failure' }}
+            SLACK_COLOR: ${{ github.event.action == 'test-failure' && 'danger' || 'good' }}
             SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.event.client_payload.server_url }}/${{ github.event.client_payload.repository }}/actions/runs/${{ github.event.client_payload.run_id }} <@U042HRTL4DT>. Triggered by repository: ${{ github.event.client_payload.repository }} and job: ${{ github.job }}"
             SLACK_TITLE: "❌ ${{ github.event.client_payload.repository }} ❌ Tests failed on branch ${{ github.event.client_payload.branch }} for commit ${{ github.event.client_payload.sha }} in repository ${{ github.event.client_payload.repository }}"
             SLACK_USERNAME: liquibot

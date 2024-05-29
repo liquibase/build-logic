@@ -1,0 +1,127 @@
+# Terraform Action to lint and apply updated redirects
+name: Ephemeral Cloud Infrastructure
+on:
+ workflow_call:
+    inputs:
+        deploy:
+            description: 'Deploy the ephemeral cloud infrastructure'
+            required: false
+            type: boolean
+        destroy:
+            description: 'Destroy the ephemeral cloud infrastructure'
+            required: false
+            type: boolean
+        dynamodb:
+            description: 'Deploy or destroy the dynamodb infrastructure'
+            required: false
+            type: boolean
+            default: false
+        documentdb:
+          description: 'Deploy or destroy the documentdb infrastructure'
+          required: false
+          type: boolean
+          default: false
+        stack_id:
+            description: 'The stack ID to destroy'
+            required: false
+            type: string
+    outputs:
+        stack_id:
+            description: 'The stack ID of the ephemeral cloud infrastructure'
+            value: ${{ jobs.ephemeral-cloud-infra.outputs.stack_id }}
+        resources_id:
+          description: 'The resources ID of the ephemeral cloud infrastructure'
+          value: ${{ jobs.ephemeral-cloud-infra.outputs.resources_id }}
+
+jobs:
+  ephemeral-cloud-infra:
+    name: ${{ inputs.action}} Ephemeral Cloud Infrastructure
+    runs-on: ubuntu-latest
+    permissions: 
+        contents: read
+        id-token: write
+    outputs:
+      stack_id: ${{ steps.create_stack.outputs.stack_id }} # Used to reference the stack created in the ephemeral infra
+      resources_id: ${{ steps.create_infra.outputs.resources_id }} # Used to reference the resources created in the ephemeral infra
+    env:
+      SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
+      SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}
+      SPACELIFT_API_KEY_SECRET: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
+
+    steps:
+      - name: Checkout liquibase-infrastructure
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          repository: liquibase/liquibase-infrastructure
+          token: ${{ secrets.BOT_TOKEN }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+            role-to-assume: ${{ secrets.AWS_DEV_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+            aws-region: us-east-1
+
+      - name: Install spacectl
+        uses: spacelift-io/setup-spacectl@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: test-automation-ephemeral/stack
+        id: init
+        run: terraform init
+
+      - name: Create ephemeral stack
+        id: create_stack
+        if: ${{ inputs.deploy }}
+        working-directory: test-automation-ephemeral/stack
+        run: |
+            terraform apply -auto-approve
+            echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
+            echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
+        
+      - name: Upload Terraform state as artifact
+        if: ${{ inputs.deploy }}
+        uses: actions/upload-artifact@v4
+        with:
+            name: terraform-state
+            path: test-automation-ephemeral/stack/terraform.tfstate
+
+      - name: Create ephemeral infra
+        id: create_infra
+        working-directory: test-automation-ephemeral/infra
+        if: ${{ inputs.deploy }}
+        run: |
+            ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5)
+            echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }} 
+            spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
+            spacectl stack disable --id $EPHEMERAL_STACK_ID
+    
+      - name: Destroy ephemeral infra
+        continue-on-error: true
+        env:
+            TF_VAR_stack_id: ${{ inputs.stack_id }}
+        if: ${{ inputs.destroy }}
+        working-directory: test-automation-ephemeral/infra
+        run: |
+            spacectl stack enable --id ${{ inputs.stack_id }}
+            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve"
+            spacectl stack disable --id ${{ inputs.stack_id }}
+
+      - name: Download Terraform state
+        if: ${{ inputs.destroy }}
+        uses: actions/download-artifact@v4
+        with:
+            name: terraform-state
+            path: test-automation-ephemeral/stack
+
+      - name: Destroy ephemeral stack
+        if: ${{ inputs.destroy }}
+        working-directory: test-automation-ephemeral/stack
+        run: |
+            spacectl stack enable --id ${{ inputs.stack_id }}
+            terraform destroy -auto-approve

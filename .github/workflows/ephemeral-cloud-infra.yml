@@ -87,7 +87,7 @@ jobs:
         if: ${{ inputs.deploy }}
         working-directory: test-automation-ephemeral/stack
         run: |
-            terraform apply -auto-approve
+            terraform apply -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"
             echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
             echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
         
@@ -121,7 +121,7 @@ jobs:
         working-directory: test-automation-ephemeral/infra
         run: |
             spacectl stack enable --id ${{ inputs.stack_id }}
-            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve"
+            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve" || true
             spacectl stack disable --id ${{ inputs.stack_id }}
 
       - name: Download Terraform state

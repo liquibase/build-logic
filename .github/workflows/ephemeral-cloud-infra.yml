@@ -77,7 +77,7 @@ jobs:
         if: ${{ inputs.deploy }}
         working-directory: test-automation-ephemeral/stack
         run: |
-            terraform apply -auto-approve -var "run_id=${{ github.run_id }}"
+            terraform apply -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"
             echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
             echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
         

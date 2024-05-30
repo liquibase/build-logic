@@ -136,4 +136,4 @@ jobs:
         working-directory: test-automation-ephemeral/stack
         run: |
             spacectl stack enable --id ${{ inputs.stack_id }} || true
-            terraform destroy -auto-approve
+            terraform destroy -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"

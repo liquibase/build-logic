@@ -135,5 +135,5 @@ jobs:
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/stack
         run: |
-            spacectl stack enable --id ${{ inputs.stack_id }}
+            spacectl stack enable --id ${{ inputs.stack_id }} || true
             terraform destroy -auto-approve

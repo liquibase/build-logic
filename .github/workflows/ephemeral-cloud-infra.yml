@@ -109,7 +109,7 @@ jobs:
         working-directory: test-automation-ephemeral/infra
         run: |
             spacectl stack enable --id ${{ inputs.stack_id }}
-            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve"
+            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve" || true
             spacectl stack disable --id ${{ inputs.stack_id }}
 
       - name: Download Terraform state

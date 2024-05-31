@@ -154,6 +154,8 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
@@ -253,7 +255,7 @@ jobs:
   sonar-pr:
     if: ${{ !inputs.nightly }}
     needs: [unit-test]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.7.7
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.7.8
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

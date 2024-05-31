@@ -51,6 +51,11 @@ on:
           required: false
           type: boolean
           default: false
+        aws_mysql:
+          description: 'Deploy or destroy the aws_mysql infrastructure'
+          required: false
+          type: boolean
+          default: false
         stack_id:
             description: 'The stack ID to destroy'
             required: false
@@ -134,6 +139,7 @@ jobs:
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql ${{ inputs.aws_aurora_mysql }}
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mssql ${{ inputs.aws_mssql }}
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql ${{ inputs.aws_mysql }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
             spacectl stack disable --id $EPHEMERAL_STACK_ID
     

@@ -82,7 +82,7 @@ jobs:
       - name: Checkout liquibase-infrastructure
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: DAT-17834
           repository: liquibase/liquibase-infrastructure
           token: ${{ secrets.BOT_TOKEN }}
 

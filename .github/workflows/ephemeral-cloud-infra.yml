@@ -141,7 +141,6 @@ jobs:
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql ${{ inputs.aws_mysql }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
-            spacectl stack disable --id $EPHEMERAL_STACK_ID
     
       - name: Destroy ephemeral infra
         continue-on-error: true
@@ -150,9 +149,7 @@ jobs:
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |
-            spacectl stack enable --id ${{ inputs.stack_id }}
             spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve" || true
-            spacectl stack disable --id ${{ inputs.stack_id }}
 
       - name: Download Terraform state
         if: ${{ inputs.destroy }}
@@ -165,5 +162,4 @@ jobs:
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/stack
         run: |
-            spacectl stack enable --id ${{ inputs.stack_id }}
             terraform destroy -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"

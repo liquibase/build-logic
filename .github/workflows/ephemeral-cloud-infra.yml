@@ -117,7 +117,7 @@ jobs:
             echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
         
       - name: Upload Terraform state as artifact
-        if: ${{ inputs.deploy }}
+        if: ${{ inputs.deploy && always()}}
         uses: actions/upload-artifact@v4
         with:
             name: terraform-state
@@ -152,14 +152,14 @@ jobs:
             spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve" || true
 
       - name: Download Terraform state
-        if: ${{ inputs.destroy }}
+        if: ${{ inputs.destroy && always()}}
         uses: actions/download-artifact@v4
         with:
             name: terraform-state
             path: test-automation-ephemeral/stack
 
       - name: Destroy ephemeral stack
-        if: ${{ inputs.destroy }}
+        if: ${{ inputs.destroy && always()}}
         working-directory: test-automation-ephemeral/stack
         run: |
             terraform destroy -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"

@@ -21,8 +21,33 @@ on:
           required: false
           type: boolean
           default: false
-        aws_test_harness:
-          description: 'Deploy or destroy the aws test harness infrastructure'
+        aws_postgresql:
+          description: 'Deploy or destroy the aws_postgresql infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_oracle:
+          description: 'Deploy or destroy the aws_oracle infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_mariadb:
+          description: 'Deploy or destroy the aws_mariadb infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_aurora_mysql:
+          description: 'Deploy or destroy the aws_aurora_mysql infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_mssql:
+          description: 'Deploy or destroy the aws_mssql infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_aurora_postgres:
+          description: 'Deploy or destroy the aws_aurora_postgres infrastructure'
           required: false
           type: boolean
           default: false
@@ -103,7 +128,12 @@ jobs:
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_test_harness ${{ inputs.aws_test_harness }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql ${{ inputs.aws_postgresql }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle ${{ inputs.aws_oracle }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mariadb ${{ inputs.aws_mariadb }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql ${{ inputs.aws_aurora_mysql }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mssql ${{ inputs.aws_mssql }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
             spacectl stack disable --id $EPHEMERAL_STACK_ID
     

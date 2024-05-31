@@ -21,6 +21,41 @@ on:
           required: false
           type: boolean
           default: false
+        aws_postgresql:
+          description: 'Deploy or destroy the aws_postgresql infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_oracle:
+          description: 'Deploy or destroy the aws_oracle infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_mariadb:
+          description: 'Deploy or destroy the aws_mariadb infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_aurora_mysql:
+          description: 'Deploy or destroy the aws_aurora_mysql infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_mssql:
+          description: 'Deploy or destroy the aws_mssql infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_aurora_postgres:
+          description: 'Deploy or destroy the aws_aurora_postgres infrastructure'
+          required: false
+          type: boolean
+          default: false
+        aws_mysql:
+          description: 'Deploy or destroy the aws_mysql infrastructure'
+          required: false
+          type: boolean
+          default: false
         stack_id:
             description: 'The stack ID to destroy'
             required: false
@@ -82,7 +117,7 @@ jobs:
             echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
         
       - name: Upload Terraform state as artifact
-        if: ${{ inputs.deploy }}
+        if: ${{ inputs.deploy && always()}}
         uses: actions/upload-artifact@v4
         with:
             name: terraform-state
@@ -97,9 +132,15 @@ jobs:
             echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }} 
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql ${{ inputs.aws_postgresql }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle ${{ inputs.aws_oracle }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mariadb ${{ inputs.aws_mariadb }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql ${{ inputs.aws_aurora_mysql }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mssql ${{ inputs.aws_mssql }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql ${{ inputs.aws_mysql }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
-            spacectl stack disable --id $EPHEMERAL_STACK_ID
     
       - name: Destroy ephemeral infra
         continue-on-error: true
@@ -108,20 +149,17 @@ jobs:
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |
-            spacectl stack enable --id ${{ inputs.stack_id }}
             spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve" || true
-            spacectl stack disable --id ${{ inputs.stack_id }}
 
       - name: Download Terraform state
-        if: ${{ inputs.destroy }}
+        if: ${{ inputs.destroy && always()}}
         uses: actions/download-artifact@v4
         with:
             name: terraform-state
             path: test-automation-ephemeral/stack
 
       - name: Destroy ephemeral stack
-        if: ${{ inputs.destroy }}
+        if: ${{ inputs.destroy && always()}}
         working-directory: test-automation-ephemeral/stack
         run: |
-            spacectl stack enable --id ${{ inputs.stack_id }}
-            terraform destroy -auto-approve
+            terraform destroy -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"

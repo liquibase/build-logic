@@ -28,6 +28,9 @@ on:
           default: false
         snowflake_pro:
           description: 'Deploy or destroy the snowflake PRO infrastructure'
+          required: false
+          type: boolean
+          default: false
         aws_postgresql:
           description: 'Deploy or destroy the aws_postgresql infrastructure'
           required: false

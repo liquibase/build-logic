@@ -158,10 +158,6 @@ jobs:
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mssql ${{ inputs.aws_mssql }}
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql ${{ inputs.aws_mysql }}
-            if [ "${{ inputs.snowflake_th }}" = "true" ]; then
-                spacectl stack task --id $EPHEMERAL_STACK_ID --tail "terraform taint snowflake_database.LIQUIBASETH && terraform taint snowflake_warehouse.liquibaseth_warehouse && terraform taint aws_secretsmanager_secret.liquibaseth_password && terraform taint aws_secretsmanager_secret.liquibaseth_user" || true
-            fi
-            spacectl stack task --id $EPHEMERAL_STACK_ID --tail "terraform taint --all" || true
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
     
       - name: Destroy ephemeral infra

@@ -126,7 +126,6 @@ jobs:
         run: |
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=${{ env.RELEASE_VERSION }} -Dtransitive=false || echo "Failed to download $extension artifact"
           ARTIFACT_FOUND=$(ls -1 ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/${{ env.RELEASE_VERSION }}/ 2>/dev/null | wc -l)
-          echo "ARTIFACT_FOUND=$ARTIFACT_FOUND" >> $GITHUB_ENV
           if [ $ARTIFACT_FOUND -eq 0 ]; then
             echo "No artifact found"
           else

@@ -126,7 +126,7 @@ jobs:
           echo "Artifacts: ${artifacts[@]}"
           artifact_found=false
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ github.event.repository.name }} -Dversion=${{ env.RELEASE_VERSION }} -Dtransitive=false || echo "Failed to download $extension artifact"
-          ls -ltr ~/.m2/repository/org/liquibase/ext/${{ github.event.repository.name }}/${{ env.RELEASE_VERSION }}}/
+          ls -ltr ~/.m2/repository/org/liquibase/ext/${{ github.event.repository.name }}/${{ env.RELEASE_VERSION }}/
           echo "ARTIFACT_FOUND=$artifact_found" >> $GITHUB_ENV
 
       # - name: Get latest draft release ID

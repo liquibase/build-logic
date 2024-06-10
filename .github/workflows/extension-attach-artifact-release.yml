@@ -133,7 +133,9 @@ jobs:
           artifact_found=false
           for artifact in "${artifacts[@]}"; do
             url="https://api.github.com/orgs/$ORG/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions/$PACKAGE_VERSION_ID"
+            echo "Checking $artifact in $url"
             response=$(curl --silent --header "Authorization: Bearer $GITHUB_TOKEN" $url)
+            echo "Response: $response"
             download_url=$(echo $response | jq -r '.url')
             echo "Download URL: $download_url"
             if [ "$download_url" != "null" ]; then

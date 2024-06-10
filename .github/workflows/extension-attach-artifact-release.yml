@@ -122,12 +122,18 @@ jobs:
       - name: Check and download artifacts
         id: check-download-artifacts
         run: |
-          artifacts=("$PACKAGE_NAME-$PACKAGE_VERSION_ID.pom" "$PACKAGE_NAME-$PACKAGE_VERSION_ID-sources.jar" "$PACKAGE_NAME-$PACKAGE_VERSION_ID-javadoc.jar" "$PACKAGE_NAME-$PACKAGE_VERSION_ID.jar")
-          echo "Artifacts: ${artifacts[@]}"
-          artifact_found=false
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ github.event.repository.name }} -Dversion=${{ env.RELEASE_VERSION }} -Dtransitive=false || echo "Failed to download $extension artifact"
           ls -ltr ~/.m2/repository/org/liquibase/ext/${{ github.event.repository.name }}/${{ env.RELEASE_VERSION }}/
-          echo "ARTIFACT_FOUND=$artifact_found" >> $GITHUB_ENV
+          ARTIFACT_FOUND=$(ls -1 ~/.m2/repository/org/liquibase/ext/${{ github.event.repository.name }}/${{ env.RELEASE_VERSION }}/ | wc -l)
+          echo "ARTIFACT_FOUND=$ARTIFACT_FOUND" >> $GITHUB_ENV
+          if [ $ARTIFACT_FOUND -eq 0 ]; then
+            echo "No artifact found"
+          else
+            echo "Artifact found"
+            rm -rf ./target && mkdir -p ./target
+            mvn dependency:copy -Dartifact=org.liquibase.ext:${{ github.event.repository.name }}:${{ env.RELEASE_VERSION }}:jar -DoutputDirectory=./target
+            ls -ltr ./target
+          fi
 
       # - name: Get latest draft release ID
       #   id: get-release

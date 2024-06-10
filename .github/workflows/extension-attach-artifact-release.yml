@@ -131,7 +131,7 @@ jobs:
           fi
 
       - name: Build release artifacts
-        if: env.ARTIFACT_FOUND == '0'
+        if: env.ARTIFACT_FOUND != 'false'
         id: build-release-artifacts
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'

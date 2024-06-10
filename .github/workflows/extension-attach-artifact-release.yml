@@ -122,7 +122,6 @@ jobs:
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=sources -Dtransitive=false || echo "Failed to download sources artifact"
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=javadoc -Dtransitive=false || echo "Failed to download javadoc artifact"
           rm -rf ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/*.lastUpdated
-          ls -1 ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/
           ARTIFACT_FOUND=$(ls -1 ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/ 2>/dev/null | wc -l)
           echo "ARTIFACT_FOUND=$ARTIFACT_FOUND" >> $GITHUB_ENV
           if [ $ARTIFACT_FOUND -eq 0 ]; then

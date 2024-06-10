@@ -174,8 +174,6 @@ jobs:
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Sign Files for Draft Release
-        # Existing GPM artifacts are already signed
-        if: env.ARTIFACT_FOUND == 0
         run: |
           gpg -K
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)

@@ -123,7 +123,6 @@ jobs:
         id: check-download-artifacts
         run: |
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ github.event.repository.name }} -Dversion=${{ env.RELEASE_VERSION }} -Dtransitive=false || echo "Failed to download $extension artifact"
-          ls -ltr ~/.m2/repository/org/liquibase/ext/${{ github.event.repository.name }}/${{ env.RELEASE_VERSION }}/
           ARTIFACT_FOUND=$(ls -1 ~/.m2/repository/org/liquibase/ext/${{ github.event.repository.name }}/${{ env.RELEASE_VERSION }}/ | wc -l)
           echo "ARTIFACT_FOUND=$ARTIFACT_FOUND" >> $GITHUB_ENV
           if [ $ARTIFACT_FOUND -eq 0 ]; then
@@ -132,6 +131,9 @@ jobs:
             echo "Artifact found"
             rm -rf ./target && mkdir -p ./target
             mvn dependency:copy -Dartifact=org.liquibase.ext:${{ github.event.repository.name }}:${{ env.RELEASE_VERSION }}:jar -DoutputDirectory=./target
+            mvn dependency:copy -Dartifact=org.liquibase.ext:${{ github.event.repository.name }}:${{ env.RELEASE_VERSION }}:jar:sources -DoutputDirectory=./target
+            mvn dependency:copy -Dartifact=org.liquibase.ext:${{ github.event.repository.name }}:${{ env.RELEASE_VERSION }}:jar:javadoc -DoutputDirectory=./target
+            mvn dependency:copy -Dartifact=org.liquibase.ext:${{ github.event.repository.name }}:${{ env.RELEASE_VERSION }}:pom -DoutputDirectory=./target
             ls -ltr ./target
           fi
 

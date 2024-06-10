@@ -129,8 +129,6 @@ jobs:
             echo "Artifact found"
             rm -rf ./target && mkdir -p ./target
             mv ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/* ./target
-            ls -ltr ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/
-            ls -ltr ./target
             sed -i 's/-SNAPSHOT//g' pom.xml
           fi
 

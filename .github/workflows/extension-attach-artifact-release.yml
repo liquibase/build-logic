@@ -117,6 +117,7 @@ jobs:
         run: |
           RELEASE_VERSION=$(grep -m2 '<version>' pom.xml | tail -n 1 | awk -F'[><]' '{print $3}' | sed 's/-SNAPSHOT//')
           echo "RELEASE_VERSION=$RELEASE_VERSION"
+          echo "ARTIFACT_FOUND=true" >> $GITHUB_ENV
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dpackaging=pom -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=sources -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV

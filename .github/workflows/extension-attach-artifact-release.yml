@@ -165,21 +165,21 @@ jobs:
             echo "Deleted artifact ID: $value"
           done
 
-      - name: Import GPG key
-        id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.GPG_SECRET }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+      # - name: Import GPG key
+      #   id: import_gpg
+      #   uses: crazy-max/ghaction-import-gpg@v6
+      #   with:
+      #     gpg_private_key: ${{ secrets.GPG_SECRET }}
+      #     passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      - name: Sign Files for Draft Release
-        run: |
-          gpg -K
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}.jar
-          ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}.pom
-          ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}-javadoc.jar
-          ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}-sources.jar
+      # - name: Sign Files for Draft Release
+      #   run: |
+      #     gpg -K
+      #     version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+      #     ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}.jar
+      #     ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}.pom
+      #     ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}-javadoc.jar
+      #     ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}-sources.jar
 
       - name: Set draft release title
         id: set-release-title

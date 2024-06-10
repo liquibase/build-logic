@@ -122,7 +122,8 @@ jobs:
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dpackaging=pom -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=sources -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=javadoc -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV
-          if [[ "$ARTIFACT_FOUND" == "false" ]]; then
+          echo "ARTIFACT_FOUND: $ARTIFACT_FOUND"
+          if [[ $ARTIFACT_FOUND == "false" ]]; then
             echo "No artifacts found"
           else
             echo "Artifacts found"

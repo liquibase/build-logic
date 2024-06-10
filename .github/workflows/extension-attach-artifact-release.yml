@@ -131,10 +131,7 @@ jobs:
           else
             echo "Artifact found"
             rm -rf ./target && mkdir -p ./target
-            mvn dependency:copy -Dartifact=org.liquibase.ext:${{ env.ARTIFACT_NAME }}:${{ env.RELEASE_VERSION }}:jar -DoutputDirectory=./target || echo "Failed to copy $extension artifact"
-            mvn dependency:copy -Dartifact=org.liquibase.ext:${{ env.ARTIFACT_NAME }}:${{ env.RELEASE_VERSION }}:jar:sources -DoutputDirectory=./target || echo "Failed to copy $extension sources"
-            mvn dependency:copy -Dartifact=org.liquibase.ext:${{ env.ARTIFACT_NAME }}:${{ env.RELEASE_VERSION }}:jar:javadoc -DoutputDirectory=./target || echo "Failed to copy $extension javadoc"
-            mvn dependency:copy -Dartifact=org.liquibase.ext:${{ env.ARTIFACT_NAME }}:${{ env.RELEASE_VERSION }}:pom -DoutputDirectory=./target || echo "Failed to copy $extension POM file"
+            mv ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/${{ env.RELEASE_VERSION }}/* ./target
           fi
 
       - name: Get latest draft release ID

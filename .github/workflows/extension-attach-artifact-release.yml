@@ -121,31 +121,12 @@ jobs:
 
       - name: Check and download artifacts
         id: check-download-artifacts
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ORG: ${{ github.repository_owner }}
-          PACKAGE_TYPE: maven
-          PACKAGE_NAME: ${{ github.event.repository.name }}
-          PACKAGE_VERSION_ID: ${{ env.RELEASE_VERSION }}
         run: |
           artifacts=("$PACKAGE_NAME-$PACKAGE_VERSION_ID.pom" "$PACKAGE_NAME-$PACKAGE_VERSION_ID-sources.jar" "$PACKAGE_NAME-$PACKAGE_VERSION_ID-javadoc.jar" "$PACKAGE_NAME-$PACKAGE_VERSION_ID.jar")
           echo "Artifacts: ${artifacts[@]}"
           artifact_found=false
-          for artifact in "${artifacts[@]}"; do
-            url="https://api.github.com/orgs/$ORG/packages/$PACKAGE_TYPE/$artifact"
-            echo "Checking $artifact in $url"
-            response=$(curl --silent --header "Authorization: Bearer $GITHUB_TOKEN" $url)
-            echo "Response: $response"
-            download_url=$(echo $response | jq -r '.url')
-            echo "Download URL: $download_url"
-            if [ "$download_url" != "null" ]; then
-              echo "$artifact is already published. Downloading..."
-              curl --location --output ./target/$artifact --header "Authorization: Bearer $GITHUB_TOKEN" $download_url
-              artifact_found=true
-            else
-              echo "$artifact is not published."
-            fi
-          done
+          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ github.event.repository.name }} -Dversion=${{ env.RELEASE_VERSION }} -Dtransitive=false || echo "Failed to download $extension artifact"
+          ls -ltr ~/.m2/repository/org/liquibase/ext/${{ github.event.repository.name }}/${{ env.RELEASE_VERSION }}}/
           echo "ARTIFACT_FOUND=$artifact_found" >> $GITHUB_ENV
 
       - name: Get latest draft release ID

@@ -132,7 +132,7 @@ jobs:
           echo "Artifacts: ${artifacts[@]}"
           artifact_found=false
           for artifact in "${artifacts[@]}"; do
-            url="https://api.github.com/orgs/$ORG/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions/$PACKAGE_VERSION_ID"
+            url="https://api.github.com/orgs/$ORG/packages/$PACKAGE_TYPE/$artifact"
             echo "Checking $artifact in $url"
             response=$(curl --silent --header "Authorization: Bearer $GITHUB_TOKEN" $url)
             echo "Response: $response"

@@ -110,22 +110,15 @@ jobs:
         run: |
           ${{ inputs.extraCommand }}
 
-      - name: Build release artifacts
-        id: build-release-artifacts
-        run: |
-          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
-          git reset HEAD~ --hard
-          mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}'
-          RELEASE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
-
       - name: Check and download artifacts from GPM
         id: check-download-artifacts
         env:
           ARTIFACT_NAME: ${{ github.event.repository.name }}
         run: |
+          RELEASE_VERSION=$(echo ${{ env.RELEASE_VERSION }} | sed 's/-SNAPSHOT//')
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=${{ env.RELEASE_VERSION }} -Dtransitive=false || echo "Failed to download $extension artifact"
           ARTIFACT_FOUND=$(ls -1 ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/${{ env.RELEASE_VERSION }}/ 2>/dev/null | wc -l)
+          echo "ARTIFACT_FOUND=$ARTIFACT_FOUND" >> $GITHUB_ENV
           if [ $ARTIFACT_FOUND -eq 0 ]; then
             echo "No artifact found"
           else
@@ -133,6 +126,16 @@ jobs:
             rm -rf ./target && mkdir -p ./target
             mv ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/${{ env.RELEASE_VERSION }}/* ./target
           fi
+
+      - name: Build release artifacts
+        if: env.ARTIFACT_FOUND == '0'
+        id: build-release-artifacts
+        run: |
+          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
+          git reset HEAD~ --hard
+          mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}'
+          RELEASE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
 
       - name: Get latest draft release ID
         id: get-release

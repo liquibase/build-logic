@@ -117,23 +117,25 @@ jobs:
         run: |
           RELEASE_VERSION=$(grep -m2 '<version>' pom.xml | tail -n 1 | awk -F'[><]' '{print $3}' | sed 's/-SNAPSHOT//')
           echo "RELEASE_VERSION=$RELEASE_VERSION"
-          echo "ARTIFACT_FOUND=true" >> $GITHUB_ENV
-          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV
-          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dpackaging=pom -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV
-          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=sources -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV
-          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=javadoc -Dtransitive=false || echo "ARTIFACT_FOUND=false" >> $GITHUB_ENV
-          echo "ARTIFACT_FOUND: $ARTIFACT_FOUND"
-          if [[ $ARTIFACT_FOUND == "false" ]]; then
-            echo "No artifacts found"
+          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dtransitive=false || echo "Failed to download artifact"
+          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dpackaging=pom -Dtransitive=false || echo "Failed to download pom artifact"
+          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=sources -Dtransitive=false || echo "Failed to download sources artifact"
+          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=javadoc -Dtransitive=false || echo "Failed to download javadoc artifact"
+          rm -rf ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/*.lastUpdated
+          ls -1 ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/
+          ARTIFACT_FOUND=$(ls -1 ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/ 2>/dev/null | wc -l)
+          echo "ARTIFACT_FOUND=$ARTIFACT_FOUND" >> $GITHUB_ENV
+          if [ $ARTIFACT_FOUND -eq 0 ]; then
+            echo "No artifact found"
           else
-            echo "Artifacts found"
+            echo "Artifact found"
             rm -rf ./target && mkdir -p ./target
             mv ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/* ./target
             sed -i 's/-SNAPSHOT//g' pom.xml
           fi
 
       - name: Build release artifacts
-        if: env.ARTIFACT_FOUND != 'false'
+        if: env.ARTIFACT_FOUND == '0'
         id: build-release-artifacts
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'

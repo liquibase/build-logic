@@ -308,7 +308,7 @@ jobs:
           -Daws.region="us-east-1"
 
       - name: Sonar PR Scan
-        if: always() && github.event.pull_request
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

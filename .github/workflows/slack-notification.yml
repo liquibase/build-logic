@@ -13,7 +13,7 @@ jobs:
           env:
             SLACK_COLOR: ${{ github.event.action == 'test-failure' && 'danger' || 'good' }}
             SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.event.client_payload.server_url }}/${{ github.event.client_payload.repository }}/actions/runs/${{ github.event.client_payload.run_id }} <@U042HRTL4DT>. Triggered by repository: ${{ github.event.client_payload.repository }} and job: ${{ github.job }}"
-            SLACK_TITLE: "❌ ${{ github.event.client_payload.repository }} ❌ Tests failed on branch ${{ github.event.client_payload.branch }} for commit ${{ github.event.client_payload.sha }} in repository ${{ github.event.client_payload.repository }} Workflow File Name: ${{ github.event.client_payload.workflow_file_name }}"
+            SLACK_TITLE: "❌ ${{ github.event.client_payload.repository }} ❌ Tests failed on branch ${{ github.event.client_payload.branch }} for commit ${{ github.event.client_payload.sha }} in repository ${{ github.event.client_payload.repository }} Workflow File Name: ${{ github.event.client_payload.workflow_name }}"
             SLACK_USERNAME: liquibot
             SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
             SLACK_ICON_EMOJI: ":robot_face:"

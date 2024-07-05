@@ -309,7 +309,7 @@ jobs:
           cd ..
           mvn versions:set -DnewVersion='${{ inputs.version }}'
           mkdir -p scripting/target
-          mv /tmp/*.jar scripting/target/
+          mv /tmp/*.jar scripting/target
           ls -ltr scripting/target/
           mvn deploy:deploy-file \
           -Dfile=scripting/target/liquibase-scripting-${{ inputs.version }}.jar \

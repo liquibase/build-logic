@@ -303,16 +303,15 @@ jobs:
           MAVEN_USERNAME: liquibot
           MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT }}
         run: |
-          ls -ltr
           ls -ltr /tmp
           cd scripting
-          mvn versions:set -DnewVersion='${{ inputs.version }}'
+          mvn versions:set -DnewVersion='${{ inputs.version }}
           cd ..
           mvn versions:set -DnewVersion=${{ inputs.liquibase-version }}
           mvn deploy:deploy-file \
-          -Dfile=tmp/liquibase-scripting-${{ inputs.liquibase-version }}.jar \
-          -Dsources=tmp/liquibase-scripting-${{ inputs.liquibase-version }}-sources.jar \
-          -Djavadoc=tmp/liquibase-scripting-${{ inputs.liquibase-version }}-javadoc.jar \
+          -Dfile=/tmp/liquibase-scripting-${{ inputs.liquibase-version }}.jar \
+          -Dsources=/tmp/liquibase-scripting-${{ inputs.liquibase-version }}-sources.jar \
+          -Djavadoc=/tmp/liquibase-scripting-${{ inputs.liquibase-version }}-javadoc.jar \
           -DrepositoryId=liquibase \
           -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
           -DpomFile=pom.xml \

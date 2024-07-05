@@ -246,7 +246,7 @@ jobs:
           path: /tmp
 
       - name: Run script for specific version
-        if: ${{ github.event_name == 'workflow_call' }}
+        if: ${{ inputs.version }}
         run: |
           #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
           rm -r -f /tmp/linux /tmp/windows /tmp/mac
@@ -266,7 +266,7 @@ jobs:
           zip -r ../liquibase-scripting.jar *
 
       - name: Run script
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ !inputs.version }}
         run: |
           #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
           rm -r -f /tmp/linux /tmp/windows /tmp/mac

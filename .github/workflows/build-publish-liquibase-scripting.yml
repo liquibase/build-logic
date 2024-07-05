@@ -297,6 +297,15 @@ jobs:
           repository: liquibase/liquibase-scripting
           token: ${{ secrets.BOT_TOKEN }}
 
+      - name: Set specific version
+        if: ${{ inputs.version }}
+        run: |
+            cd scripting
+            mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
+            cd ..
+            ls -ltr
+            ls -ltr /tmp
+
       - name: Publish to GPM
         working-directory: /tmp
         env:

@@ -110,11 +110,17 @@ jobs:
       - name: Build Liquibase-pro
         run: mvn -f liquibase-pro/pom-combined.xml clean install -DskipTests -P '!run-proguard' "-Dliquibase.version=DAT-16671-SNAPSHOT"
 
+      - uses: actions/checkout@v4
+        if: ${{ inputs.version }}
+        name: Checkout liquibase-scripting # We need to checkout the scripting repo when this workflow is called from liquibase/liquibase
+        with:
+          repository: liquibase/liquibase-scripting
+          token: ${{ secrets.BOT_TOKEN }}
+
       - name: Build specific version
         if: ${{ inputs.version }}
         run: |
-            ls -ltr
-            cd ./scripting
+            cd scripting
             mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
             cd ..
             mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"

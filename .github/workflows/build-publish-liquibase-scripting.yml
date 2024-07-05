@@ -93,17 +93,17 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                   "id": "liquibase-scripting",
                   "username": "liquibot",
-                  "password": "${{ secrets.LIQUIBOT_PAT }}"
+                  "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -324,7 +324,7 @@ jobs:
         working-directory: /tmp
         env:
           MAVEN_USERNAME: liquibot
-          MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT }}
+          MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
         run: |
           mvn deploy:deploy-file -Dfile=liquibase-scripting.jar \
           -DpomFile=${{ github.workspace }}/scripting/pom.xml -DrepositoryId=liquibase-scripting \

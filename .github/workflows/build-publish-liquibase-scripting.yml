@@ -259,15 +259,15 @@ jobs:
           unzip -d /tmp/windows /tmp/liquibase-scripting-windows-latest-${{ inputs.version }}.jar
           unzip -d /tmp/mac /tmp/liquibase-scripting-macos-latest-${{ inputs.version }}.jar
           rm -r -f /tmp/liquibase-scripting
-          mkdir /tmp/liquibase-scripting
-          cp -a /tmp/linux/* /tmp/liquibase-scripting/
-          cp -a /tmp/windows/* /tmp/liquibase-scripting/
-          cp -a /tmp/mac/* /tmp/liquibase-scripting/
-          rm /tmp/liquibase-scripting/vfs/fileslist.txt
-          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-scripting/vfs/fileslist.txt
-          rm -f /tmp/liquibase-scripting.jar
-          cd /tmp/liquibase-scripting/
-          zip -r ../liquibase-scripting.jar *
+          mkdir /tmp/liquibase-scripting-${{ inputs.version }}
+          cp -a /tmp/linux/* /tmp/liquibase-scripting-${{ inputs.version }}/
+          cp -a /tmp/windows/* /tmp/liquibase-scripting-${{ inputs.version }}/
+          cp -a /tmp/mac/* /tmp/liquibase-scripting-${{ inputs.version }}/
+          rm /tmp/liquibase-scripting-${{ inputs.version }}/vfs/fileslist.txt
+          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-scripting-${{ inputs.version }}/vfs/fileslist.txt
+          rm -f /tmp/liquibase-scripting-${{ inputs.version }}.jar
+          cd /tmp/liquibase-scripting-${{ inputs.version }}/
+          zip -r ../liquibase-scripting-${{ inputs.version }}.jar *
 
       - name: Run script
         if: ${{ !inputs.version }}
@@ -306,7 +306,20 @@ jobs:
             ls -ltr
             ls -ltr /tmp
 
+      - name: Publish specific version to GPM
+        if: ${{ inputs.version }}
+        working-directory: /tmp
+        env:
+          MAVEN_USERNAME: liquibot
+          MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT }}
+        run: |
+          mvn deploy:deploy-file -Dfile=liquibase-scripting-${{ inputs.version }}.jar \
+          -DpomFile=${{ github.workspace }}/scripting/pom.xml -DrepositoryId=liquibase-scripting \
+          -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
+          -Dtoken=${{ secrets.BOT_TOKEN }}
+
       - name: Publish to GPM
+        if: ${{ !inputs.version }}
         working-directory: /tmp
         env:
           MAVEN_USERNAME: liquibot

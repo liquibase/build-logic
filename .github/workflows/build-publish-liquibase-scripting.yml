@@ -314,7 +314,7 @@ jobs:
           -Djavadoc=/tmp/liquibase-scripting-${{ inputs.version }}-javadoc.jar \
           -DrepositoryId=liquibase \
           -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
-          -DpomFile=pom.xml \
+          -DpomFile=scripting/pom.xml \
           -Dtoken=${{ secrets.BOT_TOKEN }}
 
       - name: Publish to GPM

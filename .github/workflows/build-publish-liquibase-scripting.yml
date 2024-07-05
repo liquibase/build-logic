@@ -115,7 +115,9 @@ jobs:
       - name: Build specific version
         if: ${{ inputs.version }}
         run: |
+            cd scripting
             mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+            cd ..
             mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"
             mv scripting/target/liquibase-scripting-${{ inputs.version }}.jar scripting/target/liquibase-scripting-${{ matrix.os }}-${{ inputs.version }}.jar
 

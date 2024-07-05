@@ -217,17 +217,17 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                   "id": "liquibase-scripting",
                   "username": "liquibot",
-                  "password": "${{ secrets.LIQUIBOT_PAT }}"
+                  "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -301,7 +301,7 @@ jobs:
         if: ${{ inputs.version }}
         env:
           MAVEN_USERNAME: liquibot
-          MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT }}
+          MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
         run: |
           ls -ltr /tmp
           cd scripting
@@ -317,8 +317,7 @@ jobs:
           -Djavadoc=scripting/target/liquibase-scripting-${{ inputs.version }}-javadoc.jar \
           -DrepositoryId=liquibase \
           -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
-          -DpomFile=scripting/pom.xml \
-          -Dtoken=${{ secrets.BOT_TOKEN }}
+          -DpomFile=scripting/pom.xml
 
       - name: Publish to GPM
         if: ${{ !inputs.version }}

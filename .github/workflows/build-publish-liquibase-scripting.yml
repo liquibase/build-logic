@@ -308,6 +308,7 @@ jobs:
           mvn versions:set -DnewVersion='${{ inputs.version }}'
           cd ..
           mvn versions:set -DnewVersion='${{ inputs.version }}'
+          mkdir -p scripting/target
           mv /tmp/*.jar scripting/target/
           ls -ltr scripting/target/
           mvn deploy:deploy-file \

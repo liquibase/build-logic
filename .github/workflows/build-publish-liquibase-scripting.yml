@@ -305,9 +305,9 @@ jobs:
         run: |
           ls -ltr /tmp
           cd scripting
-          mvn versions:set -DnewVersion='${{ inputs.version }}
+          mvn versions:set -DnewVersion='${{ inputs.version }}'
           cd ..
-          mvn versions:set -DnewVersion=${{ inputs.version }}
+          mvn versions:set -DnewVersion='${{ inputs.version }}'
           mvn deploy:deploy-file \
           -Dfile=/tmp/liquibase-scripting-${{ inputs.version }}.jar \
           -Dsources=/tmp/liquibase-scripting-${{ inputs.version }}-sources.jar \

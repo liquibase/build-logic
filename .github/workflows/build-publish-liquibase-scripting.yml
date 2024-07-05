@@ -297,25 +297,25 @@ jobs:
           repository: liquibase/liquibase-scripting
           token: ${{ secrets.BOT_TOKEN }}
 
-      - name: Set specific version
-        if: ${{ inputs.version }}
-        run: |
-            cd scripting
-            mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
-            cd ..
-            ls -ltr
-            ls -ltr /tmp
-
       - name: Publish specific version to GPM
         if: ${{ inputs.version }}
-        working-directory: /tmp
         env:
           MAVEN_USERNAME: liquibot
           MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT }}
         run: |
-          mvn deploy:deploy-file -Dfile=liquibase-scripting-${{ inputs.version }}.jar \
-          -DpomFile=${{ github.workspace }}/scripting/pom.xml -DrepositoryId=liquibase-scripting \
+          ls -ltr
+          ls -ltr /tmp
+          cd scripting
+          mvn versions:set -DnewVersion='${{ inputs.version }}'
+          cd ..
+          mvn versions:set -DnewVersion=${{ inputs.liquibase-version }}
+          mvn deploy:deploy-file \
+          -Dfile=tmp/liquibase-scripting-${{ inputs.liquibase-version }}.jar \
+          -Dsources=tmp/liquibase-scripting-${{ inputs.liquibase-version }}-sources.jar \
+          -Djavadoc=tmp/liquibase-scripting-${{ inputs.liquibase-version }}-javadoc.jar \
+          -DrepositoryId=liquibase \
           -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
+          -DpomFile=pom.xml \
           -Dtoken=${{ secrets.BOT_TOKEN }}
 
       - name: Publish to GPM

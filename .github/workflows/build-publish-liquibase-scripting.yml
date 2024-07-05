@@ -1,0 +1,295 @@
+name: Build and Publish
+env:
+  java-version: 17
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'version'
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build & Package java 17 - ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        name: Checkout OSS
+        with:
+          repository: liquibase/liquibase
+          ref: "DAT-16671"
+          path: liquibase
+          token: ${{ secrets.BOT_TOKEN }}
+
+      - uses: actions/checkout@v4
+        name: Checkout liquibase-pro
+        with:
+          repository: liquibase/liquibase-pro
+          ref: "DAT-16671"
+          path: liquibase-pro
+          token: ${{ secrets.BOT_TOKEN }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: "temurin"
+          cache: "maven"
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
+
+      # look for dependencies in maven
+      - name: maven-settings-xml-action
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-scripting",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-scripting",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                  "id": "liquibase-scripting",
+                  "username": "liquibot",
+                  "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
+
+      - name: Build Liquibase-pro
+        run: mvn -f liquibase-pro/pom-combined.xml clean install -DskipTests -P '!run-proguard' "-Dliquibase.version=DAT-16671-SNAPSHOT"
+
+      - uses: actions/checkout@v4
+
+      - name: Build specific version
+        if: ${{ inputs.version }}
+        run: |
+            mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+            mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"
+            mv scripting/target/liquibase-scripting-${{ inputs.version }}.jar scripting/target/liquibase-scripting-${{ matrix.os }}-${{ inputs.version }}.jar
+
+      - name: Build and Package Scripting
+        if: ${{ !inputs.version }}
+        run: |
+          mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"
+          mv scripting/target/liquibase-scripting-0-SNAPSHOT.jar scripting/target/liquibase-scripting-${{ matrix.os }}-0-SNAPSHOT.jar
+
+      - name: get GITHUB_WORKSPACE
+        if: always()
+        shell: bash
+        run: |
+          echo "artifact_path=${GITHUB_WORKSPACE}/scripting/target/*.jar" >> $GITHUB_ENV
+
+      - name: Save Artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: liquibase-scripting-${{ matrix.os }}-artifacts
+          path: ${{ env.artifact_path }}
+
+      - name: Save Event File
+        uses: actions/upload-artifact@v3
+        with:
+          name: Event File
+          path: ${{ github.event_path }}
+
+
+  combine_jars:
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: "temurin"
+          cache: "maven"
+          server-id: liquibase-scripting
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
+
+      # look for dependencies in maven
+      - name: maven-settings-xml-action
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-scripting",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-scripting",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                  "id": "liquibase-scripting",
+                  "username": "liquibot",
+                  "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: liquibase-scripting-ubuntu-latest-artifacts
+          path: /tmp
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: liquibase-scripting-macos-latest-artifacts
+          path: /tmp
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: liquibase-scripting-windows-latest-artifacts
+          path: /tmp
+
+      - name: Run script for specific version
+        if: ${{ github.event_name == 'workflow_call' }}
+        run: |
+          #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
+          rm -r -f /tmp/linux /tmp/windows /tmp/mac
+          mkdir /tmp/linux /tmp/windows /tmp/mac
+          unzip -d /tmp/linux /tmp/liquibase-scripting-ubuntu-latest-${{ inputs.version }}.jar
+          unzip -d /tmp/windows /tmp/liquibase-scripting-windows-latest-${{ inputs.version }}.jar
+          unzip -d /tmp/mac /tmp/liquibase-scripting-macos-latest-${{ inputs.version }}.jar
+          rm -r -f /tmp/liquibase-scripting
+          mkdir /tmp/liquibase-scripting
+          cp -a /tmp/linux/* /tmp/liquibase-scripting/
+          cp -a /tmp/windows/* /tmp/liquibase-scripting/
+          cp -a /tmp/mac/* /tmp/liquibase-scripting/
+          rm /tmp/liquibase-scripting/vfs/fileslist.txt
+          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-scripting/vfs/fileslist.txt
+          rm -f /tmp/liquibase-scripting.jar
+          cd /tmp/liquibase-scripting/
+          zip -r ../liquibase-scripting.jar *
+
+      - name: Run script
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
+          rm -r -f /tmp/linux /tmp/windows /tmp/mac
+          mkdir /tmp/linux /tmp/windows /tmp/mac
+          unzip -d /tmp/linux /tmp/liquibase-scripting-ubuntu-latest-0-SNAPSHOT.jar
+          unzip -d /tmp/windows /tmp/liquibase-scripting-windows-latest-0-SNAPSHOT.jar
+          unzip -d /tmp/mac /tmp/liquibase-scripting-macos-latest-0-SNAPSHOT.jar
+          rm -r -f /tmp/liquibase-scripting
+          mkdir /tmp/liquibase-scripting
+          cp -a /tmp/linux/* /tmp/liquibase-scripting/
+          cp -a /tmp/windows/* /tmp/liquibase-scripting/
+          cp -a /tmp/mac/* /tmp/liquibase-scripting/
+          rm /tmp/liquibase-scripting/vfs/fileslist.txt
+          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-scripting/vfs/fileslist.txt
+          rm -f /tmp/liquibase-scripting.jar
+          cd /tmp/liquibase-scripting/
+          zip -r ../liquibase-scripting.jar *
+          
+
+      - name: Publish to GPM
+        working-directory: /tmp
+        env:
+          MAVEN_USERNAME: liquibot
+          MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT }}
+        run: |
+          mvn deploy:deploy-file -Dfile=liquibase-scripting.jar \
+          -DpomFile=${{ github.workspace }}/scripting/pom.xml -DrepositoryId=liquibase-scripting \
+          -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
+          -Dtoken=${{ secrets.BOT_TOKEN }}

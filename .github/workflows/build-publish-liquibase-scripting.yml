@@ -110,8 +110,6 @@ jobs:
       - name: Build Liquibase-pro
         run: mvn -f liquibase-pro/pom-combined.xml clean install -DskipTests -P '!run-proguard' "-Dliquibase.version=DAT-16671-SNAPSHOT"
 
-      - uses: actions/checkout@v4
-
       - name: Build specific version
         if: ${{ inputs.version }}
         run: |

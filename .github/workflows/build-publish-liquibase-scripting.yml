@@ -290,6 +290,13 @@ jobs:
           zip -r ../liquibase-scripting.jar *
           
 
+      - uses: actions/checkout@v4
+        if: ${{ inputs.version }}
+        name: Checkout liquibase-scripting # We need to checkout the scripting repo when this workflow is called from liquibase/liquibase
+        with:
+          repository: liquibase/liquibase-scripting
+          token: ${{ secrets.BOT_TOKEN }}
+
       - name: Publish to GPM
         working-directory: /tmp
         env:

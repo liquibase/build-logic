@@ -77,7 +77,7 @@ jobs:
                 }
               },
               {
-                "id": "liquibase-scripting",
+                "id": "liquibase-checks",
                 "url": "https://maven.pkg.github.com/liquibase/liquibase-scripting",
                 "releases": {
                   "enabled": "false"
@@ -101,7 +101,7 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
-                  "id": "liquibase-scripting",
+                  "id": "liquibase-checks",
                   "username": "liquibot",
                   "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
@@ -124,13 +124,13 @@ jobs:
             mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
             cd ..
             mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"
-            mv scripting/target/liquibase-scripting-${{ inputs.version }}.jar scripting/target/liquibase-scripting-${{ matrix.os }}-${{ inputs.version }}.jar
+            mv scripting/target/liquibase-checks-${{ inputs.version }}.jar scripting/target/liquibase-checks-${{ matrix.os }}-${{ inputs.version }}.jar
 
       - name: Build and Package Scripting
         if: ${{ !inputs.version }}
         run: |
           mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"
-          mv scripting/target/liquibase-scripting-0-SNAPSHOT.jar scripting/target/liquibase-scripting-${{ matrix.os }}-0-SNAPSHOT.jar
+          mv scripting/target/liquibase-checks-0-SNAPSHOT.jar scripting/target/liquibase-checks-${{ matrix.os }}-0-SNAPSHOT.jar
 
       - name: get GITHUB_WORKSPACE
         if: always()
@@ -163,7 +163,7 @@ jobs:
           java-version: 17
           distribution: "temurin"
           cache: "maven"
-          server-id: liquibase-scripting
+          server-id: liquibase-checks
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
 
@@ -201,7 +201,7 @@ jobs:
                 }
               },
               {
-                "id": "liquibase-scripting",
+                "id": "liquibase-checks",
                 "url": "https://maven.pkg.github.com/liquibase/liquibase-scripting",
                 "releases": {
                   "enabled": "true"
@@ -225,7 +225,7 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
-                  "id": "liquibase-scripting",
+                  "id": "liquibase-checks",
                   "username": "liquibot",
                   "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
@@ -255,9 +255,9 @@ jobs:
           #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
           rm -r -f /tmp/linux /tmp/windows /tmp/mac
           mkdir /tmp/linux /tmp/windows /tmp/mac
-          unzip -d /tmp/linux /tmp/liquibase-scripting-ubuntu-latest-${{ inputs.version }}.jar
-          unzip -d /tmp/windows /tmp/liquibase-scripting-windows-latest-${{ inputs.version }}.jar
-          unzip -d /tmp/mac /tmp/liquibase-scripting-macos-latest-${{ inputs.version }}.jar
+          unzip -d /tmp/linux /tmp/liquibase-checks-ubuntu-latest-${{ inputs.version }}.jar
+          unzip -d /tmp/windows /tmp/liquibase-checks-windows-latest-${{ inputs.version }}.jar
+          unzip -d /tmp/mac /tmp/liquibase-checks-macos-latest-${{ inputs.version }}.jar
           rm -r -f /tmp/liquibase-scripting
           mkdir /tmp/liquibase-scripting-${{ inputs.version }}
           cp -a /tmp/linux/* /tmp/liquibase-scripting-${{ inputs.version }}/
@@ -265,9 +265,9 @@ jobs:
           cp -a /tmp/mac/* /tmp/liquibase-scripting-${{ inputs.version }}/
           rm /tmp/liquibase-scripting-${{ inputs.version }}/vfs/fileslist.txt
           cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-scripting-${{ inputs.version }}/vfs/fileslist.txt
-          rm -f /tmp/liquibase-scripting-${{ inputs.version }}.jar
-          cd /tmp/liquibase-scripting-${{ inputs.version }}/
-          zip -r ../liquibase-scripting-${{ inputs.version }}.jar *
+          rm -f /tmp/liquibase-checks-${{ inputs.version }}.jar
+          cd /tmp/liquibase-checks-${{ inputs.version }}/
+          zip -r ../liquibase-checks-${{ inputs.version }}.jar *
 
       - name: Run script
         if: ${{ !inputs.version }}
@@ -275,9 +275,9 @@ jobs:
           #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
           rm -r -f /tmp/linux /tmp/windows /tmp/mac
           mkdir /tmp/linux /tmp/windows /tmp/mac
-          unzip -d /tmp/linux /tmp/liquibase-scripting-ubuntu-latest-0-SNAPSHOT.jar
-          unzip -d /tmp/windows /tmp/liquibase-scripting-windows-latest-0-SNAPSHOT.jar
-          unzip -d /tmp/mac /tmp/liquibase-scripting-macos-latest-0-SNAPSHOT.jar
+          unzip -d /tmp/linux /tmp/liquibase-checks-ubuntu-latest-0-SNAPSHOT.jar
+          unzip -d /tmp/windows /tmp/liquibase-checks-windows-latest-0-SNAPSHOT.jar
+          unzip -d /tmp/mac /tmp/liquibase-checks-macos-latest-0-SNAPSHOT.jar
           rm -r -f /tmp/liquibase-scripting
           mkdir /tmp/liquibase-scripting
           cp -a /tmp/linux/* /tmp/liquibase-scripting/
@@ -285,9 +285,9 @@ jobs:
           cp -a /tmp/mac/* /tmp/liquibase-scripting/
           rm /tmp/liquibase-scripting/vfs/fileslist.txt
           cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-scripting/vfs/fileslist.txt
-          rm -f /tmp/liquibase-scripting.jar
+          rm -f /tmp/liquibase-checks.jar
           cd /tmp/liquibase-scripting/
-          zip -r ../liquibase-scripting.jar *
+          zip -r ../liquibase-checks.jar *
           
 
       - uses: actions/checkout@v4
@@ -312,9 +312,9 @@ jobs:
           mv /tmp/*.jar scripting/target
           ls -ltr scripting/target/
           mvn deploy:deploy-file \
-          -Dfile=scripting/target/liquibase-scripting-${{ inputs.version }}.jar \
-          -Dsources=scripting/target/liquibase-scripting-${{ inputs.version }}-sources.jar \
-          -Djavadoc=scripting/target/liquibase-scripting-${{ inputs.version }}-javadoc.jar \
+          -Dfile=scripting/target/liquibase-checks-${{ inputs.version }}.jar \
+          -Dsources=scripting/target/liquibase-checks-${{ inputs.version }}-sources.jar \
+          -Djavadoc=scripting/target/liquibase-checks-${{ inputs.version }}-javadoc.jar \
           -DrepositoryId=liquibase \
           -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
           -DpomFile=scripting/pom.xml
@@ -326,7 +326,7 @@ jobs:
           MAVEN_USERNAME: liquibot
           MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
         run: |
-          mvn deploy:deploy-file -Dfile=liquibase-scripting.jar \
-          -DpomFile=${{ github.workspace }}/scripting/pom.xml -DrepositoryId=liquibase-scripting \
+          mvn deploy:deploy-file -Dfile=liquibase-checks.jar \
+          -DpomFile=${{ github.workspace }}/scripting/pom.xml -DrepositoryId=liquibase-checks \
           -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
           -Dtoken=${{ secrets.BOT_TOKEN }}

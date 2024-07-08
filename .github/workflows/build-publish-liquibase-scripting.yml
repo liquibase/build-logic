@@ -78,7 +78,7 @@ jobs:
               },
               {
                 "id": "liquibase-checks",
-                "url": "https://maven.pkg.github.com/liquibase/liquibase-scripting",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-checks",
                 "releases": {
                   "enabled": "false"
                 },
@@ -112,9 +112,9 @@ jobs:
 
       - uses: actions/checkout@v4
         if: ${{ inputs.version }}
-        name: Checkout liquibase-scripting # We need to checkout the scripting repo when this workflow is called from liquibase/liquibase
+        name: Checkout liquibase-checks # We need to checkout the scripting repo when this workflow is called from liquibase/liquibase
         with:
-          repository: liquibase/liquibase-scripting
+          repository: liquibase/liquibase-checks
           token: ${{ secrets.BOT_TOKEN }}
 
       - name: Build specific version
@@ -126,7 +126,7 @@ jobs:
             mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"
             mv scripting/target/liquibase-checks-${{ inputs.version }}.jar scripting/target/liquibase-checks-${{ matrix.os }}-${{ inputs.version }}.jar
 
-      - name: Build and Package Scripting
+      - name: Build and Package checks
         if: ${{ !inputs.version }}
         run: |
           mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"
@@ -142,7 +142,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: liquibase-scripting-${{ matrix.os }}-artifacts
+          name: liquibase-checks-${{ matrix.os }}-artifacts
           path: ${{ env.artifact_path }}
 
       - name: Save Event File
@@ -202,7 +202,7 @@ jobs:
               },
               {
                 "id": "liquibase-checks",
-                "url": "https://maven.pkg.github.com/liquibase/liquibase-scripting",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-checks",
                 "releases": {
                   "enabled": "true"
                 },
@@ -234,19 +234,19 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: liquibase-scripting-ubuntu-latest-artifacts
+          name: liquibase-checks-ubuntu-latest-artifacts
           path: /tmp
 
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: liquibase-scripting-macos-latest-artifacts
+          name: liquibase-checks-macos-latest-artifacts
           path: /tmp
 
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: liquibase-scripting-windows-latest-artifacts
+          name: liquibase-checks-windows-latest-artifacts
           path: /tmp
 
       - name: Run script for specific version
@@ -258,13 +258,13 @@ jobs:
           unzip -d /tmp/linux /tmp/liquibase-checks-ubuntu-latest-${{ inputs.version }}.jar
           unzip -d /tmp/windows /tmp/liquibase-checks-windows-latest-${{ inputs.version }}.jar
           unzip -d /tmp/mac /tmp/liquibase-checks-macos-latest-${{ inputs.version }}.jar
-          rm -r -f /tmp/liquibase-scripting
-          mkdir /tmp/liquibase-scripting-${{ inputs.version }}
-          cp -a /tmp/linux/* /tmp/liquibase-scripting-${{ inputs.version }}/
-          cp -a /tmp/windows/* /tmp/liquibase-scripting-${{ inputs.version }}/
-          cp -a /tmp/mac/* /tmp/liquibase-scripting-${{ inputs.version }}/
-          rm /tmp/liquibase-scripting-${{ inputs.version }}/vfs/fileslist.txt
-          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-scripting-${{ inputs.version }}/vfs/fileslist.txt
+          rm -r -f /tmp/liquibase-checks
+          mkdir /tmp/liquibase-checks-${{ inputs.version }}
+          cp -a /tmp/linux/* /tmp/liquibase-checks-${{ inputs.version }}/
+          cp -a /tmp/windows/* /tmp/liquibase-checks-${{ inputs.version }}/
+          cp -a /tmp/mac/* /tmp/liquibase-checks-${{ inputs.version }}/
+          rm /tmp/liquibase-checks-${{ inputs.version }}/vfs/fileslist.txt
+          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-checks-${{ inputs.version }}/vfs/fileslist.txt
           rm -f /tmp/liquibase-checks-${{ inputs.version }}.jar
           cd /tmp/liquibase-checks-${{ inputs.version }}/
           zip -r ../liquibase-checks-${{ inputs.version }}.jar *
@@ -278,23 +278,23 @@ jobs:
           unzip -d /tmp/linux /tmp/liquibase-checks-ubuntu-latest-0-SNAPSHOT.jar
           unzip -d /tmp/windows /tmp/liquibase-checks-windows-latest-0-SNAPSHOT.jar
           unzip -d /tmp/mac /tmp/liquibase-checks-macos-latest-0-SNAPSHOT.jar
-          rm -r -f /tmp/liquibase-scripting
-          mkdir /tmp/liquibase-scripting
-          cp -a /tmp/linux/* /tmp/liquibase-scripting/
-          cp -a /tmp/windows/* /tmp/liquibase-scripting/
-          cp -a /tmp/mac/* /tmp/liquibase-scripting/
-          rm /tmp/liquibase-scripting/vfs/fileslist.txt
-          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-scripting/vfs/fileslist.txt
+          rm -r -f /tmp/liquibase-checks
+          mkdir /tmp/liquibase-checks
+          cp -a /tmp/linux/* /tmp/liquibase-checks/
+          cp -a /tmp/windows/* /tmp/liquibase-checks/
+          cp -a /tmp/mac/* /tmp/liquibase-checks/
+          rm /tmp/liquibase-checks/vfs/fileslist.txt
+          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-checks/vfs/fileslist.txt
           rm -f /tmp/liquibase-checks.jar
-          cd /tmp/liquibase-scripting/
+          cd /tmp/liquibase-checks/
           zip -r ../liquibase-checks.jar *
           
 
       - uses: actions/checkout@v4
         if: ${{ inputs.version }}
-        name: Checkout liquibase-scripting # We need to checkout the scripting repo when this workflow is called from liquibase/liquibase
+        name: Checkout liquibase-checks # We need to checkout the checks repo when this workflow is called from liquibase/liquibase
         with:
-          repository: liquibase/liquibase-scripting
+          repository: liquibase/liquibase-checks
           token: ${{ secrets.BOT_TOKEN }}
 
       - name: Publish specific version to GPM
@@ -316,7 +316,7 @@ jobs:
           -Dsources=scripting/target/liquibase-checks-${{ inputs.version }}-sources.jar \
           -Djavadoc=scripting/target/liquibase-checks-${{ inputs.version }}-javadoc.jar \
           -DrepositoryId=liquibase \
-          -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
+          -Durl=https://maven.pkg.github.com/liquibase/liquibase-checks \
           -DpomFile=scripting/pom.xml
 
       - name: Publish to GPM
@@ -328,5 +328,5 @@ jobs:
         run: |
           mvn deploy:deploy-file -Dfile=liquibase-checks.jar \
           -DpomFile=${{ github.workspace }}/scripting/pom.xml -DrepositoryId=liquibase-checks \
-          -Durl=https://maven.pkg.github.com/liquibase/liquibase-scripting \
+          -Durl=https://maven.pkg.github.com/liquibase/liquibase-checks \
           -Dtoken=${{ secrets.BOT_TOKEN }}

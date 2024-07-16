@@ -37,7 +37,7 @@ jobs:
         name: Checkout OSS
         with:
           repository: liquibase/liquibase
-          ref: ${{ inputs.core-version }}
+          ref: ${{ inputs.core-branch }}
           path: liquibase
           token: ${{ secrets.BOT_TOKEN }}
 
@@ -45,7 +45,7 @@ jobs:
         name: Checkout liquibase-pro
         with:
           repository: liquibase/liquibase-pro
-          ref: ${{ inputs.core-version }}
+          ref: ${{ inputs.pro-branch }}
           path: liquibase-pro
           token: ${{ secrets.BOT_TOKEN }}
 

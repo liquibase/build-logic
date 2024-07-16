@@ -322,7 +322,7 @@ jobs:
       - name: Save Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.ref }}-multiplatform-artifacts
+          name: ${{ github.head_ref || github.ref_name }}-multiplatform-artifacts
           path: |
             scripting/target/*
 

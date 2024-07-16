@@ -127,7 +127,7 @@ jobs:
           repository: liquibase/liquibase-checks
           token: ${{ secrets.BOT_TOKEN }}
 
-      - name: Build liquibase-checks version ${{ inputs.version }} jar.
+      - name: Build liquibase-checks version ${{ inputs.version }} jar
         run: |
           cd scripting
           mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
@@ -301,6 +301,6 @@ jobs:
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.head_ref || github.ref_name }}-multiplatform-artifacts
+          name: ${{ inputs.version }}-multiplatform-artifacts
           path: |
             scripting/target/*

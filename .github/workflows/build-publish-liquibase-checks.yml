@@ -6,12 +6,12 @@ on:
     inputs:
       core-branch:
         description: 'The liquibase core branch to checkout.'
-        required: true
+        required: false
         type: string
         default: "DAT-16671"
       pro-branch:
         description: 'The liquibase commercial branch to checkout.'
-        required: true
+        required: false
         type: string
         default: "DAT-16671"
       version:

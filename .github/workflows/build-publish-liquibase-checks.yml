@@ -1,6 +1,9 @@
 name: Build and Publish
 env:
   java-version: 17
+  # Set liquibase.version to version 0-SNAPSHOT because we are
+  # building all required dependencies from the branches locally
+  LIQUIBASE_VERSION: '0-SNAPSHOT'
 on:
   workflow_call:
     inputs:
@@ -15,7 +18,7 @@ on:
         type: string
         default: "DAT-16671"
       version:
-        description: 'The -Dliquibase.version to use when building the artifacts.'
+        description: 'The version to mark the generated artifacts'
         required: true
         type: string
 
@@ -118,7 +121,8 @@ jobs:
             ]
 
       - name: Build Liquibase-pro
-        run: mvn -f liquibase-pro/pom-combined.xml clean install -DskipTests -P '!run-proguard' "-Dliquibase.version=${{ inputs.version }}"
+        # Set liquibase.version to version 0-SNAPSHOT because we are just building all the dependencies from the branches locally
+        run: mvn -f liquibase-pro/pom-combined.xml clean install -DskipTests -P '!run-proguard' "-Dliquibase.version=${{ env.LIQUIBASE_VERSION }}"
 
       - uses: actions/checkout@v4
         if: ${{ inputs.version }}
@@ -132,7 +136,7 @@ jobs:
           cd scripting
           mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
           cd ..
-          mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=${{ inputs.version }}"
+          mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=${{ env.LIQUIBASE_VERSION }}"
           mv scripting/target/liquibase-checks-${{ inputs.version }}.jar scripting/target/liquibase-checks-${{ matrix.os }}-${{ inputs.version }}.jar
 
       - name: get GITHUB_WORKSPACE

@@ -11,12 +11,12 @@ on:
         description: 'The liquibase core branch to checkout.'
         required: false
         type: string
-        default: "DAT-16671"
+        default: 'DAT-16671'
       pro-branch:
         description: 'The liquibase commercial branch to checkout.'
         required: false
         type: string
-        default: "DAT-16671"
+        default: 'DAT-16671'
       version:
         description: 'The version to mark the generated artifacts'
         required: true
@@ -26,7 +26,7 @@ jobs:
   build:
     name: Build & Package java 17 - ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
     runs-on: ${{ matrix.os }}
@@ -256,7 +256,7 @@ jobs:
           name: liquibase-checks-windows-latest-${{ inputs.version }}-artifacts
           path: /tmp
 
-      - name: Run script for specific version
+      - name: Create multiplatform jar
         run: |
           #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
           rm -r -f /tmp/linux /tmp/windows /tmp/mac
@@ -281,7 +281,7 @@ jobs:
           repository: liquibase/liquibase-checks
           token: ${{ secrets.BOT_TOKEN }}
 
-      - name: Publish specific version to GPM
+      - name: Publish multiplatform jar to GPM
         env:
           MAVEN_USERNAME: liquibot
           MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}

@@ -43,6 +43,11 @@ on:
         required: false
         default: "coverage"
         type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "target/*"
+        type: string
     secrets:
       SONAR_TOKEN:
         description: "SONAR_TOKEN from the caller workflow"
@@ -156,7 +161,7 @@ jobs:
 
       - name: Build and Package
         if: ${{ !inputs.nightly }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true
+        run: mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
 
       - name: Get Artifact ID
         id: get-artifact-id
@@ -167,7 +172,7 @@ jobs:
         with:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-artifacts
           path: |
-            target/*
+            ${{ inputs.artifactPath }}
 
       - name: Save Event File
         uses: actions/upload-artifact@v3

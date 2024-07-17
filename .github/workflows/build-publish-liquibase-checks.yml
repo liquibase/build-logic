@@ -1,11 +1,24 @@
 name: Build and Publish
 env:
   java-version: 17
+  # Set liquibase.version to version 0-SNAPSHOT because we are
+  # building all required dependencies from the branches locally
+  LIQUIBASE_VERSION: '0-SNAPSHOT'
 on:
   workflow_call:
     inputs:
+      core-branch:
+        description: 'The liquibase core branch to checkout.'
+        required: false
+        type: string
+        default: 'DAT-16671'
+      pro-branch:
+        description: 'The liquibase commercial branch to checkout.'
+        required: false
+        type: string
+        default: 'DAT-16671'
       version:
-        description: 'version'
+        description: 'The version to mark the generated artifacts'
         required: true
         type: string
 
@@ -13,7 +26,7 @@ jobs:
   build:
     name: Build & Package java 17 - ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
     runs-on: ${{ matrix.os }}
@@ -24,7 +37,7 @@ jobs:
         name: Checkout OSS
         with:
           repository: liquibase/liquibase
-          ref: "DAT-16671"
+          ref: ${{ inputs.core-branch }}
           path: liquibase
           token: ${{ secrets.BOT_TOKEN }}
 
@@ -32,7 +45,7 @@ jobs:
         name: Checkout liquibase-pro
         with:
           repository: liquibase/liquibase-pro
-          ref: "DAT-16671"
+          ref: ${{ inputs.pro-branch }}
           path: liquibase-pro
           token: ${{ secrets.BOT_TOKEN }}
 
@@ -108,7 +121,8 @@ jobs:
             ]
 
       - name: Build Liquibase-pro
-        run: mvn -f liquibase-pro/pom-combined.xml clean install -DskipTests -P '!run-proguard' "-Dliquibase.version=DAT-16671-SNAPSHOT"
+        # Set liquibase.version to version 0-SNAPSHOT because we are just building all the dependencies from the branches locally
+        run: mvn -f liquibase-pro/pom-combined.xml clean install -DskipTests -P '!run-proguard' "-Dliquibase.version=${{ env.LIQUIBASE_VERSION }}"
 
       - uses: actions/checkout@v4
         if: ${{ inputs.version }}
@@ -117,20 +131,13 @@ jobs:
           repository: liquibase/liquibase-checks
           token: ${{ secrets.BOT_TOKEN }}
 
-      - name: Build specific version
-        if: ${{ inputs.version }}
+      - name: Build liquibase-checks version ${{ inputs.version }} jar
         run: |
-            cd scripting
-            mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
-            cd ..
-            mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"
-            mv scripting/target/liquibase-checks-${{ inputs.version }}.jar scripting/target/liquibase-checks-${{ matrix.os }}-${{ inputs.version }}.jar
-
-      - name: Build and Package checks
-        if: ${{ !inputs.version }}
-        run: |
-          mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=DAT-16671-SNAPSHOT"
-          mv scripting/target/liquibase-checks-0-SNAPSHOT.jar scripting/target/liquibase-checks-${{ matrix.os }}-0-SNAPSHOT.jar
+          cd scripting
+          mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
+          cd ..
+          mvn clean install -DskipTests=true -pl '!liquibase-scripting-integration-tests' "-Dliquibase.version=${{ env.LIQUIBASE_VERSION }}"
+          mv scripting/target/liquibase-checks-${{ inputs.version }}.jar scripting/target/liquibase-checks-${{ matrix.os }}-${{ inputs.version }}.jar
 
       - name: get GITHUB_WORKSPACE
         if: always()
@@ -142,7 +149,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: liquibase-checks-${{ matrix.os }}-artifacts
+          name: liquibase-checks-${{ matrix.os }}-${{ inputs.version }}-artifacts
           path: ${{ env.artifact_path }}
 
       - name: Save Event File
@@ -234,23 +241,22 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: liquibase-checks-ubuntu-latest-artifacts
+          name: liquibase-checks-ubuntu-latest-${{ inputs.version }}-artifacts
           path: /tmp
 
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: liquibase-checks-macos-latest-artifacts
+          name: liquibase-checks-macos-latest-${{ inputs.version }}-artifacts
           path: /tmp
 
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: liquibase-checks-windows-latest-artifacts
+          name: liquibase-checks-windows-latest-${{ inputs.version }}-artifacts
           path: /tmp
 
-      - name: Run script for specific version
-        if: ${{ inputs.version }}
+      - name: Create multiplatform jar
         run: |
           #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
           rm -r -f /tmp/linux /tmp/windows /tmp/mac
@@ -269,36 +275,13 @@ jobs:
           cd /tmp/liquibase-checks-${{ inputs.version }}/
           zip -r ../liquibase-checks-${{ inputs.version }}.jar *
 
-      - name: Run script
-        if: ${{ !inputs.version }}
-        run: |
-          #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
-          rm -r -f /tmp/linux /tmp/windows /tmp/mac
-          mkdir /tmp/linux /tmp/windows /tmp/mac
-          unzip -d /tmp/linux /tmp/liquibase-checks-ubuntu-latest-0-SNAPSHOT.jar
-          unzip -d /tmp/windows /tmp/liquibase-checks-windows-latest-0-SNAPSHOT.jar
-          unzip -d /tmp/mac /tmp/liquibase-checks-macos-latest-0-SNAPSHOT.jar
-          rm -r -f /tmp/liquibase-checks
-          mkdir /tmp/liquibase-checks
-          cp -a /tmp/linux/* /tmp/liquibase-checks/
-          cp -a /tmp/windows/* /tmp/liquibase-checks/
-          cp -a /tmp/mac/* /tmp/liquibase-checks/
-          rm /tmp/liquibase-checks/vfs/fileslist.txt
-          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-checks/vfs/fileslist.txt
-          rm -f /tmp/liquibase-checks.jar
-          cd /tmp/liquibase-checks/
-          zip -r ../liquibase-checks.jar *
-          
-
       - uses: actions/checkout@v4
-        if: ${{ inputs.version }}
         name: Checkout liquibase-checks # We need to checkout the checks repo when this workflow is called from liquibase/liquibase
         with:
           repository: liquibase/liquibase-checks
           token: ${{ secrets.BOT_TOKEN }}
 
-      - name: Publish specific version to GPM
-        if: ${{ inputs.version }}
+      - name: Publish multiplatform jar to GPM
         env:
           MAVEN_USERNAME: liquibot
           MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
@@ -319,21 +302,9 @@ jobs:
           -Durl=https://maven.pkg.github.com/liquibase/liquibase-checks \
           -DpomFile=scripting/pom.xml
 
-      - name: Save Artifacts
+      - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.ref }}-multiplatform-artifacts
+          name: ${{ inputs.version }}-multiplatform-artifacts
           path: |
             scripting/target/*
-
-      - name: Publish to GPM
-        if: ${{ !inputs.version }}
-        working-directory: /tmp
-        env:
-          MAVEN_USERNAME: liquibot
-          MAVEN_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
-        run: |
-          mvn deploy:deploy-file -Dfile=liquibase-checks.jar \
-          -DpomFile=${{ github.workspace }}/scripting/pom.xml -DrepositoryId=liquibase-checks \
-          -Durl=https://maven.pkg.github.com/liquibase/liquibase-checks \
-          -Dtoken=${{ secrets.BOT_TOKEN }}

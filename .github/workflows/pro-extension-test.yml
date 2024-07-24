@@ -16,7 +16,7 @@ on:
       build-os:
         description: "Operating system to build on"
         required: false
-        default: "ubuntu-latest"
+        default: '["ubuntu-latest"]'
         type: string
       nightly:
         description: "Specifies nightly builds against liquibase master-SNAPSHOT"

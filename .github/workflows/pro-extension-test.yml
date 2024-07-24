@@ -256,7 +256,7 @@ jobs:
 
       - uses: actions/download-artifact@v3
         with:
-          name: ${{needs.build.outputs.artifact_id}}-${{ matrix.os }}artifacts
+          name: ${{needs.build.outputs.artifact_id}}-${{ matrix.os }}-artifacts
           path: ./target
 
       - name: Run extra command

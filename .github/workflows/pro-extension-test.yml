@@ -76,7 +76,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ${{fromJson(inputs.os || '["ubuntu-latest"]')}}
-    name: Build & Package - ${{ matrix.build-os }}
+    name: Build & Package - ${{ matrix.os }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -256,7 +256,7 @@ jobs:
 
       - uses: actions/download-artifact@v3
         with:
-          name: ${{needs.build.outputs.artifact_id}}-artifacts
+          name: ${{needs.build.outputs.artifact_id}}-${{ matrix.os }}artifacts
           path: ./target
 
       - name: Run extra command

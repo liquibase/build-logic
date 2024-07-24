@@ -9,9 +9,14 @@ on:
         default: "[11, 17, 21]"
         type: string
       os:
-        description: "Operating system to test"
+        description: "Operating system to test on"
         required: false
         default: '["ubuntu-latest", "windows-latest"]'
+        type: string
+      build-os:
+        description: "Operating system to build on"
+        required: false
+        default: "ubuntu-latest"
         type: string
       nightly:
         description: "Specifies nightly builds against liquibase master-SNAPSHOT"
@@ -72,7 +77,11 @@ env:
 
 jobs:
   build:
-    name: Build & Package
+    strategy:
+      fail-fast: false
+      matrix:
+        build-os: ${{fromJson(inputs.build-os || '["ubuntu-latest"]')}}
+    name: Build & Package - ${{ matrix.build-os }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -170,7 +179,7 @@ jobs:
       - name: Save Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-artifacts
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.build-os }}-artifacts
           path: |
             ${{ inputs.artifactPath }}
 

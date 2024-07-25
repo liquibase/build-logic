@@ -301,12 +301,12 @@ jobs:
         working-directory: ${{ inputs.modulePath }}
         if: ${{ !inputs.nightly }}
         run: |
-          mvn -B test -P '${{ inputs.mavenProfiles }}' "'${{ inputs.extraMavenArgs }}'"
+          mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}"
 
       - name: Run Tests
         working-directory: ${{ inputs.modulePath }}
         if: ${{ inputs.nightly }}
-        run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

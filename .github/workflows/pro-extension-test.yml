@@ -13,6 +13,11 @@ on:
         required: false
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
+      os-test:
+        description: "Operating system to test on"
+        required: false
+        default: '["ubuntu-latest", "windows-latest"]'
+        type: string
       nightly:
         description: "Specifies nightly builds against liquibase master-SNAPSHOT"
         required: false
@@ -47,6 +52,11 @@ on:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
         required: false
         default: "target/*"
+        type: string
+      modulePath:
+        description: "Specify the path to the module that should be built. Useful for multi-module extensions."
+        required: false
+        default: "."
         type: string
       combineJars:
         description: "Specify it if you want to combine the built jars into a single jar"
@@ -142,16 +152,19 @@ jobs:
             ]
 
       - name: Run extra command
+        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
 
       - name: Run extra Linux command
+        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraLinuxCommand != ''
         run: |
           ${{ inputs.extraLinuxCommand }}
 
       - name: Build and Package latest liquibase version
+        working-directory: ${{ inputs.modulePath }}
         if: ${{ inputs.nightly }}
         run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
 
@@ -169,10 +182,12 @@ jobs:
           SLACK_LINK_NAMES: true
 
       - name: Build and Package
+        working-directory: ${{ inputs.modulePath }}
         if: ${{ !inputs.nightly }}
         run: mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
 
       - name: Get Artifact ID
+        working-directory: ${{ inputs.modulePath }}
         id: get-artifact-id
         run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
 
@@ -197,7 +212,7 @@ jobs:
       fail-fast: false
       matrix:
         java: ${{fromJson(inputs.java || '[8, 11, 17, 18]')}}
-        os: ${{fromJson(inputs.os || '["ubuntu-latest", "windows-latest"]')}}
+        os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "windows-latest"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build
@@ -265,27 +280,32 @@ jobs:
           path: ./target
 
       - name: Run extra command
+        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
 
       - name: Run extra Linux command
+        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
         run: |
           ${{ inputs.extraLinuxCommand }}
 
       - name: Run extra Windows command
+        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
         run: |
           ${{ inputs.extraWindowsCommand }}
 
       - name: Run Tests
-        if: ${{ !inputs.nightly }} && ( ${{ matrix.os != 'macos-latest' }} && !contains(inputs.artifactPath, 'scripting') )
+        working-directory: ${{ inputs.modulePath }}
+        if: ${{ !inputs.nightly }}
         run: |
           mvn -B test -P '${{ inputs.mavenProfiles }}' "'${{ inputs.extraMavenArgs }}'"
 
       - name: Run Tests
-        if: ${{ inputs.nightly }} && ( ${{ matrix.os != 'macos-latest' }} && !contains(inputs.artifactPath, 'scripting') )
+        working-directory: ${{ inputs.modulePath }}
+        if: ${{ inputs.nightly }}
         run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
@@ -311,7 +331,7 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   combineJars:
-    needs: build
+    needs: [ build, unit-test ]
     if: ${{ inputs.combineJars }}
     name: Combine Jars
     runs-on: ubuntu-latest
@@ -341,9 +361,9 @@ jobs:
           rm -r -f /tmp/linux /tmp/windows /tmp/mac
           mkdir /tmp/linux /tmp/windows /tmp/mac
           ls -ltr /tmp
-          unzip -d /tmp/linux /tmp/${{needs.build.outputs.artifact_id}}-ubuntu-latest.jar
-          unzip -d /tmp/windows /tmp/${{needs.build.outputs.artifact_id}}-windows-latest.jar
-          unzip -d /tmp/mac /tmp/${{needs.build.outputs.artifact_id}}-macos-latest.jar
+          unzip -d /tmp/linux /tmp/${{needs.build.outputs.artifact_id}}-ubuntu-latest-*.jar
+          unzip -d /tmp/windows /tmp/${{needs.build.outputs.artifact_id}}-windows-latest-*.jar
+          unzip -d /tmp/mac /tmp/${{needs.build.outputs.artifact_id}}-macos-latest-*.jar
           rm -r -f /tmp/${{needs.build.outputs.artifact_id}}
           mkdir /tmp/${{needs.build.outputs.artifact_id}}
           cp -a /tmp/linux/* /tmp/${{needs.build.outputs.artifact_id}}/
@@ -351,7 +371,7 @@ jobs:
           cp -a /tmp/mac/* /tmp/${{needs.build.outputs.artifact_id}}/
           rm /tmp/${{needs.build.outputs.artifact_id}}/vfs/fileslist.txt
           cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/${{needs.build.outputs.artifact_id}}/vfs/fileslist.txt
-          rm -f /tmp/${{needs.build.outputs.artifact_id}}.jar
+          rm -f /tmp/${{needs.build.outputs.artifact_id}}-*.jar
           cd /tmp/${{needs.build.outputs.artifact_id}}/
           zip -r ../${{needs.build.outputs.artifact_id}}.jar *
 
@@ -360,7 +380,7 @@ jobs:
         with:
           name: multiplatform-artifacts
           path: |
-            scripting/target/*
+            ${{ inputs.artifactPath }}
 
   sonar-pr:
     if: ${{ !inputs.nightly }}

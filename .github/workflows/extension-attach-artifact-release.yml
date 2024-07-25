@@ -18,6 +18,11 @@ on:
         required: false
         default: ""
         type: string
+      combineJars:
+        description: 'Specify it if you want to combine jars into one'
+        required: false
+        default: false
+        type: boolean
     secrets:
       BOT_TOKEN:
         description: 'BOT_TOKEN from the caller workflow'

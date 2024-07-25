@@ -152,19 +152,16 @@ jobs:
             ]
 
       - name: Run extra command
-        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
 
       - name: Run extra Linux command
-        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraLinuxCommand != ''
         run: |
           ${{ inputs.extraLinuxCommand }}
 
       - name: Build and Package latest liquibase version
-        working-directory: ${{ inputs.modulePath }}
         if: ${{ inputs.nightly }}
         run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
 
@@ -182,7 +179,6 @@ jobs:
           SLACK_LINK_NAMES: true
 
       - name: Build and Package
-        working-directory: ${{ inputs.modulePath }}
         if: ${{ !inputs.nightly }}
         run: mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
 
@@ -364,18 +360,18 @@ jobs:
           ls -ltr /tmp/ubuntu
           ls -ltr /tmp/macos
           ls -ltr /tmp/windows
-          rm -rf /tmp/combined/linux /tmp/combined/windows /tmp/combined/mac
-          mkdir -p /tmp/combined/linux /tmp/combined/windows /tmp/combined/mac
-          unzip -d /tmp/combined/linux /tmp/linux/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+          rm -rf /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/mac
+          mkdir -p /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/mac
+          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           unzip -d /tmp/combined/windows /tmp/windows/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           unzip -d /tmp/combined/macos /tmp/macos/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           rm -r -f /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}
           mkdir /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}
-          cp -a /tmp/combined/linux/* /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/ubuntu/* /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/
           cp -a /tmp/combined/windows/* /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/
           cp -a /tmp/combined/mac/* /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/
           rm /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
-          cat /tmp/combined/linux/vfs/fileslist.txt /tmp/combined/windows/vfs/fileslist.txt /tmp/combined/mac/vfs/fileslist.txt > /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
+          cat /tmp/combined/ubuntu/vfs/fileslist.txt /tmp/combined/windows/vfs/fileslist.txt /tmp/combined/mac/vfs/fileslist.txt > /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
           rm -f /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}.jar
           cd /tmp/combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/
           zip -r ../liquibase-checks-${{needs.build.outputs.artifact_version}}.jar *

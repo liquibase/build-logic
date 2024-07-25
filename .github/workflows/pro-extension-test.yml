@@ -376,7 +376,7 @@ jobs:
         with:
           name: multiplatform-artifacts
           path: |
-            ${{ inputs.artifactPath }}/*
+            /tmp/combined/*
 
   sonar-pr:
     if: ${{ !inputs.nightly }}

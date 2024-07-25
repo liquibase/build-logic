@@ -331,7 +331,7 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   combineJars:
-    needs: [ build, unit-test ]
+    needs: [ build ]
     if: ${{ inputs.combineJars }}
     name: Combine Jars
     runs-on: ubuntu-latest

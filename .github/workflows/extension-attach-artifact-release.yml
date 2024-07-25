@@ -381,15 +381,18 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_SECRET }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
+      - name: Set root directory variable
+        run: echo "REPO_ROOT=$(git rev-parse --show-toplevel)" >> $GITHUB_ENV
+
       - name: Sign Files for Draft Release
         working-directory: ${{ inputs.artifactPath }}
         run: |
           gpg -K
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}.jar
-          ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}.pom
-          ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}-javadoc.jar
-          ./.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}-sources.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}.pom
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}-javadoc.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ./target/${{ env.artifact_id }}-${version}-sources.jar
 
       - name: Set draft release title
         id: set-release-title

@@ -115,14 +115,16 @@ jobs:
         run: |
           ${{ inputs.extraCommand }}
 
-      # - name: Build release artifacts
-      #   id: build-release-artifacts
-      #   continue-on-error: true
-      #   run: |
-      #     mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
-      #     git reset HEAD~ --hard
+      - name: Build release artifacts
+        working-directory: ${{ inputs.artifactPath }}
+        id: build-release-artifacts
+        continue-on-error: true
+        run: |
+          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -DcheckModificationExcludeList=** -DignoreSnapshots=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
+          git reset HEAD~ --hard
 
       - name: Get Artifact ID
+        working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
@@ -134,6 +136,7 @@ jobs:
           out-file-path: "."
 
       - name: Publish to Maven Central
+        working-directory: ${{ inputs.artifactPath }}
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN }}

@@ -220,10 +220,7 @@ jobs:
         with:
           name: multiplatform-artifacts
           path: |
-            /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
-            /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-sources.jar
-            /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-javadoc.jar
-            /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom
+            /tmp/combined/*
 
   attach-to-release:
     name: Attach Artifact to Release

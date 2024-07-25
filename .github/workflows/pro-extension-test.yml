@@ -351,8 +351,8 @@ jobs:
 
       - name: Create multiplatform jar
         run: |
-          rm -rf /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/mac
-          mkdir -p /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/mac
+          rm -rf /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
+          mkdir -p /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
           unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           unzip -d /tmp/combined/windows /tmp/windows/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           unzip -d /tmp/combined/macos /tmp/macos/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
@@ -360,9 +360,9 @@ jobs:
           mkdir /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}
           cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
           cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          cp -a /tmp/combined/mac/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
           rm /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
-          cat /tmp/combined/ubuntu/vfs/fileslist.txt /tmp/combined/windows/vfs/fileslist.txt /tmp/combined/mac/vfs/fileslist.txt > /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
+          cat /tmp/combined/ubuntu/vfs/fileslist.txt /tmp/combined/windows/vfs/fileslist.txt /tmp/combined/macos/vfs/fileslist.txt > /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
           rm -f /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           cd /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
           zip -r ../${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar *

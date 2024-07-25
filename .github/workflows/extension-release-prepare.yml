@@ -96,10 +96,10 @@ jobs:
       - name: Prepare Maven Release
         working-directory: ${{ inputs.artifactPath }}
         run: |
-          mvn -B build-helper:parse-version release:clean release:prepare -DcheckModificationExcludeList=** -DignoreSnapshots=true \
+          mvn -B build-helper:parse-version release:clean release:prepare \
           -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
-          -DcheckModificationExcludeList=pom.xml
+          -DcheckModificationExcludeList=** -DignoreSnapshots=true
 
       - name: Save Release files
         if: always()

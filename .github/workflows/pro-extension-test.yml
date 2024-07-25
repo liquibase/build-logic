@@ -365,15 +365,15 @@ jobs:
           unzip -d /combined/linux /tmp/linux/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           unzip -d /combined/windows /tmp/windows/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           unzip -d /combined/macos /tmp/macos/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          rm -r -f /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}
-          mkdir /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}
-          cp -a /combined/linux/* /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
-          cp -a /combined/windows/* /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
-          cp -a /combined/mac/* /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
-          rm /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
+          rm -r -f /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}
+          mkdir /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}
+          cp -a /combined/linux/* /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/
+          cp -a /combined/windows/* /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/
+          cp -a /combined/mac/* /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/
+          rm /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
           cat /combined/linux/vfs/fileslist.txt /combined/windows/vfs/fileslist.txt /combined/mac/vfs/fileslist.txt > /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
-          rm -f /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}.jar
-          cd /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
+          rm -f /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}.jar
+          cd /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/
           zip -r ../liquibase-checks-${{needs.build.outputs.artifact_version}}.jar *
 
       - name: Upload multiplatform artifact

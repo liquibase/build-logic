@@ -18,6 +18,21 @@ on:
         required: false
         default: ""
         type: string
+      os:
+        description: "Operating system to build/test on"
+        required: false
+        default: '["ubuntu-latest", "windows-latest"]'
+        type: string
+      extraMavenArgs:
+        description: "Specify it if you want to run an extra maven argument"
+        required: false
+        default: ""
+        type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "."
+        type: string
       combineJars:
         description: 'Specify it if you want to combine jars into one'
         required: false

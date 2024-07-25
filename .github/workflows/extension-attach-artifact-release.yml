@@ -207,11 +207,12 @@ jobs:
           rm /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/vfs/fileslist.txt
           cat /tmp/combined/ubuntu/vfs/fileslist.txt /tmp/combined/windows/vfs/fileslist.txt /tmp/combined/macos/vfs/fileslist.txt > /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/vfs/fileslist.txt
           rm -f /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
+          cd /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
+          zip -r ../${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar *
+          cd ..
           cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-sources.jar /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
           cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-javadoc.jar /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
           cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
-          cd /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
-          zip -r ../${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar *
           
 
       - name: Upload multiplatform artifact

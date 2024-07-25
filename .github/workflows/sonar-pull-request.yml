@@ -8,6 +8,11 @@ on:
         required: false
         default: ''
         type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "."
+        type: string
     secrets:
       SONAR_TOKEN:
         description: 'SONAR_TOKEN from the caller workflow'
@@ -86,6 +91,7 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
 
       - name: Run extra command
+        working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
@@ -100,6 +106,7 @@ jobs:
           name: test-reports-jdk-17-ubuntu-latest
 
       - name: Sonar Scan
+        working-directory: ${{ inputs.artifactPath }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

@@ -280,12 +280,12 @@ jobs:
           ${{ inputs.extraWindowsCommand }}
 
       - name: Run Tests
-        if: ${{ !inputs.nightly }} || ( ${{ matrix.os != 'macos-latest' }} && !contains(inputs.artifactPath, 'scripting') )
+        if: ${{ !inputs.nightly }} && ( ${{ matrix.os != 'macos-latest' }} && !contains(inputs.artifactPath, 'scripting') )
         run: |
-          mvn -B test -P '${{ inputs.mavenProfiles }}' "'${{ inputs.extraMavenArgs }}"
+          mvn -B test -P '${{ inputs.mavenProfiles }}' "'${{ inputs.extraMavenArgs }}'"
 
       - name: Run Tests
-        if: ${{ inputs.nightly }} || ( ${{ matrix.os != 'macos-latest' }} && !contains(inputs.artifactPath, 'scripting') )
+        if: ${{ inputs.nightly }} && ( ${{ matrix.os != 'macos-latest' }} && !contains(inputs.artifactPath, 'scripting') )
         run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
@@ -340,6 +340,7 @@ jobs:
           #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
           rm -r -f /tmp/linux /tmp/windows /tmp/mac
           mkdir /tmp/linux /tmp/windows /tmp/mac
+          ls -ltr /tmp
           unzip -d /tmp/linux /tmp/${{needs.build.outputs.artifact_id}}-ubuntu-latest.jar
           unzip -d /tmp/windows /tmp/${{needs.build.outputs.artifact_id}}-windows-latest.jar
           unzip -d /tmp/mac /tmp/${{needs.build.outputs.artifact_id}}-macos-latest.jar

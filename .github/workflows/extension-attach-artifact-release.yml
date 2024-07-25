@@ -382,6 +382,7 @@ jobs:
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Sign Files for Draft Release
+        working-directory: ${{ inputs.artifactPath }}
         run: |
           gpg -K
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)

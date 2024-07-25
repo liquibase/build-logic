@@ -286,31 +286,26 @@ jobs:
           path: ./target
 
       - name: Run extra command
-        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
 
       - name: Run extra Linux command
-        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
         run: |
           ${{ inputs.extraLinuxCommand }}
 
       - name: Run extra Windows command
-        working-directory: ${{ inputs.modulePath }}
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
         run: |
           ${{ inputs.extraWindowsCommand }}
 
       - name: Run Tests
-        working-directory: ${{ inputs.modulePath }}
         if: ${{ !inputs.nightly }}
         run: |
           mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}"
 
       - name: Run Tests
-        working-directory: ${{ inputs.modulePath }}
         if: ${{ inputs.nightly }}
         run: mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"
 
@@ -345,19 +340,19 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Download Artifacts
+      - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v2
         with:
           name: ${{needs.build.outputs.artifact_id}}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
-      - name: Download Artifacts
+      - name: Download macOS Artifacts
         uses: actions/download-artifact@v2
         with:
           name: ${{needs.build.outputs.artifact_id}}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/macos
 
-      - name: Download Artifacts
+      - name: Download Windows Artifacts
         uses: actions/download-artifact@v2
         with:
           name: ${{needs.build.outputs.artifact_id}}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
@@ -371,6 +366,22 @@ jobs:
           cp /tmp/windows/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar ./combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-windows.jar
           cd combined
           jar -cfm ${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar MANIFEST.MF ${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-ubuntu.jar ${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-macos.jar ${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-windows.jar
+
+          rm -r -f /combined/linux /combined/windows /combined/mac
+          mkdir -p /combined/linux /combined/windows /combined/mac
+          unzip -d /combined/linux /tmp/linux/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /combined/windows /tmp/windows/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /combined/macos /tmp/macos/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+          rm -r -f /tmp/liquibase-checks
+          mkdir /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}
+          cp -a /combined/linux/* /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
+          cp -a /combined/windows/* /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
+          cp -a /combined/mac/* /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
+          rm /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
+          cat /combined/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /combined/mac/vfs/fileslist.txt > /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
+          rm -f /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}.jar
+          cd /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
+          zip -r ../liquibase-checks-${{needs.build.outputs.artifact_version}}.jar *
 
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v3

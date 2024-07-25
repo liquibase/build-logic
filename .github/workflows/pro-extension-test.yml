@@ -360,13 +360,6 @@ jobs:
 
       - name: Create multiplatform jar
         run: |
-          mkdir -p combined
-          cp /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar ./combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-ubuntu.jar
-          cp /tmp/macos/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar ./combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-macos.jar
-          cp /tmp/windows/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar ./combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-windows.jar
-          cd combined
-          jar -cfm ${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar MANIFEST.MF ${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-ubuntu.jar ${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-macos.jar ${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-windows.jar
-
           rm -r -f /combined/linux /combined/windows /combined/mac
           mkdir -p /combined/linux /combined/windows /combined/mac
           unzip -d /combined/linux /tmp/linux/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar

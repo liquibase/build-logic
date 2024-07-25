@@ -191,10 +191,16 @@ jobs:
         id: get-artifact-id
         run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
 
+      - name: Get artifacts version
+        id: get-version
+        run: |
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "VERSION=$version" >> $GITHUB_ENV
+
       - name: Save Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-artifacts
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ env.VERSION }}-artifacts
           path: |
             ${{ inputs.artifactPath }}
 
@@ -274,9 +280,15 @@ jobs:
               }
             ]
 
+      - name: Get artifacts version
+        id: get-version
+        run: |
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "VERSION=$version" >> $GITHUB_ENV
+
       - uses: actions/download-artifact@v3
         with:
-          name: ${{needs.build.outputs.artifact_id}}-${{ matrix.os }}-artifacts
+          name: ${{needs.build.outputs.artifact_id}}-${{ matrix.os }}-${{ env.VERSION }}-artifacts
           path: ./target
 
       - name: Run extra command
@@ -337,22 +349,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
+      - uses: actions/checkout@v4
+
+      - name: Get artifacts version
+        id: get-version
+        run: |
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "VERSION=$version" >> $GITHUB_ENV
+
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: ${{needs.build.outputs.artifact_id}}-ubuntu-latest-artifacts
+          name: ${{needs.build.outputs.artifact_id}}-ubuntu-latest-${{ env.VERSION }}-artifacts
           path: /tmp
 
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: ${{needs.build.outputs.artifact_id}}-macos-latest-artifacts
+          name: ${{needs.build.outputs.artifact_id}}-macos-latest-${{ env.VERSION }}-artifacts
           path: /tmp
 
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: ${{needs.build.outputs.artifact_id}}-windows-latest-artifacts
+          name: ${{needs.build.outputs.artifact_id}}-windows-latest-${{ env.VERSION }}-artifacts
           path: /tmp
 
       - name: Create multiplatform jar
@@ -360,20 +380,19 @@ jobs:
           #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
           rm -r -f /tmp/linux /tmp/windows /tmp/mac
           mkdir /tmp/linux /tmp/windows /tmp/mac
-          ls -ltr /tmp
-          unzip -d /tmp/linux /tmp/${{needs.build.outputs.artifact_id}}-ubuntu-latest-*.jar
-          unzip -d /tmp/windows /tmp/${{needs.build.outputs.artifact_id}}-windows-latest-*.jar
-          unzip -d /tmp/mac /tmp/${{needs.build.outputs.artifact_id}}-macos-latest-*.jar
-          rm -r -f /tmp/${{needs.build.outputs.artifact_id}}
-          mkdir /tmp/${{needs.build.outputs.artifact_id}}
-          cp -a /tmp/linux/* /tmp/${{needs.build.outputs.artifact_id}}/
-          cp -a /tmp/windows/* /tmp/${{needs.build.outputs.artifact_id}}/
-          cp -a /tmp/mac/* /tmp/${{needs.build.outputs.artifact_id}}/
-          rm /tmp/${{needs.build.outputs.artifact_id}}/vfs/fileslist.txt
-          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/${{needs.build.outputs.artifact_id}}/vfs/fileslist.txt
-          rm -f /tmp/${{needs.build.outputs.artifact_id}}-*.jar
-          cd /tmp/${{needs.build.outputs.artifact_id}}/
-          zip -r ../${{needs.build.outputs.artifact_id}}.jar *
+          unzip -d /tmp/linux /tmp/liquibase-checks-ubuntu-latest-${{ env.VERSION }}.jar
+          unzip -d /tmp/windows /tmp/liquibase-checks-windows-latest-${{ env.VERSION }}.jar
+          unzip -d /tmp/mac /tmp/liquibase-checks-macos-latest-${{ env.VERSION }}.jar
+          rm -r -f /tmp/liquibase-checks
+          mkdir /tmp/liquibase-checks-${{ env.VERSION }}
+          cp -a /tmp/linux/* /tmp/liquibase-checks-${{ env.VERSION }}/
+          cp -a /tmp/windows/* /tmp/liquibase-checks-${{ env.VERSION }}/
+          cp -a /tmp/mac/* /tmp/liquibase-checks-${{ env.VERSION }}/
+          rm /tmp/liquibase-checks-${{ env.VERSION }}/vfs/fileslist.txt
+          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/liquibase-checks-${{ env.VERSION }}/vfs/fileslist.txt
+          rm -f /tmp/liquibase-checks-${{ env.VERSION }}.jar
+          cd /tmp/liquibase-checks-${{ env.VERSION }}/
+          zip -r ../liquibase-checks-${{ env.VERSION }}.jar *
 
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v3

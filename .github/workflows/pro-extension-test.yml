@@ -376,7 +376,7 @@ jobs:
         with:
           name: multiplatform-artifacts
           path: |
-            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-sources.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-javadoc.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.pom

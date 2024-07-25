@@ -51,11 +51,6 @@ on:
       artifactPath:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
         required: false
-        default: "target/*"
-        type: string
-      modulePath:
-        description: "Specify the path to the module that should be built. Useful for multi-module extensions."
-        required: false
         default: "."
         type: string
       combineJars:
@@ -183,12 +178,12 @@ jobs:
         run: mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
 
       - name: Get Artifact ID
-        working-directory: ${{ inputs.modulePath }}
+        working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
         run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
 
       - name: Get Artifact Version
-        working-directory: ${{ inputs.modulePath }}
+        working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
         run: echo "::set-output name=artifact_version::$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
 
@@ -197,7 +192,7 @@ jobs:
         with:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
-            ${{ inputs.artifactPath }}
+            ${{ inputs.artifactPath }}/target/*
 
       - name: Save Event File
         uses: actions/upload-artifact@v3
@@ -381,7 +376,7 @@ jobs:
         with:
           name: multiplatform-artifacts
           path: |
-            ${{ inputs.artifactPath }}
+            ${{ inputs.artifactPath }}/*
 
   sonar-pr:
     if: ${{ !inputs.nightly }}

@@ -360,18 +360,18 @@ jobs:
 
       - name: Create multiplatform jar
         run: |
-          rm -r -f /combined/linux /combined/windows /combined/mac
+          rm -rf /combined/linux /combined/windows /combined/mac
           mkdir -p /combined/linux /combined/windows /combined/mac
           unzip -d /combined/linux /tmp/linux/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           unzip -d /combined/windows /tmp/windows/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           unzip -d /combined/macos /tmp/macos/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          rm -r -f /tmp/liquibase-checks
+          rm -r -f /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}
           mkdir /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}
           cp -a /combined/linux/* /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
           cp -a /combined/windows/* /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
           cp -a /combined/mac/* /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
           rm /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
-          cat /combined/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /combined/mac/vfs/fileslist.txt > /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
+          cat /combined/linux/vfs/fileslist.txt /combined/windows/vfs/fileslist.txt /combined/mac/vfs/fileslist.txt > /combined/liquibase-checks-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
           rm -f /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}.jar
           cd /tmp/liquibase-checks-${{needs.build.outputs.artifact_version}}/
           zip -r ../liquibase-checks-${{needs.build.outputs.artifact_version}}.jar *

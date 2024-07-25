@@ -13,6 +13,11 @@ on:
         required: false
         default: ''
         type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "."
+        type: string
     secrets:
       SONATYPE_USERNAME:
         description: 'SONATYPE_USERNAME from the caller workflow'
@@ -23,10 +28,11 @@ on:
 
 jobs:
   maven-release:
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.7.8
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@DAT-18141
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
+      artifactPath: ${{ inputs.artifactPath }}
       
   release:
     runs-on: ubuntu-latest

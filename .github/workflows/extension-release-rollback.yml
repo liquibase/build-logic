@@ -8,6 +8,11 @@ on:
         required: false
         default: ''
         type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "."
+        type: string
 
 permissions:
   contents: write
@@ -94,8 +99,9 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Perform Maven Release Rollback
+        working-directory: ${{ inputs.artifactPath }}
         run: |
-          mvn -B versions:revert release:rollback \
+          mvn -B versions:revert release:rollback -DcheckModificationExcludeList=** -DignoreSnapshots=true \
           -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git \
           -DcheckModificationExcludeList=pom.xml

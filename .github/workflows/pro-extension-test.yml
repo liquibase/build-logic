@@ -48,6 +48,11 @@ on:
         required: false
         default: "target/*"
         type: string
+      combineJars:
+        description: "Specify it if you want to combine the built jars into a single jar"
+        required: false
+        default: false
+        type: boolean
     secrets:
       SONAR_TOKEN:
         description: "SONAR_TOKEN from the caller workflow"
@@ -283,8 +288,7 @@ jobs:
       - name: Run Tests
         if: ${{ !inputs.nightly }}
         run: |
-          extraMavenArgs="${{ inputs.extraMavenArgs }}"
-          mvn -B test -P '${{ inputs.mavenProfiles }}' "$extraMavenArgs"
+          mvn -B test -P '${{ inputs.mavenProfiles }}' "'${{ inputs.extraMavenArgs }}"
 
       - name: Run Tests
         if: ${{ inputs.nightly }}
@@ -311,6 +315,57 @@ jobs:
           path: |
             **/target/surefire-reports
             **/target/site/jacoco/jacoco.xml
+
+  combineJars:
+    needs: build
+    if: ${{ inputs.combineJars }}
+    name: Combine Jars
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{needs.build.outputs.artifact_id}}-ubuntu-latest-artifacts
+          path: /tmp
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{needs.build.outputs.artifact_id}}-macos-latest-artifacts
+          path: /tmp
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{needs.build.outputs.artifact_id}}-windows-latest-artifacts
+          path: /tmp
+
+      - name: Create multiplatform jar
+        run: |
+          #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
+          rm -r -f /tmp/linux /tmp/windows /tmp/mac
+          mkdir /tmp/linux /tmp/windows /tmp/mac
+          unzip -d /tmp/linux /tmp/${{needs.build.outputs.artifact_id}}-ubuntu-latest.jar
+          unzip -d /tmp/windows /tmp/${{needs.build.outputs.artifact_id}}-windows-latest.jar
+          unzip -d /tmp/mac /tmp/${{needs.build.outputs.artifact_id}}-macos-latest.jar
+          rm -r -f /tmp/${{needs.build.outputs.artifact_id}}
+          mkdir /tmp/${{needs.build.outputs.artifact_id}}
+          cp -a /tmp/linux/* /tmp/${{needs.build.outputs.artifact_id}}/
+          cp -a /tmp/windows/* /tmp/${{needs.build.outputs.artifact_id}}/
+          cp -a /tmp/mac/* /tmp/${{needs.build.outputs.artifact_id}}/
+          rm /tmp/${{needs.build.outputs.artifact_id}}/vfs/fileslist.txt
+          cat /tmp/linux/vfs/fileslist.txt /tmp/windows/vfs/fileslist.txt /tmp/mac/vfs/fileslist.txt > /tmp/${{needs.build.outputs.artifact_id}}/vfs/fileslist.txt
+          rm -f /tmp/${{needs.build.outputs.artifact_id}}.jar
+          cd /tmp/${{needs.build.outputs.artifact_id}}/
+          zip -r ../${{needs.build.outputs.artifact_id}}.jar *
+
+      - name: Upload multiplatform artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: multiplatform-artifacts
+          path: |
+            scripting/target/*
 
   sonar-pr:
     if: ${{ !inputs.nightly }}

@@ -111,6 +111,7 @@ jobs:
           git config user.email "liquibot@liquibase.org"
 
       - name: Run extra command
+        working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}

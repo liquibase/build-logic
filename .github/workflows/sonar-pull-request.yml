@@ -97,6 +97,7 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Get Artifact ID
+        working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 

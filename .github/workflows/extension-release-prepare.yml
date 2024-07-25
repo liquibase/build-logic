@@ -89,6 +89,7 @@ jobs:
           git config --local user.name "liquibot"
 
       - name: Run extra command
+        working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}

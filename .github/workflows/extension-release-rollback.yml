@@ -94,6 +94,7 @@ jobs:
           name: release-files
 
       - name: Run extra command
+        working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}

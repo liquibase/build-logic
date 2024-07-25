@@ -389,10 +389,10 @@ jobs:
         run: |
           gpg -K
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/target/${{ env.artifact_id }}-${version}.jar
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/target/${{ env.artifact_id }}-${version}.pom
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/target/${{ env.artifact_id }}-${version}-sources.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-sources.jar
 
       - name: Set draft release title
         working-directory: ${{ inputs.artifactPath }}

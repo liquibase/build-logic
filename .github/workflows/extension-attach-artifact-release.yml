@@ -395,6 +395,7 @@ jobs:
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/target/${{ env.artifact_id }}-${version}-sources.jar
 
       - name: Set draft release title
+        working-directory: ${{ inputs.artifactPath }}
         id: set-release-title
         run: |
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)

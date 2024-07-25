@@ -199,7 +199,7 @@ jobs:
       - name: Save Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-id.outputs.artifact_version }}-artifacts
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
             ${{ inputs.artifactPath }}
 
@@ -211,7 +211,7 @@ jobs:
 
     outputs:
       artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
-      artifact_version: ${{ steps.get-artifact-id.outputs.artifact_version }}
+      artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
 
   unit-test:
     strategy:

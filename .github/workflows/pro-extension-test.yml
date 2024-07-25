@@ -377,7 +377,7 @@ jobs:
 
       - name: Create multiplatform jar
         run: |
-          ls -ltr
+          ls -ltr /tmp
           #Copy the .jar files from Linux, Windows, and Mac builds to /tmp/linux, /tmp/windows, and /tmp/mac
           rm -r -f /tmp/linux /tmp/windows /tmp/mac
           mkdir /tmp/linux /tmp/windows /tmp/mac

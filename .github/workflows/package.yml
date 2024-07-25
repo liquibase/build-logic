@@ -155,7 +155,7 @@ jobs:
         run: |
           wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
           mkdir -p liquibase-$VERSION/bin/internal
-          unzip liquibase-$VERSION.zip 
+          unzip liquibase-$VERSION.zip -d liquibase-$VERSION
           rm -rf liquibase-$VERSION.zip
           mv ./liquibase-$VERSION/liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
           mv ./liquibase-$VERSION/liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/

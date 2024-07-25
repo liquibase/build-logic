@@ -199,6 +199,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Docker for macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew install docker
+          colima start
+
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
@@ -276,7 +282,9 @@ jobs:
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}
-        run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${{ inputs.extraMavenArgs }}
+        run: |
+          extraMavenArgs="${{ inputs.extraMavenArgs }}"
+          mvn -B test -P '${{ inputs.mavenProfiles }}' "$extraMavenArgs"
 
       - name: Run Tests
         if: ${{ inputs.nightly }}

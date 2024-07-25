@@ -360,6 +360,10 @@ jobs:
 
       - name: Create multiplatform jar
         run: |
+          ls -ltr /tmp
+          ls -ltr /tmp/ubuntu
+          ls -ltr /tmp/macos
+          ls -ltr /tmp/windows
           rm -rf /tmp/combined/linux /tmp/combined/windows /tmp/combined/mac
           mkdir -p /tmp/combined/linux /tmp/combined/windows /tmp/combined/mac
           unzip -d /tmp/combined/linux /tmp/linux/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar

@@ -283,7 +283,7 @@ jobs:
       - name: Get Artifacts Version
         id: get-version
         run: |
-          version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout)
+          version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout))
           echo "VERSION=$version" >> $GITHUB_ENV
 
       - uses: actions/download-artifact@v3
@@ -354,7 +354,7 @@ jobs:
       - name: Get Artifacts Version
         id: get-version
         run: |
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout)
           echo "VERSION=$version" >> $GITHUB_ENV
 
       - name: Download Artifacts

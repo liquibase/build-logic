@@ -8,13 +8,19 @@ on:
         required: false
         default: ''
         type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "."
+        type: string
   
 jobs:
   sonar:
-    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@v0.7.8
+    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@DAT-18141
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
+      artifactPath: ${{ inputs.artifactPath }}
               
   create-release:
     name: Create Release

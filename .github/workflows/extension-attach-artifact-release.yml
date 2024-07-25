@@ -331,6 +331,7 @@ jobs:
           fi
 
       - name: Build release artifacts
+        working-directory: ${{ inputs.artifactPath }}
         if: env.ARTIFACT_FOUND == '0'
         id: build-release-artifacts
         run: |

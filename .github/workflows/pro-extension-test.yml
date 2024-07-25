@@ -376,7 +376,7 @@ jobs:
         with:
           name: multiplatform-artifacts
           path: |
-            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}*
+            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/*
 
   sonar-pr:
     if: ${{ !inputs.nightly }}

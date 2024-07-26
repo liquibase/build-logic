@@ -134,7 +134,7 @@ jobs:
         with:
           tag: "${{ github.event.release.tag_name }}"
           filename: "${{ env.artifact_id }}-*"
-          out-file-path: "."
+          out-file-path: ${{ inputs.artifactPath }}
 
       - name: Publish to Maven Central
         working-directory: ${{ inputs.artifactPath }}

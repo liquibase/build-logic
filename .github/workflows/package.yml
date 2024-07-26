@@ -55,6 +55,9 @@ jobs:
         with:
           ruby-version: 3.1.4
 
+      - name: Install GitHub CLI
+        run: sudo apt-get update && sudo apt-get install gh -y
+
       - name: Get Reusable Files
         run: |
           # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
@@ -130,7 +133,28 @@ jobs:
           mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
           aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
+
+      - name: Check for existing Homebrew formula PR for ${{ inputs.artifactId }}
+        id: check-brew-pr
+        run: |
+          # Authenticate GitHub CLI
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+          # Define the PR title
+          pr_title="liquibase ${{ inputs.version }}"
+
+          # Search for open pull requests with the specified title in the Homebrew/homebrew-core repo
+          pr_exists=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" || true)
+          echo "pr_exists: $pr_exists"
+          # Set the environment variable based on whether the PR exists
+          if [ -n "$pr_exists" ]; then
+            echo "PR_EXISTS=true" >> $GITHUB_ENV
+          else
+            echo "PR_EXISTS=false" >> $GITHUB_ENV
+          fi
+
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
+        if: env.PR_EXISTS == 'false'
         uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: liquibase

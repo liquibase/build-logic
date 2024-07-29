@@ -7,10 +7,9 @@ on:
   workflow_call:
     inputs:
       gradle:
-        required: true
+        required: false
         type: boolean
-        description: 'Is it a gradle project?'
-        default: 'false'
+        description: 'Flag to specify if the project uses Gradle instead of Maven'
   release:
     types: [published] # Run this action when a release is published
 

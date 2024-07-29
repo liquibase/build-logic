@@ -26,48 +26,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-          #look for dependencies in maven
-      - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
+      - name: Set up JDK
+        uses: actions/setup-java@v3
         with:
-          repositories: |
-            [
-              {
-                "id": "liquibase",
-                "url": "https://maven.pkg.github.com/liquibase/liquibase",
-                "releases": {
-                  "enabled": "false"
-                },
-                "snapshots": {
-                  "enabled": "true",
-                  "updatePolicy": "always"
-                }
-              },
-              {
-                "id": "liquibase-pro",
-                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
-                "releases": {
-                  "enabled": "false"
-                },
-                "snapshots": {
-                  "enabled": "true",
-                  "updatePolicy": "always"
-                }
-              }
-            ]
-          servers: |
-            [
-              {
-                "id": "liquibase-pro",
-                "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
-              },
-              {
-                "id": "liquibase",
-                "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
-              }
-            ]
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'maven'
+          server-id: daticalrepo
+          server-username: REPO_MAVEN_USER
+          server-password: REPO_MAVEN_PASSWORD
+
       - name: Install Maven dependencies (excluding test scope)
         run: mvn -B -U -DskipTests -ntp clean install
         env:

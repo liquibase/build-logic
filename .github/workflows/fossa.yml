@@ -69,7 +69,10 @@ jobs:
               }
             ]
       - name: Install Maven dependencies (excluding test scope)
-        run: mvn clean install -DskipTests
+        run: mvn -B -U -DskipTests -ntp clean install
+        env:
+          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
+          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
 
       - name: run FOSSA CLI
         uses: fossas/fossa-action@main

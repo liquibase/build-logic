@@ -1,0 +1,113 @@
+# Name of the GitHub Action workflow
+name: FOSSA Report Generation
+
+# Event triggers for the workflow
+on:
+  workflow_dispatch:  # Run this action manually from the GitHub Actions tab
+  workflow_call:
+  release:
+    types: [published] # Run this action when a release is published
+
+# Define the jobs in the workflow
+jobs:
+  fossa-scan:
+    # Specifies the type of runner to use
+    runs-on: ubuntu-latest
+
+    # Sequence of steps that make up a single job
+    steps:
+      # Checkout the code to the GitHub runner
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+          #look for dependencies in maven
+      - name: maven-settings-xml-action
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
+      - name: Install Maven dependencies (excluding test scope)
+        run: mvn clean install -DskipTests
+
+      - name: run FOSSA CLI
+        uses: fossas/fossa-action@main
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+          branch: ${{ github.ref }}
+
+      - name: Get the commit sha
+        id: get_commit_sha
+        run: |
+          commit_sha=`(git rev-parse HEAD)`
+          echo "commit_sha=${commit_sha}" >> $GITHUB_OUTPUT
+      - name: Get repository name
+        id: get_repo_name
+        run: echo "repo_name=$(echo ${{ github.repository }} | cut -d'/' -f2)" >> $GITHUB_OUTPUT
+
+      # https://docs.fossa.com/docs/download-fossa-project-attribution-reports
+      -   name: Set the dependency metadata information
+          run: |
+            sleep 120
+            mkdir /home/runner/work/{{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+            curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2Fdliquibase%2F{{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&download=true' \
+            --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
+            -o /home/runner/work/{{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/{{ steps.get_repo_name.outputs.repo_name }}.csv
+            ls -l /home/runner/work/{{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+            cat /home/runner/work/{{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/{{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
+
+      # Upload report to S3
+      #            - name: Upload report to S3
+      #              if: always()
+      #              run: aws s3 cp /home/runner/work/liquibase-pro/fossa_reports/datical_service.csv s3://liquibaseorg-origin/test_fossa_report/
+      #              env:
+      #                  AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
+      #                  AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
+      #                  AWS_DEFAULT_REGION: us-east-1
+
+      - name : Upload to build page
+        uses: actions/upload-artifact@v3
+        with:
+          name: fossa-reports
+          path: /home/runner/work/liquibase-pro/fossa_reports/{{ steps.get_repo_name.outputs.repo_name }}.csv

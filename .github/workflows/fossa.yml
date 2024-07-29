@@ -56,7 +56,7 @@ jobs:
           run: |
             sleep 120
             mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2Fdliquibase%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=false&download=true' \
+            curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2Fliquibase%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=false&download=true' \
             --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
             -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv
             ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports

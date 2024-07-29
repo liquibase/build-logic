@@ -75,4 +75,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: fossa-reports
-          path: /home/runner/work/liquibase-pro/fossa_reports/{{ steps.get_repo_name.outputs.repo_name }}.csv
+          path: /home/runner/work/liquibase-pro/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv

@@ -8,6 +8,7 @@ on:
     inputs:
       gradle:
         required: true
+        type: boolean
         description: 'Is it a gradle project?'
         default: 'false'
   release:

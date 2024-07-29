@@ -1,5 +1,5 @@
 # Name of the GitHub Action workflow
-name: FOSSA Report Generation
+name: FOSSA Report Generation - Datical Repsoitories
 
 # Event triggers for the workflow
 on:
@@ -22,12 +22,6 @@ jobs:
 
       - name: Set up JDK
         uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Set up JDK
-        uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
@@ -61,12 +55,12 @@ jobs:
       -   name: Set the dependency metadata information
           run: |
             sleep 120
-            mkdir /home/runner/work/{{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2Fdliquibase%2F{{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&download=true' \
+            mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+            curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2Fdliquibase%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=false&download=true' \
             --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
-            -o /home/runner/work/{{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/{{ steps.get_repo_name.outputs.repo_name }}.csv
-            ls -l /home/runner/work/{{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            cat /home/runner/work/{{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/{{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
+            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv
+            ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
 
       # Upload report to S3
       #            - name: Upload report to S3

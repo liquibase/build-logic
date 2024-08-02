@@ -16,7 +16,7 @@ on:
       deployToMavenCentral:
         description: 'Specify it if you want to deploy to maven'
         required: false
-        default: 'true'
+        default: true
         type: boolean
     secrets:
       SONATYPE_USERNAME:

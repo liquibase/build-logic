@@ -54,14 +54,14 @@ jobs:
           server-password: REPO_MAVEN_PASSWORD
 
       - name: Install Maven dependencies (excluding test scope)
-        if: ${{ github.event.inputs.gradle == 'false' && github.event.inputs.org == 'datical'}}
+        if: ${{ inputs.gradle == 'false' && inputs.org == 'datical'}}
         run: mvn -B -U -DskipTests -ntp clean install
         env:
           REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
           REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
 
       - name: Install Gradle dependencies
-        if: ${{ github.event.inputs.gradle == 'true' && github.event.inputs.org == 'datical'}}
+        if: ${{ inputs.gradle == 'true' && inputs.org == 'datical'}}
         run: |
           chmod +x gradlew
           ./gradlew clean build -x test
@@ -71,7 +71,7 @@ jobs:
 
 
       - name: Set up JDK for Liquibase
-        if: ${{ github.event.inputs.org == 'liquibase' }}
+        if: ${{ inputs.org == 'liquibase' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -79,7 +79,7 @@ jobs:
 
             #look for dependencies in maven
       - name: maven-settings-xml-action
-        if: ${{ github.event.inputs.org == 'liquibase' }}
+        if: ${{ inputs.org == 'liquibase' }}
         uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |
@@ -141,7 +141,7 @@ jobs:
 
       # https://docs.fossa.com/docs/download-fossa-project-attribution-reports
       -   name: Set the dependency metadata information
-          if: ${{ github.event.inputs.org == 'datical'}}
+          if: ${{ inputs.org == 'datical'}}
           run: |
             sleep 120
             mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
@@ -153,7 +153,7 @@ jobs:
 
 
       -   name: Set the dependency metadata information
-          if: ${{ github.event.inputs.org == 'liquibase'}}
+          if: ${{ inputs.org == 'liquibase'}}
           run: |
             sleep 120
             mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports

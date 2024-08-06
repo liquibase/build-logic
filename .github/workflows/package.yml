@@ -55,9 +55,6 @@ jobs:
         with:
           ruby-version: 3.1.4
 
-      - name: Install GitHub CLI
-        run: sudo apt-get update && sudo apt-get install gh -y
-
       - name: Get Reusable Files
         run: |
           # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step

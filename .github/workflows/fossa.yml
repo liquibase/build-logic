@@ -11,11 +11,12 @@ on:
         description: 'Flag to specify if the project uses Gradle instead of Maven'
       org:
         required: false
-        type: string
+        type: choice
         description: 'Organization to run on'
-        option:
-          - 'liquibase'
-          - 'datical'
+        options:
+          - liquibase
+          - datical
+
   workflow_call:
     inputs:
       gradle:
@@ -42,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK
-        if: ${{ inputs.org && inputs.org != 'liquibase' || github.event.inputs.org && github.event.inputs.org != 'liquibase' }}
+        if: ${{ inputs.org != 'liquibase' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'

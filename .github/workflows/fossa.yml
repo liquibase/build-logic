@@ -54,7 +54,7 @@ jobs:
           server-password: REPO_MAVEN_PASSWORD
 
       - name: Install Maven dependencies (excluding test scope) for Datical
-        if: ${{ inputs.gradle == 'false' && inputs.org == 'datical' }}
+        if: ${{ inputs.org == 'datical' }}
         run: mvn -B -U -DskipTests -ntp clean install
         env:
           REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}

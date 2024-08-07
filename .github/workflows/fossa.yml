@@ -69,6 +69,10 @@ jobs:
           REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
           REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
 
+      - name: Log inputs
+        run: |
+          echo "Gradle: ${{ inputs.gradle }}"
+          echo "Org: ${{ inputs.org }}"
 
       - name: Set up JDK for Liquibase
         if: ${{ inputs.org == 'liquibase' }}

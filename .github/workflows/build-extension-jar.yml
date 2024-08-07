@@ -1,0 +1,117 @@
+name: Build & Deploy extension jar to GPM
+# This action will download an extension from github repo, build it, and deploy it to GPM as version master-SNAPSHOT.
+
+on:
+  workflow_call:
+    inputs:
+      extension:
+        description: "Extension to build"
+        required: true
+        default: ""
+        type: string
+  workflow_dispatch:
+    inputs:
+      extension:
+        description: "Extension to build"
+        required: true
+        default: ""
+        type: string
+
+
+jobs:
+  delete-dependency-packages:
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: org.liquibase.ext.${{ inputs.extension }}
+          package-type: 'maven'
+          token: ${{ secrets.BOT_TOKEN }}
+          min-versions-to-keep: 5 # Keep the last 5 versions so we don't break simultaneous builds
+          delete-only-pre-release-versions: true
+
+  build-and-deploy-extensions:
+    needs: [delete-dependency-packages]
+    runs-on: ubuntu-22.04
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GIT_USERNAME: "liquibot"
+      GIT_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
+    steps:
+      - name: Checkout Dependencies
+        run: |
+            git config --global credential.helper store
+            echo "https://$GIT_USERNAME:$GIT_PASSWORD@github.com" > ~/.git-credentials
+            git clone https://github.com/liquibase/${{ inputs.extension }}.git ${{ inputs.extension }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: 'temurin'
+          cache: 'maven'
+          gpg-private-key: ${{ secrets.GPG_SECRET }}
+          gpg-passphrase: GPG_PASSPHRASE
+        env:
+           GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
+
+        #look for dependencies in maven
+      - name: maven-settings-xml-action
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+              },
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+              }
+            ]
+
+      - name: Build and deploy Extension to GPM
+        env:
+           GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          cd ${{ inputs.extension }}
+          EXTENSION_VERSION="master-SNAPSHOT"
+          mvn versions:set -DnewVersion=$EXTENSION_VERSION
+          mvn clean install -DskipTests
+            mvn deploy:deploy-file \
+              -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
+              -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
+              -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
+              -DrepositoryId=liquibase \
+              -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
+              -DpomFile=pom.xml
+            cd ..

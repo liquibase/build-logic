@@ -28,7 +28,7 @@ on:
         type: string
         description: 'Organization name: liquibase or datical'
   release:
-    types: [published] # Run this action when a release is published
+    types: [published] # TODO: check when to trigger this event
 
 # Define the jobs in the workflow
 jobs:
@@ -53,14 +53,14 @@ jobs:
           server-username: REPO_MAVEN_USER
           server-password: REPO_MAVEN_PASSWORD
 
-      - name: Install Maven dependencies (excluding test scope)
+      - name: Install Maven dependencies (excluding test scope) for Datical
         if: ${{ inputs.org == 'datical'}}
         run: mvn -B -U -DskipTests -ntp clean install
         env:
           REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
           REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
 
-      - name: Install Gradle dependencies
+      - name: Install Gradle dependencies (excluding test scope) for Datical
         if: ${{ inputs.gradle == 'true' && inputs.org == 'datical'}}
         run: |
           chmod +x gradlew
@@ -78,7 +78,7 @@ jobs:
           java-version: '17'
 
             #look for dependencies in maven
-      - name: maven-settings-xml-action
+      - name: maven-settings-xml-action for Liquibase
         if: ${{ inputs.org == 'liquibase' }}
         uses: whelk-io/maven-settings-xml-action@v22
         with:
@@ -140,7 +140,7 @@ jobs:
         run: echo "repo_name=$(echo ${{ github.repository }} | cut -d'/' -f2)" >> $GITHUB_OUTPUT
 
       # https://docs.fossa.com/docs/download-fossa-project-attribution-reports
-      -   name: Set the dependency metadata information
+      -   name: Set the dependency metadata information for Datical
           if: ${{ inputs.org == 'datical'}}
           run: |
             sleep 120
@@ -152,7 +152,7 @@ jobs:
             cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
 
 
-      -   name: Set the dependency metadata information
+      -   name: Set the dependency metadata information for Liquibase
           if: ${{ inputs.org == 'liquibase'}}
           run: |
             sleep 120

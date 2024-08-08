@@ -42,40 +42,40 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-#      - name: Set up JDK for Datical
-#        if: ${{ inputs.org != 'liquibase' }}
-#        uses: actions/setup-java@v4
-#        with:
-#          distribution: 'temurin'
-#          java-version: '11'
-#          cache: 'maven'
-#          server-id: daticalrepo
-#          server-username: REPO_MAVEN_USER
-#          server-password: REPO_MAVEN_PASSWORD
-#
-#      - name: Install Maven dependencies (excluding test scope) for Datical
-#        if: ${{ inputs.gradle != 'true' && inputs.org == 'datical' }}
-#        run: mvn -B -U -DskipTests -ntp clean install
-#        env:
-#          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
-#          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
-#
-#      - name: Install Gradle dependencies (excluding test scope) for Datical
-#        if: ${{ inputs.gradle == 'true' && inputs.org == 'datical' }}
-#        run: |
-#          chmod +x gradlew
-#          ./gradlew clean build -x test
-#        env:
-#          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
-#          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
-#
-#      - name: Log inputs
-#        run: |
-#          echo "Gradle: ${{ inputs.gradle }}"
-#          echo "Org: ${{ inputs.org }}"
+      - name: Set up JDK for Datical
+        if:  inputs.gradle != 'false' && inputs.org != 'liquibase'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'maven'
+          server-id: daticalrepo
+          server-username: REPO_MAVEN_USER
+          server-password: REPO_MAVEN_PASSWORD
+
+      - name: Install Maven dependencies (excluding test scope) for Datical
+        if: inputs.gradle != 'true' && inputs.org == 'datical'
+        run: mvn -B -U -DskipTests -ntp clean install
+        env:
+          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
+          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
+
+      - name: Install Gradle dependencies (excluding test scope) for Datical
+        if: inputs.gradle == 'true' && inputs.org == 'datical'
+        run: |
+          chmod +x gradlew
+          ./gradlew clean build -x test
+        env:
+          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
+          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
+
+      - name: Log inputs
+        run: |
+          echo "Gradle: ${{ inputs.gradle }}"
+          echo "Org: ${{ inputs.org }}"
 
       - name: Set up JDK for Liquibase
-        if: ${{ inputs.org == 'liquibase' }}
+        if: inputs.org == 'liquibase'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -145,7 +145,7 @@ jobs:
 
       # https://docs.fossa.com/docs/download-fossa-project-attribution-reports
       -   name: Set the dependency metadata information for Datical
-          if: ${{ inputs.org == 'datical' }}
+          if: inputs.org == 'datical'
           run: |
             sleep 120
             mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
@@ -157,7 +157,7 @@ jobs:
 
 
       -   name: Set the dependency metadata information for Liquibase
-          if: ${{ inputs.org == 'liquibase' }}
+          if: inputs.org == 'liquibase'
           run: |
             sleep 120
             mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
@@ -168,17 +168,18 @@ jobs:
             cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
 
       # Upload report to S3
-#      -   name: Upload report to S3
-#          if: always()
-#          run: aws s3 cp /home/runner/work/liquibase-pro/fossa_reports/datical_service.csv s3://liquibaseorg-origin/enterprise_fossa_report/
-#          env:
-#              AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
-#              AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
-#              AWS_DEFAULT_REGION: us-east-1
+      -   name: Upload report to S3
+          if: always()
+          run: aws s3 cp /home/runner/work/liquibase-pro/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/
+          env:
+              AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
+              AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
+              AWS_DEFAULT_REGION: us-east-1
 
 
       -   name : Upload to build page
           uses: actions/upload-artifact@v3
           with:
             name: fossa-reports
-            path: /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv
+            path: |
+              /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv

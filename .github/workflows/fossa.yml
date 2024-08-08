@@ -54,7 +54,7 @@ jobs:
           server-password: REPO_MAVEN_PASSWORD
 
       - name: Install Maven dependencies (excluding test scope) for Datical
-        if: inputs.gradle != 'true' && inputs.org == 'datical'
+        if: inputs.gradle == 'false' && inputs.org == 'datical'
         run: mvn -B -U -DskipTests -ntp clean install
         env:
           REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
@@ -170,7 +170,7 @@ jobs:
       # Upload report to S3
       -   name: Upload report to S3
           if: always()
-          run: aws s3 cp /home/runner/work/liquibase-pro/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/
+          run: aws s3 cp /home/runner/work/enterprise/fossa_reports_s3/${{ steps.get_repo_name.outputs.repo_name }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/
           env:
               AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
               AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}

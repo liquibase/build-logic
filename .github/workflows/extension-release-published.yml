@@ -153,7 +153,7 @@ jobs:
                       -Dclassifiers=,sources,javadoc,
 
   deploy_xsd:
-    if: inputs.nameSpace != '' && inputs.deployToMaven == true
+    if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true
     name: Upload xsds
     runs-on: ubuntu-20.04
     # These permissions are needed to interact with GitHub's OIDC Token endpoint.

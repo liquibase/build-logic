@@ -69,6 +69,15 @@ jobs:
           REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
           REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
 
+      - name: Install Gradle dependencies (excluding test scope) for Liquibase
+        if:  inputs.gradle == 'true' && inputs.org == 'liquibase'  # not working
+        run: |
+          chmod +x gradlew
+          ./gradlew clean build -x test
+#        env:
+#          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
+#          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
+
       - name: Log inputs
         run: |
           echo "Gradle: ${{ inputs.gradle }}"

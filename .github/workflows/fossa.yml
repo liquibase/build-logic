@@ -32,6 +32,10 @@ on:
         required: false
         type: string
         description: 'Organization name: liquibase or datical'
+      different_folder_scan:
+        required: false
+        type: boolean
+        description: 'different folder to scan than the root one'
   release:
     types: [published] # TODO: check when to trigger this event
 

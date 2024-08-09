@@ -13,6 +13,11 @@ on:
         required: false
         default: ''
         type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "."
+        type: string
       deployToMavenCentral:
         description: 'Specify it if you want to deploy to maven'
         required: false
@@ -33,6 +38,7 @@ jobs:
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
+      artifactPath: ${{ inputs.artifactPath }}
       
   release:
     if: inputs.deployToMavenCentral == true
@@ -112,18 +118,21 @@ jobs:
           git config user.email "liquibot@liquibase.org"
 
       - name: Run extra command
+        working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
 
       - name: Build release artifacts
+        working-directory: ${{ inputs.artifactPath }}
         id: build-release-artifacts
         continue-on-error: true
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
+          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
           git reset HEAD~ --hard
 
       - name: Get Artifact ID
+        working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
@@ -132,9 +141,10 @@ jobs:
         with:
           tag: "${{ github.event.release.tag_name }}"
           filename: "${{ env.artifact_id }}-*"
-          out-file-path: "."
+          out-file-path: ${{ inputs.artifactPath }}
 
       - name: Publish to Maven Central
+        working-directory: ${{ inputs.artifactPath }}
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN }}

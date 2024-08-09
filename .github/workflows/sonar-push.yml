@@ -8,6 +8,11 @@ on:
         required: false
         default: ''
         type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "."
+        type: string
     secrets:
       SONAR_TOKEN:
         description: 'SONAR_TOKEN from the caller workflow'
@@ -44,11 +49,13 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
 
       - name: Run extra command
+        working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
 
       - name: Get Artifact ID
+        working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
@@ -107,6 +114,7 @@ jobs:
             ]
 
       - name: Sonar Scan
+        working-directory: ${{ inputs.artifactPath }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

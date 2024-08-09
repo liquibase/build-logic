@@ -16,6 +16,11 @@ on:
         options:
           - liquibase
           - datical
+      extraArg:
+        required: false
+        type: string
+        description: 'Extra argument to pass to the workflow'
+
 
   workflow_call:
     inputs:
@@ -49,7 +54,7 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
           cache: 'maven'
-          server-id: daticalrepo
+          server-id: datical
           server-username: REPO_MAVEN_USER
           server-password: REPO_MAVEN_PASSWORD
 
@@ -77,6 +82,13 @@ jobs:
 #        env:
 #          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
 #          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
+
+      - name: Install dependencies (excluding test scope) for DaticalDBInstaller
+        if: ${{ (inputs.gradle == true) && (inputs.org == 'datical') }}
+        run: |
+          ./fetchZips.sh
+          ./buildInstallers.sh
+
 
       - name: Log inputs
         run: |

@@ -142,12 +142,16 @@ jobs:
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
-        run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=\"project.artifactId\" -q -DforceStdout)"
+        run: |
+          artifact_id=$(mvn help:evaluate -Dexpression="project.artifactId" -q -DforceStdout)
+          echo "artifact_id=$artifact_id" >> $GITHUB_OUTPUT
 
       - name: Get Artifact Version
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
-        run: echo "::set-output name=artifact_version::$(mvn help:evaluate -Dexpression=\"project.version\" -q -DforceStdout)"
+        run: |
+          artifact_version=$(mvn help:evaluate -Dexpression="project.version" -q -DforceStdout)
+          echo "artifact_version=$artifact_version" >> $GITHUB_OUTPUT
 
       - name: Save Artifacts
         uses: actions/upload-artifact@v3

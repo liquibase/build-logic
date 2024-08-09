@@ -189,9 +189,9 @@ jobs:
             cd "${WORK_DIR}"
             curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
             --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
-            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv
-            ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
+            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/ui/${{ steps.get_repo_name.outputs.repo_name }}.csv
+            ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/ui
+            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/ui/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
 
       -   name: Liquibase- Set the dependency metadata information
           if: inputs.org == 'liquibase'

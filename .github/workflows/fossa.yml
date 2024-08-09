@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK for Datical
-        if:  inputs.gradle != 'false' && inputs.org != 'liquibase'
+        if:  ${{ (inputs.gradle == 'true') && (inputs.org == 'datical') }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -54,14 +54,14 @@ jobs:
           server-password: REPO_MAVEN_PASSWORD
 
       - name: Install Maven dependencies (excluding test scope) for Datical
-        if: inputs.gradle == 'false' && inputs.org == 'datical'  # not working
+        if: ${{ (inputs.gradle == 'false') && (inputs.org == 'datical') }}  # not working
         run: mvn -B -U -DskipTests -ntp clean install
         env:
           REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
           REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
 
       - name: Install Gradle dependencies (excluding test scope) for Datical
-        if:  inputs.gradle == 'true' && inputs.org == 'datical'  # not working
+        if:  ${{ (inputs.gradle == 'true') && (inputs.org == 'datical') }}  # not working
         run: |
           chmod +x gradlew
           ./gradlew clean build -x test
@@ -70,7 +70,7 @@ jobs:
           REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
 
       - name: Install Gradle dependencies (excluding test scope) for Liquibase
-        if:  inputs.gradle == 'true' && inputs.org == 'liquibase'  # not working
+        if:  ${{ (inputs.gradle == 'true') && (inputs.org == 'liquibase') }}  # not working
         run: |
           chmod +x gradlew
           ./gradlew clean build -x test
@@ -92,7 +92,7 @@ jobs:
 
             #look for dependencies in maven
       - name: maven-settings-xml-action for Liquibase
-        if: ${{ inputs.org == 'liquibase' }}
+        if: inputs.org == 'liquibase'
         uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |

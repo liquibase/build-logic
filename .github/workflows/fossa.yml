@@ -70,7 +70,7 @@ jobs:
           REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
 
       - name: Install Gradle dependencies (excluding test scope) for Liquibase
-        if:  ${{ (inputs.gradle == 'true') && (inputs.org == 'liquibase') }}  # not working
+        if:  ${{ (inputs.gradle == true) && (inputs.org == 'liquibase') }}  # not working
         run: |
           chmod +x gradlew
           ./gradlew clean build -x test
@@ -133,10 +133,10 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT }}"
               }
             ]
-            
-      - name: Install Maven dependencies (excluding test scope) for Liquibase
-        if: inputs.org == 'liquibase'
-        run: mvn clean install -DskipTests
+#
+#      - name: Install Maven dependencies (excluding test scope) for Liquibase
+#        if: inputs.org == 'liquibase'
+#        run: mvn clean install -DskipTests
 
       - name: run FOSSA CLI
         uses: fossas/fossa-action@main

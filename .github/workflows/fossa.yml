@@ -78,7 +78,7 @@ jobs:
 #          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
 #          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
 
-      - name: Log inputs
+      - name: Log inputs1
         run: |
           echo "Gradle: ${{ inputs.gradle }}"
           echo "Org: ${{ inputs.org }}"

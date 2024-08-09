@@ -184,7 +184,6 @@ jobs:
           if: inputs.different_folder_scan == true
           run: |
             sleep 120
-            mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
             WORK_DIR=/home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/ui
             # Navigate to the specific directory where the scan should be executed
             cd "${WORK_DIR}"

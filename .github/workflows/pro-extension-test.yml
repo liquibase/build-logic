@@ -9,7 +9,12 @@ on:
         default: "[11, 17, 21]"
         type: string
       os:
-        description: "Operating system to test"
+        description: "Operating system to build/test on"
+        required: false
+        default: '["ubuntu-latest", "windows-latest"]'
+        type: string
+      os-test:
+        description: "Operating system to test on"
         required: false
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
@@ -46,8 +51,13 @@ on:
       artifactPath:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
         required: false
-        default: "target/*"
+        default: "."
         type: string
+      combineJars:
+        description: "Specify it if you want to combine the built jars into a single jar"
+        required: false
+        default: false
+        type: boolean
     secrets:
       SONAR_TOKEN:
         description: "SONAR_TOKEN from the caller workflow"
@@ -72,7 +82,11 @@ env:
 
 jobs:
   build:
-    name: Build & Package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{fromJson(inputs.os || '["ubuntu-latest"]')}}
+    name: Build & Package - ${{ matrix.os }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,13 +101,13 @@ jobs:
           cache: "maven"
 
       - name: Set up Maven
-        uses: stCarolas/setup-maven@v4.5
+        uses: stCarolas/setup-maven@v5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v21
+        uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |
             [
@@ -166,15 +180,21 @@ jobs:
         run: mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
 
       - name: Get Artifact ID
+        working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
         run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
+
+      - name: Get Artifact Version
+        working-directory: ${{ inputs.artifactPath }}
+        id: get-artifact-version
+        run: echo "::set-output name=artifact_version::$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
 
       - name: Save Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-artifacts
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
-            ${{ inputs.artifactPath }}
+            ${{ inputs.artifactPath }}/target/*
 
       - name: Save Event File
         uses: actions/upload-artifact@v3
@@ -184,13 +204,14 @@ jobs:
 
     outputs:
       artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
+      artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
 
   unit-test:
     strategy:
       fail-fast: false
       matrix:
         java: ${{fromJson(inputs.java || '[8, 11, 17, 18]')}}
-        os: ${{fromJson(inputs.os || '["ubuntu-latest", "windows-latest"]')}}
+        os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "windows-latest"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build
@@ -205,13 +226,13 @@ jobs:
           cache: "maven"
 
       - name: Set up Maven
-        uses: stCarolas/setup-maven@v4.5
+        uses: stCarolas/setup-maven@v5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v21
+        uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |
             [
@@ -254,7 +275,7 @@ jobs:
 
       - uses: actions/download-artifact@v3
         with:
-          name: ${{needs.build.outputs.artifact_id}}-artifacts
+          name: ${{needs.build.outputs.artifact_id}}-${{ matrix.os }}-${{needs.build.outputs.artifact_version}}-artifacts
           path: ./target
 
       - name: Run extra command
@@ -274,11 +295,12 @@ jobs:
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}
-        run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${{ inputs.extraMavenArgs }}
+        run: |
+          mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}"
 
       - name: Run Tests
         if: ${{ inputs.nightly }}
-        run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -302,10 +324,71 @@ jobs:
             **/target/surefire-reports
             **/target/site/jacoco/jacoco.xml
 
+  combineJars:
+    needs: [ build, unit-test ]
+    if: ${{ inputs.combineJars }}
+    name: Combine Jars
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Download Ubuntu Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{needs.build.outputs.artifact_id}}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          path: /tmp/ubuntu
+
+      - name: Download macOS Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{needs.build.outputs.artifact_id}}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          path: /tmp/macos
+
+      - name: Download Windows Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{needs.build.outputs.artifact_id}}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          path: /tmp/windows
+
+      - name: Create multiplatform jar
+        run: |
+          rm -rf /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
+          mkdir -p /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
+          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/windows /tmp/windows/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/macos /tmp/macos/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+          rm -r -f /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}
+          mkdir /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}
+          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
+          rm /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
+          cat /tmp/combined/ubuntu/vfs/fileslist.txt /tmp/combined/windows/vfs/fileslist.txt /tmp/combined/macos/vfs/fileslist.txt > /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
+          rm -f /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+          cd /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
+          zip -r ../${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar *
+          cd ..
+          cp /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
+          cp /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
+          cp /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
+
+      - name: Upload multiplatform artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: multiplatform-artifacts
+          path: |
+            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
+            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-sources.jar
+            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-javadoc.jar
+            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.pom
+
   sonar-pr:
     if: ${{ !inputs.nightly }}
     needs: [unit-test]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@v0.7.8
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
+      artifactPath: ${{ inputs.artifactPath }}
+

@@ -100,7 +100,10 @@ jobs:
           mvn -B build-helper:parse-version release:clean release:prepare \
           -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
-          -DcheckModificationExcludeList=** -DignoreSnapshots=true
+          -DcheckModificationExcludeList=pom.xml -DpushChanges=false -Dtag=temp
+          git tag -d temp
+          git push --force
+
 
       - name: Save Release files
         if: always()

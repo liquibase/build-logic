@@ -18,6 +18,11 @@ on:
         required: false
         default: "."
         type: string
+      deployToMavenCentral:
+        description: 'Specify it if you want to deploy to maven'
+        required: false
+        default: true
+        type: boolean
     secrets:
       SONATYPE_USERNAME:
         description: 'SONATYPE_USERNAME from the caller workflow'
@@ -28,13 +33,15 @@ on:
 
 jobs:
   maven-release:
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@DAT-18141
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@main
+    if: inputs.deployToMavenCentral == true
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
       artifactPath: ${{ inputs.artifactPath }}
       
   release:
+    if: inputs.deployToMavenCentral == true
     runs-on: ubuntu-latest
     needs: maven-release
     steps:
@@ -156,7 +163,7 @@ jobs:
                       -Dclassifiers=,sources,javadoc,
 
   deploy_xsd:
-    if: inputs.nameSpace != ''
+    if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true
     name: Upload xsds
     runs-on: ubuntu-20.04
     # These permissions are needed to interact with GitHub's OIDC Token endpoint.
@@ -200,4 +207,3 @@ jobs:
           done
           
           aws s3 sync index-file s3://liquibaseorg-origin/xml/ns/${{ inputs.nameSpace }}/ --only-show-errors
-                    

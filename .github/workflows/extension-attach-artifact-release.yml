@@ -142,6 +142,7 @@ jobs:
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
+        shell: bash
         run: |
           artifact_id=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
           echo "artifact_id=$artifact_id" >> $GITHUB_OUTPUT
@@ -149,6 +150,7 @@ jobs:
       - name: Get Artifact Version
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
+        shell: bash
         run: |
           artifact_version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout)
           echo "artifact_version=$artifact_version" >> $GITHUB_OUTPUT

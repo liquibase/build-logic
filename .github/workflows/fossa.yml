@@ -133,10 +133,6 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT }}"
               }
             ]
-#
-#      - name: Install Maven dependencies (excluding test scope) for Liquibase
-#        if: inputs.org == 'liquibase'
-#        run: mvn clean install -DskipTests
 
       - name: run FOSSA CLI
         uses: fossas/fossa-action@main

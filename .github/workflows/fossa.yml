@@ -16,10 +16,10 @@ on:
         options:
           - liquibase
           - datical
-      extraArg:
+      different_folder_scan:
         required: false
-        type: string
-        description: 'Extra argument to pass to the workflow'
+        type: boolean
+        description: 'different folder to scan than the root one'
 
 
   workflow_call:
@@ -165,7 +165,7 @@ jobs:
         run: echo "repo_name=$(echo ${{ github.repository }} | cut -d'/' -f2)" >> $GITHUB_OUTPUT
 
       # https://docs.fossa.com/docs/download-fossa-project-attribution-reports
-      -   name: Set the dependency metadata information for Datical
+      -   name: Datical- Set the dependency metadata information
           if: inputs.org == 'datical'
           run: |
             sleep 120
@@ -176,8 +176,21 @@ jobs:
             ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
             cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
 
+      -   name: Protoclub repo- Set the dependency metadata information
+          if: inputs.different_folder_scan == true
+          run: |
+            sleep 120
+            mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+            WORK_DIR=/home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/ui
+            # Navigate to the specific directory where the scan should be executed
+            cd "${WORK_DIR}"
+            curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
+            --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
+            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv
+            ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
 
-      -   name: Set the dependency metadata information for Liquibase
+      -   name: Liquibase- Set the dependency metadata information
           if: inputs.org == 'liquibase'
           run: |
             sleep 120

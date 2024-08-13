@@ -4,11 +4,7 @@ name: FOSSA Report Generation
 # Event triggers for the workflow
 on:
   workflow_dispatch:  # Run this action manually from the GitHub Actions tab
-    inputs:
-      gradle:
-        required: false
-        type: boolean
-        description: 'Flag to specify if the project uses Gradle instead of Maven'
+     inputs:
       org:
         required: false
         type: choice
@@ -19,18 +15,11 @@ on:
 
   workflow_call:
     inputs:
-      gradle:
-        required: false
-        type: boolean
-        description: 'Flag to specify if the project uses Gradle instead of Maven'
       org:
         required: false
         type: string
         description: 'Organization name: liquibase or datical'
-      different_folder_scan:
-        required: false
-        type: boolean
-        description: 'different folder to scan than the root one'
+
   release:
     types: [published] # TODO: check when to trigger this event
 
@@ -49,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK for Datical
-        if:  ${{ (inputs.gradle == true) && (inputs.org == 'datical') }}
+        if: inputs.org == 'datical'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -59,41 +48,8 @@ jobs:
           server-username: REPO_MAVEN_USER
           server-password: REPO_MAVEN_PASSWORD
 
-#      - name: Install Maven dependencies (excluding test scope) for Datical
-#        if: ${{ (inputs.gradle == false) && (inputs.org == 'datical') }}
-#        run: mvn -B -U -DskipTests -ntp clean install
-#        env:
-#          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
-#          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
-
-#      - name: Install Gradle dependencies (excluding test scope) for Datical
-#        if:  ${{ (inputs.gradle == true) && (inputs.org == 'datical') }}
-#        run: |
-#          chmod +x gradlew
-#          ./gradlew clean build -x test
-#        env:
-#          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
-#          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
-#
-#      - name: Install Gradle dependencies (excluding test scope) for Liquibase
-#        if:  ${{ (inputs.gradle == true) && (inputs.org == 'liquibase') }}
-#        run: |
-#          chmod +x gradlew
-#          ./gradlew clean build -x test
-#        env:
-#          REPO_MAVEN_USER: ${{ secrets.REPO_MAVEN_USER }}
-#          REPO_MAVEN_PASSWORD: ${{ secrets.REPO_MAVEN_PASSWORD }}
-
-#      - name: Install dependencies (excluding test scope) for DaticalDBInstaller
-#        if: ${{ (inputs.gradle == true) && (inputs.org == 'datical') }}
-#        run: |
-#          ./fetchZips.sh
-#          ./buildInstallers.sh
-
-
       - name: Log inputs
         run: |
-          echo "Gradle: ${{ inputs.gradle }}"
           echo "Org: ${{ inputs.org }}"
 
       - name: Set up JDK for Liquibase
@@ -190,7 +146,6 @@ jobs:
       -   name: Upload report to S3
           if: always()
           run: |
-            aws s3 cp /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/
             aws s3 cp /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/
           env:
               AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}

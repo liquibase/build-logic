@@ -182,12 +182,14 @@ jobs:
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
-        run: echo "::set-output name=artifact_id::$(mvn help:evaluate \"-Dexpression=project.artifactId\" -q -DforceStdout)"
+        shell: bash
+        run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
 
       - name: Get Artifact Version
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
-        run: echo "::set-output name=artifact_version::$(mvn help:evaluate \"-Dexpression=project.version\" -q -DforceStdout)"
+        shell: bash
+        run: echo "::set-output name=artifact_version::$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
 
       - name: Save Artifacts
         uses: actions/upload-artifact@v3

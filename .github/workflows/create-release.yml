@@ -22,12 +22,12 @@ jobs:
       extraCommand: ${{ inputs.extraCommand }}
       artifactPath: ${{ inputs.artifactPath }}
               
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create Release Draft
-        id: create-release
-        uses: release-drafter/release-drafter@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#  create-release:
+#    name: Create Release
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Create Release Draft
+#        id: create-release
+#        uses: release-drafter/release-drafter@v5
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

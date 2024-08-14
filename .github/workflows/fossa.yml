@@ -20,9 +20,6 @@ on:
         type: string
         description: 'Organization name: liquibase or datical'
 
-  release:
-    types: [published] # TODO: check when to trigger this event
-
 # Define the jobs in the workflow
 jobs:
   fossa-scan:

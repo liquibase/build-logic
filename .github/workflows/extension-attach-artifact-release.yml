@@ -232,6 +232,7 @@ jobs:
             /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom
 
   attach-to-release:
+    if: always()
     name: Attach Artifact to Release
     needs: [ combineJars ]
     runs-on: ubuntu-latest

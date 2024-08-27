@@ -23,13 +23,17 @@ on:
       GPG_SECRET_KEY_ID:
         description: "GPG_SECRET_KEY_ID from the caller workflow"
         required: true
-
+      dry_run: 
+        description: 'Flag to indicate if the workflow is triggered to create a dry-run release'
+        required: true
+        
 env:
   MAVEN_VERSION: "3.9.5"
 
 jobs:
 
   upload_packages:
+    if: ${{ inputs.dry_run == false }}
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
     permissions:
@@ -217,12 +221,14 @@ jobs:
           aws s3api put-bucket-acl --bucket repo.liquibase.com  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
 
   upload_windows_package:
+    if: ${{ inputs.dry_run == false }}
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
     secrets: inherit
     with:
       version: ${{ inputs.version }}
 
   upload_ansible_role:
+    if: ${{ inputs.dry_run == false }}
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
     secrets: inherit
     with:

@@ -309,6 +309,7 @@ jobs:
   
       - name: Run Tests
         if: ${{ inputs.nightly }}
+        shell: bash
         run: |
           if [ -n "${{ inputs.extraMavenArgs }}" ]; then
             mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"

@@ -191,7 +191,7 @@ jobs:
           fi
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
-        if: env.PR_EXISTS == 'false' && ${{ inputs.dry_run == false }}
+        if: ${{ env.PR_EXISTS == 'false' && inputs.dry_run == 'false' }}
         uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: liquibase

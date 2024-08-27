@@ -253,7 +253,7 @@ jobs:
           https://vendors.sdkman.io/announce/struct
           echo "Announced liquibase-$VERSION.zip to SDKMAN"
 
-      - name: Update SDKMAN version for ${{ inputs.artifactId }}
+      - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
         if: ${{ inputs.dry_run == true }}
         env:
           SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
@@ -279,7 +279,6 @@ jobs:
           aws s3api put-bucket-acl --bucket repo.liquibase.com.dry.run  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
 
   upload_windows_package:
-    if: ${{ inputs.dry_run == false }}
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
     secrets: inherit
     with:
@@ -287,7 +286,6 @@ jobs:
       dry_run: ${{ inputs.dry_run }}
 
   upload_ansible_role:
-    if: ${{ inputs.dry_run == false }}
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
     secrets: inherit
     with:

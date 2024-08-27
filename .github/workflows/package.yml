@@ -91,10 +91,18 @@ jobs:
           aws-region: us-east-1
 
       - name: Download ${{ inputs.artifactId }} Release
+        if: ${{ inputs.dry_run == false }}
         run: |
           mkdir -p $PWD/.github/target
           # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
-          wget -q --header="Authorization: token ${{ secrets.BOT_TOKEN }}" -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+          wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+
+      - name: Download ${{ inputs.artifactId }} dry-run Release
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          mkdir -p $PWD/.github/target
+          # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
+          wget -q --header="Authorization: token ${{ secrets.BOT_TOKEN }}" -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz ${{ inputs.dry_run_release_url }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |
@@ -267,7 +275,7 @@ jobs:
           S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
           S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
         run: |
-          wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
+          wget --header="Authorization: token ${{ secrets.BOT_TOKEN }}" -q ${{ inputs.dry_run_release_url }}/liquibase-$VERSION.zip
           mkdir -p liquibase-$VERSION/bin/internal
           unzip liquibase-$VERSION.zip -d liquibase-$VERSION
           rm -rf liquibase-$VERSION.zip
@@ -284,16 +292,19 @@ jobs:
           aws s3api put-bucket-acl --bucket repo.liquibase.com.dry.run  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
 
   upload_windows_package:
-    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
+    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@DAT-18302
     secrets: inherit
     with:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
+      dry_run_release_url: ${{ inputs.dry_run_release_url }}
 
   upload_ansible_role:
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@DAT-18302
     secrets: inherit
     with:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
+      dry_run_release_url: ${{ inputs.dry_run_release_url }}
+
           

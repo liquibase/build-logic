@@ -299,12 +299,13 @@ jobs:
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}
-        run: |
-          mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}"
+        shell: bash
+        run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${${{ inputs.extraMavenArgs }}:+\"${{ inputs.extraMavenArgs }}\"}
 
       - name: Run Tests
         if: ${{ inputs.nightly }}
-        run: mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"
+        shell: bash
+        run: mvn -B test -P '${{ inputs.mavenProfiles }}' ${${{ inputs.extraMavenArgs }}:+\"${{ inputs.extraMavenArgs }}\"} "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

@@ -20,9 +20,8 @@ on:
         default: false
       dry_run_release_url: 
         description: 'URL of the dry-run release'
-        required: true
-        type: boolean
-        default: false
+        required: false
+        type: string
     secrets:
       GPG_SECRET:
         description: "GPG_SECRET from the caller workflow"

@@ -18,8 +18,12 @@ on:
         required: true
         type: boolean
         default: false
-      dry_run_release_url: 
-        description: 'URL of the dry-run release'
+      dry_run_zip_url: 
+        description: 'URL of the dry-run zip release'
+        required: false
+        type: string
+      dry_run_tar_gz_url: 
+        description: 'URL of the dry-run tar.gz release'
         required: false
         type: string
     secrets:
@@ -101,7 +105,7 @@ jobs:
         run: |
           mkdir -p $PWD/.github/target
           # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
-          wget -q --header="Authorization: token ${{ secrets.BOT_TOKEN }}" -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz ${{ inputs.dry_run_release_url }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+          wget --content-disposition --header="Accept: application/octet-stream" --header="Authorization: Token ${{ secrets.BOT_TOKEN }}" -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz ${{ inputs.dry_run_tar_gz_url }}
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |
@@ -274,7 +278,8 @@ jobs:
           S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
           S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
         run: |
-          wget --header="Authorization: token ${{ secrets.BOT_TOKEN }}" -q ${{ inputs.dry_run_release_url }}/liquibase-$VERSION.zip
+          wget --content-disposition --header="Accept: application/octet-stream" --header="Authorization: Token ${{ secrets.BOT_TOKEN }}" ${{ inputs.dry_run_zip_url }}
+
           mkdir -p liquibase-$VERSION/bin/internal
           unzip liquibase-$VERSION.zip -d liquibase-$VERSION
           rm -rf liquibase-$VERSION.zip
@@ -296,7 +301,7 @@ jobs:
     with:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
-      dry_run_release_url: ${{ inputs.dry_run_release_url }}
+      dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   upload_ansible_role:
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@DAT-18302
@@ -304,6 +309,6 @@ jobs:
     with:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
-      dry_run_release_url: ${{ inputs.dry_run_release_url }}
+      dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
 
           

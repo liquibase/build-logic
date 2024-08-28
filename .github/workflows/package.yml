@@ -166,6 +166,9 @@ jobs:
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
         if: ${{ inputs.dry_run == true }}
         run: |
+          original_file=$(basename "$(find . -maxdepth 1 -name "*.rpm")")
+          new_name=$(echo "$original_file" | sed 's/+/-/g')
+          mv "$original_file" "$new_name"
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
           ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
           mkdir createrepo_folder

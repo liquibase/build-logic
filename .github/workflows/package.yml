@@ -18,6 +18,14 @@ on:
         required: true
         type: boolean
         default: false
+      dry_run_zip_url: 
+        description: 'URL of the dry-run zip release'
+        required: false
+        type: string
+      dry_run_tar_gz_url: 
+        description: 'URL of the dry-run tar.gz release'
+        required: false
+        type: string
     secrets:
       GPG_SECRET:
         description: "GPG_SECRET from the caller workflow"
@@ -86,10 +94,18 @@ jobs:
           aws-region: us-east-1
 
       - name: Download ${{ inputs.artifactId }} Release
+        if: ${{ inputs.dry_run == false }}
         run: |
           mkdir -p $PWD/.github/target
           # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
-          wget -q --header="Authorization: token ${{ secrets.BOT_TOKEN }}" -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+          wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+
+      - name: Download ${{ inputs.artifactId }} dry-run Release
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          mkdir -p $PWD/.github/target
+          # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
+          wget --content-disposition --header="Accept: application/octet-stream" --header="Authorization: Token ${{ secrets.BOT_TOKEN }}" -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz ${{ inputs.dry_run_tar_gz_url }}
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |
@@ -150,6 +166,9 @@ jobs:
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
         if: ${{ inputs.dry_run == true }}
         run: |
+          original_file=$(basename "$(find . -maxdepth 1 -name "*.rpm")")
+          new_name=$(echo "$original_file" | sed 's/+/-/g')
+          mv "$original_file" "$new_name"
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
           ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
           mkdir createrepo_folder
@@ -262,7 +281,8 @@ jobs:
           S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
           S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
         run: |
-          wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
+          wget --content-disposition --header="Accept: application/octet-stream" --header="Authorization: Token ${{ secrets.BOT_TOKEN }}" ${{ inputs.dry_run_zip_url }}
+
           mkdir -p liquibase-$VERSION/bin/internal
           unzip liquibase-$VERSION.zip -d liquibase-$VERSION
           rm -rf liquibase-$VERSION.zip
@@ -284,6 +304,7 @@ jobs:
     with:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
+      dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   upload_ansible_role:
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
@@ -291,4 +312,6 @@ jobs:
     with:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
+      dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
+
           

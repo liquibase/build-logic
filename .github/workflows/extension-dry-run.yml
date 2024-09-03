@@ -55,7 +55,7 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/create-release.yml@DAT-18303
     secrets: inherit
     with:
-      dryRun: true
+      dry_run: true
       dry_run_version: "dry-run-${{ github.run_id }}"
       sonar: false
 
@@ -94,7 +94,7 @@ jobs:
       extraMavenArgs: ${{ inputs.extraMavenArgs }}
       artifactPath: ${{ inputs.artifactPath }}
       combineJars: ${{ inputs.combineJars }}
-      dryRun: true
+      dry_run: true
       dry_run_release_id: ${{ needs.dry-run-get-draft-release.outputs.dry_run_release_id }}
       dry_run_version: "dry-run-${{ github.run_id }}"
 

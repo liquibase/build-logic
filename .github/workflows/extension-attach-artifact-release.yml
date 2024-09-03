@@ -38,7 +38,7 @@ on:
         required: false
         default: false
         type: boolean
-      dryRun:
+      dry_run:
         description: 'Specify it if you want to run a dry run'
         required: false
         default: false
@@ -386,7 +386,7 @@ jobs:
           path: ${{ inputs.artifactPath }}/target
 
       - name: Get latest draft release ID
-        if: ${{ inputs.dryRun == false }}
+        if: ${{ inputs.dry_run == false }}
         id: get-release
         run: |
           LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
@@ -394,7 +394,7 @@ jobs:
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
 
       - name: Get latest draft release ID (dry-run)
-        if: ${{ inputs.dryRun == true }}
+        if: ${{ inputs.dry_run == true }}
         id: get-release
         run: |
           echo "Latest Dry Run Draft Release ID: ${{ inputs.dry_run_release_id }}"

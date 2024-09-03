@@ -501,7 +501,7 @@ jobs:
         with:
           tag_name: v${{ inputs.dry_run_version }}
           fail_on_unmatched_files: true
-          body: ${{ inputs.dry_run_version }}
+          body: Dry Run ${{ inputs.dry_run_version }}
           generate_release_notes: true
           draft: true
           files: ./target/*

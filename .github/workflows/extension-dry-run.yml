@@ -88,10 +88,19 @@ jobs:
             echo "release_id=$release_id" >> $GITHUB_OUTPUT
           fi
 
+   dry-run-release-published:
+    needs: dry-run-get-draft-release
+    uses: liquibase/build-logic/.github/workflows/extension-release-published.yml@DAT-18303
+    secrets: inherit
+    with:
+      dry_run: true
+      dry_run_version: "0.0.${{ github.run_number }}"
+      deployToMavenCentral: false
+
    cleanup:
     runs-on: ubuntu-latest
     if: always()
-    needs: [ dry-run-get-draft-release ]
+    needs: [ dry-run-release-published ]
     steps:
       - name: Checkout liquibase
         uses: actions/checkout@v4

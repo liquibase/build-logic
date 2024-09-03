@@ -395,7 +395,7 @@ jobs:
 
       - name: Get latest draft release ID (dry-run)
         if: ${{ inputs.dry_run == true }}
-        id: get-release
+        id: get-dry-run-release
         run: |
           echo "Latest Dry Run Draft Release ID: ${{ inputs.dry_run_release_id }}"
           echo "RELEASE_ID=${{ inputs.dry_run_release_id }}" >> $GITHUB_ENV

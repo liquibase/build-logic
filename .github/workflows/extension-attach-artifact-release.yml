@@ -267,7 +267,7 @@ jobs:
     steps:
       - run: sleep 30
         if: ${{ inputs.dry_run == false }}
-        
+
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -494,7 +494,7 @@ jobs:
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target
 
-      - name: Attach Files to Dry-Run Draft Release
+      - name: Attach Files to Draft Release (dry-run)
         id: attach-files-dry-run
         if: ${{ inputs.dry_run == true }}
         uses: softprops/action-gh-release@v2
@@ -504,7 +504,7 @@ jobs:
           body: ${{ inputs.dry_run_version }}
           generate_release_notes: true
           draft: true
-          files: ./target
+          files: ./target/*
 
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'

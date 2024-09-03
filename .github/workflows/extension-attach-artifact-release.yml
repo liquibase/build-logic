@@ -166,12 +166,22 @@ jobs:
           echo "artifact_id=$artifact_id" >> $GITHUB_OUTPUT
 
       - name: Get Artifact Version
+        if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
         shell: bash
         run: |
           artifact_version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout)
           echo "artifact_version=$artifact_version" >> $GITHUB_OUTPUT
+
+      - name: Get Artifact Version
+        if: ${{ inputs.dry_run == true }}
+        working-directory: ${{ inputs.artifactPath }}
+        id: get-artifact-version-dry-run
+        shell: bash
+        run: |
+          echo "artifact_version=${{ inputs.dry_run_version }}" >> $GITHUB_OUTPUT
+
 
       - name: Save Artifacts
         uses: actions/upload-artifact@v3
@@ -333,6 +343,7 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Check and download artifacts from GPM
+        if: ${{ inputs.dry_run == false }}
         id: check-download-artifacts
         env:
           ARTIFACT_NAME: ${{ github.event.repository.name }}
@@ -357,10 +368,29 @@ jobs:
 
       - name: Build release artifacts
         working-directory: ${{ inputs.artifactPath }}
-        if: env.ARTIFACT_FOUND == '0'
+        if: ${{ env.ARTIFACT_FOUND == '0' && inputs.dry_run == false }}
         id: build-release-artifacts
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
+          git reset HEAD~ --hard
+          # Determine the default branch (master or main)
+          if git rev-parse --verify origin/master >/dev/null 2>&1; then
+            DEFAULT_BRANCH="master"
+          elif git rev-parse --verify origin/main >/dev/null 2>&1; then
+            DEFAULT_BRANCH="main"
+          else
+            echo "Neither master nor main branch found. Exiting."
+            exit 1
+          fi
+          LAST_COMMIT_HASH=$(git rev-parse origin/$DEFAULT_BRANCH)
+          mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$LAST_COMMIT_HASH
+
+      - name: Build release artifacts (dry-run)
+        working-directory: ${{ inputs.artifactPath }}
+        if: ${{ inputs.dry_run == true }}
+        id: build-release-artifacts-dry-run
+        run: |
+          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
           git reset HEAD~ --hard
           # Determine the default branch (master or main)
           if git rev-parse --verify origin/master >/dev/null 2>&1; then
@@ -390,7 +420,7 @@ jobs:
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
 
       - name: List artifacts in release
-        if: env.RELEASE_ID != '' && env.RELEASE_ID != null
+        if: ${{ env.RELEASE_ID != '' && env.RELEASE_ID != null && inputs.dry_run == false }}
         id: list-artifacts
         run: |
           RELEASE_ID="${{ env.RELEASE_ID }}"
@@ -400,7 +430,7 @@ jobs:
           echo "ARTIFACTS_TO_DELETE=$ARTIFACTS_CLEANED" >> $GITHUB_ENV
 
       - name: Delete artifacts
-        if: env.ARTIFACTS_TO_DELETE != null
+        if: ${{ env.ARTIFACTS_TO_DELETE != null && inputs.dry_run == false }}
         run: |
           RELEASE_ID="${{ env.RELEASE_ID }}"
           ARTIFACTS_TO_DELETE="${{ env.ARTIFACTS_TO_DELETE }}"
@@ -421,10 +451,22 @@ jobs:
         run: echo "REPO_ROOT=$(git rev-parse --show-toplevel)" >> $GITHUB_ENV
 
       - name: Sign Files for Draft Release
+        if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         run: |
           gpg -K
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-sources.jar
+
+      - name: Sign Files for Draft Release (dry-run)
+        if: ${{ inputs.dry_run == true }}
+        working-directory: ${{ inputs.artifactPath }}
+        run: |
+          gpg -K
+          version=${{ inputs.dry_run_version }}
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar

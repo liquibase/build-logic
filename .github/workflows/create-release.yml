@@ -55,5 +55,7 @@ jobs:
         uses: release-drafter/release-drafter@v5
         with:
           version: ${{ inputs.dry_run_version }}
+          name: ${{ inputs.dry_run_version }}
+          tag: ${{ inputs.dry_run_version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

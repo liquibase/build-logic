@@ -38,6 +38,19 @@ on:
         required: false
         default: false
         type: boolean
+      dryRun:
+        description: 'Specify it if you want to run a dry run'
+        required: false
+        default: false
+        type: boolean
+      dry_run_release_id:
+        description: 'The release id of the dry-run release'
+        required: false
+        type: string
+      dry_run_version:
+        description: 'The version of the dry-run release'
+        required: false
+        type: string
     secrets:
       BOT_TOKEN:
         description: 'BOT_TOKEN from the caller workflow'
@@ -133,9 +146,18 @@ jobs:
           ${{ inputs.extraLinuxCommand }}
 
       - name: Build and Package
+        if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
+          git reset HEAD~ --hard
+          mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
+
+      - name: Build and Package (dry-run)
+        if: ${{ inputs.dry_run == true }}
+        working-directory: ${{ inputs.artifactPath }}
+        run: |
+          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
           git reset HEAD~ --hard
           mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
 
@@ -364,11 +386,19 @@ jobs:
           path: ${{ inputs.artifactPath }}/target
 
       - name: Get latest draft release ID
+        if: ${{ inputs.dryRun == false }}
         id: get-release
         run: |
           LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
           echo "Latest Draft Release ID: $LATEST_DRAFT_RELEASE"
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
+
+      - name: Get latest draft release ID (dry-run)
+        if: ${{ inputs.dryRun == true }}
+        id: get-release
+        run: |
+          echo "Latest Dry Run Draft Release ID: ${{ inputs.dry_run_release_id }}"
+          echo "RELEASE_ID=${{ inputs.dry_run_release_id }}" >> $GITHUB_ENV
 
       - name: List artifacts in release
         if: env.RELEASE_ID != '' && env.RELEASE_ID != null

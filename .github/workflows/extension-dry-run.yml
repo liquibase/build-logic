@@ -1,0 +1,100 @@
+name: Extension Dry Run Release
+
+on:
+  workflow_call:
+    inputs:
+      zip:
+        description: 'Specify it if you want to attach a zip file to the release'
+        required: false
+        default: 'false'
+        type: string
+      extraCommand:
+        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        required: false
+        default: ''
+        type: string
+      mavenProfiles:
+        description: "Specify it if you want to run different Maven profiles from the default (coverage).  mavenProfiles example: 'coverage,run-proguard'"
+        required: false
+        default: ""
+        type: string
+      os:
+        description: "Operating system to build/test on"
+        required: false
+        default: '["ubuntu-latest", "windows-latest"]'
+        type: string
+      extraMavenArgs:
+        description: "Specify it if you want to run an extra maven argument"
+        required: false
+        default: ""
+        type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "."
+        type: string
+      combineJars:
+        description: 'Specify it if you want to combine jars into one'
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      BOT_TOKEN:
+        description: 'BOT_TOKEN from the caller workflow'
+        required: true
+      GPG_SECRET:
+        description: 'GPG_SECRET from the caller workflow'
+        required: true
+      GPG_PASSPHRASE:
+        description: 'GPG_PASSPHRASE from the caller workflow'
+        required: true
+
+jobs:
+
+   dry-run-create-release:
+    uses: liquibase/build-logic/.github/workflows/create-release.yml@DAT-18303
+    secrets: inherit
+    with:
+      dryRun: true
+      dry_run_version: "dry-run-${{ github.run_id }}"
+      sonar: false
+
+   dry-run-get-draft-release:
+    needs: dry-run-create-release
+    runs-on: ubuntu-latest
+    outputs:
+      dry_run_release_id: ${{ steps.get_draft_release_id.outputs.release_id }}
+    steps:
+      - name: Get Draft Release ID 
+        id: get_draft_release_id
+        run: |
+          release_name="vdry-run-${{ github.run_id }}"
+          response=$(curl -s -H "Authorization: token ${{ secrets.BOT_TOKEN }}" \
+                          -H "Accept: application/vnd.github.v3+json" \
+                          "https://api.github.com/repos/${{ github.repository }}/releases")
+          draft_release=$(echo "$response" | jq -r --arg name "$release_name" '.[] | select(.name == $name and .draft == true)')
+          if [ -z "$draft_release" ]; then
+            echo "No draft release found with the name '$release_name'"
+            exit 1
+          else
+            echo "$draft_release" | jq .
+            release_id=$(echo "$draft_release" | jq -r '.id')
+            echo "release_id=$release_id" >> $GITHUB_OUTPUT
+          fi
+
+   dry-run-attach-artifact-to-release:
+    uses: liquibase/build-logic/.github/workflows/extension-attach-artifact-release.yml@DAT-18303
+    needs: dry-run-get-draft-release
+    secrets: inherit
+    with:
+      zip: ${{ inputs.zip }}
+      extraCommand: ${{ inputs.extraCommand }}
+      mavenProfiles: ${{ inputs.mavenProfiles }}
+      os: ${{ inputs.os }}
+      extraMavenArgs: ${{ inputs.extraMavenArgs }}
+      artifactPath: ${{ inputs.artifactPath }}
+      combineJars: ${{ inputs.combineJars }}
+      dryRun: true
+      dry_run_release_id: ${{ needs.dry-run-get-draft-release.outputs.dry_run_release_id }}
+      dry_run_version: "dry-run-${{ github.run_id }}"
+

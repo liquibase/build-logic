@@ -214,7 +214,7 @@ jobs:
               },
               {
                 "id": "dry-run-sonatype-nexus-staging",
-                "url": "https://oss.sonatype.org/service/local/staging/deploy/maven2/",
+                "url": "https://repo.liquibase.net/repository/dry-run-sonatype-nexus-staging/",
                 "releases": {
                   "enabled": "true"
                 },

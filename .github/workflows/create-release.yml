@@ -51,7 +51,7 @@ jobs:
 
       - name: Create Dry Run Release Draft
         if: ${{ inputs.dry_run == true }}
-        id: create-release
+        id: create-dry-run-release
         uses: release-drafter/release-drafter@v5
         with:
           version: ${{ inputs.dry_run_version }}

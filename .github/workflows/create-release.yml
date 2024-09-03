@@ -18,15 +18,6 @@ on:
         required: false
         default: true
         type: boolean
-      dry_run: 
-        description: 'Flag to indicate if the workflow is triggered to create a dry-run release'
-        required: false
-        type: boolean
-        default: false
-      dry_run_version:
-        description: 'The version of the dry-run release'
-        required: false
-        type: string
   
 jobs:
   sonar:
@@ -41,21 +32,8 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     steps:
-    
       - name: Create Release Draft
-        if: ${{ inputs.dry_run == false }}
         id: create-release
         uses: release-drafter/release-drafter@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Dry Run Release Draft
-        if: ${{ inputs.dry_run == true }}
-        id: create-dry-run-release
-        uses: release-drafter/release-drafter@v5
-        with:
-          version: ${{ inputs.dry_run_version }}
-          name: ${{ inputs.dry_run_version }}
-          tag: ${{ inputs.dry_run_version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

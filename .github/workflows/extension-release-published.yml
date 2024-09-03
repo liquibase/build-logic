@@ -255,7 +255,7 @@ jobs:
       - name: Download Release Artifacts
         uses: robinraju/release-downloader@v1.9
         with:
-          tag: "v${{ inputs.dry_run_version }}"
+          releaseId: "${{ inputs.dry_run_release_id }}"
           filename: "${{ env.artifact_id }}-*"
           out-file-path: ${{ inputs.artifactPath }}
 

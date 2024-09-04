@@ -154,10 +154,17 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Run extra Linux command
-        if: inputs.extraLinuxCommand != ''
+        if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
+        shell: bash
         run: |
           ${{ inputs.extraLinuxCommand }}
 
+      - name: Run extra Windows Command
+        if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
+        shell: powershell
+        run: |
+          ${{ inputs.extraWindowsCommand }}
+          
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
         shell: bash

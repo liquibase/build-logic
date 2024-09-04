@@ -161,7 +161,7 @@ jobs:
 
       - name: Run extra Windows Command
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
-        shell: cmd
+        shell: powershell
         run: |
           ${{ inputs.extraWindowsCommand }}
           

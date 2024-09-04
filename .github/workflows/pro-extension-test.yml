@@ -155,6 +155,7 @@ jobs:
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != ''
+        shell: bash
         run: |
           ${{ inputs.extraLinuxCommand }}
 

@@ -15,7 +15,7 @@ on:
         type: string
       dry_run: 
         description: 'Flag to indicate if the workflow is triggered to create a dry-run release'
-        required: true
+        required: false
         type: boolean
         default: false
       dry_run_zip_url: 

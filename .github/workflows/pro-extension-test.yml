@@ -160,7 +160,7 @@ jobs:
           ${{ inputs.extraLinuxCommand }}
 
       - name: Run extra Windows Command
-        if: inputs.extraWindowsCommand != ''
+        if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
         shell: cmd
         run: |
           ${{ inputs.extraWindowsCommand }}

@@ -227,7 +227,11 @@ jobs:
 
           # Search for open pull requests with the specified title in the Homebrew/homebrew-core repo
           pr_exists=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" || true)
-          echo "pr_exists: $pr_exists"
+          # Trim any leading/trailing whitespace (if any) from pr_exists
+          pr_exists=$(echo "$pr_exists" | xargs)
+          
+          echo "pr_exists: '$pr_exists'"
+          
           # Set the environment variable based on whether the PR exists
           if [ -n "$pr_exists" ]; then
             echo "PR_EXISTS=true" >> $GITHUB_ENV
@@ -236,7 +240,7 @@ jobs:
           fi
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
-        if: ${{ env.PR_EXISTS == 'false' && inputs.dry_run == 'false' }}
+        if: ${{ env.PR_EXISTS == 'false' && inputs.dry_run == false }}
         uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: liquibase

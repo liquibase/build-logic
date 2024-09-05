@@ -114,28 +114,66 @@ jobs:
 
       - name: Get repository name
         id: get_repo_name
-        run: echo "repo_name=$(echo ${{ github.repository }} | cut -d'/' -f2)" >> $GITHUB_OUTPUT
+        run: echo "repo_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
 
-      # https://docs.fossa.com/docs/download-fossa-project-attribution-reports
+          # https://docs.fossa.com/docs/download-fossa-project-attribution-reports
+          # 7retries×30seconds=210seconds
       -   name: Datical- Set the dependency metadata information
           if: inputs.org == 'datical'
           run: |
-            sleep 120
-            mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+            run: |
+            mkdir -p /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+          
+            max_retries=8
+            retry_delay=30
+            attempt=0
+            success=0
+          
+            while [ $attempt -lt $max_retries ]; do
             curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2FDatical%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
             --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
-            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv
+            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv && success=1 && break
+            
+            echo "Curl failed, retrying in $retry_delay seconds..."
+            attempt=$((attempt + 1))
+            sleep $retry_delay
+            done
+          
+            if [ $success -ne 1 ]; then
+            echo "Failed to download the report after $max_retries attempts"
+            exit 1
+            fi
+          
             ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
             cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
 
+          # 7retries×30seconds=210seconds
       -   name: Liquibase- Set the dependency metadata information
           if: inputs.org == 'liquibase'
           run: |
-            sleep 120
-            mkdir /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+            run: |
+            mkdir -p /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
+          
+            max_retries=8
+            retry_delay=30
+            attempt=0
+            success=0
+          
+            while [ $attempt -lt $max_retries ]; do
             curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2Fliquibase%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
             --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
-            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv
+            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv && success=1 && break
+            
+            echo "Curl failed, retrying in $retry_delay seconds..."
+            attempt=$((attempt + 1))
+            sleep $retry_delay
+            done
+          
+            if [ $success -ne 1 ]; then
+            echo "Failed to download the report after $max_retries attempts"
+            exit 1
+            fi
+          
             ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
             cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
 

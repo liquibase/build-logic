@@ -15,7 +15,7 @@ on:
         type: string
       dry_run: 
         description: 'Flag to indicate if the workflow is triggered to create a dry-run release'
-        required: true
+        required: false
         type: boolean
         default: false
       dry_run_zip_url: 
@@ -36,6 +36,32 @@ on:
       GPG_SECRET_KEY_ID:
         description: "GPG_SECRET_KEY_ID from the caller workflow"
         required: true
+  workflow_dispatch:
+    inputs:
+      groupId:
+        description: "Value from the groupId field in pom.xml. i.e. org.liquibase"
+        required: true
+        type: string
+      artifactId:
+        description: "Value from the artifactId field in pom.xml. i.e. liquibase"
+        required: true
+        type: string
+      version:
+        description: "Value from the version field in pom.xml. i.e 4.23.0"
+        type: string
+      dry_run: 
+        description: 'Flag to indicate if the workflow is triggered to create a dry-run release'
+        required: false
+        type: boolean
+        default: false
+      dry_run_zip_url: 
+        description: 'URL of the dry-run zip release'
+        required: false
+        type: string
+      dry_run_tar_gz_url: 
+        description: 'URL of the dry-run tar.gz release'
+        required: false
+        type: string
         
 env:
   MAVEN_VERSION: "3.9.5"
@@ -200,17 +226,17 @@ jobs:
           pr_title="liquibase ${{ inputs.version }}"
 
           # Search for open pull requests with the specified title in the Homebrew/homebrew-core repo
-          pr_exists=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" || true)
-          echo "pr_exists: $pr_exists"
+          pr_title=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
+          echo "pr_title: $pr_title"
           # Set the environment variable based on whether the PR exists
-          if [ -n "$pr_exists" ]; then
-            echo "PR_EXISTS=true" >> $GITHUB_ENV
-          else
+          if [ -z "$pr_title" ]; then
             echo "PR_EXISTS=false" >> $GITHUB_ENV
+          else
+            echo "PR_EXISTS=true" >> $GITHUB_ENV
           fi
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
-        if: ${{ env.PR_EXISTS == 'false' && inputs.dry_run == 'false' }}
+        if: ${{ env.PR_EXISTS == false && inputs.dry_run == false }}
         uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: liquibase

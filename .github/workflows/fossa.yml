@@ -121,7 +121,6 @@ jobs:
       -   name: Datical- Set the dependency metadata information
           if: inputs.org == 'datical'
           run: |
-            run: |
             mkdir -p /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
           
             max_retries=8
@@ -151,7 +150,6 @@ jobs:
       -   name: Liquibase- Set the dependency metadata information
           if: inputs.org == 'liquibase'
           run: |
-            run: |
             mkdir -p /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
           
             max_retries=8

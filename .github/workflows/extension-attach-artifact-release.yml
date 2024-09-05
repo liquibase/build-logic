@@ -153,6 +153,7 @@ jobs:
       - name: Build and Package (dry-run)
         if: ${{ inputs.dry_run == true }}
         working-directory: ${{ inputs.artifactPath }}
+        shell: bash
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
           git reset HEAD~ --hard

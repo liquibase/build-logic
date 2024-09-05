@@ -13,9 +13,15 @@ on:
         required: false
         default: "."
         type: string
+      sonar:
+        description: 'Specify it if you want to run sonar scan'
+        required: false
+        default: true
+        type: boolean
   
 jobs:
   sonar:
+    if: ${{ inputs.sonar == true }}
     uses: liquibase/build-logic/.github/workflows/sonar-push.yml@main
     secrets: inherit
     with:

@@ -154,12 +154,20 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Run extra Linux command
-        if: inputs.extraLinuxCommand != ''
+        if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
+        shell: bash
         run: |
           ${{ inputs.extraLinuxCommand }}
 
+      - name: Run extra Windows Command
+        if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
+        shell: powershell
+        run: |
+          ${{ inputs.extraWindowsCommand }}
+          
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
+        shell: bash
         run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
@@ -177,7 +185,13 @@ jobs:
 
       - name: Build and Package
         if: ${{ !inputs.nightly }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true "${{ inputs.extraMavenArgs }}"
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.extraMavenArgs }}" ]; then
+            mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
+          else
+            mvn -B dependency:go-offline clean package -DskipTests=true
+          fi
 
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}
@@ -219,6 +233,8 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
@@ -297,12 +313,23 @@ jobs:
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}
+        shell: bash
         run: |
-          mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}"
-
+          if [ -n "${{ inputs.extraMavenArgs }}" ]; then
+            mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}"
+          else
+            mvn -B test -P '${{ inputs.mavenProfiles }}'
+          fi
+  
       - name: Run Tests
         if: ${{ inputs.nightly }}
-        run: mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.extraMavenArgs }}" ]; then
+            mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"
+          else
+            mvn -B test -P '${{ inputs.mavenProfiles }}' "-Dliquibase.version=master-SNAPSHOT"
+          fi
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -334,6 +361,8 @@ jobs:
     steps:
 
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v2

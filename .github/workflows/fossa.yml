@@ -3,16 +3,6 @@ name: FOSSA Report Generation
 
 # Event triggers for the workflow
 on:
-  workflow_dispatch:  # Run this action manually from the GitHub Actions tab
-     inputs:
-      org:
-        required: false
-        type: choice
-        description: 'Organization to run on'
-        options:
-          - liquibase
-          - datical
-
   workflow_call:
     inputs:
       org:

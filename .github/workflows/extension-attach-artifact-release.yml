@@ -144,6 +144,7 @@ jobs:
       - name: Build and Package
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
+        shell: bash
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
           git reset HEAD~ --hard

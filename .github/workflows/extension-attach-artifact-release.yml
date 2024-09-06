@@ -38,6 +38,15 @@ on:
         required: false
         default: false
         type: boolean
+      dry_run:
+        description: 'Specify it if you want to run a dry run'
+        required: false
+        default: false
+        type: boolean
+      dry_run_version:
+        description: 'The version of the dry-run release'
+        required: false
+        type: string
     secrets:
       BOT_TOKEN:
         description: 'BOT_TOKEN from the caller workflow'
@@ -133,9 +142,20 @@ jobs:
           ${{ inputs.extraLinuxCommand }}
 
       - name: Build and Package
+        if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
+        shell: bash
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
+          git reset HEAD~ --hard
+          mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
+
+      - name: Build and Package (dry-run)
+        if: ${{ inputs.dry_run == true }}
+        working-directory: ${{ inputs.artifactPath }}
+        shell: bash
+        run: |
+          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
           git reset HEAD~ --hard
           mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
 
@@ -148,12 +168,22 @@ jobs:
           echo "artifact_id=$artifact_id" >> $GITHUB_OUTPUT
 
       - name: Get Artifact Version
+        if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
         shell: bash
         run: |
           artifact_version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout)
           echo "artifact_version=$artifact_version" >> $GITHUB_OUTPUT
+
+      - name: Get Artifact Version
+        if: ${{ inputs.dry_run == true }}
+        working-directory: ${{ inputs.artifactPath }}
+        id: get-artifact-version-dry-run
+        shell: bash
+        run: |
+          echo "artifact_version=${{ inputs.dry_run_version }}" >> $GITHUB_OUTPUT
+
 
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
@@ -238,6 +268,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: sleep 30
+        if: ${{ inputs.dry_run == false }}
+
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -315,6 +347,7 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Check and download artifacts from GPM
+        if: ${{ inputs.dry_run == false }}
         id: check-download-artifacts
         env:
           ARTIFACT_NAME: ${{ github.event.repository.name }}
@@ -339,10 +372,29 @@ jobs:
 
       - name: Build release artifacts
         working-directory: ${{ inputs.artifactPath }}
-        if: env.ARTIFACT_FOUND == '0'
+        if: ${{ env.ARTIFACT_FOUND == '0' && inputs.dry_run == false }}
         id: build-release-artifacts
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
+          git reset HEAD~ --hard
+          # Determine the default branch (master or main)
+          if git rev-parse --verify origin/master >/dev/null 2>&1; then
+            DEFAULT_BRANCH="master"
+          elif git rev-parse --verify origin/main >/dev/null 2>&1; then
+            DEFAULT_BRANCH="main"
+          else
+            echo "Neither master nor main branch found. Exiting."
+            exit 1
+          fi
+          LAST_COMMIT_HASH=$(git rev-parse origin/$DEFAULT_BRANCH)
+          mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$LAST_COMMIT_HASH
+
+      - name: Build release artifacts (dry-run)
+        working-directory: ${{ inputs.artifactPath }}
+        if: ${{ inputs.dry_run == true }}
+        id: build-release-artifacts-dry-run
+        run: |
+          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
           git reset HEAD~ --hard
           # Determine the default branch (master or main)
           if git rev-parse --verify origin/master >/dev/null 2>&1; then
@@ -364,6 +416,7 @@ jobs:
           path: ${{ inputs.artifactPath }}/target
 
       - name: Get latest draft release ID
+        if: ${{ inputs.dry_run == false }}
         id: get-release
         run: |
           LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
@@ -371,7 +424,7 @@ jobs:
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
 
       - name: List artifacts in release
-        if: env.RELEASE_ID != '' && env.RELEASE_ID != null
+        if: ${{ env.RELEASE_ID != '' && env.RELEASE_ID != null && inputs.dry_run == false }}
         id: list-artifacts
         run: |
           RELEASE_ID="${{ env.RELEASE_ID }}"
@@ -381,7 +434,7 @@ jobs:
           echo "ARTIFACTS_TO_DELETE=$ARTIFACTS_CLEANED" >> $GITHUB_ENV
 
       - name: Delete artifacts
-        if: env.ARTIFACTS_TO_DELETE != null
+        if: ${{ env.ARTIFACTS_TO_DELETE != null && inputs.dry_run == false }}
         run: |
           RELEASE_ID="${{ env.RELEASE_ID }}"
           ARTIFACTS_TO_DELETE="${{ env.ARTIFACTS_TO_DELETE }}"
@@ -402,6 +455,7 @@ jobs:
         run: echo "REPO_ROOT=$(git rev-parse --show-toplevel)" >> $GITHUB_ENV
 
       - name: Sign Files for Draft Release
+        if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         run: |
           gpg -K
@@ -411,7 +465,19 @@ jobs:
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-sources.jar
 
+      - name: Sign Files for Draft Release (dry-run)
+        if: ${{ inputs.dry_run == true }}
+        working-directory: ${{ inputs.artifactPath }}
+        run: |
+          gpg -K
+          version=${{ inputs.dry_run_version }}
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-sources.jar
+
       - name: Set draft release title
+        if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: set-release-title
         run: |
@@ -421,6 +487,7 @@ jobs:
           curl -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'", "tag_name": "'"v$version"'"}' "https://api.github.com/repos/${{ github.repository }}/releases/${{ env.RELEASE_ID }}"
 
       - name: Attach Files to Draft Release
+        if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: upload-release-asset
         run: ${{ env.REPO_ROOT }}/.github/upload_asset.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
@@ -428,6 +495,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target
+
+      - name: Attach Files to Draft Release (dry-run)
+        id: attach-files-dry-run
+        if: ${{ inputs.dry_run == true }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.dry_run_version }}
+          fail_on_unmatched_files: true
+          body: Dry Run ${{ inputs.dry_run_version }}
+          generate_release_notes: true
+          draft: true
+          files: ./target/*
 
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'

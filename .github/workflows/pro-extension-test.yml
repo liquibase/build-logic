@@ -365,19 +365,19 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
       - name: Download Ubuntu Artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: ${{needs.build.outputs.artifact_id}}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: ${{needs.build.outputs.artifact_id}}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/macos
 
       - name: Download Windows Artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: ${{needs.build.outputs.artifact_id}}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/windows

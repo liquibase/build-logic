@@ -77,12 +77,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout OSS Repo
-        uses: actions/checkout@v4
-        with:
-          repository: liquibase/liquibase
-          ref: "v4.29.2"
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -125,23 +119,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1
 
-      - name: Download ${{ inputs.artifactId }} Release
-        if: ${{ inputs.dry_run == false }}
-        run: |
-          mkdir -p $PWD/.github/target
-          # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
-          wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
-
-      - name: Build ${{ inputs.artifactId }} deb package
-        run: |
-          mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
-
-      - name: Convert deb to rpm
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y alien
-          sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
-
       - name: Upload ${{ inputs.artifactId }} rpm package
         if: ${{ inputs.dry_run == false }}
         run: |
@@ -159,7 +136,6 @@ jobs:
           cd ../../..
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-          /opt/createrepo -h
           /opt/createrepo -dp $PWD/yum/noarch
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
           mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch

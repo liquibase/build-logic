@@ -111,7 +111,6 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         run: |
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-          ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
           mkdir createrepo_folder
           cd createrepo_folder
           git clone https://github.com/rpm-software-management/createrepo_c
@@ -126,7 +125,6 @@ jobs:
           aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
           /opt/createrepo -dp $PWD/yum/noarch
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
-          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
           aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
       - name: Ensure s3 bucket public access is enabled

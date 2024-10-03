@@ -127,6 +127,7 @@ jobs:
           /opt/createrepo -dp $PWD/yum/noarch
           ls -ltr $PWD/yum/noarch
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+          ls -ltr $PWD/yum/noarch/repodata
           #aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
       - name: Ensure s3 bucket public access is enabled

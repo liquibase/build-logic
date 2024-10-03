@@ -183,10 +183,9 @@ jobs:
           cd ../../..
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-          /opt/createrepo -h
+          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
           /opt/createrepo -dp $PWD/yum/noarch
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
-          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
           aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
@@ -209,10 +208,9 @@ jobs:
           cd ../../..
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
-          /opt/createrepo -h
+          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
           /opt/createrepo -dp $PWD/yum/noarch
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
-          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
 

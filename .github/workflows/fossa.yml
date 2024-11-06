@@ -125,7 +125,7 @@ jobs:
             while [ $attempt -lt $max_retries ]; do
             curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2FDatical%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
             --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
-            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv && success=1 && break
+            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}_${{ github.event.inputs.version_number_for_report_generation }}.csv && success=1 && break
             
             echo "Curl failed, retrying in $retry_delay seconds..."
             attempt=$((attempt + 1))
@@ -138,7 +138,7 @@ jobs:
             fi
           
             ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
+            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}_${{ github.event.inputs.version_number_for_report_generation }}.csv || echo "File is empty or not found"
 
           # 7retries×30seconds=210seconds
       -   name: Liquibase- Set the dependency metadata information
@@ -154,7 +154,7 @@ jobs:
             while [ $attempt -lt $max_retries ]; do
             curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2Fliquibase%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
             --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
-            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv && success=1 && break
+            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}_${{ github.event.inputs.version_number_for_report_generation }}.csv && success=1 && break
             
             echo "Curl failed, retrying in $retry_delay seconds..."
             attempt=$((attempt + 1))
@@ -167,7 +167,7 @@ jobs:
             fi
           
             ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv || echo "File is empty or not found"
+            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}_${{ github.event.inputs.version_number_for_report_generation }}.csv || echo "File is empty or not found"
 
       # Upload report to S3
       -   name: Upload report to S3

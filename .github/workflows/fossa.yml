@@ -184,4 +184,4 @@ jobs:
           with:
             name: fossa-reports
             path: |
-              /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv
+              /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}_${{ github.event.inputs.version_number_for_report_generation }}.csv

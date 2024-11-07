@@ -12,7 +12,7 @@ on:
       version_number_for_report_generation:
         type: string
         description: 'Supply the DaticalDb-installer version variable which is used during its report generation to be stored in the s3 bucket. eg 8.7.352'
-        required: true
+        required: false
 
 # Define the jobs in the workflow
 jobs:

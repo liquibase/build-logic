@@ -116,29 +116,34 @@ jobs:
           if: inputs.org == 'datical'
           run: |
             mkdir -p /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-          
+            filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
             max_retries=8
             retry_delay=30
             attempt=0
             success=0
           
             while [ $attempt -lt $max_retries ]; do
-            curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2FDatical%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
-            --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
-            -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}_${{ github.event.inputs.version_number_for_report_generation }}.csv && success=1 && break
-            
-            echo "Curl failed, retrying in $retry_delay seconds..."
-            attempt=$((attempt + 1))
-            sleep $retry_delay
+              curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2FDatical%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
+              --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
+              -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename
+              
+              if [[ grep -iq "No direct dependencies found" /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename ]] ; then
+                echo "Curl failed, retrying in $retry_delay seconds..."
+                attempt=$((attempt + 1))
+                sleep $retry_delay
+              else
+                success=1
+                break
+              fi
             done
           
             if [ $success -ne 1 ]; then
-            echo "Failed to download the report after $max_retries attempts"
-            exit 1
+              echo "Failed to download the report after $max_retries attempts"
+              exit 1
             fi
           
             ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}_${{ github.event.inputs.version_number_for_report_generation }}.csv || echo "File is empty or not found"
+            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename || echo "File is empty or not found"
 
           # 7retries×30seconds=210seconds
       -   name: Liquibase- Set the dependency metadata information

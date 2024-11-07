@@ -127,8 +127,8 @@ jobs:
               --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
               -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename
               
-              if [[ grep -iq "No direct dependencies found" /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename ]] ; then
-                echo "Curl failed, retrying in $retry_delay seconds..."
+              if grep -iq "No direct dependencies found" "/home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename"; then
+                echo "Report not yet available, retrying in $retry_delay seconds..."
                 attempt=$((attempt + 1))
                 sleep $retry_delay
               else

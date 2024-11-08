@@ -128,8 +128,8 @@ jobs:
               -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename
               
               if grep -iq "No direct dependencies found" "/home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename"; then
-                echo "attempt $attempt of $max_retries: Report not yet available, retrying in $retry_delay seconds..."
                 attempt=$((attempt + 1))
+                echo "attempt $attempt of $max_retries: Report not yet available, retrying in $retry_delay seconds..."
                 sleep $retry_delay
               else
                 success=1
@@ -162,8 +162,8 @@ jobs:
               -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename
               
               if grep -iq "No direct dependencies found" "/home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename"; then
-                echo "attempt $attempt of $max_retries: Report not yet available, retrying in $retry_delay seconds..."
                 attempt=$((attempt + 1))
+                echo "attempt $attempt of $max_retries: Report not yet available, retrying in $retry_delay seconds..."
                 sleep $retry_delay
               else
                 success=1

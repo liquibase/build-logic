@@ -27,6 +27,8 @@ jobs:
       # Checkout the code to the GitHub runner
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Set up JDK for Datical
         if: inputs.org == 'datical'
@@ -94,11 +96,11 @@ jobs:
               }
             ]
 
-      - name: run FOSSA CLI
-        uses: fossas/fossa-action@main
-        with:
-          api-key: ${{ secrets.FOSSA_API_KEY }}
-          branch: ${{ github.ref }}
+#      - name: run FOSSA CLI
+#        uses: fossas/fossa-action@main
+#        with:
+#          api-key: ${{ secrets.FOSSA_API_KEY }}
+#          branch: ${{ github.ref }}
 
       - name: Get the commit sha
         id: get_commit_sha
@@ -110,69 +112,34 @@ jobs:
         id: get_repo_name
         run: echo "repo_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
 
-          # https://docs.fossa.com/docs/download-fossa-project-attribution-reports
-          # 7retries×30seconds=210seconds
-      -   name: Datical- Generate CSV report
-          if: inputs.org == 'datical'
-          run: |
-            mkdir -p /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-            max_retries=8
-            retry_delay=30
-            attempt=0
-            success=0
-          
-            while [ $attempt -lt $max_retries ]; do
-              curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2FDatical%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
-              --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
-              -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename
-              
-              if grep -iq "No direct dependencies found" "/home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename"; then
-                attempt=$((attempt + 1))
-                echo "attempt $attempt of $max_retries: Report not yet available, retrying in $retry_delay seconds..."
-                sleep $retry_delay
-              else
-                success=1
-                break
-              fi
-            done
-          
-            if [ $success -ne 1 ]; then
-              echo "Failed to download the report after $max_retries attempts"
-              exit 1
-            fi
-          
-            ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename || echo "File is empty or not found"
+      - name: Setup Fossa CLI
+        run: |
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
+          export FOSSA_API_KEY="${{ secrets.FOSSA_API_KEY }}"
 
-          # 7retries×30seconds=210seconds
-      -   name: Liquibase- Generate CSV report
-          if: inputs.org == 'liquibase'
-          run: |
-            mkdir -p /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-            max_retries=8
-            retry_delay=30
-            attempt=0
-            success=0
-          
-            while [ $attempt -lt $max_retries ]; do
-              curl --location 'https://app.fossa.com/api/revisions/custom%2B40163%2Fgithub.com%2Fliquibase%2F${{ steps.get_repo_name.outputs.repo_name }}%24${{ steps.get_commit_sha.outputs.commit_sha }}/attribution/download?format=CSV&includeDirectDependencies=true&includeDeepDependencies=true&download=true' \
-              --header 'Authorization: Bearer ${{ secrets.FOSSA_COMBINED_REPORT }}' \
-              -o /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename
-              
-              if grep -iq "No direct dependencies found" "/home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename"; then
-                attempt=$((attempt + 1))
-                echo "attempt $attempt of $max_retries: Report not yet available, retrying in $retry_delay seconds..."
-                sleep $retry_delay
-              else
-                success=1
-                break
-              fi
-            done
+      - name: Analyze project
+        run: fossa analyze
 
-            ls -l /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports
-            cat /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename || echo "File is empty or not found"
+      - name: Generate report
+        run: |
+          # Download JSON report         
+          fossa report attribution --format json > fossa.json
+          
+          csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
+          
+          # Extract fields from the JSON and create a CSV report.
+          echo "Title,Version,Declared License,Package Homepage" > $csv_filename
+          
+          jq -r '
+          (.directDependencies + .deepDependencies)[] |
+          [
+            .title,
+            .version,
+            (.licenses | map(.name) | join(";")),
+            .projectUrl
+          ] |
+          @csv
+          ' fossa.json >> $csv_filename
 
       # Upload report to S3
       -   name: Upload report to S3

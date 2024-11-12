@@ -191,7 +191,7 @@ jobs:
           ls -l $GITHUB_WORKSPACE
           
           # Read ignored dependencies from a file
-          ignoredLibsFile=$(cat $GITHUB_WORKSPACE/build-logic/.github/workflows/ignore_dependencies_fossa.txt)
+          ignoredLibsFile=$(cat $GITHUB_WORKSPACE/.github/workflows/ignore_dependencies_fossa.txt)
 
           # Split the ignored dependencies into an array
           IFS=',' read -r -a ignoredLibs <<< "$ignoredLibsFile"

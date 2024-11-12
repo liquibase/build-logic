@@ -155,6 +155,7 @@ jobs:
         with:
           repository: liquibase/build-logic
           ref: DAT-18919
+          path: build-logic
 
       - name: Set up AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -191,7 +192,7 @@ jobs:
           ls -l $GITHUB_WORKSPACE
           
           # Read ignored dependencies from a file
-          ignoredLibsFile=$(cat $GITHUB_WORKSPACE/.github/workflows/ignore_dependencies_fossa.txt)
+          ignoredLibsFile=$(cat $GITHUB_WORKSPACE/build-logic/.github/workflows/ignore_dependencies_fossa.txt)
 
           # Split the ignored dependencies into an array
           IFS=',' read -r -a ignoredLibs <<< "$ignoredLibsFile"

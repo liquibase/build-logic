@@ -9,7 +9,8 @@ on:
         required: false
         type: string
         description: 'Organization name: liquibase or datical'
-
+  workflow_dispatch:
+  
 # Define the jobs in the workflow
 jobs:
   fossa-scan:

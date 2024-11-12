@@ -4,8 +4,8 @@ on:
   workflow_call:
     inputs:
       version_number_for_report_generation:
-      type: string
-      required: true
+        type: string
+        required: true
 
 jobs:
   fossa-scan:

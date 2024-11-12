@@ -7,136 +7,136 @@ on:
         type: string
         description: 'Supply the DaticalDb-installer version variable which is used during its report generation to be stored in the s3 bucket. eg 8.7.352'
         required: false
-
-fossa-scan:
-  runs-on: ubuntu-latest
-  permissions:
-    contents: read
-    packages: write
-  steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref }}
-
-    - name: Set up JDK for Datical
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '11'
-        cache: 'maven'
-        server-id: datical
-        server-username: REPO_MAVEN_USER
-        server-password: REPO_MAVEN_PASSWORD
-
-    - name: Set up JDK for Liquibase
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-
-      #look for dependencies in maven
-    - name: maven-settings-xml-action for Liquibase
-      if: inputs.org == 'liquibase'
-      uses: whelk-io/maven-settings-xml-action@v22
-      with:
-        repositories: |
-          [
-            {
-              "id": "liquibase",
-              "url": "https://maven.pkg.github.com/liquibase/liquibase",
-              "releases": {
-                "enabled": "false"
-              },
-              "snapshots": {
-                "enabled": "true",
-                "updatePolicy": "always"
-              }
-            },
-            {
-              "id": "liquibase-pro",
-              "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
-              "releases": {
-                "enabled": "false"
-              },
-              "snapshots": {
-                "enabled": "true",
-                "updatePolicy": "always"
-              }
-            }
-          ]
-        servers: |
-          [
-            {
-              "id": "liquibase-pro",
-              "username": "liquibot",
-              "password": "${{ secrets.LIQUIBOT_PAT }}"
-            },
-            {
-              "id": "liquibase",
-              "username": "liquibot",
-              "password": "${{ secrets.LIQUIBOT_PAT }}"
-            }
-          ]
-
-    #      - name: run FOSSA CLI
-    #        uses: fossas/fossa-action@main
-    #        with:
-    #          api-key: ${{ secrets.FOSSA_API_KEY }}
-    #          branch: ${{ github.ref }}
-
-    - name: Get the commit sha
-      id: get_commit_sha
-      run: |
-        commit_sha=`(git rev-parse HEAD)`
-        echo "commit_sha=${commit_sha}" >> $GITHUB_OUTPUT
-
-    - name: Get repository name
-      id: get_repo_name
-      run: echo "repo_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
-
-    - name: Setup Fossa CLI
-      run: |
-        curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
-        export FOSSA_API_KEY="${{ secrets.FOSSA_API_KEY }}"
-
-    - name: Analyze project
-      run: fossa analyze
-
-    - name: Generate report
-      run: |
-        # Download JSON report
-        fossa report attribution --format json > fossa.json
-        
-        csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-        
-        # Extract fields from the JSON and create a CSV report.
-        echo "Title,Version,Declared License,Package Homepage" > $csv_filename
-        
-        jq -r '
-        (.directDependencies + .deepDependencies)[] |
-        [
-          .title,
-          .version,
-          (.licenses | map(.name) | join(";")),
-          .projectUrl
-        ] |
-        @csv
-        ' fossa.json >> $csv_filename
-
-    -   name: Upload report to S3
-        if: always()
-        run: |
-          filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-          aws s3 cp /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/$filename
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-
-    -   name : Upload to build page
-        uses: actions/upload-artifact@v3
+jobs:
+  fossa-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
         with:
-          name: fossa-reports
-          path: |
-            /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv
+          ref: ${{ github.ref }}
+
+      - name: Set up JDK for Datical
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'maven'
+          server-id: datical
+          server-username: REPO_MAVEN_USER
+          server-password: REPO_MAVEN_PASSWORD
+
+      - name: Set up JDK for Liquibase
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+        #look for dependencies in maven
+      - name: maven-settings-xml-action for Liquibase
+        if: inputs.org == 'liquibase'
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "false"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
+
+      #      - name: run FOSSA CLI
+      #        uses: fossas/fossa-action@main
+      #        with:
+      #          api-key: ${{ secrets.FOSSA_API_KEY }}
+      #          branch: ${{ github.ref }}
+
+      - name: Get the commit sha
+        id: get_commit_sha
+        run: |
+          commit_sha=`(git rev-parse HEAD)`
+          echo "commit_sha=${commit_sha}" >> $GITHUB_OUTPUT
+
+      - name: Get repository name
+        id: get_repo_name
+        run: echo "repo_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+
+      - name: Setup Fossa CLI
+        run: |
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
+          export FOSSA_API_KEY="${{ secrets.FOSSA_API_KEY }}"
+
+      - name: Analyze project
+        run: fossa analyze
+
+      - name: Generate report
+        run: |
+          # Download JSON report
+          fossa report attribution --format json > fossa.json
+          
+          csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
+          
+          # Extract fields from the JSON and create a CSV report.
+          echo "Title,Version,Declared License,Package Homepage" > $csv_filename
+          
+          jq -r '
+          (.directDependencies + .deepDependencies)[] |
+          [
+            .title,
+            .version,
+            (.licenses | map(.name) | join(";")),
+            .projectUrl
+          ] |
+          @csv
+          ' fossa.json >> $csv_filename
+
+      -   name: Upload report to S3
+          if: always()
+          run: |
+            filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
+            aws s3 cp /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/$filename
+          env:
+            AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
+            AWS_DEFAULT_REGION: us-east-1
+
+      -   name : Upload to build page
+          uses: actions/upload-artifact@v3
+          with:
+            name: fossa-reports
+            path: |
+              /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/${{ steps.get_repo_name.outputs.repo_name }}.csv

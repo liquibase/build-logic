@@ -106,6 +106,8 @@ jobs:
           FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
 
       - name: Generate report
+        env:
+          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
         run: |
           # Download JSON report
           fossa report attribution --format json > fossa.json

@@ -131,8 +131,9 @@ jobs:
       -   name: Upload report to S3
           if: always()
           run: |
-            filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-            aws s3 cp "$csv_filename" s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/$csv_filename
+            aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/$csv_filename
+#            filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
+#            aws s3 cp /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/$filename
           env:
             AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
@@ -143,4 +144,4 @@ jobs:
           with:
             name: fossa-reports
             path: |
-              $csv_filename
+              /home/runner/work/$csv_filename

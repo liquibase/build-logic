@@ -131,8 +131,6 @@ jobs:
           run: |
             csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
             aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/
-#            filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-#            aws s3 cp /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/$filename
           env:
             AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
@@ -213,9 +211,9 @@ jobs:
       - name: Upload CSV to Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: enterprise_report_${{ inputs.version_number_for_report_generation }}
-          path: enterprise_report_${{ inputs.version_number_for_report_generation }}.csv
+          name: enterprise_report
+          path: enterprise_report.csv
 
       - name: Upload merged CSV to S3
         if: always()
-        run: aws s3 cp enterprise_report_${{ inputs.version_number_for_report_generation }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_report_generation }}/
+        run: aws s3 cp enterprise_report.csv s3://liquibaseorg-origin/enterprise_fossa_report/

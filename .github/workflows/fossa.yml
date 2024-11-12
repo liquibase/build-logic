@@ -47,3 +47,36 @@ jobs:
           workflow: fossa.yml
           workflow_inputs: ${{ env.WORKFLOW_INPUTS }}
 
+      - name: Retry fetching run ID (max 4 attempts with 5 seconds delay)
+        run: |
+          retries=4
+          delay=5  # Delay of 5 seconds between retries
+          for i in $(seq 1 $retries); do
+            run_id="${{ steps.return_dispatch.outputs.run_id }}"
+            if [ -n "$run_id" ]; then
+              echo "Found run ID: $run_id"
+              echo "run_id=$run_id" >> $GITHUB_ENV
+              break
+            else
+              echo "Run ID not found, retrying in $delay seconds..."
+            fi
+          
+            if [ $i -eq $retries ]; then
+              echo "Failed to get run ID after $retries attempts."
+              exit 1
+            fi
+          
+            # Wait before retrying
+            sleep $delay
+          done
+        shell: bash
+
+      - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
+        uses: Codex-/await-remote-run@v1
+        with:
+          token: ${{ secrets.FOSSA_TRIGGER_REPORT_GENERATION }}
+          run_id: ${{ steps.return_dispatch.outputs.run_id }}
+          repo: ${{ matrix.repo.name }}
+          owner: ${{ matrix.repo.owner }}
+          run_timeout_seconds: 420 # 7 minutes Time until giving up on the run
+          poll_interval_ms: 120000 # 2 minutes Frequency to poll the run for a status.

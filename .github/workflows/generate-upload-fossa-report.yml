@@ -155,7 +155,6 @@ jobs:
         with:
           repository: liquibase/build-logic
           ref: DAT-18919
-          path: /home/runner/work/
 
       - name: Set up AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -189,10 +188,10 @@ jobs:
           # Add a header to the final CSV file, placing it above the sorted and unique data
           echo 'Title,Version,Declared License,Package Homepage' | cat - /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv > temp && mv temp /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
 
-          ls -l /home/runner/work
+          ls -l $GITHUB_WORKSPACE
           
           # Read ignored dependencies from a file
-          ignoredLibsFile=$(cat /home/runner/work/build-logic/.github/workflows/ignore_dependencies_fossa.txt)
+          ignoredLibsFile=$(cat $GITHUB_WORKSPACE/build-logic/.github/workflows/ignore_dependencies_fossa.txt)
 
           # Split the ignored dependencies into an array
           IFS=',' read -r -a ignoredLibs <<< "$ignoredLibsFile"

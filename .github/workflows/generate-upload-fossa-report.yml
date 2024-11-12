@@ -129,7 +129,7 @@ jobs:
       -   name: Upload report to S3
           if: always()
           run: |
-            aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/
+            aws s3 cp /home/runner/work/$csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/
 #            filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
 #            aws s3 cp /home/runner/work/${{ steps.get_repo_name.outputs.repo_name }}/fossa_reports/$filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/$filename
           env:
@@ -138,8 +138,76 @@ jobs:
             AWS_DEFAULT_REGION: us-east-1
 
       -   name : Upload to build page
+          if: always()
           uses: actions/upload-artifact@v3
           with:
             name: fossa-reports
             path: |
               /home/runner/work/$csv_filename
+
+  combine-fossa-reports:
+    runs-on: ubuntu-latest
+    needs: fossa-scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Download reports from S3 and Rearrange CSV files
+        run: |
+          # Create a directory to store downloaded reports from S3
+          mkdir -p /home/runner/work/enterprise/fossa_reports_s3
+
+          # Download all files from the specified S3 bucket to the created directory
+          aws s3 cp --recursive s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports /home/runner/work/enterprise/fossa_reports_s3/ 
+
+          # List the contents of the directory to confirm successful download
+          ls -l /home/runner/work/enterprise/fossa_reports_s3
+
+          # Define an array of CSV file names
+          csv_files=("DaticalDB-installer" "drivers" "protoclub" "datical-sqlparser" "storedlogic" "AppDBA" "liquibase-bundle" "liquibase")
+
+          # Loop through each CSV file and remove headers
+          for file in "${csv_files[@]}"; do
+            tail -n +3 /home/runner/work/enterprise/fossa_reports_s3/${file}.csv >> /home/runner/work/enterprise/fossa_reports_s3/${file}_no_header.csv
+          done
+
+          # Concatenate all CSV files without headers, sort, and remove duplicates
+          cat /home/runner/work/enterprise/fossa_reports_s3/*_no_header.csv | sort | uniq > /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
+
+          # Add a header to the final CSV file, placing it above the sorted and unique data
+          echo 'Title,Version,Declared License,Package Homepage' | cat - /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv > temp && mv temp /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
+
+          # Read ignored dependencies from a file
+          ignoredLibsFile=$(cat ${{ github.workspace }}/.github/ignore_dependencies_fossa.txt)
+
+          # Split the ignored dependencies into an array
+          IFS=',' read -r -a ignoredLibs <<< "$ignoredLibsFile"
+
+          # Create a temporary file
+          tempfile=$(mktemp)
+
+          # Build the grep command to filter out ignored dependencies
+          grepCmd="grep -iv"
+          for lib in "${ignoredLibs[@]}"; do
+            grepCmd="$grepCmd -e \"$lib\""
+          done
+
+          # Process the FOSSA report to remove ignored dependencies
+          cat /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv | eval $grepCmd > enterprise_report.csv
+
+
+      - name: Upload CSV to Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: enterprise_report_${{ github.event.inputs.version_number_for_report_generation }}
+          path: enterprise_report_${{ github.event.inputs.version_number_for_report_generation }}.csv
+
+      - name: Upload merged CSV to S3
+        run: aws s3 cp enterprise_report_${{ github.event.inputs.version_number_for_report_generation }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/${{ github.event.inputs.version_number_for_report_generation }}/

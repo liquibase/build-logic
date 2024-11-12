@@ -4,9 +4,9 @@ on:
   workflow_call:
     inputs:
       version_number_for_report_generation:
-        type: string
-        description: 'Supply the DaticalDb-installer version variable which is used during its report generation to be stored in the s3 bucket. eg 8.7.352'
-        required: false
+      type: string
+      required: true
+
 jobs:
   fossa-scan:
     runs-on: ubuntu-latest
@@ -212,8 +212,8 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: enterprise_report
-          path: enterprise_report.csv
+          path: ${{ inputs.version_number_for_report_generation }}/enterprise_report.csv
 
       - name: Upload merged CSV to S3
         if: always()
-        run: aws s3 cp enterprise_report.csv s3://liquibaseorg-origin/enterprise_fossa_report/
+        run: aws s3 cp enterprise_report.csv s3://liquibaseorg-origin/enterprise_fossa_report/enterprise_report_${{ inputs.version_number_for_report_generation }}.csv

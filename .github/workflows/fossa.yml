@@ -49,6 +49,7 @@ jobs:
 
   fossa-scan:
     runs-on: ubuntu-latest
+    needs: wait-for-fossa-report-generation
     permissions:
       contents: read
       packages: write

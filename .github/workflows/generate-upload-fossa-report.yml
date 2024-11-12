@@ -152,6 +152,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          repository: liquibase/build-logic
 
       - name: Set up AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -174,9 +176,9 @@ jobs:
           # Define an array of CSV file names
           csv_files=("DaticalDB-installer" "drivers" "protoclub" "datical-sqlparser" "storedlogic" "AppDBA" "liquibase-bundle" "liquibase")
 
-          # Loop through each CSV file and remove headers
+          # Loop through each CSV file and remove headers again for combine report generation
           for file in "${csv_files[@]}"; do
-            tail -n +3 /home/runner/work/enterprise/fossa_reports_s3/${file}.csv >> /home/runner/work/enterprise/fossa_reports_s3/${file}_no_header.csv
+            tail -n +1 /home/runner/work/enterprise/fossa_reports_s3/${file}.csv >> /home/runner/work/enterprise/fossa_reports_s3/${file}_no_header.csv
           done
 
           # Concatenate all CSV files without headers, sort, and remove duplicates
@@ -211,4 +213,5 @@ jobs:
           path: enterprise_report_${{ github.event.inputs.version_number_for_report_generation }}.csv
 
       - name: Upload merged CSV to S3
+        if: always()
         run: aws s3 cp enterprise_report_${{ github.event.inputs.version_number_for_report_generation }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/${{ github.event.inputs.version_number_for_report_generation }}/

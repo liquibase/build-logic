@@ -102,8 +102,8 @@ jobs:
 
       - name: Analyze project
         run: fossa analyze
-        with:
-          api-key: ${{ secrets.FOSSA_API_KEY }}
+        env:
+          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
 
       - name: Generate report
         run: |

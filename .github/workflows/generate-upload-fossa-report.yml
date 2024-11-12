@@ -188,7 +188,7 @@ jobs:
           echo 'Title,Version,Declared License,Package Homepage' | cat - /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv > temp && mv temp /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
 
           # Read ignored dependencies from a file
-          ignoredLibsFile=$(cat /home/runner/work/build-logic/.github/ignore_dependencies_fossa.txt)
+          ignoredLibsFile=$(cat /home/runner/work/build-logic/.github/workflows/ignore_dependencies_fossa.txt)
 
           # Split the ignored dependencies into an array
           IFS=',' read -r -a ignoredLibs <<< "$ignoredLibsFile"

@@ -25,15 +25,15 @@ jobs:
           { name: "liquibase", ref: "DAT-18919",owner: "Datical" }
         ]
 
-    name: "${{ matrix.repo.name }} - Trigger Fossa Report"
+    name: "${{ matrix.repo.name }} - Fossa Report"
     steps:
-#      - name: Set workflow inputs
-#        run: |
-#          if [[ "${{ matrix.repo.name }}" == "DaticalDB-installer" ]]; then
-#            echo "WORKFLOW_INPUTS={ \"version_number_for_report_generation\": \"${{ github.event.inputs.version_number_for_report_generation }}\" }" >> $GITHUB_ENV
-#          else
-#            echo "WORKFLOW_INPUTS={}" >> $GITHUB_ENV
-#          fi
+      - name: Set workflow inputs
+        run: |
+          if [[ "${{ matrix.repo.name }}" ]]; then
+            echo "WORKFLOW_INPUTS={ \"version_number_for_report_generation\": \"${{ github.event.inputs.version_number_for_report_generation }}\" }" >> $GITHUB_ENV
+          else
+            echo "WORKFLOW_INPUTS={}" >> $GITHUB_ENV
+          fi
 
       - name: Dispatch an action and get the run ID
         uses: codex-/return-dispatch@v1
@@ -45,8 +45,7 @@ jobs:
           repo: ${{ matrix.repo.name }}
           owner: ${{ matrix.repo.owner }}
           workflow: fossa.yml
-#          workflow_inputs:
-          workflow_inputs: ${{ github.event.inputs.version_number_for_report_generation }}
+          workflow_inputs: ${{ env.WORKFLOW_INPUTS }}
 
       - name: Retry fetching run ID (max 4 attempts with 5 seconds delay)
         run: |

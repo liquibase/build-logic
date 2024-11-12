@@ -213,9 +213,9 @@ jobs:
       - name: Upload CSV to Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: enterprise_report_${{ github.event.inputs.version_number_for_report_generation }}
-          path: enterprise_report_${{ github.event.inputs.version_number_for_report_generation }}.csv
+          name: enterprise_report_${{ inputs.version_number_for_report_generation }}
+          path: enterprise_report_${{ inputs.version_number_for_report_generation }}.csv
 
       - name: Upload merged CSV to S3
         if: always()
-        run: aws s3 cp enterprise_report_${{ github.event.inputs.version_number_for_report_generation }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/${{ github.event.inputs.version_number_for_report_generation }}/
+        run: aws s3 cp enterprise_report_${{ inputs.version_number_for_report_generation }}.csv s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_report_generation }}/

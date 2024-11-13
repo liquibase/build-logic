@@ -453,3 +453,16 @@ Here the modules we want to generate and aggregate test reports must be specifie
 ### Releasing a new version of build-logic
 
 When you want to release new version of `build-logic`, it is important to update all the occurrences of previous version eg: `v0.7.8` with the new version eg : `v0.7.8` in all the files. As, the code for the new version internally refers to the old version.   
+
+
+### Fossa Report Generation for Enterprise
+
+1. AWS s3 bucket under `liquibase-prod` `s3://liquibaseorg-origin/enterprise_fossa_report/`
+2. Manually run the workflow under `enterprise-fossa-trigger-report-generation.yml`
+   - this workflow triggers a run in the specified repository matrix
+   - individual repositories call the workflow `generate-upload-fossa-report.yml`
+3. `generate-upload-fossa-report.yml`
+   - the individual reports are uploaded under `raw_reports`
+   - the combined reports is called `enterprise_report_version_number_for_report_generation` which is uploaded under `version_number_for_report_generation` 
+   - the report for `datical-service` is uploaded under version_number_for_report_generation
+4. You might need to do some manipulation of the columns as sometimes they are empty. Just the way Fossa populates them! 

@@ -138,13 +138,13 @@ jobs:
           csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
           aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_report_generation }}/
 
-      - name : Upload to build page
+      - name: Upload to build page
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: fossa-reports
           path: |
-            /home/runner/work/$csv_filename
+            /home/runner/work/${{ steps.set_csv_filename.outputs.csv_filename }}
 
   combine-fossa-reports:
     runs-on: ubuntu-latest

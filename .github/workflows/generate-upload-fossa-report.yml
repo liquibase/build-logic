@@ -147,7 +147,6 @@ jobs:
 
   combine-fossa-reports:
     runs-on: ubuntu-latest
-    if: ${{ steps.get_repo_name.outputs.repo_name }}" == 'datical-service'
     needs: fossa-scan
     steps:
       - name: Checkout code

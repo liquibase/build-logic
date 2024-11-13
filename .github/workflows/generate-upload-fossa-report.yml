@@ -39,7 +39,6 @@ jobs:
 
         #look for dependencies in maven
       - name: maven-settings-xml-action for Liquibase
-        if: inputs.org == 'liquibase'
         uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |

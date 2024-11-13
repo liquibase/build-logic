@@ -9,78 +9,153 @@ on:
         required: false
 
 jobs:
-#  wait-for-fossa-report-generation:
-#    runs-on: ubuntu-latest
-#    strategy:
-#      matrix:
-#        repo: [
-#          { name: "DaticalDB-installer", ref: "DAT-18919",owner: "Datical" },
-#          #{name: "ephemeral-database", ref: "master",owner: "liquibase"}, #TODO: producing html report instead of csv. CSV report already uploaded in s3 to unblock the combine-fossa-reports job
-#          { name: "drivers", ref: "DAT-18919",owner: "Datical" },
-#          #          {name: "protoclub", ref: "develop",owner: "Datical"}, #TODO: producing html report instead of csv. CSV report already uploaded in s3 to unblock the combine-fossa-reports job
-#          { name: "datical-sqlparser", ref: "DAT-18919",owner: "Datical" },
-#          { name: "storedlogic", ref: "DAT-18919",owner: "Datical" },
-#          { name: "AppDBA", ref: "DAT-18919",owner: "Datical" },
-#          { name: "liquibase-bundle", ref: "DAT-18919",owner: "Datical" },
-#          { name: "liquibase", ref: "DAT-18919",owner: "Datical" }
-#        ]
-#
-#    name: "${{ matrix.repo.name }} - Fossa Report"
-#    steps:
-#      - name: Set workflow inputs
-#        run: |
-#          if [[ "${{ matrix.repo.name }}" ]]; then
-#            echo "WORKFLOW_INPUTS={ \"version_number_for_report_generation\": \"${{ github.event.inputs.version_number_for_report_generation }}\" }" >> $GITHUB_ENV
-#          else
-#            echo "WORKFLOW_INPUTS={}" >> $GITHUB_ENV
-#          fi
-#
-#      - name: Dispatch an action and get the run ID
-#        uses: codex-/return-dispatch@v1
-#        id: return_dispatch
-#        continue-on-error: true
-#        with:
-#          token: ${{ secrets.FOSSA_TRIGGER_REPORT_GENERATION  }}
-#          ref: ${{ matrix.repo.ref }}
-#          repo: ${{ matrix.repo.name }}
-#          owner: ${{ matrix.repo.owner }}
-#          workflow: fossa.yml
-#          workflow_inputs: ${{ env.WORKFLOW_INPUTS }}
-#
-#      - name: Retry fetching run ID (max 4 attempts with 5 seconds delay)
-#        run: |
-#          retries=4
-#          delay=5  # Delay of 5 seconds between retries
-#          for i in $(seq 1 $retries); do
-#            run_id="${{ steps.return_dispatch.outputs.run_id }}"
-#            if [ -n "$run_id" ]; then
-#              echo "Found run ID: $run_id"
-#              echo "run_id=$run_id" >> $GITHUB_ENV
-#              break
-#            else
-#              echo "Run ID not found, retrying in $delay seconds..."
-#            fi
-#
-#            if [ $i -eq $retries ]; then
-#              echo "Failed to get run ID after $retries attempts."
-#              exit 1
-#            fi
-#
-#            # Wait before retrying
-#            sleep $delay
-#          done
-#        shell: bash
-#
-#      - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
-#        uses: Codex-/await-remote-run@v1
-#        with:
-#          token: ${{ secrets.FOSSA_TRIGGER_REPORT_GENERATION }}
-#          run_id: ${{ steps.return_dispatch.outputs.run_id }}
-#          repo: ${{ matrix.repo.name }}
-#          owner: ${{ matrix.repo.owner }}
-#          run_timeout_seconds: 420 # 7 minutes Time until giving up on the run
-#          poll_interval_ms: 120000 # 2 minutes Frequency to poll the run for a status.
-#
+  wait-for-fossa-report-generation:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repo: [
+          { name: "DaticalDB-installer", ref: "DAT-18919",owner: "Datical" },
+          #{name: "ephemeral-database", ref: "master",owner: "liquibase"}, #TODO: producing html report instead of csv. CSV report already uploaded in s3 to unblock the combine-fossa-reports job
+          { name: "drivers", ref: "DAT-18919",owner: "Datical" },
+          #          {name: "protoclub", ref: "develop",owner: "Datical"}, #TODO: producing html report instead of csv. CSV report already uploaded in s3 to unblock the combine-fossa-reports job
+          { name: "datical-sqlparser", ref: "DAT-18919",owner: "Datical" },
+          { name: "storedlogic", ref: "DAT-18919",owner: "Datical" },
+          { name: "AppDBA", ref: "DAT-18919",owner: "Datical" },
+          { name: "liquibase-bundle", ref: "DAT-18919",owner: "Datical" },
+          { name: "liquibase", ref: "DAT-18919",owner: "Datical" }
+        ]
+
+    name: "${{ matrix.repo.name }} - Fossa Report"
+    steps:
+      - name: Set workflow inputs
+        run: |
+          if [[ "${{ matrix.repo.name }}" ]]; then
+            echo "WORKFLOW_INPUTS={ \"version_number_for_report_generation\": \"${{ github.event.inputs.version_number_for_report_generation }}\" }" >> $GITHUB_ENV
+          else
+            echo "WORKFLOW_INPUTS={}" >> $GITHUB_ENV
+          fi
+
+      - name: Dispatch an action and get the run ID
+        uses: codex-/return-dispatch@v1
+        id: return_dispatch
+        continue-on-error: true
+        with:
+          token: ${{ secrets.FOSSA_TRIGGER_REPORT_GENERATION  }}
+          ref: ${{ matrix.repo.ref }}
+          repo: ${{ matrix.repo.name }}
+          owner: ${{ matrix.repo.owner }}
+          workflow: fossa.yml
+          workflow_inputs: ${{ env.WORKFLOW_INPUTS }}
+
+      - name: Retry fetching run ID (max 4 attempts with 5 seconds delay)
+        run: |
+          retries=4
+          delay=5  # Delay of 5 seconds between retries
+          for i in $(seq 1 $retries); do
+            run_id="${{ steps.return_dispatch.outputs.run_id }}"
+            if [ -n "$run_id" ]; then
+              echo "Found run ID: $run_id"
+              echo "run_id=$run_id" >> $GITHUB_ENV
+              break
+            else
+              echo "Run ID not found, retrying in $delay seconds..."
+            fi
+
+            if [ $i -eq $retries ]; then
+              echo "Failed to get run ID after $retries attempts."
+              exit 1
+            fi
+
+            # Wait before retrying
+            sleep $delay
+          done
+        shell: bash
+
+      - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
+        uses: Codex-/await-remote-run@v1
+        with:
+          token: ${{ secrets.FOSSA_TRIGGER_REPORT_GENERATION }}
+          run_id: ${{ steps.return_dispatch.outputs.run_id }}
+          repo: ${{ matrix.repo.name }}
+          owner: ${{ matrix.repo.owner }}
+          run_timeout_seconds: 420 # 7 minutes Time until giving up on the run
+          poll_interval_ms: 120000 # 2 minutes Frequency to poll the run for a status.
+
+
+  combine-fossa-reports:
+    runs-on: ubuntu-latest
+    needs: fossa-scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/build-logic
+          ref: DAT-18919
+          path: build-logic
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Download reports from S3 and Rearrange CSV files
+        run: |
+          # Create a directory to store downloaded reports from S3
+          mkdir -p /home/runner/work/enterprise/fossa_reports_s3
+
+          # Download all files from the specified S3 bucket to the created directory
+          aws s3 cp --recursive s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports /home/runner/work/enterprise/fossa_reports_s3/
+
+          # List the contents of the directory to confirm successful download
+          ls -l /home/runner/work/enterprise/fossa_reports_s3
+
+          # Define an array of CSV file names
+          csv_files=("DaticalDB-installer" "drivers" "protoclub" "datical-sqlparser" "storedlogic" "AppDBA" "liquibase-bundle" "liquibase")
+
+          # Loop through each CSV file and remove headers again for combine report generation
+          for file in "${csv_files[@]}"; do
+            tail -n +1 /home/runner/work/enterprise/fossa_reports_s3/${file}.csv >> /home/runner/work/enterprise/fossa_reports_s3/${file}_no_header.csv
+          done
+
+          # Concatenate all CSV files without headers, sort, and remove duplicates
+          cat /home/runner/work/enterprise/fossa_reports_s3/*_no_header.csv | sort | uniq > /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
+
+          # Add a header to the final CSV file, placing it above the sorted and unique data
+          echo 'Title,Version,Declared License,Package Homepage' | cat - /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv > temp && mv temp /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
+
+          ls -l $GITHUB_WORKSPACE
+
+          # Read ignored dependencies from a file
+          ignoredLibsFile=$(cat $GITHUB_WORKSPACE/build-logic/.github/workflows/ignore_dependencies_fossa.txt)
+
+          # Split the ignored dependencies into an array
+          IFS=',' read -r -a ignoredLibs <<< "$ignoredLibsFile"
+
+          # Create a temporary file
+          tempfile=$(mktemp)
+
+          # Build the grep command to filter out ignored dependencies
+          grepCmd="grep -iv"
+          for lib in "${ignoredLibs[@]}"; do
+            grepCmd="$grepCmd -e \"$lib\""
+          done
+
+          # Process the FOSSA report to remove ignored dependencies
+          cat /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv | eval $grepCmd > enterprise_report.csv
+
+
+      - name: Upload CSV to Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: enterprise_report
+          path: ${{ inputs.version_number_for_report_generation }}
+
+      - name: Upload merged CSV to S3
+        if: always()
+        run: aws s3 cp enterprise_report.csv s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_report_generation }}/enterprise_report_${{ inputs.version_number_for_report_generation }}.csv
+
 
   trigger-datical-service:
     runs-on: ubuntu-latest

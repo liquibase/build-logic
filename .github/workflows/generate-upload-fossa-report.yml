@@ -1,5 +1,4 @@
-#name: Generate and upload Fossa Report to s3
-name: Fossa Report Generation
+name: Generate and upload Fossa Report to s3
 
 on:
   workflow_call:

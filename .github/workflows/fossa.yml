@@ -22,7 +22,8 @@ jobs:
           { name: "storedlogic", ref: "DAT-18919",owner: "Datical" },
           { name: "AppDBA", ref: "DAT-18919",owner: "Datical" },
           { name: "liquibase-bundle", ref: "DAT-18919",owner: "Datical" },
-          { name: "liquibase", ref: "DAT-18919",owner: "Datical" }
+          { name: "liquibase", ref: "DAT-18919",owner: "Datical" },
+          { name: "datical-service", ref: "DAT-18919",owner: "Datical" }
         ]
 
     name: "${{ matrix.repo.name }} - Fossa Report"

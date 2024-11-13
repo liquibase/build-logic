@@ -60,18 +60,11 @@ jobs:
           @csv
           ' fossa.json >> $csv_filename
 
-        # Upload the report to S3 with conditional paths:
-        # - If the repository is 'datical-service', upload to a version-specific folder
-        # - Otherwise, upload to the generic 'raw_reports' folder
       - name: Upload report to S3
         if: always()
         run: |
           csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-          if [ "${{ steps.get_repo_name.outputs.repo_name }}" == "datical-service" ]; then
-            aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_report_generation }}/
-          else
           aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/
-          fi
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}

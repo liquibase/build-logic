@@ -14,15 +14,15 @@ jobs:
     strategy:
       matrix:
         repo: [
-          { name: "DaticalDB-installer", ref: "DAT-18919",owner: "Datical" },
-          #{name: "ephemeral-database", ref: "master",owner: "liquibase"}, #TODO: producing html report instead of csv. CSV report already uploaded in s3 to unblock the combine-fossa-reports job
-          { name: "drivers", ref: "DAT-18919",owner: "Datical" },
-          #          {name: "protoclub", ref: "develop",owner: "Datical"}, #TODO: producing html report instead of csv. CSV report already uploaded in s3 to unblock the combine-fossa-reports job
-          { name: "datical-sqlparser", ref: "DAT-18919",owner: "Datical" },
-          { name: "storedlogic", ref: "DAT-18919",owner: "Datical" },
-          { name: "AppDBA", ref: "DAT-18919",owner: "Datical" },
-          { name: "liquibase-bundle", ref: "DAT-18919",owner: "Datical" },
-          { name: "liquibase", ref: "DAT-18919",owner: "Datical" }
+#          { name: "DaticalDB-installer", ref: "DAT-18919",owner: "Datical" },
+#          #{name: "ephemeral-database", ref: "master",owner: "liquibase"}, #TODO: producing html report instead of csv. CSV report already uploaded in s3 to unblock the combine-fossa-reports job
+#          { name: "drivers", ref: "DAT-18919",owner: "Datical" },
+          {name: "protoclub", ref: "DAT-18919",owner: "Datical"}
+#          { name: "datical-sqlparser", ref: "DAT-18919",owner: "Datical" },
+#          { name: "storedlogic", ref: "DAT-18919",owner: "Datical" },
+#          { name: "AppDBA", ref: "DAT-18919",owner: "Datical" },
+#          { name: "liquibase-bundle", ref: "DAT-18919",owner: "Datical" },
+#          { name: "liquibase", ref: "DAT-18919",owner: "Datical" }
         ]
 
     name: "${{ matrix.repo.name }} - Fossa Report"

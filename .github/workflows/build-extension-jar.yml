@@ -9,12 +9,44 @@ on:
         required: true
         default: ""
         type: string
+      extension-version:
+        description: "The version that will be defined to the extensions. Defaults to master-SNAPSHOT"
+        required: false
+        default: "master-SNAPSHOT"
+        type: string
+      submodule:
+        description: "Maven submodule to cd into"
+        required: false
+        default: ""
+        type: string
+      branch:
+        description: "Branch to checkout"
+        required: false
+        default: "main"
+        type: string
+
+
   workflow_dispatch:
     inputs:
       extension:
         description: "Extension to build"
         required: true
         default: ""
+        type: string
+      extension-version:
+        description: "The version that will be defined to the extensions. Defaults to master-SNAPSHOT"
+        required: false
+        default: "master-SNAPSHOT"
+        type: string
+      submodule:
+        description: "Maven submodule to cd into"
+        required: false
+        default: ""
+        type: string
+      branch:
+        description: "Branch to checkout"
+        required: false
+        default: "main"
         type: string
 
 
@@ -43,7 +75,7 @@ jobs:
         run: |
             git config --global credential.helper store
             echo "https://$GIT_USERNAME:$GIT_PASSWORD@github.com" > ~/.git-credentials
-            git clone https://github.com/liquibase/${{ inputs.extension }}.git ${{ inputs.extension }}
+            git clone https://github.com/liquibase/${{ inputs.extension }}.git --branch ${{ inputs.branch }} ${{ inputs.extension }}
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -103,15 +135,14 @@ jobs:
         env:
            GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          cd ${{ inputs.extension }}
-          EXTENSION_VERSION="master-SNAPSHOT"
+          cd ${{ inputs.extension }}/${{ inputs.submodule }}
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
-            mvn deploy:deploy-file \
-              -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
-              -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
-              -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
+          mvn deploy:deploy-file \
+              -Dfile=./target/${{ inputs.extension }}-${{ inputs.extension-version }}.jar \
+              -Dsources=./target/${{ inputs.extension }}-${{ inputs.extension-version }}-sources.jar \
+              -Djavadoc=./target/${{ inputs.extension }}-${{ inputs.extension-version }}-javadoc.jar \
               -DrepositoryId=liquibase \
               -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
               -DpomFile=pom.xml
-            cd ..
+          cd -

@@ -44,7 +44,7 @@ jobs:
           ref: ${{ matrix.repo.ref }}
           repo: ${{ matrix.repo.name }}
           owner: ${{ matrix.repo.owner }}
-          workflow: enterprise-fossa-trigger-report-generation.yml
+          workflow: fossa.yml
           workflow_inputs: ${{ env.WORKFLOW_INPUTS }}
 
       - name: Retry fetching run ID (max 4 attempts with 5 seconds delay)

@@ -120,23 +120,23 @@ jobs:
           @csv
           ' fossa.json >> $csv_filename
 
-        # upload all report to s3 under /raw_reports/ except datical-service.
-      - name: Upload all report to S3
-        if: always() && steps.get_repo_name.outputs.repo_name != 'datical-service'
+        # Upload the report to S3 with conditional paths:
+        # - If the repository is 'datical-service', upload to a version-specific folder
+        # - Otherwise, upload to the generic 'raw_reports' folder
+      - name: Upload report to S3
+        if: always()
         run: |
           csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-          aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/
+          if [ "${{ steps.get_repo_name.outputs.repo_name }}" == "datical-service" ]; then
+            aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_report_generation }}/
+          else
+            aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/
+          fi
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
 
-        # upload only datical-service report in /${{ inputs.version_number_for_report_generation }}/. We dont want to see it in raw_reports folder
-      - name: Upload datical-service report to s3
-        if: ${{ steps.get_repo_name.outputs.repo_name == 'datical-service' }}
-        run: |
-          csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-          aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_report_generation }}/
 
       - name: Upload to build page
         if: always()

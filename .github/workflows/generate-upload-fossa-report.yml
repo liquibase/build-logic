@@ -214,7 +214,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: enterprise_report
-          path: ${{ inputs.version_number_for_report_generation }}/enterprise_report.csv
+          path: ${{ inputs.version_number_for_report_generation }}
 
       - name: Upload merged CSV to S3
         if: always()

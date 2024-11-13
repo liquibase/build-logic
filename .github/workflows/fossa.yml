@@ -17,7 +17,7 @@ jobs:
           { name: "DaticalDB-installer", ref: "master",owner: "Datical" },
           #{name: "ephemeral-database", ref: "master",owner: "liquibase"}, #TODO: producing html report instead of csv. CSV report already uploaded in s3 to unblock the combine-fossa-reports job
           { name: "drivers", ref: "master",owner: "Datical" },
-          {name: "protoclub", ref: "develop",owner: "Datical"}
+          {name: "protoclub", ref: "develop",owner: "Datical"},
           { name: "datical-sqlparser", ref: "master",owner: "Datical" },
           { name: "storedlogic", ref: "master",owner: "Datical" },
           { name: "AppDBA", ref: "master",owner: "Datical" },

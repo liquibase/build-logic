@@ -107,7 +107,7 @@ jobs:
           mkdir -p /home/runner/work/enterprise/fossa_reports_s3
 
           # Download all files from the specified S3 bucket to the created directory
-          aws s3 cp --recursive s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports /home/runner/work/enterprise/fossa_reports_s3/
+          aws s3 cp --recursive s3://liquibaseorg-origin/enterprise_fossa_report/${{ github.event.inputs.version_number_for_report_generation }}/raw_reports /home/runner/work/enterprise/fossa_reports_s3/
 
           # List the contents of the directory to confirm successful download
           ls -l /home/runner/work/enterprise/fossa_reports_s3

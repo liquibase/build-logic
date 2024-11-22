@@ -64,7 +64,7 @@ jobs:
         if: always()
         run: |
           csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-          aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/raw_reports/
+          aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/${{ github.event.inputs.version_number_for_report_generation }}/raw_reports/
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}

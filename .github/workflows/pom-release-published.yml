@@ -60,13 +60,12 @@ jobs:
                       -DpomFile=${{ env.artifact_id }}-${version}.pom \
                       -DgeneratePom=false \
                       -Dfile=${{ env.artifact_id }}-${version}.pom \
-                      -Dsources=${{ env.artifact_id }}-${version}-sources.jar \
-                      -Djavadoc=${{ env.artifact_id }}-${version}-javadoc.jar \
-                      -Dfiles=${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
-                      -Dtypes=jar.asc,jar.asc,pom.asc \
-                      -Dclassifiers=sources,javadoc,
+                      -Dfiles=${{ env.artifact_id }}-${version}.pom.asc \
+                      -Dtypes=pom.asc \
+                      -Dclassifiers=
 
   maven-release:
     needs: release
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@v0.7.8
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@main
     secrets: inherit
+    

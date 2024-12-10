@@ -394,8 +394,8 @@ jobs:
           cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
           cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
           cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          rm /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
-          cat /tmp/combined/ubuntu/vfs/fileslist.txt /tmp/combined/windows/vfs/fileslist.txt /tmp/combined/macos/vfs/fileslist.txt > /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/vfs/fileslist.txt
+          rm /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
           rm -f /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
           cd /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
           zip -r ../${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar *

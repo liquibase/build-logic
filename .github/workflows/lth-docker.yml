@@ -6,6 +6,9 @@ on:
         PRO_LICENSE_KEY:
             description: 'Liquibase Pro license key'
             required: false
+   permissions:
+    checks: write
+
 env:
   LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
 

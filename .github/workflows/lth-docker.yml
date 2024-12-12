@@ -6,7 +6,7 @@ on:
         PRO_LICENSE_KEY:
             description: 'Liquibase Pro license key'
             required: false
-   permissions:
+  permissions:
     checks: write
 
 env:

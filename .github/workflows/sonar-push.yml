@@ -26,8 +26,7 @@ jobs:
     env:
       AWS_REGION: us-east-1
       LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
+      AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
 
     steps:
       - uses: actions/checkout@v4

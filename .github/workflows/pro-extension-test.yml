@@ -65,18 +65,13 @@ on:
       PRO_LICENSE_KEY:
         description: "PRO_LICENSE_KEY from the caller workflow"
         required: true
-      GHA_AWS_KEY_ID:
-        description: "GHA_AWS_KEY_ID from the caller workflow"
+      AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA:
+        description: "OIDC Role from the caller workflow"
         required: true
-      GHA_AWS_KEY:
-        description: "GHA_AWS_KEY from the caller workflow"
-        required: true
-
 env:
   AWS_REGION: us-east-1
   LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
-  AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
+  AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MAVEN_VERSION: "3.9.5"
 

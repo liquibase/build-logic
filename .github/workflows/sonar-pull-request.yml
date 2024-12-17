@@ -25,7 +25,6 @@ jobs:
     
     env:
       LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
-      AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
 
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +38,12 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
+          
       # look for dependencies in maven
       - name: maven-settings-xml-action
         uses: whelk-io/maven-settings-xml-action@v22

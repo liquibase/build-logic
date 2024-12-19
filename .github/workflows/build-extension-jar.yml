@@ -113,10 +113,10 @@ jobs:
            GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           EXTENSION_VERSION="master-SNAPSHOT"
+          cd ${{ inputs.extension }}/${{ inputs.extension }}
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
           tree .
-          jar_base_path="${{ inputs.extension }}"
           # Construct the mvn command dynamically
           if [ "${{ inputs.include_sources }}" = true ]; then
             mvn deploy:deploy-file \

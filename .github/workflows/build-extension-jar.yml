@@ -128,7 +128,6 @@ jobs:
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
           ls -l
-          ls -l target
           # Construct the mvn command dynamically
           if [ "${{ inputs.sources }}" = "true" ] && [ "${{ inputs.javadoc }}" = "true" ]; then
             mvn deploy:deploy-file \

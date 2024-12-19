@@ -107,11 +107,13 @@ jobs:
           EXTENSION_VERSION="master-SNAPSHOT"
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
-            mvn deploy:deploy-file \
-              -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
-              -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
-              -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
-              -DrepositoryId=liquibase \
-              -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
-              -DpomFile=pom.xml
+          ls -l
+          ls -l target
+          mvn deploy:deploy-file \
+            -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
+            -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
+            -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
+            -DrepositoryId=liquibase \
+            -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
+            -DpomFile=pom.xml
             cd ..

@@ -9,16 +9,11 @@ on:
         required: true
         default: ""
         type: string
-      sources:
-        description: "Sources to build"
+      include_sources:
+        description: "Include sources and javadoc in the deploy"
         required: true
         default: true
-        type: boolean
-      javadoc:
-        description: "Javadoc to build"
-        required: true
-        default: true
-        type: boolean    
+        type: boolean 
   workflow_dispatch:
     inputs:
       extension:
@@ -26,17 +21,11 @@ on:
         required: true
         default: ""
         type: string
-      sources:
-        description: "Sources to build"
+      include_sources:
+        description: "Include sources and javadoc in the deploy"
         required: true
         default: true
-        type: boolean
-      javadoc:
-        description: "Javadoc to build"
-        required: true
-        default: true
-        type: boolean    
-
+        type: boolean  
 
 jobs:
   delete-dependency-packages:
@@ -123,13 +112,13 @@ jobs:
         env:
            GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          cd ${{ inputs.extension }}
           EXTENSION_VERSION="master-SNAPSHOT"
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
-          cd ${{ inputs.extension }}
+          tree .
+          jar_base_path="${{ inputs.extension }}"
           # Construct the mvn command dynamically
-          if [ "${{ inputs.sources }}" = "true" ] && [ "${{ inputs.javadoc }}" = "true" ]; then
+          if [ "${{ inputs.include_sources }}" = true ]; then
             mvn deploy:deploy-file \
               -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
               -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
@@ -144,4 +133,3 @@ jobs:
               -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
               -DpomFile=pom.xml
           fi
-          cd ..

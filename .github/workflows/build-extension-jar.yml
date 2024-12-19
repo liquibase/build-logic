@@ -127,7 +127,6 @@ jobs:
           EXTENSION_VERSION="master-SNAPSHOT"
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
-          ls -l
           cd ${{ inputs.extension }}
           # Construct the mvn command dynamically
           if [ "${{ inputs.sources }}" = "true" ] && [ "${{ inputs.javadoc }}" = "true" ]; then

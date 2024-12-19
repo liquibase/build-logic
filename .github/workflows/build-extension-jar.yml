@@ -9,6 +9,16 @@ on:
         required: true
         default: ""
         type: string
+      sources:
+        description: "Sources to build"
+        required: true
+        default: true
+        type: boolean
+      javadoc:
+        description: "Javadoc to build"
+        required: true
+        default: true
+        type: boolean    
   workflow_dispatch:
     inputs:
       extension:
@@ -16,6 +26,16 @@ on:
         required: true
         default: ""
         type: string
+      sources:
+        description: "Sources to build"
+        required: true
+        default: true
+        type: boolean
+      javadoc:
+        description: "Javadoc to build"
+        required: true
+        default: true
+        type: boolean    
 
 
 jobs:
@@ -43,7 +63,7 @@ jobs:
         run: |
             git config --global credential.helper store
             echo "https://$GIT_USERNAME:$GIT_PASSWORD@github.com" > ~/.git-credentials
-            git clone https://github.com/liquibase/${{ inputs.extension }}.git ${{ inputs.extension }}
+            git clone https://github.com/liquibase/${{ inputs.extension }}.git
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -109,11 +129,20 @@ jobs:
           mvn clean install -DskipTests
           ls -l
           ls -l target
-          mvn deploy:deploy-file \
-            -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
-            -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
-            -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
-            -DrepositoryId=liquibase \
-            -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
-            -DpomFile=pom.xml
-            cd ..
+          # Construct the mvn command dynamically
+          if [ "${{ inputs.sources }}" = "true" ] && [ "${{ inputs.javadoc }}" = "true" ]; then
+            mvn deploy:deploy-file \
+              -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
+              -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
+              -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
+              -DrepositoryId=liquibase \
+              -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
+              -DpomFile=pom.xml
+          else
+            mvn deploy:deploy-file \
+              -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
+              -DrepositoryId=liquibase \
+              -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
+              -DpomFile=pom.xml
+          fi
+          cd ..

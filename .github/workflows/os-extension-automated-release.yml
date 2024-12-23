@@ -236,7 +236,7 @@ jobs:
           done
 
       - name: Archive closed_nexus_repos.txt
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: closed_nexus_repos
           path: closed_nexus_repos.txt

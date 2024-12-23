@@ -121,84 +121,84 @@ jobs:
             ]
 
       - name: Download unit tests report
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: liquibase-jacoco-test-results
           path: ${{ inputs.sonarRootPath }}/unit-tests
 
       - name: Download mssql integration tests report
         if: contains(inputs.dbPlatforms, 'mssql')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
             name: liquibase-integration-jacoco-test-results-mssql
             path: ${{ inputs.sonarRootPath }}/integration-tests/mssql
 
       - name: Download mysql integration tests report
         if: contains(inputs.dbPlatforms, 'mysql')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
             name: liquibase-integration-jacoco-test-results-mysql
             path: ${{ inputs.sonarRootPath }}/integration-tests/mysql
 
       - name: Download oracle integration tests report
         if: contains(inputs.dbPlatforms, 'oracle')
-        uses: actions/download-artifact@v3     
+        uses: actions/download-artifact@v4     
         with:
           name: liquibase-integration-jacoco-test-results-oracle
           path: ${{ inputs.sonarRootPath }}/integration-tests/oracle
 
       - name: Download postgresql integration tests report
         if: contains(inputs.dbPlatforms, 'postgresql')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: liquibase-integration-jacoco-test-results-postgresql
           path: ${{ inputs.sonarRootPath }}/integration-tests/postgresql
 
       - name: Download h2 integration tests report
         if: contains(inputs.dbPlatforms, 'h2')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: liquibase-integration-jacoco-test-results-h2
           path: ${{ inputs.sonarRootPath }}/integration-tests/h2
 
       - name: Download hsqldb integration tests report
         if: contains(inputs.dbPlatforms, 'hsqldb')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: liquibase-integration-jacoco-test-results-hsqldb
           path: ${{ inputs.sonarRootPath }}/integration-tests/hsqldb
 
       - name: Download mariadb integration tests report
         if: contains(inputs.dbPlatforms, 'mariadb')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: liquibase-integration-jacoco-test-results-mariadb
           path: ${{ inputs.sonarRootPath }}/integration-tests/mariadb
 
       - name: Download sqlite integration tests report
         if: contains(inputs.dbPlatforms, 'sqlite')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: liquibase-integration-jacoco-test-results-sqlite
           path: ${{ inputs.sonarRootPath }}/integration-tests/sqlite
 
       - name: Download firebird integration tests report
         if: contains(inputs.dbPlatforms, 'firebird')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: liquibase-integration-jacoco-test-results-firebird
           path: ${{ inputs.sonarRootPath }}/integration-tests/firebird
 
       - name: Download snowflake integration tests report
         if: contains(inputs.dbPlatforms, 'snowflake')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: liquibase-integration-jacoco-test-results-snowflake
           path: ${{ inputs.sonarRootPath }}/integration-tests/snowflake
 
       - name: Download db2 integration tests report
         if: contains(inputs.dbPlatforms, 'db2')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: liquibase-integration-jacoco-test-results-db2
           path: ${{ inputs.sonarRootPath }}/integration-tests/db2

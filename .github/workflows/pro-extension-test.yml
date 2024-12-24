@@ -214,8 +214,9 @@ jobs:
 
       - name: Save Event File
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
-          name: Event File
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
           path: ${{ github.event_path }}
 
     outputs:

@@ -22,7 +22,9 @@ jobs:
   sonar-pr:
     name: Sonar Scan
     runs-on: ubuntu-latest
-    
+    permissions:
+      id-token: write
+      contents: read
     env:
       LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
 

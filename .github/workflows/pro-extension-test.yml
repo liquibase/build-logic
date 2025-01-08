@@ -82,6 +82,9 @@ jobs:
         os: ${{fromJson(inputs.os || '["ubuntu-latest"]')}}
     name: Build & Package - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -231,6 +234,9 @@ jobs:
         os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "windows-latest"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
+      contents: read
     needs: build
     steps:
       - uses: actions/checkout@v4

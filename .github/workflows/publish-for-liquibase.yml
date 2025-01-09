@@ -47,7 +47,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        repository: ${{ github.event.inputs.repository }}
+        repository: ${{ inputs.repository }}
 
     - name: Download Multiplatform Artifacts
       uses: actions/download-artifact@v4
@@ -119,7 +119,7 @@ jobs:
         -Dversion=${{ inputs.version }} \
         -Dpackaging=jar \
         -DrepositoryId=liquibase \
-        -Durl=https://maven.pkg.github.com/${{ github.repository }} \
+        -Durl=https://maven.pkg.github.com/${{ inputs.repository }} \
         -Dusername=liquibot \
         -Dpassword=${{ env.GIT_PASSWORD }}   
            

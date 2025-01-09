@@ -52,6 +52,10 @@ on:
         required: true
         description: 'Repository to check out'
         type: string
+      version:
+        required: true
+        description: 'Version to publish'
+        type: string
     secrets:
       SONAR_TOKEN:
         description: "SONAR_TOKEN from the caller workflow"

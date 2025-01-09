@@ -1,4 +1,4 @@
-name: Build and Test Pro Extension
+name: Build and Test Pro Extension for Liquibase
 
 on:
   workflow_call:

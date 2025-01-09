@@ -36,12 +36,6 @@ jobs:
           java-version: 17
           distribution: 'temurin'
           cache: 'maven'
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
-          aws-region: us-east-1
           
       # look for dependencies in maven
       - name: maven-settings-xml-action

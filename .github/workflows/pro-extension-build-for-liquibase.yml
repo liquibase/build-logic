@@ -172,6 +172,12 @@ jobs:
         run: |
           mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
 
+      - name: Set Artifact Versions
+        working-directory: ${{ inputs.artifactPath }}
+        shell: bash
+        run: |
+          mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
+
       - name: Build and Package
         shell: bash
         run: |

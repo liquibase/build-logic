@@ -30,17 +30,6 @@ jobs:
       combineJars: true
       repository: ${{ inputs.repository }}
       version: ${{ inputs.version }}
-      extraLinuxCommand: |
-        wget -q https://dl.min.io/server/minio/release/linux-amd64/minio
-        chmod +x minio
-        export MINIO_ROOT_USER=minio
-        export MINIO_ROOT_PASSWORD=minio123
-        ./minio server /tmp/minio &
-      extraWindowsCommand: |
-        Invoke-WebRequest -Uri "https://dl.min.io/server/minio/release/windows-amd64/minio.exe" -OutFile "C:\minio.exe"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/minio/minio-service/master/windows/install-service.ps1" -OutFile "C:\install-service.ps1"
-        C:\install-service.ps1
-        net start MinIO  
   
   publish-main-snapshots-to-gpm:
     name: Publish to GPM

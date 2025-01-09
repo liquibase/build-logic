@@ -168,9 +168,16 @@ jobs:
           ${{ inputs.extraWindowsCommand }}
 
       - name: Set Artifact Versions
-        shell: bash
         run: |
           mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+        if: runner.os == 'Windows'
+        shell: pwsh
+
+      - name: Set Artifact Versions
+        run: |
+          mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+        if: runner.os != 'Windows'
+        shell: bash
 
       - name: Build and Package
         shell: bash

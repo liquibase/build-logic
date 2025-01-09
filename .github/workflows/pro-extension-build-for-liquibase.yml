@@ -167,6 +167,10 @@ jobs:
         run: |
           ${{ inputs.extraWindowsCommand }}
 
+      - name: Set Artifact Versions
+        run: |
+          mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+
       - name: Build and Package
         shell: bash
         run: |

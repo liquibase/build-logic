@@ -13,16 +13,6 @@ on:
         required: false
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
-      os-test:
-        description: "Operating system to test on"
-        required: false
-        default: '["ubuntu-latest", "windows-latest"]'
-        type: string
-      nightly:
-        description: "Specifies nightly builds against liquibase master-SNAPSHOT"
-        required: false
-        default: false
-        type: boolean
       extraCommand:
         description: "Specify it if you want to run an extra command before attaching the artifact. This runs on both Linux and Windows runners."
         required: false
@@ -172,27 +162,8 @@ jobs:
         shell: powershell
         run: |
           ${{ inputs.extraWindowsCommand }}
-          
-      - name: Build and Package latest liquibase version
-        if: ${{ inputs.nightly }}
-        shell: bash
-        run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
-
-      - name: Notify Slack on Build Failure
-        if: ${{ failure() && inputs.nightly }}
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
-          SLACK_TITLE: "❌ ${{ github.repository }} ❌ Build failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
-          SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
-          SLACK_ICON_EMOJI: ":robot_face:"
-          SLACK_FOOTER: "${{ github.repository }}"
-          SLACK_LINK_NAMES: true
 
       - name: Build and Package
-        if: ${{ !inputs.nightly }}
         shell: bash
         run: |
           if [ -n "${{ inputs.extraMavenArgs }}" ]; then
@@ -231,149 +202,8 @@ jobs:
       artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
 
-  unit-test:
-    strategy:
-      fail-fast: false
-      matrix:
-        java: ${{fromJson(inputs.java || '[8, 11, 17, 18]')}}
-        os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "windows-latest"]')}}
-    name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    permissions:
-      id-token: write
-      contents: read
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: ${{ inputs.repository || github.repository }}
-          token: ${{ secrets.BOT_TOKEN }}
-
-      - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java }}
-          distribution: "temurin"
-          cache: "maven"
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
-          aws-region: us-east-1
-          
-      - name: Set up Maven
-        uses: stCarolas/setup-maven@v5
-        with:
-          maven-version: ${{ env.MAVEN_VERSION }}
-
-      # look for dependencies in maven
-      - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
-        with:
-          repositories: |
-            [
-              {
-                "id": "liquibase",
-                "url": "https://maven.pkg.github.com/liquibase/liquibase",
-                "releases": {
-                  "enabled": "true"
-                },
-                "snapshots": {
-                  "enabled": "true",
-                  "updatePolicy": "always"
-                }
-              },
-              {
-                "id": "liquibase-pro",
-                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
-                "releases": {
-                  "enabled": "true"
-                },
-                "snapshots": {
-                  "enabled": "true",
-                  "updatePolicy": "always"
-                }
-              }
-            ]
-          servers: |
-            [
-              {
-                "id": "liquibase-pro",
-                "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
-              },
-              {
-                "id": "liquibase",
-                "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
-              }
-            ]
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{needs.build.outputs.artifact_id}}-${{ matrix.os }}-${{needs.build.outputs.artifact_version}}-artifacts
-          path: ./target
-
-      - name: Run extra command
-        if: inputs.extraCommand != ''
-        run: |
-          ${{ inputs.extraCommand }}
-
-      - name: Run extra Linux command
-        if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
-        run: |
-          ${{ inputs.extraLinuxCommand }}
-
-      - name: Run extra Windows command
-        if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
-        run: |
-          ${{ inputs.extraWindowsCommand }}
-
-      - name: Run Tests
-        if: ${{ !inputs.nightly }}
-        shell: bash
-        run: |
-          if [ -n "${{ inputs.extraMavenArgs }}" ]; then
-            mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}"
-          else
-            mvn -B test -P '${{ inputs.mavenProfiles }}'
-          fi
-  
-      - name: Run Tests
-        if: ${{ inputs.nightly }}
-        shell: bash
-        run: |
-          if [ -n "${{ inputs.extraMavenArgs }}" ]; then
-            mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"
-          else
-            mvn -B test -P '${{ inputs.mavenProfiles }}' "-Dliquibase.version=master-SNAPSHOT"
-          fi
-
-      - name: Notify Slack on Build Failure
-        if: ${{ failure() && inputs.nightly }}
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
-          SLACK_TITLE: "❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
-          SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
-          SLACK_ICON_EMOJI: ":robot_face:"
-          SLACK_FOOTER: "${{ github.repository }}"
-          SLACK_LINK_NAMES: true
-
-      - name: Archive Test Results - ${{ matrix.os }}
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
-          path: |
-            **/target/surefire-reports
-            **/target/site/jacoco/jacoco.xml
-
   combineJars:
-    needs: [ build, unit-test ]
+    needs: build
     if: ${{ inputs.combineJars }}
     name: Combine Jars
     runs-on: ubuntu-latest

@@ -29,6 +29,7 @@ jobs:
       java: "[17, 21]"
       artifactPath: liquibase-checks
       combineJars: true
+      repository: ${{ inputs.repository }}
       extraLinuxCommand: |
         wget -q https://dl.min.io/server/minio/release/linux-amd64/minio
         chmod +x minio

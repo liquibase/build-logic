@@ -98,7 +98,7 @@ jobs:
 
     - name: Set up Maven
       if: matrix.language == 'java'
-      uses: stCarolas/setup-maven@v4.5
+      uses: stCarolas/setup-maven@v5
       with:
         maven-version: "3.9.5"
     # look for dependencies in maven

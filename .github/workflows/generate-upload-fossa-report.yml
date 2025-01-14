@@ -37,7 +37,7 @@ jobs:
           export FOSSA_API_KEY="${{ secrets.FOSSA_API_KEY }}"
 
       - name: Analyze project
-        run: fossa analyze
+        run: fossa analyze --static-only-analysis
 
       - name: Generate report
         run: |

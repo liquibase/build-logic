@@ -9,6 +9,11 @@ on:
         required: true
         default: ""
         type: string
+      groupId:
+        description: "Maven Group ID"
+        required: true
+        default: "org.liquibase.ext"
+        type: string
   workflow_dispatch:
     inputs:
       extension:
@@ -25,7 +30,7 @@ jobs:
     steps:
       - uses: actions/delete-package-versions@v5
         with:
-          package-name: org.liquibase.ext.${{ inputs.extension }}
+          package-name: ${{ inputs.groupId }}.${{ inputs.extension }}
           package-type: 'maven'
           token: ${{ secrets.BOT_TOKEN }}
           min-versions-to-keep: 5 # Keep the last 5 versions so we don't break simultaneous builds

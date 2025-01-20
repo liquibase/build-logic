@@ -1,9 +1,7 @@
 name: Deploy Master Snapshot
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
 
 jobs:
   deploy:
@@ -65,7 +63,7 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT }}"
               }
             ]
-              
+
       - name: Update version to master-SNAPSHOT
         run: mvn versions:set -DnewVersion=master-SNAPSHOT
 

@@ -10,7 +10,7 @@ on:
       repositories:
         description: 'Comma separated list of repositories to release'
         required: false
-        default: '["liquibase-bigquery","liquibase-cache","liquibase-cassandra","liquibase-cosmosdb","liquibase-db2i","liquibase-filechangelog","liquibase-nochangeloglock","liquibase-hanadb","liquibase-maxdb","liquibase-modify-column","liquibase-mssql","liquibase-oracle","liquibase-postgresql","liquibase-redshift","liquibase-sqlfire","liquibase-teradata","liquibase-vertica","liquibase-yugabytedb","liquibase-hibernate"]'
+        default: '["liquibase-bigquery","liquibase-cache","liquibase-cassandra","liquibase-cosmosdb","liquibase-db2i","liquibase-filechangelog","liquibase-nochangeloglock","liquibase-hanadb","liquibase-maxdb","liquibase-modify-column","liquibase-mssql","liquibase-oracle","liquibase-postgresql","liquibase-redshift","liquibase-sqlfire","liquibase-teradata","liquibase-vertica","liquibase-yugabytedb","liquibase-hibernate","liquibase-parent-pom"]'
         type: string
 
 jobs:
@@ -130,11 +130,14 @@ jobs:
             }
           ]
 
+    - name: Update extension version to next SNAPSHOT
+      if: ${{ matrix.repository != 'liquibase-parent-pom' }}
+      run: mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
+
     - name: Update pom.xml
       env:
         GH_TOKEN: ${{ secrets.BOT_TOKEN }}
       run: |
-        mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
         sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
         git add pom.xml
         # Check if there are changes before committing

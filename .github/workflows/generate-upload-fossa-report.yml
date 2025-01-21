@@ -1,0 +1,80 @@
+name: Generate and upload Fossa Report to s3
+
+on:
+  workflow_call:
+    inputs:
+      version_number_for_report_generation:
+        type: string
+        required: true
+
+jobs:
+  fossa-scan:
+    runs-on: ubuntu-latest
+    env:
+      FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get the commit sha
+        id: get_commit_sha
+        run: |
+          commit_sha=`(git rev-parse HEAD)`
+          echo "commit_sha=${commit_sha}" >> $GITHUB_OUTPUT
+
+      - name: Get repository name
+        id: get_repo_name
+        run: echo "repo_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+
+      - name: Setup Fossa CLI
+        run: |
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
+          export FOSSA_API_KEY="${{ secrets.FOSSA_API_KEY }}"
+
+      - name: Analyze project
+        run: fossa analyze --static-only-analysis
+
+      - name: Generate report
+        run: |
+          # Run JSON report
+          fossa report attribution --format json > fossa.json
+          
+          csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
+          
+          # Extract fields from the JSON and create a CSV report.
+          echo "Title,Version,Declared License,Package Homepage" > $csv_filename
+          
+          jq -r '
+          (.directDependencies + .deepDependencies)[] |
+          [
+            .title,
+            .version,
+            (.licenses | map(.name) | join(";")),
+            .projectUrl
+          ] |
+          @csv
+          ' fossa.json >> $csv_filename
+
+      - name: Upload report to S3
+        if: always()
+        run: |
+          csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
+          aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/${{ github.event.inputs.version_number_for_report_generation }}/raw_reports/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+
+      - name: Upload to build page
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: fossa-reports
+          path: |
+            /home/runner/work/${{ steps.set_csv_filename.outputs.csv_filename }}
+

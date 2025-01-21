@@ -171,3 +171,4 @@ jobs:
           repository: Datical/datical-service
           event-type: trigger-fossa-report-generation
           client-payload: '{"ref": "master", "version_number_for_report_generation": "${{ github.event.inputs.version_number_for_report_generation }}"}'
+          

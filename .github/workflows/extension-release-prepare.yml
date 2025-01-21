@@ -42,7 +42,7 @@ jobs:
           
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v21
+        uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |
             [
@@ -107,7 +107,7 @@ jobs:
 
       - name: Save Release files
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: release-files
           path: |

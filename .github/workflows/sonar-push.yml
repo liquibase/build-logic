@@ -22,12 +22,9 @@ jobs:
   sonar-push:
     name: Sonar Scan
     runs-on: ubuntu-latest
-
     env:
       AWS_REGION: us-east-1
       LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +37,7 @@ jobs:
           java-version: 17
           distribution: 'temurin'
           cache: 'maven'
-
+          
       - name: Cache SonarCloud packages
         uses: actions/cache@v4
         with:
@@ -61,7 +58,7 @@ jobs:
 
       - name: Download Test Results Artifact
         id: download-artifact
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v7
         with:
           github_token: ${{secrets.BOT_TOKEN}}
           workflow: test.yml
@@ -72,7 +69,7 @@ jobs:
           
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v21
+        uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |
             [

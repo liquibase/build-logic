@@ -22,11 +22,8 @@ jobs:
   sonar-pr:
     name: Sonar Scan
     runs-on: ubuntu-latest
-    
     env:
       LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.GHA_AWS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.GHA_AWS_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -39,10 +36,10 @@ jobs:
           java-version: 17
           distribution: 'temurin'
           cache: 'maven'
-
+          
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v21
+        uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |
             [
@@ -102,7 +99,7 @@ jobs:
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
       - name: Download unit tests report
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: test-reports-jdk-17-ubuntu-latest
 

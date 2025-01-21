@@ -104,7 +104,7 @@ jobs:
     # look for dependencies in maven
     - name: maven-settings-xml-action
       if: matrix.language == 'java'
-      uses: whelk-io/maven-settings-xml-action@v21
+      uses: whelk-io/maven-settings-xml-action@v22
       with:
         repositories: |
           [

@@ -148,7 +148,7 @@ jobs:
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
           git reset HEAD~ --hard
-          mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
+          mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }} -P '${{ inputs.mavenProfiles }}'
 
       - name: Build and Package (dry-run)
         if: ${{ inputs.dry_run == true }}
@@ -157,7 +157,7 @@ jobs:
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
           git reset HEAD~ --hard
-          mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
+          mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }} -P '${{ inputs.mavenProfiles }}'
 
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}
@@ -191,12 +191,6 @@ jobs:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
             ${{ inputs.artifactPath }}/target/*
-
-      - name: Save Event File
-        uses: actions/upload-artifact@v4
-        with:
-          name: Event File
-          path: ${{ github.event_path }}
     outputs:
       artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
@@ -240,8 +234,8 @@ jobs:
           cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
           cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
           cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
-          rm /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/vfs/fileslist.txt
-          cat /tmp/combined/ubuntu/vfs/fileslist.txt /tmp/combined/windows/vfs/fileslist.txt /tmp/combined/macos/vfs/fileslist.txt > /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/vfs/fileslist.txt
+          rm /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
           rm -f /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
           cd /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
           zip -r ../${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar *

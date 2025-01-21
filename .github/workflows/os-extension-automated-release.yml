@@ -130,11 +130,14 @@ jobs:
             }
           ]
 
+    - name: Update extension version to next SNAPSHOT
+      if: ${{ matrix.repository != 'liquibase-parent-pom' }}
+      run: mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
+
     - name: Update pom.xml
       env:
         GH_TOKEN: ${{ secrets.BOT_TOKEN }}
       run: |
-        mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
         sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
         git add pom.xml
         # Check if there are changes before committing

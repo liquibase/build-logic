@@ -18,7 +18,9 @@ on:
         required: false
         default: true
         type: boolean
-  
+      permissions:
+      checks: write
+      
 jobs:
   sonar:
     if: ${{ inputs.sonar == true }}

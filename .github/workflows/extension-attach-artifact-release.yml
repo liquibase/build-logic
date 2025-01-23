@@ -68,6 +68,8 @@ jobs:
     name: Build & Package - ${{ matrix.os }}
     if: ${{ inputs.combineJars }}
     runs-on: ${{ matrix.os }}
+    concurrency:
+      group: attach-artifact-${{ github.ref }}
     steps:
       - uses: actions/checkout@v4
 

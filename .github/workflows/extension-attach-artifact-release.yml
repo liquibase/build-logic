@@ -262,6 +262,8 @@ jobs:
     name: Attach Artifact to Release
     needs: [ combineJars ]
     runs-on: ubuntu-latest
+    concurrency:
+      group: attach-artifact-${{ github.ref }}
     steps:
       - run: sleep 30
         if: ${{ inputs.dry_run == false }}

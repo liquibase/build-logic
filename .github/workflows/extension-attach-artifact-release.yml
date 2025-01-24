@@ -68,6 +68,8 @@ jobs:
     name: Build & Package - ${{ matrix.os }}
     if: ${{ inputs.combineJars }}
     runs-on: ${{ matrix.os }}
+    concurrency:
+      group: attach-artifact-${{ github.ref }}
     steps:
       - uses: actions/checkout@v4
 
@@ -260,6 +262,8 @@ jobs:
     name: Attach Artifact to Release
     needs: [ combineJars ]
     runs-on: ubuntu-latest
+    concurrency:
+      group: attach-artifact-${{ github.ref }}
     steps:
       - run: sleep 30
         if: ${{ inputs.dry_run == false }}

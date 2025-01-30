@@ -148,7 +148,7 @@ jobs:
 
 
       - name: Upload CSV to Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: enterprise_report
           path: ${{ inputs.version_number_for_report_generation }}/enterprise_report.csv

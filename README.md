@@ -458,9 +458,12 @@ When you want to release new version of `build-logic`, it is important to update
 ### Fossa Report Generation for Enterprise
 
 1. AWS s3 bucket under `liquibase-prod` `s3://liquibaseorg-origin/enterprise_fossa_report/`
-2. Manually run the workflow under `enterprise-fossa-trigger-report-generation.yml`
-   - this workflow triggers a run in the specified repository matrix
-   - individual repositories call the workflow `generate-upload-fossa-report.yml`
+2. Manually run the workflow under `fossa.yml` from this repository under `./github/workflows/fossa.yml`.Supply the DaticalDb-installer version variable which is used during its report generation to be stored in the s3 bucket. eg 8.7.352'
+
+![](./doc/img/run-enterprise-fossa-manually.png)
+
+   - this workflow triggers a run in the specified repository matrix in workflow `fossa.yml`
+   - individual repositories call the workflow `generate-upload-fossa-report.yml` under this repository `liquibase/build-logic` ./github/workflows/fossa.yml`
 3. `generate-upload-fossa-report.yml`
    - the individual reports are uploaded under `raw_reports`
    - the combined reports is called `enterprise_report_version_number_for_report_generation` which is uploaded under `version_number_for_report_generation` 

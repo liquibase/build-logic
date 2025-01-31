@@ -22,8 +22,7 @@ jobs:
           { name: "storedlogic", ref: "master",owner: "Datical" },
           { name: "AppDBA", ref: "master",owner: "Datical" },
           { name: "liquibase-bundle", ref: "master",owner: "Datical" },
-          { name: "liquibase", ref: "ddb",owner: "Datical" },
-          { name: "ephemeral-database", ref: "master",owner: "Liquibase" }
+          { name: "liquibase", ref: "ddb",owner: "Datical" }
         ]
 
     name: "${{ matrix.repo.name }} - Fossa Report"
@@ -112,7 +111,7 @@ jobs:
           # List the contents of the directory to confirm successful download
           ls -l /home/runner/work/enterprise/fossa_reports_s3
 
-          # Define an array of CSV file names
+          # Define an array of CSV file names. We dont have ephemeral-database here as it is not part of enterprise
           csv_files=("DaticalDB-installer" "drivers" "protoclub" "datical-sqlparser" "storedlogic" "AppDBA" "liquibase-bundle" "liquibase")
 
           # Loop through each CSV file and remove headers again for combine report generation
@@ -123,8 +122,8 @@ jobs:
           # Concatenate all CSV files without headers, sort, and remove duplicates
           cat /home/runner/work/enterprise/fossa_reports_s3/*_no_header.csv | sort | uniq > /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
 
-          # Add a header to the final CSV file, placing it above the sorted and unique data
-          echo 'Title,Version,Declared License,Package Homepage' | cat - /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv > temp && mv temp /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
+          # Add a header to the final CSV file, placing it above the sorted and unique data and remove the last line of headers
+          echo 'Title,Version,Declared License,Package Homepage' | cat - /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv > temp && mv temp /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv && sed -i '$ d' /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
 
           ls -l $GITHUB_WORKSPACE
 
@@ -151,7 +150,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: enterprise_report
-          path: ${{ inputs.version_number_for_report_generation }}/enterprise_report.csv
+          path: ./enterprise_report.csv
 
       - name: Upload merged CSV to S3
         if: always()

@@ -469,11 +469,12 @@ When you want to release new version of `build-logic`, it is important to update
    - the combined reports is called `enterprise_report_version_number_for_report_generation` which is uploaded under `version_number_for_report_generation` 
    - the report for `datical-service` is uploaded under version_number_for_report_generation
 4. You might need to do some manipulation of the columns as sometimes they are empty. Just the way Fossa populates them! 
-5. Final combined report for all repos except datical-service is called `enterprise_report_8.7.352.csv`
-6. Final separate report for datical-service is called `datical-service.csv`
+5. For any dependencies you dont want included in the final report, just add them to `.github/workflows/ignore_dependencies_fossa.txt` file. 
+6. Final combined report for all repos except datical-service is called `enterprise_report_8.7.352.csv`
+7. Final separate report for datical-service is called `datical-service.csv`
 
 ![](./doc/img/aws-s3-bucket-enterprise-reports.png)
 
-7. If we plan on sending this report to the users it will be on some page like we have for OSS -> https://www.liquibase.com/eula and they will have access to only the URI’s we mention. As to to the liquibase users, DevOps team can add them to permission set to have access to those reports. 
+8. If we plan on sending this report to the users it will be on some page like we have for OSS -> https://www.liquibase.com/eula and they will have access to only the URI’s we mention. As to to the liquibase users, DevOps team can add them to permission set to have access to those reports. 
 
 ![](./doc/img/permission-set-enterprise-fossa-report.png)

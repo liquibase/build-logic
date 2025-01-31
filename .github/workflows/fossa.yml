@@ -122,8 +122,8 @@ jobs:
           # Concatenate all CSV files without headers, sort, and remove duplicates
           cat /home/runner/work/enterprise/fossa_reports_s3/*_no_header.csv | sort | uniq > /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
 
-          # Add a header to the final CSV file, placing it above the sorted and unique data
-          echo 'Title,Version,Declared License,Package Homepage' | cat - /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv > temp && mv temp /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
+          # Add a header to the final CSV file, placing it above the sorted and unique data and remove the last line of headers
+          echo 'Title,Version,Declared License,Package Homepage' | cat - /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv > temp && mv temp /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv && sed -i '$ d' /home/runner/work/enterprise/fossa_reports_s3/enterprise_unique.csv
 
           ls -l $GITHUB_WORKSPACE
 

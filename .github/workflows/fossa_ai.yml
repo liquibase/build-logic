@@ -18,6 +18,12 @@ on:
         required: false
         default: false
         type: boolean
+      latest_version:   
+        required: false
+        type: string  
+  repository_dispatch:
+    types: [oss-released-version]
+            
 jobs:
   fossa-scan:
     runs-on: ubuntu-latest
@@ -132,11 +138,20 @@ jobs:
         if: ${{ inputs.generate_sbom }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-          fossa report -p ${{ github.event.repository.name }} attribution --format html 2>&1 | tee sbom.html
+          fossa report -p ${{ github.event.repository.name }} attribution --format json 2>&1 | tee sbom.json
 
       - name: Archive FOSSA SBOM Report
         if: ${{ inputs.generate_sbom }}
         uses: actions/upload-artifact@v4
         with:
           name: sbom
-          path: sbom.html
+          path: sbom.json
+
+      - name: Get current timestamp
+        id: timestamp
+        run: echo "timestamp=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
+      - name: Upload FOSSA Results to s3 for Liquibase releases
+        if: github.event.action == 'oss-released-version'
+        run: |
+          aws s3 cp sbom.json s3://liquibase-artifacts/fossa/liquibase-pro-${{ inputs.latest_version }}_${{ env.timestamp }}/sbom.json

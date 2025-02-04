@@ -475,6 +475,6 @@ When you want to release new version of `build-logic`, it is important to update
 
 ![](./doc/img/aws-s3-bucket-enterprise-reports.png)
 
-8. If we plan on sending this report to the users it will be on some page like we have for OSS -> https://www.liquibase.com/eula and they will have access to only the URI’s we mention. As to to the liquibase users, DevOps team can add them to permission set to have access to those reports. 
+8. If we plan on sending this report to the users it will be on some page like we have for OSS -> https://www.liquibase.com/eula and they will have access to only the URI’s we mention. As to to the liquibase users, DevOps team can add them to permission set to have access to those reports.
 
 ![](./doc/img/permission-set-enterprise-fossa-report.png)

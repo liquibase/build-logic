@@ -17,6 +17,10 @@ on:
         required: true
         description: "Repository to check out"
         type: string
+      branch:
+        required: true
+        description: "Branch to check out"
+        type: string
 
 jobs:
   build:
@@ -30,7 +34,8 @@ jobs:
       combineJars: true
       repository: ${{ inputs.repository }}
       version: ${{ inputs.version }}
-
+      branch: ${{ inputs.branch }}
+      
   publish-main-snapshots-to-gpm:
     name: Publish to GPM
     runs-on: ubuntu-latest

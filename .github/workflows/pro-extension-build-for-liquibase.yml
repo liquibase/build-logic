@@ -56,6 +56,10 @@ on:
         required: true
         description: 'Version to publish'
         type: string
+      branch:
+        required: true
+        description: 'Branch to check out'
+        type: string
     secrets:
       SONAR_TOKEN:
         description: "SONAR_TOKEN from the caller workflow"
@@ -87,6 +91,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository || github.repository }}
+          ref: ${{ inputs.branch }}
           token: ${{ secrets.BOT_TOKEN }}
 
       - name: Configure AWS Credentials

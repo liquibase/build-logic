@@ -33,7 +33,7 @@ on:
         required: true
         type: string
   repository_dispatch:
-    types: [ oss-released-version ]
+    types: [oss-released-version]
 
 jobs:
   fossa-scan:
@@ -53,7 +53,7 @@ jobs:
       - name: Get Fossa Configuration
         if: ${{ inputs.check_ai_generated_code }}
         run: |
-          curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/v0.7.8/.github/.fossa.yml
+          curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/.fossa.yml
 
       - name: Install FOSSA CLI
         run: |
@@ -166,7 +166,6 @@ jobs:
     env:
       FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
     steps:
-
       - name: Checkout Code
         uses: actions/checkout@v4
 

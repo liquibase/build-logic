@@ -21,11 +21,11 @@ In the calling workflow file, use the `uses` property to specify the location an
 reusable workflow file to run as a job.
 
 ```yml
-name: {Job name}
+name: { Job name }
 on:
   pull_request:
 jobs:
-  {workflow}:
+  { workflow }:
     uses: liquibase/build-logic/.github/workflows/{workflow}.yml@main
 ```
 
@@ -34,14 +34,14 @@ jobs:
 `os-extension-test.yml` and `pro-extension-test.yml` are triggered by a workflow call event and runs tests for Liquibase extensions (os/pro) on different Java versions and operating systems. The `java` input specifies the Java versions to test, and the `os` input specifies the operating systems to test. Both inputs are required and have default values.
 
 ```yml
-name: {Job name}
+name: { Job name }
 on:
   pull_request:
 jobs:
-  {workflow}:
+  { workflow }:
     uses: liquibase/build-logic/.github/workflows/{workflow}.yml@main
     with:
-      java: '[17, 18]'
+      java: "[17, 18]"
       os: '["ubuntu-latest", "windows-latest"]'
 ```
 
@@ -66,7 +66,7 @@ graph LR
 Please review the below table of reusable workflows and their descriptions:
 
 | Workflow                                | Description                                                                                                             |
-|-----------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `build-artifact.yml`                    | Runs maven build and saves artifacts                                                                                    |
 | `codeql.yml`                            | Runs CodeQL scanning                                                                                                    |
 | `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                                                                 |
@@ -79,9 +79,9 @@ Please review the below table of reusable workflows and their descriptions:
 | `package-deb.yml`                       | Creates and uploads deb packages                                                                                        |
 | `pom-release-published.yml`             | Publishes a release pom to Maven Central                                                                                |
 | `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                                                   |
-| `sonar-pull-request.yml`                | Code Coverage Scan for PRs.  Requires branch name parameter                                                             |
+| `sonar-pull-request.yml`                | Code Coverage Scan for PRs. Requires branch name parameter                                                              |
 | `sonar-test-scan.yml`                   | Code Coverage Scan for unit and integration tests                                                                       |
-| `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                                          |  
+| `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                                          |
 | various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets                                   |
 
 ## Requirements
@@ -114,7 +114,7 @@ Jacoco must be configured and exporting test results.
 
 #### Surefire
 
-All unit tests must run and pass with `surefire:test`. If any test require additional setup, such as docker, they will need to run separately from the reusable build logic. 
+All unit tests must run and pass with `surefire:test`. If any test require additional setup, such as docker, they will need to run separately from the reusable build logic.
 
 ```xml
 <plugin>
@@ -190,9 +190,9 @@ The Maven release plugin must be configured to allow extensions update `pom.xml`
 
 ## Liquibase Test Harness
 
-| Workflow                                | Description                                                                           |
-|-----------------------------------------|---------------------------------------------------------------------------------------|
-| `lth-docker.yml`                        | Runs Liquibase Test Harness against a docker container                                |
+| Workflow         | Description                                            |
+| ---------------- | ------------------------------------------------------ |
+| `lth-docker.yml` | Runs Liquibase Test Harness against a docker container |
 
 ### Docker Databases
 
@@ -202,7 +202,7 @@ The Maven release plugin must be configured to allow extensions update `pom.xml`
 
 ## Liquibase test (unit & integration tests) + Sonar
 
-The `sonar-test-scan.yml` reusable workflow has been designed to execute unit and integration tests and deliver the Jacoco agregated report to Sonar. 
+The `sonar-test-scan.yml` reusable workflow has been designed to execute unit and integration tests and deliver the Jacoco agregated report to Sonar.
 Jacoco requires all generated reports to fulfill its merge goal. Running integration tests on separate runners complicates the aggregation of reports. This is why an optimized workflow has been created to launch all tests and generate a comprehensive aggregated report for Sonar. It utilizes [mvnd](https://github.com/apache/maven-mvnd) instead of `mvn`` to speed up the build and test process and it also creates one thread per core.
 
 `sonar-test-scan.yml` can be run in parallel to the rest of the workflow steps since it builds the application by itself. With this, we managed not to interfere with the total final build time.
@@ -237,7 +237,7 @@ All modules need to specify where the final report will be generated setting the
         <jacoco-maven-plugin.version>0.8.5</jacoco-maven-plugin.version>
         <maven-surefire-plugin.version>3.0.0-M7</maven-surefire-plugin.version>
         <code.coverage.project.folder>${basedir}/../</code.coverage.project.folder>
-        <code.coverage.overall.data.folder>${basedir}/target/</code.coverage.overall.data.folder>      
+        <code.coverage.overall.data.folder>${basedir}/target/</code.coverage.overall.data.folder>
         <skip.integration.tests>true</skip.integration.tests>
         <skip.unit.tests>true</skip.unit.tests>
         <itCoverageAgent></itCoverageAgent>
@@ -452,8 +452,7 @@ Here the modules we want to generate and aggregate test reports must be specifie
 
 ### Releasing a new version of build-logic
 
-When you want to release new version of `build-logic`, it is important to update all the occurrences of previous version eg: `v0.7.8` with the new version eg : `v0.7.8` in all the files. As, the code for the new version internally refers to the old version.   
-
+When you want to release new version of `build-logic`, it is important to update all the occurrences of previous version eg: `main` with the new version eg : `main` in all the files. As, the code for the new version internally refers to the old version.
 
 ### Fossa Report Generation for Enterprise
 
@@ -462,14 +461,15 @@ When you want to release new version of `build-logic`, it is important to update
 
 ![](./doc/img/run-enterprise-fossa-manually.png)
 
-   - this workflow triggers a run in the specified repository matrix in workflow `fossa.yml`
-   - individual repositories call the workflow `generate-upload-fossa-report.yml` under this repository `liquibase/build-logic` ./github/workflows/fossa.yml`
+- this workflow triggers a run in the specified repository matrix in workflow `fossa.yml`
+- individual repositories call the workflow `generate-upload-fossa-report.yml` under this repository `liquibase/build-logic` ./github/workflows/fossa.yml`
+
 3. `generate-upload-fossa-report.yml`
    - the individual reports are uploaded under `raw_reports`
-   - the combined reports is called `enterprise_report_version_number_for_report_generation` which is uploaded under `version_number_for_report_generation` 
+   - the combined reports is called `enterprise_report_version_number_for_report_generation` which is uploaded under `version_number_for_report_generation`
    - the report for `datical-service` is uploaded under version_number_for_report_generation
-4. You might need to do some manipulation of the columns as sometimes they are empty. Just the way Fossa populates them! 
-5. For any dependencies you dont want included in the final report, just add them to `.github/workflows/ignore_dependencies_fossa.txt` file. 
+4. You might need to do some manipulation of the columns as sometimes they are empty. Just the way Fossa populates them!
+5. For any dependencies you dont want included in the final report, just add them to `.github/workflows/ignore_dependencies_fossa.txt` file.
 6. Final combined report for all repos except datical-service is called `enterprise_report_8.7.352.csv`
 7. Final separate report for datical-service is called `datical-service.csv`
 

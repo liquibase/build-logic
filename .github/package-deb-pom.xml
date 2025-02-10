@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
 	<groupId>${groupId}</groupId>
 	<artifactId>${artifactId}</artifactId>
 	<version>${revision}</version>
-    <description>Universal pom for deb packaging</description>
+	<description>Universal pom for deb packaging</description>
 
 	<properties>
 		<maven.antrun.version>3.1.0</maven.antrun.version>
@@ -16,24 +16,27 @@
 	<build>
 		<plugins>
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>  
-				<artifactId>maven-antrun-plugin</artifactId>  
-				<version>${maven.antrun.version}</version>  
-				<executions>  
-					<execution>  
-						<id>unpack</id>  
-						<phase>package</phase>  
-						<configuration>  
-							<target>  
-								<untar src="${project.build.directory}/${project.artifactId}-${project.version}.tar.gz" compression="gzip" dest="${project.build.directory}/dist-unpacked" />
-							</target>  
-						</configuration>  
-						<goals>  
-							<goal>run</goal>  
-						</goals>  
-					</execution>  
-				</executions>  
-			</plugin> 
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>${maven.antrun.version}</version>
+				<executions>
+					<execution>
+						<id>unpack</id>
+						<phase>package</phase>
+						<configuration>
+							<target>
+								<untar
+									src="${project.build.directory}/${project.artifactId}-${project.version}.tar.gz"
+									compression="gzip"
+									dest="${project.build.directory}/dist-unpacked" />
+							</target>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.vafer</groupId>
 				<artifactId>jdeb</artifactId>
@@ -57,6 +60,15 @@
 							<mapper>
 								<type>perm</type>
 								<prefix>/opt/liquibase</prefix>
+								<filemode>755</filemode>
+							</mapper>
+						</data>
+						<data>
+							<src>${project.build.directory}/dist-unpacked/liquibase</src>
+							<type>file</type>
+							<mapper>
+								<type>perm</type>
+								<prefix>/usr/bin</prefix>
 								<filemode>755</filemode>
 							</mapper>
 						</data>

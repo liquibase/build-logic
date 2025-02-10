@@ -57,7 +57,6 @@
 						<data>
 							<src>${project.build.directory}/dist-unpacked</src>
 							<type>directory</type>
-							<excludes>liquibase</excludes>
 							<mapper>
 								<type>perm</type>
 								<prefix>/opt/liquibase</prefix>
@@ -65,13 +64,9 @@
 							</mapper>
 						</data>
 						<data>
-							<src>${project.build.directory}/dist-unpacked/liquibase</src>
-							<type>file</type>
-							<mapper>
-								<type>perm</type>
-								<prefix>/usr/bin</prefix>
-								<filemode>755</filemode>
-							</mapper>
+							<type>link</type>
+							<symlink>/usr/bin/liquibase</symlink>
+							<linkTarget>/opt/liquibase/liquibase</linkTarget>
 						</data>
 					</dataSet>
 				</configuration>

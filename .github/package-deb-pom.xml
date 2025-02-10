@@ -57,6 +57,9 @@
 						<data>
 							<src>${project.build.directory}/dist-unpacked</src>
 							<type>directory</type>
+							<excludes>
+								<exclude>liquibase</exclude>
+							</excludes>
 							<mapper>
 								<type>perm</type>
 								<prefix>/opt/liquibase</prefix>

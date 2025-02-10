@@ -64,9 +64,10 @@
 							</mapper>
 						</data>
 						<data>
-							<type>link</type>
+							<type>symlink</type>
 							<linkName>/usr/bin/liquibase</linkName>
 							<linkTarget>/opt/liquibase/liquibase</linkTarget>
+							<symlink>true</symlink>
 						</data>
 					</dataSet>
 				</configuration>

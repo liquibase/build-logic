@@ -65,6 +65,7 @@
 						</data>
 						<data>
 							<type>symlink</type>
+							<src>.</src>
 							<linkName>/usr/bin/liquibase</linkName>
 							<linkTarget>/opt/liquibase/liquibase</linkTarget>
 							<symlink>true</symlink>

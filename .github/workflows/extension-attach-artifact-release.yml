@@ -4,14 +4,14 @@ on:
   workflow_call:
     inputs:
       zip:
-        description: 'Specify it if you want to attach a zip file to the release'
+        description: "Specify it if you want to attach a zip file to the release"
         required: false
-        default: 'false'
+        default: "false"
         type: string
       extraCommand:
-        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        description: "Specify it if you want to run an extra command before attaching the artifact"
         required: false
-        default: ''
+        default: ""
         type: string
       mavenProfiles:
         description: "Specify it if you want to run different Maven profiles from the default (coverage).  mavenProfiles example: 'coverage,run-proguard'"
@@ -34,32 +34,31 @@ on:
         default: "."
         type: string
       combineJars:
-        description: 'Specify it if you want to combine jars into one'
+        description: "Specify it if you want to combine jars into one"
         required: false
         default: false
         type: boolean
       dry_run:
-        description: 'Specify it if you want to run a dry run'
+        description: "Specify it if you want to run a dry run"
         required: false
         default: false
         type: boolean
       dry_run_version:
-        description: 'The version of the dry-run release'
+        description: "The version of the dry-run release"
         required: false
         type: string
     secrets:
       BOT_TOKEN:
-        description: 'BOT_TOKEN from the caller workflow'
+        description: "BOT_TOKEN from the caller workflow"
         required: true
       GPG_SECRET:
-        description: 'GPG_SECRET from the caller workflow'
+        description: "GPG_SECRET from the caller workflow"
         required: true
       GPG_PASSPHRASE:
-        description: 'GPG_PASSPHRASE from the caller workflow'
+        description: "GPG_PASSPHRASE from the caller workflow"
         required: true
 
 jobs:
-
   build-multi-architecture:
     strategy:
       fail-fast: false
@@ -186,7 +185,6 @@ jobs:
         run: |
           echo "artifact_version=${{ inputs.dry_run_version }}" >> $GITHUB_OUTPUT
 
-
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -198,12 +196,11 @@ jobs:
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
 
   combineJars:
-    needs: [ build-multi-architecture ]
+    needs: [build-multi-architecture]
     if: ${{ inputs.combineJars }}
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
-
       - uses: actions/checkout@v4
 
       - name: Download Ubuntu Artifacts
@@ -245,7 +242,6 @@ jobs:
           cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-sources.jar /tmp/combined/
           cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-javadoc.jar /tmp/combined/
           cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom /tmp/combined/
-          
 
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v4
@@ -260,7 +256,7 @@ jobs:
   attach-to-release:
     if: always()
     name: Attach Artifact to Release
-    needs: [ combineJars ]
+    needs: [combineJars]
     runs-on: ubuntu-latest
     concurrency:
       group: attach-artifact-${{ github.ref }}
@@ -274,8 +270,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: 17
-          distribution: 'temurin'
-          cache: 'maven'
+          distribution: "temurin"
+          cache: "maven"
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
@@ -319,12 +315,12 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT }}"
               }
             ]
-            
+
       - name: Get Reusable Script Files
         run: |
-          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.7.8/.github/get_draft_release.sh
-          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.7.8/.github/sign_artifact.sh
-          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.7.8/.github/upload_asset.sh
+          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/get_draft_release.sh
+          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
+          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/upload_asset.sh
           chmod +x $PWD/.github/get_draft_release.sh
           chmod +x $PWD/.github/sign_artifact.sh
           chmod +x $PWD/.github/upload_asset.sh
@@ -509,9 +505,9 @@ jobs:
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'
         run: |
-          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.7.8/.github/upload_zip.sh
+          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/upload_zip.sh
           chmod +x $PWD/.github/upload_zip.sh
-  
+
       - name: Attach Zip File to Draft Release
         if: inputs.zip == 'true'
         id: upload-release-zip

@@ -13,17 +13,17 @@ on:
       version:
         description: "Value from the version field in pom.xml. i.e 4.23.0"
         type: string
-      dry_run: 
-        description: 'Flag to indicate if the workflow is triggered to create a dry-run release'
+      dry_run:
+        description: "Flag to indicate if the workflow is triggered to create a dry-run release"
         required: false
         type: boolean
         default: false
-      dry_run_zip_url: 
-        description: 'URL of the dry-run zip release'
+      dry_run_zip_url:
+        description: "URL of the dry-run zip release"
         required: false
         type: string
-      dry_run_tar_gz_url: 
-        description: 'URL of the dry-run tar.gz release'
+      dry_run_tar_gz_url:
+        description: "URL of the dry-run tar.gz release"
         required: false
         type: string
     secrets:
@@ -49,25 +49,24 @@ on:
       version:
         description: "Value from the version field in pom.xml. i.e 4.23.0"
         type: string
-      dry_run: 
-        description: 'Flag to indicate if the workflow is triggered to create a dry-run release'
+      dry_run:
+        description: "Flag to indicate if the workflow is triggered to create a dry-run release"
         required: false
         type: boolean
         default: false
-      dry_run_zip_url: 
-        description: 'URL of the dry-run zip release'
+      dry_run_zip_url:
+        description: "URL of the dry-run zip release"
         required: false
         type: string
-      dry_run_tar_gz_url: 
-        description: 'URL of the dry-run tar.gz release'
+      dry_run_tar_gz_url:
+        description: "URL of the dry-run tar.gz release"
         required: false
         type: string
-        
+
 env:
   MAVEN_VERSION: "3.9.5"
 
 jobs:
-
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
@@ -99,11 +98,11 @@ jobs:
           # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
           mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
           mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/deb/control/control
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/deb/control/postinst
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-          curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/.github/package-deb-pom.xml
-          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/v0.6.3/.github/sign_artifact.sh
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/control
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postinst
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
+          curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
+          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
           chmod +x $PWD/.github/sign_artifact.sh
 
       - name: Import GPG key
@@ -213,7 +212,6 @@ jobs:
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
-
       - name: Check for existing Homebrew formula PR for ${{ inputs.artifactId }}
         id: check-brew-pr
         run: |
@@ -248,7 +246,7 @@ jobs:
             Created by https://github.com/mislav/bump-homebrew-formula-action
         env:
           COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}
-          
+
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}
         env:
@@ -337,5 +335,3 @@ jobs:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
       dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
-
-          

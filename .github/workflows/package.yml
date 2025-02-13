@@ -130,7 +130,7 @@ jobs:
         run: |
           mkdir -p $PWD/.github/target
           # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
-          wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz ${{ inputs.dry_run_tar_gz_url }}
+          wget -v --header="Authorization: Token ${{ secrets.BOT_TOKEN }}" -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz ${{ inputs.dry_run_tar_gz_url }}
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |

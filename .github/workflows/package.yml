@@ -314,10 +314,8 @@ jobs:
           S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
           S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
         run: |
-          wget --content-disposition --header="Accept: application/octet-stream" --header="Authorization: Token ${{ secrets.BOT_TOKEN }}" ${{ inputs.dry_run_zip_url }}
-
           mkdir -p liquibase-$VERSION/bin/internal
-          unzip liquibase-$VERSION.zip -d liquibase-$VERSION
+          unzip .github/target/liquibase-$VERSION.zip -d liquibase-$VERSION
           rm -rf liquibase-$VERSION.zip
           mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
           mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/

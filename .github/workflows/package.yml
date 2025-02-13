@@ -140,7 +140,7 @@ jobs:
           repository: "liquibase/liquibase"
           releaseId: "${{ inputs.dry_run_release_id }}"
           fileName: "*"
-          out-file-path: "$PWD/.github/target/"
+          out-file-path: ".github/target/"
           token: ${{ secrets.BOT_TOKEN }}
 
       - name: Build ${{ inputs.artifactId }} deb package

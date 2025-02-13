@@ -129,8 +129,7 @@ jobs:
         if: ${{ inputs.dry_run == true }}
         run: |
           mkdir -p $PWD/.github/target
-          # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
-          wget -v --content-disposition --header="Accept: application/octet-stream" --header="Authorization: Token ${{ secrets.BOT_TOKEN }}" -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz ${{ inputs.dry_run_tar_gz_url }}
+          curl -L -o $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz -H "Accept: application/octet-stream" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -v ${{ inputs.dry_run_tar_gz_url }}
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |

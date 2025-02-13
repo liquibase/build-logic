@@ -26,6 +26,10 @@ on:
         description: "URL of the dry-run tar.gz release"
         required: false
         type: string
+      dry_run_release_id:
+        description: "ID of the dry-run release"
+        required: false
+        type: string
     secrets:
       GPG_SECRET:
         description: "GPG_SECRET from the caller workflow"
@@ -60,6 +64,10 @@ on:
         type: string
       dry_run_tar_gz_url:
         description: "URL of the dry-run tar.gz release"
+        required: false
+        type: string
+      dry_run_release_id:
+        description: "ID of the dry-run release"
         required: false
         type: string
 
@@ -127,9 +135,12 @@ jobs:
 
       - name: Download ${{ inputs.artifactId }} dry-run Release
         if: ${{ inputs.dry_run == true }}
-        run: |
-          mkdir -p $PWD/.github/target
-          curl -L -o $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz -H "Accept: application/octet-stream" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -v ${{ inputs.dry_run_tar_gz_url }}
+        uses: robinraju/release-downloader@v1.11
+        with:
+          repository: "liquibase/liquibase"
+          releaseId: "${{ inputs.dry_run_release_id }}"
+          fileName: "*"
+          out-file-path: "$PWD/.github/target/"
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |

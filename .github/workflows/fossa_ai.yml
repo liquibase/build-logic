@@ -32,6 +32,9 @@ on:
       repo_name:
         required: true
         type: string
+      branch_name:
+        required: true
+        type: string  
   repository_dispatch:
     types: [oss-released-version]
 
@@ -39,7 +42,7 @@ jobs:
   fossa-scan:
     runs-on: ubuntu-latest
     permissions: write-all
-    if: github.event_name != 'repository_dispatch'
+    if: github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch'
     env:
       FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
 
@@ -162,35 +165,45 @@ jobs:
   generate-oss-pro-sbom-reports:
     runs-on: ubuntu-latest
     permissions: write-all
-    if: >-
-      (github.event_name == 'repository_dispatch')
-      || (github.event_name == 'workflow_dispatch' && !needs.fossa-scan.result)
+    if: github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch'
 
     env:
       FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
     steps:
       - name: Checkout Code
+        if: github.event_name == 'repository_dispatch'
+        uses: actions/checkout@v4
+
+      - name: Checkout Code
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
-          fetch-depth: 0
-          
+          repository: ${{ github.event.inputs.repo_name }}
+          ref: ${{ github.event.inputs.branch_name }}
+      
+      - name: Setup 
+        id: setup
+        run: |
+          echo "repo_name=${{ github.event.inputs.repo_name || github.event.client_payload.repo_name}}" >> $GITHUB_OUTPUT
+          echo "latest_version=${{ github.event.inputs.latest_version || github.event.client_payload.latest_version}}" >> $GITHUB_OUTPUT
+
+
       - name: Install FOSSA CLI
         run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
 
       - name: Run FOSSA SBOM Report for OSS
-        if: ${{ github.event.inputs.repo_name == 'liquibase' || github.event.client_payload.repo_name == 'liquibase' }}
+        if: ${{ steps.setup.outputs.repo_name == 'liquibase' }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-          fossa report -p ${{ github.event.inputs.repo_name || github.event.client_payload.repo_name }} attribution --format html 2>&1 | tee oss-sbom.html
+          fossa report -p ${{ steps.setup.outputs.repo_name }} attribution --format html 2>&1 | tee oss-sbom.html
 
       - name: Run FOSSA SBOM Reports for OSS-pro
-        if: ${{ github.event.inputs.repo_name == 'liquibase-pro' || github.event.client_payload.repo_name == 'liquibase-pro' }}
+        if: ${{ steps.setup.outputs.repo_name == 'liquibase-pro' }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-          fossa report -p ${{ github.event.inputs.repo_name || github.event.client_payload.repo_name }} attribution --format cyclonedx-json 2>&1 | tee pro-sbom-cyclonedx-json.json
-          fossa report -p ${{ github.event.inputs.repo_name || github.event.client_payload.repo_name }} attribution --format spdx-json 2>&1 | tee pro-sbom-spdx-json.json
+          fossa report -p ${{ steps.setup.outputs.repo_name }} attribution --format cyclonedx-json 2>&1 | tee pro-sbom-cyclonedx-json.json
+          fossa report -p ${{ steps.setup.outputs.repo_name }} attribution --format spdx-json 2>&1 | tee pro-sbom-spdx-json.json
 
       - name: Set up AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -205,6 +218,6 @@ jobs:
 
       - name: Upload OSS FOSSA Results to s3
         run: |
-          aws s3 cp oss-sbom.html s3://liquibaseorg-origin/sbom-lb-lbpro-releases/liquibase-${{ github.event.inputs.latest_version || github.event.client_payload.latest_version }}_${{ env.timestamp }}/
-          aws s3 cp pro-sbom-cyclonedx-json.json s3://liquibaseorg-origin/sbom-lb-lbpro-releases/liquibase-${{ github.event.inputs.latest_version || github.event.client_payload.latest_version }}_${{ env.timestamp }}/
-          aws s3 cp pro-sbom-spdx-json.json s3://liquibaseorg-origin/sbom-lb-lbpro-releases/liquibase-${{ github.event.inputs.latest_version || github.event.client_payload.latest_version }}_${{ env.timestamp }}/
+          aws s3 cp oss-sbom.html s3://liquibaseorg-origin/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ env.timestamp }}/
+          aws s3 cp pro-sbom-cyclonedx-json.json s3://liquibaseorg-origin/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ env.timestamp }}/
+          aws s3 cp pro-sbom-spdx-json.json s3://liquibaseorg-origin/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ env.timestamp }}/

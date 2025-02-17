@@ -241,6 +241,7 @@ jobs:
           else
             echo "PR_EXISTS=true" >> $GITHUB_ENV
           fi
+            echo "PR_EXISTS is set to $PR_EXISTS"
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
         if: ${{ env.PR_EXISTS == false && inputs.dry_run == false }}

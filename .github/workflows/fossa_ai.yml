@@ -32,6 +32,7 @@ on:
       repo_name:
         required: true
         type: string
+        description: "The name of the repo should be org/repo_name. eg: liquibase/repo_name or datical/repo_name"
       branch_name:
         required: true
         type: string  

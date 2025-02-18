@@ -237,11 +237,15 @@ jobs:
           echo "pr_title: $pr_title"
           # Set the environment variable based on whether the PR exists
           if [ -z "$pr_title" ]; then
-            echo "PR_EXISTS=false" >> $GITHUB_ENV
+            echo "PR_EXISTS=false" 
           else
-            echo "PR_EXISTS=true" >> $GITHUB_ENV
+            echo "PR_EXISTS=true"
           fi
-          # Check PR_EXISTS value
+          
+          # Store it in GitHub environment for later steps
+          echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_ENV
+
+          # Echo it immediately to see the value in logs
           echo "PR_EXISTS is set to $PR_EXISTS"
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}

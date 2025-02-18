@@ -71,6 +71,11 @@ on:
           required: false
           type: boolean
           default: false
+        aws_redshift:
+          description: 'Deploy or destroy the aws_redshift infrastructure'
+          required: false
+          type: boolean
+          default: false
         stack_id:
             description: 'The stack ID to destroy'
             required: false
@@ -164,6 +169,7 @@ jobs:
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mssql ${{ inputs.aws_mssql }}
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
             spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql ${{ inputs.aws_mysql }}
+            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_redshift ${{ inputs.aws_redshift }}
             spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
     
       - name: Destroy ephemeral infra

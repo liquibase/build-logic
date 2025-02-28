@@ -68,9 +68,6 @@ on:
       AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA:
         description: "OIDC Role from the caller workflow"
         required: true
-      LIQUIBASE_PRO_LICENSE_KEY:
-        description: "Azure Active Directory (AD) tenant ID."
-        required: true
       AZURE_TENANT_ID:
         description: "Azure Active Directory (AD) tenant ID."
         required: true

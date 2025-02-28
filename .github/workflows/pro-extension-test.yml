@@ -68,6 +68,22 @@ on:
       AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA:
         description: "OIDC Role from the caller workflow"
         required: true
+      LIQUIBASE_PRO_LICENSE_KEY:
+        description: "Azure Active Directory (AD) tenant ID."
+        required: true
+      AZURE_TENANT_ID:
+        description: "Azure Active Directory (AD) tenant ID."
+        required: true
+      AZURE_CLIENT_SECRET:
+        description: "Secret key for Azure authentication."
+        required: true
+      AZURE_CLIENT_ID:
+        description: "Client ID for Azure service authentication."
+        required: true
+      LIQUIBASE_AZURE_STORAGE_ACCOUNT:
+        description: "Azure Storage Account name for Liquibase."
+        required: true
+  
 env:
   AWS_REGION: us-east-1
   LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}

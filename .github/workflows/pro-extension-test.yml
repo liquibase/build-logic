@@ -445,11 +445,11 @@ jobs:
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.pom
 
 # dont include the sonar-pull-request with pro-extension-test by default
-  # sonar-pr:
-  #   if: ${{ !inputs.nightly }}
-  #   needs: [unit-test]
-  #   uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
-  #   secrets: inherit
-  #   with:
-  #     extraCommand: ${{ inputs.extraCommand }}
-  #     artifactPath: ${{ inputs.artifactPath }}
+  sonar-pr:
+    if: ${{ !inputs.nightly }}
+    needs: [unit-test]
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
+    secrets: inherit
+    with:
+      extraCommand: ${{ inputs.extraCommand }}
+      artifactPath: ${{ inputs.artifactPath }}

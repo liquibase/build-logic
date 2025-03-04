@@ -454,7 +454,8 @@ Here the modules we want to generate and aggregate test reports must be specifie
 
 When you want to release new version of `build-logic`, it is important to update all the occurrences of previous version eg: `main` with the new version eg : `main` in all the files. As, the code for the new version internally refers to the old version.
 
-### Fossa Report Generation for Enterprise
+_____________________________________________________________________________________________________________________________________________________________________________
+### 📓  Fossa Report Generation for Enterprise
 
 1. AWS s3 bucket under `liquibase-prod` `s3://liquibaseorg-origin/enterprise_fossa_report/`
 2. Manually run the workflow under `fossa.yml` from this repository under `./github/workflows/fossa.yml`.Supply the DaticalDb-installer version variable which is used during its report generation to be stored in the s3 bucket. eg 8.7.352'
@@ -478,3 +479,8 @@ When you want to release new version of `build-logic`, it is important to update
 8. If we plan on sending this report to the users it will be on some page like we have for OSS -> https://www.liquibase.com/eula and they will have access to only the URI’s we mention. As to to the liquibase users, DevOps team can add them to permission set to have access to those reports.
 
 ![](./doc/img/permission-set-enterprise-fossa-report.png)
+
+
+### 🪣 Store SBOM for LB and LB Pro on every release
+
+https://datical.atlassian.net/wiki/x/CQAkCwE

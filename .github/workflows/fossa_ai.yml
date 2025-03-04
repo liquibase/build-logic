@@ -220,6 +220,6 @@ jobs:
 
       - name: Upload OSS FOSSA Results to s3
         run: |
-          aws s3 cp oss-sbom.html s3://liquibaseorg-origin/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ steps.get-timestamp.outputs.timestamp }}/
-          aws s3 cp pro-sbom-cyclonedx-json.json s3://liquibaseorg-origin/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ steps.get-timestamp.outputs.timestamp }}/
-          aws s3 cp pro-sbom-spdx-json.json s3://liquibaseorg-origin/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ steps.get-timestamp.outputs.timestamp }}/
+          aws s3 cp oss-sbom.html s3://liquibase-release-sboms/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ steps.get-timestamp.outputs.timestamp }}/
+          aws s3 cp pro-sbom-cyclonedx-json.json s3://liquibase-release-sboms/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ steps.get-timestamp.outputs.timestamp }}/
+          aws s3 cp pro-sbom-spdx-json.json s3://liquibase-release-sboms/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ steps.get-timestamp.outputs.timestamp }}/

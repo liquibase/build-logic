@@ -70,16 +70,16 @@ on:
         required: true
       AZURE_TENANT_ID:
         description: "Azure Active Directory (AD) tenant ID."
-        required: true
+        required: false
       AZURE_CLIENT_SECRET:
         description: "Secret key for Azure authentication."
-        required: true
+        required: false
       AZURE_CLIENT_ID:
         description: "Client ID for Azure service authentication."
-        required: true
+        required: false
       LIQUIBASE_AZURE_STORAGE_ACCOUNT:
         description: "Azure Storage Account name for Liquibase."
-        required: true
+        required: false
   
 env:
   AWS_REGION: us-east-1

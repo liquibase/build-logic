@@ -150,7 +150,7 @@ jobs:
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
       - name: Download Release Artifacts
-        uses: robinraju/release-downloader@v1.9
+        uses: robinraju/release-downloader@v1.12
         with:
           tag: "${{ github.event.release.tag_name }}"
           filename: "${{ env.artifact_id }}-*"
@@ -257,7 +257,7 @@ jobs:
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
       - name: Download Release Artifacts
-        uses: robinraju/release-downloader@v1.9
+        uses: robinraju/release-downloader@v1.12
         with:
           releaseId: "${{ inputs.dry_run_release_id }}"
           filename: "${{ env.artifact_id }}-*"

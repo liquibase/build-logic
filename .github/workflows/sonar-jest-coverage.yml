@@ -46,6 +46,10 @@ jobs:
         continue-on-error: true
         run: npm test -- --coverage
         
+      - name: Run Maven build
+        continue-on-error: true
+        run: mvn clean install
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v5.0.0
         env:

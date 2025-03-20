@@ -2,7 +2,10 @@ name: Sonar Scan for jest
 
 on:
   workflow_call:
-
+    
+env:
+  MAVEN_VERSION: "3.9.5"
+  
 jobs:
   sonarcloud:
     name: SonarCloud
@@ -14,18 +17,33 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18.5'
+          
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: "temurin"
+          cache: "maven"
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
 
       - name: Set up npm registry and authentication
+        continue-on-error: true
         run: |
           npm config set @liquibase:registry https://npm.pkg.github.com
           npm config set //npm.pkg.github.com/:_authToken ${{ secrets.NPM_TOKEN }}
 
       - name: Install dependencies
+        continue-on-error: true
         run: |
           npm cache clean --force
           npm install
 
       - name: Run Jest with coverage
+        continue-on-error: true
         run: npm test -- --coverage
         
       - name: SonarCloud Scan

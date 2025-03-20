@@ -31,22 +31,70 @@ jobs:
           maven-version: ${{ env.MAVEN_VERSION }}
 
       - name: Set up npm registry and authentication
+        # This job is for Node.js and Java sonar scans, don't fail if npm is not found
         continue-on-error: true
         run: |
           npm config set @liquibase:registry https://npm.pkg.github.com
           npm config set //npm.pkg.github.com/:_authToken ${{ secrets.NPM_TOKEN }}
 
       - name: Install dependencies
+        # This job is for Node.js and Java sonar scans, don't fail if npm is not found
         continue-on-error: true
         run: |
           npm cache clean --force
           npm install
 
       - name: Run Jest with coverage
+        # This job is for Node.js and Java sonar scans, don't fail if npm is not found
         continue-on-error: true
         run: npm test -- --coverage
         
+      # look for dependencies in maven
+      - name: maven-settings-xml-action
+        continue-on-error: true
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT }}"
+              }
+            ]
+
       - name: Run Maven build
+        # This job is for Node.js and Java sonar scans, don't fail if Java is not found
         continue-on-error: true
         run: mvn clean install
 

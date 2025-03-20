@@ -238,6 +238,14 @@ jobs:
         with:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
           path: ${{ github.event_path }}
+          
+      - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-artifacts
+          path: |
+            target/*
 
     outputs:
       artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}

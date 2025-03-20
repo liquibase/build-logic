@@ -98,8 +98,18 @@ jobs:
         continue-on-error: true
         run: mvn clean install
 
+      # Run SonarCloud Scan
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v5.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          
+      # Check the Quality Gate status.
+      - name: SonarQube Quality Gate check
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
+        with:
+          pollingTimeoutSec: 600
+        env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

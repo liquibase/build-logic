@@ -68,7 +68,7 @@ jobs:
     if: ${{ inputs.combineJars }}
     runs-on: ${{ matrix.os }}
     concurrency:
-      group: attach-artifact-${{ github.ref }}
+      group: attach-artifact-${{ github.ref }}-${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 

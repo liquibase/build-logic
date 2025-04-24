@@ -143,126 +143,126 @@ jobs:
           out-file-path: ".github/target/"
           token: ${{ secrets.BOT_TOKEN }}
 
-      - name: Build ${{ inputs.artifactId }} deb package
-        run: |
-          mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
+      # - name: Build ${{ inputs.artifactId }} deb package
+      #   run: |
+      #     mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
 
-      - name: Install deb-s3 gem
-        run: gem install deb-s3
+      # - name: Install deb-s3 gem
+      #   run: gem install deb-s3
 
-      - name: Upload ${{ inputs.artifactId }} deb package
-        if: ${{ inputs.dry_run == false }}
-        run: |
-          sudo apt install pinentry-tty
-          echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
-          export GPG_TTY=$(tty)
-          echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+      # - name: Upload ${{ inputs.artifactId }} deb package
+      #   if: ${{ inputs.dry_run == false }}
+      #   run: |
+      #     sudo apt install pinentry-tty
+      #     echo "2" | sudo update-alternatives --config pinentry
+      #     echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+      #     export GPG_TTY=$(tty)
+      #     echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
+      #     deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-      - name: Upload ${{ inputs.artifactId }} dry-run deb package
-        if: ${{ inputs.dry_run == true }}
-        run: |
-          sudo apt install pinentry-tty
-          echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
-          export GPG_TTY=$(tty)
-          echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+      # - name: Upload ${{ inputs.artifactId }} dry-run deb package
+      #   if: ${{ inputs.dry_run == true }}
+      #   run: |
+      #     sudo apt install pinentry-tty
+      #     echo "2" | sudo update-alternatives --config pinentry
+      #     echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+      #     export GPG_TTY=$(tty)
+      #     echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
+      #     deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-      - name: Convert deb to rpm
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y alien
-          sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+      # - name: Convert deb to rpm
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y alien
+      #     sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-      - name: Upload ${{ inputs.artifactId }} rpm package
-        if: ${{ inputs.dry_run == false }}
-        run: |
-          sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-          ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
-          mkdir createrepo_folder
-          cd createrepo_folder
-          git clone https://github.com/rpm-software-management/createrepo_c
-          cd createrepo_c
-          mkdir build
-          cd build
-          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
-          make -j
-          cp src/createrepo_c  /opt/createrepo
-          cd ../../..
-          mkdir -p $PWD/yum/noarch
-          aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
-          /opt/createrepo -dp $PWD/yum/noarch
-          ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
-          aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
+      # - name: Upload ${{ inputs.artifactId }} rpm package
+      #   if: ${{ inputs.dry_run == false }}
+      #   run: |
+      #     sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
+      #     ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+      #     mkdir createrepo_folder
+      #     cd createrepo_folder
+      #     git clone https://github.com/rpm-software-management/createrepo_c
+      #     cd createrepo_c
+      #     mkdir build
+      #     cd build
+      #     cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
+      #     make -j
+      #     cp src/createrepo_c  /opt/createrepo
+      #     cd ../../..
+      #     mkdir -p $PWD/yum/noarch
+      #     aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
+      #     mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
+      #     /opt/createrepo -dp $PWD/yum/noarch
+      #     ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+      #     aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
-      - name: Upload ${{ inputs.artifactId }} dry-run rpm package
-        if: ${{ inputs.dry_run == true }}
-        run: |
-          original_file=$(basename "$(find . -maxdepth 1 -name "*.rpm")")
-          new_name=$(echo "$original_file" | sed 's/+/-/g')
-          mv "$original_file" "$new_name"
-          sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-          ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
-          mkdir createrepo_folder
-          cd createrepo_folder
-          git clone https://github.com/rpm-software-management/createrepo_c
-          cd createrepo_c
-          mkdir build
-          cd build
-          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
-          make -j
-          cp src/createrepo_c  /opt/createrepo
-          cd ../../..
-          mkdir -p $PWD/yum/noarch
-          aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
-          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
-          /opt/createrepo -dp $PWD/yum/noarch
-          ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
-          aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
+      # - name: Upload ${{ inputs.artifactId }} dry-run rpm package
+      #   if: ${{ inputs.dry_run == true }}
+      #   run: |
+      #     original_file=$(basename "$(find . -maxdepth 1 -name "*.rpm")")
+      #     new_name=$(echo "$original_file" | sed 's/+/-/g')
+      #     mv "$original_file" "$new_name"
+      #     sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
+      #     ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+      #     mkdir createrepo_folder
+      #     cd createrepo_folder
+      #     git clone https://github.com/rpm-software-management/createrepo_c
+      #     cd createrepo_c
+      #     mkdir build
+      #     cd build
+      #     cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
+      #     make -j
+      #     cp src/createrepo_c  /opt/createrepo
+      #     cd ../../..
+      #     mkdir -p $PWD/yum/noarch
+      #     aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
+      #     mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
+      #     /opt/createrepo -dp $PWD/yum/noarch
+      #     ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+      #     aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
-      - name: Check for existing Homebrew formula PR for ${{ inputs.artifactId }}
-        id: check-brew-pr
-        run: |
-          # Authenticate GitHub CLI
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+      # - name: Check for existing Homebrew formula PR for ${{ inputs.artifactId }}
+      #   id: check-brew-pr
+      #   run: |
+      #     # Authenticate GitHub CLI
+      #     echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-          # Define the PR title
-          pr_title="liquibase ${{ inputs.version }}"
+      #     # Define the PR title
+      #     pr_title="liquibase ${{ inputs.version }}"
 
-          # Search for open pull requests with the specified title in the Homebrew/homebrew-core repo
-          pr_title=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
-          echo "pr_title: $pr_title"
-          # Set the environment variable based on whether the PR exists
-          if [ -z "$pr_title" ]; then
-            echo "PR_EXISTS=false" 
-          else
-            echo "PR_EXISTS=true"
-          fi
+      #     # Search for open pull requests with the specified title in the Homebrew/homebrew-core repo
+      #     pr_title=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
+      #     echo "pr_title: $pr_title"
+      #     # Set the environment variable based on whether the PR exists
+      #     if [ -z "$pr_title" ]; then
+      #       echo "PR_EXISTS=false" 
+      #     else
+      #       echo "PR_EXISTS=true"
+      #     fi
           
-          # Store it in GitHub environment for later steps
-          echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_ENV
+      #     # Store it in GitHub environment for later steps
+      #     echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_ENV
 
-          # Echo it immediately to see the value in logs
-          echo "PR_EXISTS is set to $PR_EXISTS"
+      #     # Echo it immediately to see the value in logs
+      #     echo "PR_EXISTS is set to $PR_EXISTS"
 
-      - name: Update Homebrew formula for ${{ inputs.artifactId }}
-        if: ${{ env.PR_EXISTS == 'false' && inputs.dry_run == false }}
-        uses: mislav/bump-homebrew-formula-action@v3
-        with:
-          formula-name: liquibase
-          formula-path: Formula/l/liquibase.rb
-          homebrew-tap: Homebrew/homebrew-core
-          tag-name: ${{ inputs.version }}
-          download-url: "https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.tar.gz"
-          commit-message: |
-            {{formulaName}} {{version}}
+      # - name: Update Homebrew formula for ${{ inputs.artifactId }}
+      #   if: ${{ env.PR_EXISTS == 'false' && inputs.dry_run == false }}
+      #   uses: mislav/bump-homebrew-formula-action@v3
+      #   with:
+      #     formula-name: liquibase
+      #     formula-path: Formula/l/liquibase.rb
+      #     homebrew-tap: Homebrew/homebrew-core
+      #     tag-name: ${{ inputs.version }}
+      #     download-url: "https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.tar.gz"
+      #     commit-message: |
+      #       {{formulaName}} {{version}}
 
-            Created by https://github.com/mislav/bump-homebrew-formula-action
-        env:
-          COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}
+      #       Created by https://github.com/mislav/bump-homebrew-formula-action
+      #   env:
+      #     COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}
@@ -335,18 +335,18 @@ jobs:
           aws s3api put-bucket-acl --bucket repo.liquibase.com  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
           aws s3api put-bucket-acl --bucket repo.liquibase.com.dry.run  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
 
-  upload_windows_package:
-    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-      dry_run: ${{ inputs.dry_run }}
-      dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
+  # upload_windows_package:
+  #   uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
+  #   secrets: inherit
+  #   with:
+  #     version: ${{ inputs.version }}
+  #     dry_run: ${{ inputs.dry_run }}
+  #     dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
-  upload_ansible_role:
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-      dry_run: ${{ inputs.dry_run }}
-      dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
+  # upload_ansible_role:
+  #   uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
+  #   secrets: inherit
+  #   with:
+  #     version: ${{ inputs.version }}
+  #     dry_run: ${{ inputs.dry_run }}
+  #     dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}

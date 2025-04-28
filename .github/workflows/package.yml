@@ -241,7 +241,7 @@ jobs:
           else
             echo "PR_EXISTS=true"
           fi
-          
+
           # Store it in GitHub environment for later steps
           echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_ENV
 
@@ -329,11 +329,6 @@ jobs:
           # Upload the release to S3
           aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
           echo "Uploaded liquibase-$VERSION.zip to s3"
-
-      - name: Ensure s3 bucket public access is enabled
-        run: |
-          aws s3api put-bucket-acl --bucket repo.liquibase.com  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
-          aws s3api put-bucket-acl --bucket repo.liquibase.com.dry.run  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
 
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master

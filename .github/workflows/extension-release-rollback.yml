@@ -103,6 +103,6 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         run: |
           mvn -B versions:revert release:rollback \
-          -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git \
           -DcheckModificationExcludeList=** -DignoreSnapshots=true

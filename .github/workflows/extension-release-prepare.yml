@@ -112,7 +112,6 @@ jobs:
           name: release-files
           path: |
             **/pom.xml.releaseBackup
-            **/release.properties
 
   release-rollback:
     needs: prepare-release

@@ -98,7 +98,7 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         run: |
           mvn -B build-helper:parse-version release:clean release:prepare \
-          -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
           -DcheckModificationExcludeList=pom.xml -DpushChanges=false -Dtag=temp
           git tag -d temp

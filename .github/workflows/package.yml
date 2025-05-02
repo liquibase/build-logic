@@ -74,6 +74,11 @@ on:
 env:
   MAVEN_VERSION: "3.9.5"
 
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
 jobs:
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
@@ -141,7 +146,7 @@ jobs:
           releaseId: "${{ inputs.dry_run_release_id }}"
           fileName: "*"
           out-file-path: ".github/target/"
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |
@@ -262,7 +267,7 @@ jobs:
 
             Created by https://github.com/mislav/bump-homebrew-formula-action
         env:
-          COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}
+          COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}

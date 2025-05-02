@@ -50,15 +50,15 @@ on:
         type: boolean
       repository:
         required: true
-        description: 'Repository to check out'
+        description: "Repository to check out"
         type: string
       version:
         required: true
-        description: 'Version to publish'
+        description: "Version to publish"
         type: string
       branch:
         required: true
-        description: 'Branch to check out'
+        description: "Branch to check out"
         type: string
     secrets:
       SONAR_TOKEN:
@@ -70,6 +70,11 @@ on:
       AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA:
         description: "OIDC Role from the caller workflow"
         required: true
+
+permissions:
+  contents: read
+  id-token: write
+
 env:
   AWS_REGION: us-east-1
   LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
@@ -92,7 +97,7 @@ jobs:
         with:
           repository: ${{ inputs.repository || github.repository }}
           ref: ${{ inputs.branch }}
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -228,11 +233,10 @@ jobs:
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
-
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository || github.repository }}
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4

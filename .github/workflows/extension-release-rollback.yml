@@ -23,14 +23,14 @@ jobs:
     name: Release rollback
     runs-on: ubuntu-latest
     env:
-      GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
 
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure Git
         run: |

@@ -23,7 +23,7 @@ on:
 
 # Add permissions for the default GITHUB_TOKEN
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -73,6 +73,7 @@ jobs:
           app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
           private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
+          repositories: ${{ inputs.extension }}
 
         #look for dependencies in maven
       - name: maven-settings-xml-action
@@ -136,6 +137,7 @@ jobs:
       - name: Build and deploy Extension to GPM
         env:
           GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
+          APP_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
           cd ${{ inputs.extension }}
           EXTENSION_VERSION="master-SNAPSHOT"

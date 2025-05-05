@@ -121,12 +121,12 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.GITHUB_TOKEN }}"
+                "password": "${{ steps.get-token.outputs.token }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.GITHUB_TOKEN }}"
+                "password": "${{ steps.get-token.outputs.token }}"
               },
               {
                 "id": "extension-repo",

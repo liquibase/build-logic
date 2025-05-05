@@ -85,6 +85,7 @@ permissions:
   contents: write
   id-token: write
   packages: read
+  pull-requests: write
 
 env:
   AWS_REGION: us-east-1

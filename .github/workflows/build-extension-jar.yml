@@ -41,6 +41,9 @@ jobs:
   build-and-deploy-extensions:
     needs: [delete-dependency-packages]
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GIT_USERNAME: "liquibot"
@@ -90,6 +93,17 @@ jobs:
                   "enabled": "true",
                   "updatePolicy": "always"
                 }
+              },
+              {
+                "id": "extension-repo",
+                "url": "https://maven.pkg.github.com/liquibase/${{ inputs.extension }}",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
               }
             ]
           servers: |
@@ -101,6 +115,11 @@ jobs:
               },
               {
                 "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.GITHUB_TOKEN }}"
+              },
+              {
+                "id": "extension-repo",
                 "username": "liquibot",
                 "password": "${{ secrets.GITHUB_TOKEN }}"
               }
@@ -118,7 +137,7 @@ jobs:
               -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
               -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
               -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
-              -DrepositoryId=liquibase \
+              -DrepositoryId=extension-repo \
               -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
               -DpomFile=pom.xml
             cd ..

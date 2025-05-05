@@ -25,6 +25,7 @@ permissions:
   issues: read
   statuses: read
   actions: read
+  security-events: write
 
 jobs:
   sonar:

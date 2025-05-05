@@ -135,7 +135,7 @@ jobs:
 
       - name: Download ${{ inputs.artifactId }} dry-run Release
         if: ${{ inputs.dry_run == true }}
-        uses: robinraju/release-downloader@v1.11
+        uses: robinraju/release-downloader@v1.12
         with:
           repository: "liquibase/liquibase"
           releaseId: "${{ inputs.dry_run_release_id }}"

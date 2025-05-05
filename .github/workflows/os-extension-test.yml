@@ -216,7 +216,7 @@ jobs:
                 "password": "${{ secrets.GITHUB_TOKEN }}"
               }
             ]
-            
+
       - uses: actions/download-artifact@v4
         with:
           name: ${{needs.build.outputs.artifact_id}}-artifacts
@@ -260,7 +260,7 @@ jobs:
   sonar-pr:
     if: ${{ !inputs.nightly }}
     needs: [unit-test]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@DAT-20127
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

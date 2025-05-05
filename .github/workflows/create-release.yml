@@ -4,9 +4,9 @@ on:
   workflow_call:
     inputs:
       extraCommand:
-        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        description: "Specify it if you want to run an extra command before attaching the artifact"
         required: false
-        default: ''
+        default: ""
         type: string
       artifactPath:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
@@ -14,23 +14,27 @@ on:
         default: "."
         type: string
       sonar:
-        description: 'Specify it if you want to run sonar scan'
+        description: "Specify it if you want to run sonar scan"
         required: false
         default: true
         type: boolean
 
 permissions:
   contents: write
-      
+  pull-requests: read
+  issues: read
+  statuses: read
+  actions: read
+
 jobs:
   sonar:
     if: ${{ inputs.sonar == true }}
-    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@main
+    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@DAT-20127
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
       artifactPath: ${{ inputs.artifactPath }}
-              
+
   create-release:
     name: Create Release
     runs-on: ubuntu-latest

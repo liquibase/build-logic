@@ -23,13 +23,13 @@ on:
         type: string
 
 permissions:
-  contents: write  # Updated from 'read' to 'write' to allow tag operations
+  contents: write # Updated from 'read' to 'write' to allow tag operations
   packages: write
 
 jobs:
   build:
     name: Build Extension
-    uses: liquibase/build-logic/.github/workflows/pro-extension-build-for-liquibase.yml@main
+    uses: liquibase/build-logic/.github/workflows/pro-extension-build-for-liquibase.yml@DAT-20127
     secrets: inherit
     with:
       os: '["ubuntu-latest", "macos-latest", "windows-latest"]'

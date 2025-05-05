@@ -106,7 +106,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       id-token: write
-      contents: write  # Updated from 'read' to 'write' to allow tag operations
+      contents: write # Updated from 'read' to 'write' to allow tag operations
     steps:
       - uses: actions/checkout@v4
         with:
@@ -189,7 +189,7 @@ jobs:
         shell: powershell
         run: |
           ${{ inputs.extraWindowsCommand }}
-          
+
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
         shell: bash
@@ -243,7 +243,7 @@ jobs:
         with:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
           path: ${{ github.event_path }}
-          
+
       - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
@@ -285,7 +285,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
-          
+
       - name: Set up Maven
         uses: stCarolas/setup-maven@v5
         with:
@@ -363,7 +363,7 @@ jobs:
           else
             mvn -B test -P '${{ inputs.mavenProfiles }}'
           fi
-  
+
       - name: Run Tests
         if: ${{ inputs.nightly }}
         shell: bash
@@ -397,12 +397,11 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   combineJars:
-    needs: [ build, unit-test ]
+    needs: [build, unit-test]
     if: ${{ inputs.combineJars }}
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
@@ -460,7 +459,7 @@ jobs:
   sonar-pr:
     if: ${{ !inputs.nightly }}
     needs: [unit-test]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@DAT-20127
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

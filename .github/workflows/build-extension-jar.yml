@@ -61,9 +61,13 @@ jobs:
           java-version: 21
           distribution: "temurin"
           cache: "maven"
+          server-id: github # Used for the settings.xml server configuration
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
           gpg-private-key: ${{ secrets.GPG_SECRET }}
           gpg-passphrase: GPG_PASSPHRASE
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
 
         #look for dependencies in maven
@@ -128,16 +132,25 @@ jobs:
       - name: Build and deploy Extension to GPM
         env:
           GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd ${{ inputs.extension }}
           EXTENSION_VERSION="master-SNAPSHOT"
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
-            mvn deploy:deploy-file \
-              -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
-              -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
-              -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
-              -DrepositoryId=extension-repo \
-              -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
-              -DpomFile=pom.xml
-            cd ..
+          # Debug - view Maven settings
+          cat ~/.m2/settings.xml
+          # Try with explicit credentials
+          mvn deploy:deploy-file \
+            -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
+            -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
+            -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
+            -DrepositoryId=github \
+            -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
+            -DgroupId=${{ inputs.groupId }} \
+            -DartifactId=${{ inputs.extension }} \
+            -Dversion=$EXTENSION_VERSION \
+            -DgeneratePom=false \
+            -DpomFile=pom.xml \
+            -DretryFailedDeploymentCount=3
+          cd ..

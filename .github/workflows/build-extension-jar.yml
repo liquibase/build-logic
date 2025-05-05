@@ -141,11 +141,21 @@ jobs:
           APP_TOKEN: ${{ steps.get-token.outputs.token }}
           ACTIONS_RUNNER_DEBUG: true
           ACTIONS_STEP_DEBUG: true
+          GITHUB_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
           cd ${{ inputs.extension }}
           EXTENSION_VERSION="master-SNAPSHOT"
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
+          # Debug token info (masked in logs)
+          echo "Token length: ${#APP_TOKEN}"
+          echo "First 4 chars: ${APP_TOKEN:0:4}..."
+
+          # Configure git for username/token in case it's needed
+          git config --global credential.helper store
+          echo "https://liquibot:${APP_TOKEN}@github.com" > ~/.git-credentials
+
+          # Deploy with explicit token authentication
           mvn deploy:deploy-file \
               -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
               -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
@@ -154,5 +164,7 @@ jobs:
               -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
               -DpomFile=pom.xml \
               -X \
-              -Dgithub.token=${{ steps.get-token.outputs.token }}
+              -Dgithub.token=${{ steps.get-token.outputs.token }} \
+              -Dserver.username=liquibot \
+              -Dserver.password=${{ steps.get-token.outputs.token }}
           cd ..

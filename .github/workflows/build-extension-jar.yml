@@ -44,7 +44,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GIT_USERNAME: "liquibot"
-      GIT_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
+      GIT_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout Dependencies
         run: |
@@ -97,12 +97,12 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               }
             ]
 

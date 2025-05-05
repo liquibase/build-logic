@@ -80,7 +80,8 @@ on:
       LIQUIBASE_AZURE_STORAGE_ACCOUNT:
         description: "Azure Storage Account name for Liquibase."
         required: false
-  
+
+
 env:
   AWS_REGION: us-east-1
   LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
@@ -101,7 +102,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       id-token: write
-      contents: read
+      contents: write  # Updated from 'read' to 'write' to allow tag operations
     steps:
       - uses: actions/checkout@v4
         with:
@@ -159,12 +160,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               }
             ]
 
@@ -320,12 +321,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               }
             ]
 

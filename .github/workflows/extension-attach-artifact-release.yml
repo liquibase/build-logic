@@ -4,6 +4,7 @@ name: Attach Artifact to Release
 permissions:
   contents: write
   actions: read
+  packages: write
 
 on:
   workflow_call:
@@ -53,9 +54,6 @@ on:
         required: false
         type: string
     secrets:
-      BOT_TOKEN:
-        description: "BOT_TOKEN from the caller workflow"
-        required: true
       GPG_SECRET:
         description: "GPG_SECRET from the caller workflow"
         required: true
@@ -123,12 +121,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               }
             ]
 
@@ -312,12 +310,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               }
             ]
 

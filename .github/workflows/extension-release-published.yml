@@ -44,6 +44,11 @@ on:
         description: 'SONATYPE_TOKEN from the caller workflow'
         required: true
 
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+
 jobs:
   maven-release:
     uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@main
@@ -111,12 +116,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "sonatype-nexus-staging",
@@ -232,12 +237,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "dry-run-sonatype-nexus-staging",

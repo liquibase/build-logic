@@ -35,7 +35,6 @@ jobs:
         with:
           package-name: ${{ inputs.groupId }}.${{ inputs.extension }}
           package-type: "maven"
-          token: ${{ secrets.GITHUB_TOKEN }}
           min-versions-to-keep: 5 # Keep the last 5 versions so we don't break simultaneous builds
           delete-only-pre-release-versions: true
 

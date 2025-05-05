@@ -52,7 +52,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository }}
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download Multiplatform Artifacts
         uses: actions/download-artifact@v4

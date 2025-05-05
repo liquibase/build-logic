@@ -146,7 +146,6 @@ jobs:
           releaseId: "${{ inputs.dry_run_release_id }}"
           fileName: "*"
           out-file-path: ".github/target/"
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |

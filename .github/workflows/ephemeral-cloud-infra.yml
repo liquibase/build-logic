@@ -113,7 +113,6 @@ jobs:
         with:
           ref: master
           repository: liquibase/liquibase-infrastructure
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3

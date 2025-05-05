@@ -19,9 +19,8 @@ on:
         required: true
 
 permissions:
-  actions: read # Required for downloading artifacts
-  contents: read # Required for checkout
-  security-events: write # Required for SonarCloud integrations
+  contents: read
+  security-events: write
 
 jobs:
   sonar-push:

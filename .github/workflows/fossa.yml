@@ -8,6 +8,10 @@ on:
         description: 'Supply the DaticalDb-installer version variable which is used during its report generation to be stored in the s3 bucket. eg 8.7.352'
         required: false
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   wait-for-fossa-report-generation:
     runs-on: ubuntu-latest
@@ -170,4 +174,4 @@ jobs:
           repository: Datical/datical-service
           event-type: trigger-fossa-report-generation
           client-payload: '{"ref": "master", "version_number_for_report_generation": "${{ github.event.inputs.version_number_for_report_generation }}"}'
-          
+

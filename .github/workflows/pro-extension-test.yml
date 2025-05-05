@@ -81,6 +81,10 @@ on:
         description: "Azure Storage Account name for Liquibase."
         required: false
 
+permissions:
+  contents: write
+  id-token: write
+  packages: read
 
 env:
   AWS_REGION: us-east-1

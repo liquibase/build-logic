@@ -18,6 +18,9 @@ on:
         required: false
         default: true
         type: boolean
+
+permissions:
+  contents: write
       
 jobs:
   sonar:

@@ -81,11 +81,6 @@ jobs:
               }
             ]
 
-      - name: Configure Git
-        run: |
-          git config --local user.email "64099989+liquibot@users.noreply.github.com"
-          git config --local user.name "liquibot"
-
       - name: Run extra command
         working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
@@ -99,8 +94,20 @@ jobs:
           -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
           -DcheckModificationExcludeList=pom.xml -DpushChanges=false -Dtag=temp
-          git tag -d temp
-          git push --force
+
+      - name: Create Pull Request for version bump
+        uses: peter-evans/create-pull-request@v7.0.8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update version after release"
+          title: "Version bump after release"
+          body: |
+            This PR updates the POM version after a release.
+
+            Automated changes by GitHub Actions.
+          branch: version-bump-after-release
+          base: main
+          delete-branch: true
 
       - name: Save Release files
         if: always()

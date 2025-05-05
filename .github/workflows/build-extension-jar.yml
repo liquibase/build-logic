@@ -139,16 +139,20 @@ jobs:
         env:
           GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
           APP_TOKEN: ${{ steps.get-token.outputs.token }}
+          ACTIONS_RUNNER_DEBUG: true
+          ACTIONS_STEP_DEBUG: true
         run: |
           cd ${{ inputs.extension }}
           EXTENSION_VERSION="master-SNAPSHOT"
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
-            mvn deploy:deploy-file \
+          mvn deploy:deploy-file \
               -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
               -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
               -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
               -DrepositoryId=extension-repo \
               -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
-              -DpomFile=pom.xml
-            cd ..
+              -DpomFile=pom.xml \
+              -X \
+              -Dgithub.token=${{ steps.get-token.outputs.token }}
+          cd ..

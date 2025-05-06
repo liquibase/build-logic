@@ -210,7 +210,6 @@ The PR creation is handled by the `extension-release-prepare.yml` workflow:
       
       Automated changes by GitHub Actions.
     branch: version-bump-after-release
-    base: main
     delete-branch: true
 ```
 

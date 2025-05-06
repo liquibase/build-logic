@@ -111,7 +111,6 @@ jobs:
 
             Automated changes by GitHub Actions.
           branch: version-bump-after-release
-          base: main
           delete-branch: true
 
       - name: Save Release files

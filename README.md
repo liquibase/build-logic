@@ -213,7 +213,7 @@ The PR creation is handled by the `extension-release-prepare.yml` workflow:
     delete-branch: true
 ```
 
-These version bump PRs are automatically merged through a nightly scheduled workflow in the `liquibase-infrastructure` repository. This workflow:
+These version bump PRs are automatically merged through a nightly scheduled workflow (`auto_merge_release_prs.yml`) in the `liquibase-infrastructure` repository. This workflow:
 
 1. Runs on a daily schedule (midnight UTC) or can be triggered manually
 2. Identifies all repositories with the `extension` topic

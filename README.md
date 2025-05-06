@@ -188,6 +188,41 @@ The Maven release plugin must be configured to allow extensions update `pom.xml`
 </build>
 ```
 
+### Version Bumping after Release
+
+When releasing extensions, a Pull Request is automatically created to update the version in the `pom.xml` files instead of directly committing to the main branch. This approach provides the following benefits:
+
+1. Improved security by requiring reviews before version changes are merged
+2. Better traceability of version bumps through the PR history
+3. Opportunity for validation before finalizing the version change
+
+The PR creation is handled by the `extension-release-prepare.yml` workflow:
+
+```yml
+- name: Create Pull Request for version bump
+  uses: peter-evans/create-pull-request@v7.0.8
+  with:
+    token: ${{ secrets.GITHUB_TOKEN }}
+    commit-message: "chore: update version after release"
+    title: "Version bump after release"
+    body: |
+      This PR updates the POM version after a release.
+      
+      Automated changes by GitHub Actions.
+    branch: version-bump-after-release
+    base: main
+    delete-branch: true
+```
+
+These version bump PRs are automatically merged through a nightly scheduled workflow in the `liquibase-infrastructure` repository. This workflow:
+
+1. Runs on a daily schedule (midnight UTC) or can be triggered manually
+2. Identifies all repositories with the `extension` topic
+3. Finds open PRs with the exact title "Version bump after release"
+4. Merges these PRs using the squash strategy
+
+This automation ensures that version bumps are consistently applied across all extension repositories without requiring manual intervention, while still maintaining the security benefits of the PR-based approach.
+
 ## Liquibase Test Harness
 
 | Workflow         | Description                                            |

@@ -107,7 +107,7 @@ jobs:
       - name: Checkout liquibase-infrastructure
         uses: actions/checkout@v4
         with:
-          ref: "DAT-20074"
+          ref: DAT-20074
           repository: liquibase/liquibase-infrastructure
           token: ${{ secrets.BOT_TOKEN }}
 

@@ -22,10 +22,16 @@ on:
         description: "Branch to check out"
         type: string
 
+permissions:
+  contents: write
+  packages: write
+  actions: read
+  id-token: write
+
 jobs:
   build:
     name: Build Extension
-    uses: liquibase/build-logic/.github/workflows/pro-extension-build-for-liquibase.yml@main
+    uses: liquibase/build-logic/.github/workflows/pro-extension-build-for-liquibase.yml@DAT-20127
     secrets: inherit
     with:
       os: '["ubuntu-latest", "macos-latest", "windows-latest"]'
@@ -34,24 +40,20 @@ jobs:
       repository: ${{ inputs.repository }}
       version: ${{ inputs.version }}
       branch: ${{ inputs.branch }}
-      
+
   publish-main-snapshots-to-gpm:
     name: Publish to GPM
     runs-on: ubuntu-latest
     needs: [build]
-    permissions:
-      contents: read
-      packages: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GIT_USERNAME: "liquibot"
-      GIT_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
+      GIT_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository }}
-          token: ${{ secrets.BOT_TOKEN }}
 
       - name: Download Multiplatform Artifacts
         uses: actions/download-artifact@v4
@@ -104,12 +106,12 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               }
             ]
 
@@ -124,6 +126,4 @@ jobs:
           -Dpackaging=jar \
           -DrepositoryId=liquibase \
           -Durl=https://maven.pkg.github.com/${{ inputs.repository }} \
-          -Dusername=liquibot \
-          -Dpassword=${{ env.GIT_PASSWORD }}   
-
+          -DscmServerId=liquibase

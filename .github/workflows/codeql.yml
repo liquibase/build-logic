@@ -31,15 +31,17 @@ on:
         default: ''
         type: string
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+  packages: read
+
 jobs:
   analyze:
     name: Analyze
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
     timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
 
     strategy:
       fail-fast: false
@@ -136,12 +138,12 @@ jobs:
             {
               "id": "liquibase-pro",
               "username": "liquibot",
-              "password": "${{ secrets.LIQUIBOT_PAT }}"
+              "password": "${{ secrets.GITHUB_TOKEN }}"
             },
             {
               "id": "liquibase",
               "username": "liquibot",
-              "password": "${{ secrets.LIQUIBOT_PAT }}"
+              "password": "${{ secrets.GITHUB_TOKEN }}"
             }
           ]
 

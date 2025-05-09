@@ -23,8 +23,10 @@ on:
         type: string
 
 permissions:
-  contents: write # Updated from 'read' to 'write' to allow tag operations
+  contents: write
   packages: write
+  actions: read
+  id-token: write
 
 jobs:
   build:

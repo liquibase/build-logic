@@ -50,6 +50,7 @@ jobs:
       GIT_USERNAME: "liquibot"
       GIT_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
     steps:
+
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v1
@@ -117,12 +118,12 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ steps.get-token.outputs.token }}"
+                "password": "${{ secrets.PUBLISH_TO_GPM_TOKEN }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ steps.get-token.outputs.token }}"
+                "password": "${{ secrets.PUBLISH_TO_GPM_TOKEN }}"
               }
             ]
 

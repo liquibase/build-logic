@@ -152,4 +152,6 @@ jobs:
           -Dversion=${{ inputs.version }} \
           -Dpackaging=jar \
           -DrepositoryId=github \
-          -Durl=https://maven.pkg.github.com/liquibase/liquibase-checks
+          -Durl=https://maven.pkg.github.com/${{ inputs.repository }} \
+          -Dusername=liquibot \
+          -Dpassword=${{ env.GIT_PASSWORD }}  

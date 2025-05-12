@@ -128,24 +128,24 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ steps.get-token.outputs.token }}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ steps.get-token.outputs.token}}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               },
               {
                 "id": "github",
                 "username": "liquibot",
-                "password": "${{ steps.get-token.outputs.token}}"
+                "password": "${{ secrets.GITHUB_TOKEN }}"
               }
             ]
 
       - name: Publish to GitHub Packages
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          mvn deploy:deploy-file \
+          mvn deploy:deploy-file -X \
           -Dfile="./artifacts/liquibase-checks-${{ inputs.version }}.jar" \
           -DgroupId=org.liquibase.ext \
           -DartifactId=liquibase-checks \

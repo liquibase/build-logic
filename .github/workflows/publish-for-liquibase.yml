@@ -50,10 +50,21 @@ jobs:
       GIT_USERNAME: "liquibot"
       GIT_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+          permission-packages: write
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository }}
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Download Multiplatform Artifacts
         uses: actions/download-artifact@v4
@@ -106,12 +117,12 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.GITHUB_TOKEN }}"
+                "password": "${{ steps.get-token.outputs.token }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.GITHUB_TOKEN }}"
+                "password": "${{ steps.get-token.outputs.token }}"
               }
             ]
 

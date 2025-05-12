@@ -114,7 +114,7 @@ jobs:
               },
               {
                 "id": "github",
-                "url": "https://maven.pkg.github.com/liquibase/${{ inputs.repository }}",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-checks",
                 "releases": {
                   "enabled": "true"
                 },
@@ -147,10 +147,10 @@ jobs:
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           mvn deploy:deploy-file \
-          -Dfile="./artifacts/${{ inputs.repository }}-${{ inputs.version }}.jar" \
+          -Dfile="./artifacts/liquibase-checks-${{ inputs.version }}.jar" \
           -DgroupId=org.liquibase.ext \
-          -DartifactId=${{ inputs.repository }} \
+          -DartifactId=liquibase-checks \
           -Dversion=${{ inputs.version }} \
           -Dpackaging=jar \
-          -DrepositoryId=${{ inputs.repository }} \
-          -Durl=https://maven.pkg.github.com/${{ inputs.repository }}
+          -DrepositoryId=github \
+          -Durl=https://maven.pkg.github.com/liquibase-checks

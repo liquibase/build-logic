@@ -154,4 +154,4 @@ jobs:
           -DrepositoryId=github \
           -Durl=https://maven.pkg.github.com/liquibase/liquibase-checks \
           -Dusername=liquibot \
-          -Dpassword=${{ env.GIT_PASSWORD }}
+          -Dpassword=${{ SECRETS.BOT_TOKEN }} \

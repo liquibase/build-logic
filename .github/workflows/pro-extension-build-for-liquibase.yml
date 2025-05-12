@@ -92,11 +92,23 @@ jobs:
     permissions:
       id-token: write
       contents: read
+
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+          permission-packages: write
+
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository || github.repository }}
           ref: ${{ inputs.branch }}
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -232,9 +244,20 @@ jobs:
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+          permission-packages: write
+
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository || github.repository }}
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4

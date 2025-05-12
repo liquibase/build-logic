@@ -50,7 +50,6 @@ jobs:
       GIT_USERNAME: "liquibot"
       GIT_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
     steps:
-
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v1
@@ -153,4 +152,4 @@ jobs:
           -Dversion=${{ inputs.version }} \
           -Dpackaging=jar \
           -DrepositoryId=github \
-          -Durl=https://maven.pkg.github.com/liquibase-checks
+          -Durl=https://maven.pkg.github.com/liquibase/liquibase-checks

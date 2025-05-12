@@ -145,7 +145,7 @@ jobs:
       - name: Publish to GitHub Packages
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          mvn deploy:deploy-file -X \
+          mvn deploy:deploy-file \
           -Dfile="./artifacts/liquibase-checks-${{ inputs.version }}.jar" \
           -DgroupId=org.liquibase.ext \
           -DartifactId=liquibase-checks \
@@ -154,4 +154,4 @@ jobs:
           -DrepositoryId=github \
           -Durl=https://maven.pkg.github.com/liquibase/liquibase-checks \
           -Dusername=liquibot \
-          -Dpassword=${{ SECRETS.BOT_TOKEN }} \
+          -Dpassword=${{ secrets.BOT_TOKEN }} \

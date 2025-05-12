@@ -118,12 +118,12 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.PUBLISH_TO_GPM_TOKEN }}"
+                "password": "${{ steps.get-token.outputs.token }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.PUBLISH_TO_GPM_TOKEN }}"
+                "password": "${{ steps.get-token.outputs.token}}"
               }
             ]
 
@@ -139,3 +139,4 @@ jobs:
           -DrepositoryId=liquibase \
           -Durl=https://maven.pkg.github.com/${{ inputs.repository }} \
           -DscmServerId=liquibase
+          -Dtoken=${{ steps.get-token.outputs.token }}

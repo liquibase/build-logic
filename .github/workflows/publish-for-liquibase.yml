@@ -151,7 +151,7 @@ jobs:
           -DartifactId=liquibase-checks \
           -Dversion=${{ inputs.version }} \
           -Dpackaging=jar \
-          -DrepositoryId=liquibase \
-          -Durl=https://maven.pkg.github.com/${{ inputs.repository }} \
+          -DrepositoryId=github \
+          -Durl=https://maven.pkg.github.com/liquibase/liquibase-checks \
           -Dusername=liquibot \
-          -Dpassword=${{ env.GIT_PASSWORD }}  
+          -Dpassword=${{ env.GIT_PASSWORD }}

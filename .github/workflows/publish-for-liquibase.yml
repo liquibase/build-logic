@@ -48,7 +48,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GIT_USERNAME: "liquibot"
-      GIT_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      GIT_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
     steps:
       - name: Get GitHub App token
         id: get-token
@@ -128,17 +128,17 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.BOT_TOKEN }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.BOT_TOKEN }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "github",
                 "username": "liquibot",
-                "password": "${{ secrets.BOT_TOKEN }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -151,7 +151,7 @@ jobs:
           -DartifactId=liquibase-checks \
           -Dversion=${{ inputs.version }} \
           -Dpackaging=jar \
-          -DrepositoryId=github \
+          -DrepositoryId=liquibase \
           -Durl=https://maven.pkg.github.com/${{ inputs.repository }} \
-          -Dserver.username=liquibot \
-          -Dserver.password=${{ secrets.BOT_TOKEN }}
+          -Dusername=liquibot \
+          -Dpassword=${{ env.GIT_PASSWORD }} 

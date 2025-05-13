@@ -128,17 +128,17 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.GITHUB_TOKEN }}"
+                "password": "${{ secrets.BOT_TOKEN }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.GITHUB_TOKEN }}"
+                "password": "${{ secrets.BOT_TOKEN }}"
               },
               {
                 "id": "github",
                 "username": "liquibot",
-                "password": "${{ secrets.GITHUB_TOKEN }}"
+                "password": "${{ secrets.BOT_TOKEN }}"
               }
             ]
 

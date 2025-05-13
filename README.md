@@ -68,17 +68,30 @@ Please review the below table of reusable workflows and their descriptions:
 | Workflow                                | Description                                                                                                             |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `build-artifact.yml`                    | Runs maven build and saves artifacts                                                                                    |
+| `build-extension-jar.yml`               | Builds and deploys extension JARs to GitHub Package Manager                                                             |
 | `codeql.yml`                            | Runs CodeQL scanning                                                                                                    |
 | `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                                                                 |
+| `dependabot-automerge.yml`              | Automatically merges Dependabot PRs for minor and patch updates                                                         |
 | `ephemeral-cloud-infra.yml`             | Creates/Destroys test automation cloud infrastructure                                                                   |
 | `extension-attach-artifact-release.yml` | Attaches a tested artifact to the draft release. Receives a `zip` input to upload generated zip files                   |
+| `extension-release-prepare.yml`         | Prepares extension release artifacts                                                                                    |
 | `extension-release-published.yml`       | Publishes a release to Maven Central                                                                                    |
+| `extension-release-rollback.yml`        | Rolls back a failed extension release                                                                                   |
 | `extension-update-version.yml`          | Updates release and development `pom.xml` versions                                                                      |
+| `fossa.yml`                             | Runs FOSSA license compliance checks and uploads reports                                                                |
+| `fossa_ai.yml`                          | Scans code for AI-generated content and runs FOSSA license compliance                                                   |
+| `generate-upload-fossa-report.yml`      | Generates and uploads license reports to FOSSA                                                                          |
+| `lth-docker.yml`                        | Runs Liquibase Test Harness on Docker-based databases                                                                   |
 | `os-extension-automated-release.yml`    | Publishes draft releases and closes Nexus staging repositories. Details [here](./doc/os-extension-automated-release.md) |
 | `os-extension-test.yml`                 | Unit tests across build matrix on previously built artifact                                                             |
+| `owasp-scanner.yml`                     | Runs vulnerability scans using OWASP dependency checker                                                                 |
+| `package.yml`                           | Creates and distributes Linux packages (deb, rpm) and updates platform-specific repositories                            |
 | `package-deb.yml`                       | Creates and uploads deb packages                                                                                        |
 | `pom-release-published.yml`             | Publishes a release pom to Maven Central                                                                                |
+| `pro-extension-build-for-liquibase.yml` | Builds and tests Pro extensions specifically for Liquibase                                                              |
 | `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                                                   |
+| `publish-for-liquibase.yml`             | Publishes extensions for Liquibase consumption                                                                          |
+| `slack-notification.yml`                | Sends notifications to Slack when tests fail                                                                            |
 | `sonar-pull-request.yml`                | Code Coverage Scan for PRs. Requires branch name parameter                                                              |
 | `sonar-test-scan.yml`                   | Code Coverage Scan for unit and integration tests                                                                       |
 | `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                                          |
@@ -207,7 +220,7 @@ The PR creation is handled by the `extension-release-prepare.yml` workflow:
     title: "Version bump after release"
     body: |
       This PR updates the POM version after a release.
-      
+
       Automated changes by GitHub Actions.
     branch: version-bump-after-release
     delete-branch: true
@@ -488,8 +501,9 @@ Here the modules we want to generate and aggregate test reports must be specifie
 
 When you want to release new version of `build-logic`, it is important to update all the occurrences of previous version eg: `main` with the new version eg : `main` in all the files. As, the code for the new version internally refers to the old version.
 
-_____________________________________________________________________________________________________________________________________________________________________________
-### 📓  Fossa Report Generation for Enterprise
+---
+
+### 📓 Fossa Report Generation for Enterprise
 
 1. AWS s3 bucket under `liquibase-prod` `s3://liquibaseorg-origin/enterprise_fossa_report/`
 2. Manually run the workflow under `fossa.yml` from this repository under `./github/workflows/fossa.yml`.Supply the DaticalDb-installer version variable which is used during its report generation to be stored in the s3 bucket. eg 8.7.352'
@@ -513,7 +527,6 @@ ________________________________________________________________________________
 8. If we plan on sending this report to the users it will be on some page like we have for OSS -> https://www.liquibase.com/eula and they will have access to only the URI’s we mention. As to to the liquibase users, DevOps team can add them to permission set to have access to those reports.
 
 ![](./doc/img/permission-set-enterprise-fossa-report.png)
-
 
 ### 🪣 Store SBOM for LB and LB Pro on every release
 

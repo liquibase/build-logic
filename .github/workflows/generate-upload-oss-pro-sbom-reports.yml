@@ -1,0 +1,75 @@
+name: Generate and Upload OSS and PRO SBOM Reports
+on:
+    workflow_dispatch:
+        inputs:
+            repo_name:
+                description: 'Repository name to generate SBOM for'
+                required: false
+                default: 'liquibase/liquibase'
+            latest_version:
+                description: 'Latest version of OSS release'
+                required: false
+            branch_name:
+                description: 'Branch name'
+                required: false
+    repository_dispatch:
+            types: [oss-released-version]
+
+jobs:
+  generate-upload-oss-pro-sbom-reports: 
+    runs-on: ubuntu-latest
+    permissions: write-all
+
+    env:
+      FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+    steps:
+      - name: Setup 
+        id: setup
+        run: |
+          echo "repo_name=${{ github.event.inputs.repo_name || github.event.client_payload.repo_name }}" >> $GITHUB_OUTPUT
+          echo "latest_version=${{ github.event.inputs.latest_version || github.event.client_payload.latest_version}}" >> $GITHUB_OUTPUT
+          echo "branch_name=${{ github.event.inputs.branch_name || github.event.client_payload.branch_name}}" >> $GITHUB_OUTPUT
+          
+          # remove the org_name from repo_name
+          fossa_repo_name="$(echo ${{ github.event.inputs.repo_name || github.event.client_payload.repo_name }} | cut -d'/' -f2)" 
+          echo "fossa_repo_name=$fossa_repo_name" >> $GITHUB_OUTPUT
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.setup.outputs.repo_name }}
+          ref: ${{ steps.setup.outputs.branch_name }}
+          
+      - name: Install FOSSA CLI
+        run: |
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
+
+      - name: Run FOSSA SBOM Report for OSS
+        if: ${{ steps.setup.outputs.fossa_repo_name == 'liquibase' }}
+        run: |
+          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
+          fossa report -p ${{ steps.setup.outputs.fossa_repo_name }} attribution --format html 2>&1 | tee oss-sbom.html
+
+      - name: Run FOSSA SBOM Reports for OSS-pro
+        if: ${{ steps.setup.outputs.fossa_repo_name == 'liquibase-pro' }}
+        run: |
+          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
+          fossa report -p ${{ steps.setup.outputs.fossa_repo_name }} attribution --format cyclonedx-json 2>&1 | tee pro-sbom-cyclonedx-json.json
+          fossa report -p ${{ steps.setup.outputs.fossa_repo_name }} attribution --format spdx-json 2>&1 | tee pro-sbom-spdx-json.json
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Get current timestamp
+        id: get-timestamp
+        run: echo "timestamp=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Upload SBOM reports to S3
+        run: |
+          aws s3 cp oss-sbom.html s3://liquibase-release-sboms/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ steps.get-timestamp.outputs.timestamp }}/
+          aws s3 cp pro-sbom-cyclonedx-json.json s3://liquibase-release-sboms/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ steps.get-timestamp.outputs.timestamp }}/
+          aws s3 cp pro-sbom-spdx-json.json s3://liquibase-release-sboms/sbom-lb-lbpro-releases/liquibase-${{ steps.setup.outputs.latest_version }}_${{ steps.get-timestamp.outputs.timestamp }}/

@@ -154,4 +154,4 @@ jobs:
           -DrepositoryId=github \
           -Durl=https://maven.pkg.github.com/${{ inputs.repository }} \
           -Dserver.username=liquibot \
-          -Dserver.password=${{ steps.get-token.outputs.token }}
+          -Dserver.password=${{ secrets.BOT_TOKEN }}

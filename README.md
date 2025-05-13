@@ -531,3 +531,136 @@ When you want to release new version of `build-logic`, it is important to update
 ### 🪣 Store SBOM for LB and LB Pro on every release
 
 https://datical.atlassian.net/wiki/x/CQAkCwE
+
+## 🔑 GitHub Tokens Strategy
+
+Secure authentication and authorization are critical aspects of our CI/CD workflow. We employ different token types for various scenarios to optimize security and minimize GitHub API rate limit issues.
+
+### 🔒 Default GITHUB_TOKEN
+
+GitHub automatically provides a `GITHUB_TOKEN` secret that's available during workflow runs. This is a short-lived token that expires when the job completes.
+
+#### When to use:
+
+- For single-repository operations
+- When no cross-repository access is needed
+- For most common GitHub API operations within the same repository
+
+#### Security benefits:
+
+- Automatically rotated for each job
+- Limited to the repository where the workflow runs
+- Permissions can be explicitly scoped using the `permissions` key
+
+```yml
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+```
+
+#### Example:
+
+```yml
+- name: Create Pull Request for version bump
+  uses: peter-evans/create-pull-request@v7.0.8
+  with:
+    token: ${{ secrets.GITHUB_TOKEN }}
+    commit-message: "chore: update version after release"
+    title: "Version bump after release"
+```
+
+### 🔐 GitHub App Tokens
+
+For operations that require cross-repository access or elevated permissions without using personal credentials, we use GitHub App tokens.
+
+#### When to use:
+
+- For cross-repository operations (cloning, checking out)
+- When you need specific permissions across multiple repositories
+- For operations that would exceed rate limits with `GITHUB_TOKEN`
+
+#### Security benefits:
+
+- Fine-grained permissions control
+- No personal credentials involved
+- Short-lived by default (can be configured)
+- Auditable through GitHub App activity
+
+#### Example:
+
+```yml
+- name: Get GitHub App token
+  id: get-token
+  uses: actions/create-github-app-token@v1
+  with:
+    app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+    private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+    owner: ${{ github.repository_owner }}
+    permission-contents: read
+    permission-packages: write
+
+- name: Checkout code
+  uses: actions/checkout@v4
+  with:
+    repository: ${{ inputs.repository }}
+    token: ${{ steps.get-token.outputs.token }}
+```
+
+### 🪪 Personal Access Tokens (PATs)
+
+While we minimize their use, PATs are sometimes necessary for specific scenarios where GitHub Apps or GITHUB_TOKEN aren't sufficient.
+
+#### When to use:
+
+- When GitHub App tokens cannot provide the necessary access
+- For GitHub Package Manager (`GPM`) cross-repository access
+- For legacy integrations that don't support other authentication methods
+
+#### Security considerations:
+
+- Store as encrypted repository secrets
+- Use fine-grained PATs with minimum required scopes (`GPM` cross-repo deploys requires classic `PAT`)
+- Regularly rotate tokens
+- Consider using organization-level PATs instead of personal tokens
+
+#### Example for GPM access:
+
+```yml
+- name: Maven settings with GPM access
+  uses: whelk-io/maven-settings-xml-action@v22
+  with:
+    repositories: |
+      [
+        {
+          "id": "github",
+          "url": "https://maven.pkg.github.com/liquibase/*",
+          "releases": {
+            "enabled": "true"
+          },
+          "snapshots": {
+            "enabled": "true"
+          }
+        }
+      ]
+    servers: |
+      [
+        {
+          "id": "github",
+          "username": "${{ github.actor }}",
+          "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+        }
+      ]
+```
+
+### 🛡️ Token Selection Strategy
+
+Our approach to selecting tokens follows these principles:
+
+1. **Default to GITHUB_TOKEN** when possible for its security and simplicity
+2. **Use GitHub App tokens** for cross-repository operations
+3. **Limit PAT usage** to only specialized cases where other token types don't suffice
+4. **Scope permissions** explicitly for all token types
+5. **Separate tokens** for different types of operations (deployment vs. reading)
+
+This strategy helps us maintain security while ensuring our CI/CD workflows operate smoothly with appropriate permissions.

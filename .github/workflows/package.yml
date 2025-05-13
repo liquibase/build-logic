@@ -203,7 +203,7 @@ jobs:
           cd createrepo_c
           mkdir build
           cd build
-          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
+          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO
           make -j
           cp src/createrepo_c  /opt/createrepo
           cd ../../..
@@ -228,7 +228,7 @@ jobs:
           cd createrepo_c
           mkdir build
           cd build
-          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
+          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO
           make -j
           cp src/createrepo_c  /opt/createrepo
           cd ../../..

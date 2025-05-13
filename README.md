@@ -70,6 +70,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `build-artifact.yml`                    | Runs maven build and saves artifacts                                                                                    |
 | `codeql.yml`                            | Runs CodeQL scanning                                                                                                    |
 | `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                                                                 |
+| `fossa_ai.yml`                          | Runs FOSSA Scan for AI Generated Code                                                                                   |
 | `ephemeral-cloud-infra.yml`             | Creates/Destroys test automation cloud infrastructure                                                                   |
 | `extension-attach-artifact-release.yml` | Attaches a tested artifact to the draft release. Receives a `zip` input to upload generated zip files                   |
 | `extension-release-published.yml`       | Publishes a release to Maven Central                                                                                    |
@@ -455,32 +456,3 @@ Here the modules we want to generate and aggregate test reports must be specifie
 When you want to release new version of `build-logic`, it is important to update all the occurrences of previous version eg: `main` with the new version eg : `main` in all the files. As, the code for the new version internally refers to the old version.
 
 _____________________________________________________________________________________________________________________________________________________________________________
-### 📓  Fossa Report Generation for Enterprise
-
-1. AWS s3 bucket under `liquibase-prod` `s3://liquibaseorg-origin/enterprise_fossa_report/`
-2. Manually run the workflow under `fossa.yml` from this repository under `./github/workflows/fossa.yml`.Supply the DaticalDb-installer version variable which is used during its report generation to be stored in the s3 bucket. eg 8.7.352'
-
-![](./doc/img/run-enterprise-fossa-manually.png)
-
-- this workflow triggers a run in the specified repository matrix in workflow `fossa.yml`
-- individual repositories call the workflow `generate-upload-fossa-report.yml` under this repository `liquibase/build-logic` ./github/workflows/fossa.yml`
-
-3. `generate-upload-fossa-report.yml`
-   - the individual reports are uploaded under `raw_reports`
-   - the combined reports is called `enterprise_report_version_number_for_report_generation` which is uploaded under `version_number_for_report_generation`
-   - the report for `datical-service` is uploaded under version_number_for_report_generation
-4. You might need to do some manipulation of the columns as sometimes they are empty. Just the way Fossa populates them!
-5. For any dependencies you dont want included in the final report, just add them to `.github/workflows/ignore_dependencies_fossa.txt` file.
-6. Final combined report for all repos except datical-service is called `enterprise_report_8.7.352.csv`
-7. Final separate report for datical-service is called `datical-service.csv`
-
-![](./doc/img/aws-s3-bucket-enterprise-reports.png)
-
-8. If we plan on sending this report to the users it will be on some page like we have for OSS -> https://www.liquibase.com/eula and they will have access to only the URI’s we mention. As to to the liquibase users, DevOps team can add them to permission set to have access to those reports.
-
-![](./doc/img/permission-set-enterprise-fossa-report.png)
-
-
-### 🪣 Store SBOM for LB and LB Pro on every release
-
-https://datical.atlassian.net/wiki/x/CQAkCwE

@@ -87,6 +87,17 @@ jobs:
       id-token: write
       contents: read
     steps:
+
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+          permission-actions: write
+
       - uses: actions/checkout@v4
 
       - name: Set up Java
@@ -146,6 +157,7 @@ jobs:
           releaseId: "${{ inputs.dry_run_release_id }}"
           fileName: "*"
           out-file-path: ".github/target/"
+          token: "${{ steps.get-token.outputs.token }}"
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |

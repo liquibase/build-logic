@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       version:
-        description: "Version to release (4.26.0, 4.26.1, etc.))"
+        description: "Version to release (4.26.0, 4.26.1, etc.)"
         required: true
         type: string
       repositories:

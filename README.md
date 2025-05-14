@@ -550,7 +550,7 @@ GitHub automatically provides a `GITHUB_TOKEN` secret that's available during wo
 
 - Automatically rotated for each job
 - Limited to the repository where the workflow runs
-- Permissions can be explicitly scoped using the `permissions` key
+- [Permissions can be explicitly scoped](https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication) using the `permissions` key
 
 ```yml
 permissions:
@@ -585,7 +585,7 @@ For operations that require cross-repository access or elevated permissions with
 - Fine-grained permissions control
 - No personal credentials involved
 - Short-lived by default (can be configured)
-- Auditable through GitHub App activity
+- [Auditable through GitHub App activity](https://github.com/enterprises/liquibase/settings/audit-log?q=action%3Aoauth_application.generate_client_secret++). (Search filter: `action:oauth_application`)
 
 #### Example:
 

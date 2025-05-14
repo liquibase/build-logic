@@ -4,11 +4,14 @@ on:
   workflow_call:
     secrets:
       SONATYPE_USERNAME:
-        description: 'SONATYPE_USERNAME from the caller workflow'
+        description: "SONATYPE_USERNAME from the caller workflow"
         required: true
       SONATYPE_TOKEN:
-        description: 'SONATYPE_TOKEN from the caller workflow'
+        description: "SONATYPE_TOKEN from the caller workflow"
         required: true
+
+permissions:
+  contents: read
 
 jobs:
   release:
@@ -19,9 +22,9 @@ jobs:
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'maven'
+          java-version: "17"
+          distribution: "temurin"
+          cache: "maven"
           server-id: sonatype-nexus-staging
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
@@ -34,7 +37,7 @@ jobs:
       - name: Build release artifacts
         id: build-release-artifacts
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
+          mvn -B release:clean release:prepare -Darguments="-DscmServerId=liquibase -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
           git reset HEAD~ --hard
 
       - name: Get Artifact ID
@@ -68,4 +71,3 @@ jobs:
     needs: release
     uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@main
     secrets: inherit
-    

@@ -592,7 +592,7 @@ For operations that require cross-repository access or elevated permissions with
 ```yml
 - name: Get GitHub App token
   id: get-token
-  uses: actions/create-github-app-token@v1
+  uses: actions/create-github-app-token@v2
   with:
     app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
     private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}

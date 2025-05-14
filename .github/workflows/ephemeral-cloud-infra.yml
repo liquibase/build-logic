@@ -108,6 +108,20 @@ jobs:
       SPACELIFT_API_KEY_SECRET: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
 
     steps:
+      - name: Get GitHub App token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-repositories: read
+          permission-contents: read
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          token: ${{ steps.get-token.outputs.token }}
       - name: Checkout liquibase-infrastructure
         uses: actions/checkout@v4
         with:

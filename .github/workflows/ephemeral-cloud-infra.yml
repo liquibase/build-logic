@@ -108,11 +108,21 @@ jobs:
       SPACELIFT_API_KEY_SECRET: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
 
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+
       - name: Checkout liquibase-infrastructure
         uses: actions/checkout@v4
         with:
           ref: master
           repository: liquibase/liquibase-infrastructure
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3

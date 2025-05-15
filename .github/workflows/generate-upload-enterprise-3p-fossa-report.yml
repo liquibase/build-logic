@@ -2,7 +2,7 @@
 # build-logic/.github/workflows/trigger-enterprise-fossa-third-party-license-report.yml
 # The workflow generates a CSV report of 3rd-party licenses and uploads it to S3 and as an artifact for the team to view under `raw_reports`.
 
-name: Generate and upload 3rd Party Fossa Report to s3
+name: Generate and upload 3rd Party License Fossa Report to s3
 
 on:
   workflow_call:
@@ -65,15 +65,17 @@ jobs:
           @csv
           ' fossa.json >> $csv_filename
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
+          aws-region: us-east-1
+
       - name: Upload 3rd Party report to S3
         if: always()
         run: |
           csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
           aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/${{ env.VERSION_NUMBER }}/raw_reports/
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
                 
       - name: Set CSV filename
         id: set_csv_filename

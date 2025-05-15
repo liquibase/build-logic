@@ -3,6 +3,9 @@ name: Sonar Scan for jest
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   sonarcloud:
     name: SonarCloud
@@ -18,7 +21,7 @@ jobs:
       - name: Set up npm registry and authentication
         run: |
           npm config set @liquibase:registry https://npm.pkg.github.com
-          npm config set //npm.pkg.github.com/:_authToken ${{ secrets.NPM_TOKEN }}
+          npm config set //npm.pkg.github.com/:_authToken ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: |

@@ -8,6 +8,10 @@ on:
         description: 'Supply the DaticalDb-installer version number to be stored in the s3 bucket. eg 8.7.352'
         required: false
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   wait-for-fossa-report-generation:
     runs-on: ubuntu-latest

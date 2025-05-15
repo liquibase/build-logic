@@ -80,7 +80,13 @@ on:
       LIQUIBASE_AZURE_STORAGE_ACCOUNT:
         description: "Azure Storage Account name for Liquibase."
         required: false
-  
+
+permissions:
+  contents: write
+  id-token: write
+  packages: read
+  pull-requests: write
+
 env:
   AWS_REGION: us-east-1
   LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
@@ -101,7 +107,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       id-token: write
-      contents: read
+      contents: write # Updated from 'read' to 'write' to allow tag operations
     steps:
       - uses: actions/checkout@v4
         with:
@@ -159,12 +165,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -184,7 +190,7 @@ jobs:
         shell: powershell
         run: |
           ${{ inputs.extraWindowsCommand }}
-          
+
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
         shell: bash
@@ -238,7 +244,7 @@ jobs:
         with:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
           path: ${{ github.event_path }}
-          
+
       - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
@@ -280,7 +286,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
-          
+
       - name: Set up Maven
         uses: stCarolas/setup-maven@v5
         with:
@@ -320,12 +326,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -358,7 +364,7 @@ jobs:
           else
             mvn -B test -P '${{ inputs.mavenProfiles }}'
           fi
-  
+
       - name: Run Tests
         if: ${{ inputs.nightly }}
         shell: bash
@@ -392,12 +398,11 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   combineJars:
-    needs: [ build, unit-test ]
+    needs: [build, unit-test]
     if: ${{ inputs.combineJars }}
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}

@@ -1,7 +1,6 @@
-# This workflow is invoked by individual Datical repositories to generate and upload 
-# the 3rd-party license report using FOSSA to S3. It is triggered by the central workflow located at: 
+# This workflow is invoked by individual Datical repositories to generate and upload the 3rd-party license report using FOSSA to S3. It is triggered by the central workflow located at: 
 # build-logic/.github/workflows/trigger-enterprise-fossa-third-party-license-report.yml
-# The workflow generates a CSV report of 3rd-party licenses and uploads it to S3 and as an artifact. 
+# The workflow generates a CSV report of 3rd-party licenses and uploads it to S3 and as an artifact for the team to view under `raw_reports`.
 
 name: Generate and upload 3rd Party Fossa Report to s3
 

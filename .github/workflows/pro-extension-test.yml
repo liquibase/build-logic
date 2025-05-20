@@ -208,8 +208,9 @@ jobs:
         run: |
           ${{ inputs.extraWindowsCommand }}
 
-      - name: Setup Vault token
+      - name: Setup Hashicorp Vault token
         uses: hashicorp/vault-action@v3
+        if: ${{ inputs.vaultAddr != '' && inputs.vaultNamespace != '' }}
         with:
           url: ${{ inputs.vaultAddr }}
           namespace: ${{ inputs.vaultNamespace }}
@@ -382,8 +383,9 @@ jobs:
         run: |
           ${{ inputs.extraWindowsCommand }}
 
-      - name: Setup Vault token
+      - name: Setup Hashicorp Vault token
         uses: hashicorp/vault-action@v3
+        if: ${{ inputs.vaultAddr != '' && inputs.vaultNamespace != '' }}
         with:
           url: ${{ inputs.vaultAddr }}
           namespace: ${{ inputs.vaultNamespace }}

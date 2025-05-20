@@ -58,6 +58,16 @@ on:
         required: false
         default: false
         type: boolean
+      vaultAddr:
+        description: "Hashicorp Vault server address"
+        required: false
+        default: ""
+        type: string
+      vaultNamespace:
+        description: "Hashicorp Vault namespace"
+        required: false
+        default: ""
+        type: string
     secrets:
       SONAR_TOKEN:
         description: "SONAR_TOKEN from the caller workflow"
@@ -79,6 +89,12 @@ on:
         required: false
       LIQUIBASE_AZURE_STORAGE_ACCOUNT:
         description: "Azure Storage Account name for Liquibase."
+        required: false
+      VAULT_ROLE_ID:
+        description: "Hashicorp Vault Role ID for authentication"
+        required: false
+      VAULT_SECRET_ID:
+        description: "Hashicorp Vault Secret ID for authentication"
         required: false
 
 permissions:
@@ -178,6 +194,18 @@ jobs:
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
+
+      - name: Setup Vault token
+        if: ${{ inputs.vaultAddr != '' && runner.os == 'Linux' }}
+        id: vault
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ inputs.vaultAddr }}
+          namespace: ${{ inputs.vaultNamespace }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportToken: true
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
@@ -344,6 +372,18 @@ jobs:
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
+
+      - name: Setup Hashicorp Vault token
+        if: ${{ inputs.vaultAddr != '' && runner.os == 'Linux' }}
+        id: vault
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ inputs.vaultAddr }}
+          namespace: ${{ inputs.vaultNamespace }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportToken: true
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'

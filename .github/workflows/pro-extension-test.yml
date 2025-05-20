@@ -92,8 +92,10 @@ on:
         description: "Azure Storage Account name for Liquibase."
         required: false
       VAULT_ROLE_ID:
+        description: "Role ID for HashiCorp Vault authentication."
         required: false
       VAULT_SECRET_ID:
+        description: "Secret ID for HashiCorp Vault authentication."
         required: false
 
 permissions:

@@ -68,11 +68,6 @@ on:
         required: false
         default: ""
         type: string
-      vaultToken:
-        description: "Hashicorp Vault token"
-        required: false
-        default: ""
-        type: string
 
     secrets:
       SONAR_TOKEN:
@@ -96,6 +91,10 @@ on:
       LIQUIBASE_AZURE_STORAGE_ACCOUNT:
         description: "Azure Storage Account name for Liquibase."
         required: false
+      VAULT_ROLE_ID:
+        required: false
+      VAULT_SECRET_ID:
+        required: false
 
 permissions:
   contents: write
@@ -114,7 +113,6 @@ env:
   MAVEN_VERSION: "3.9.5"
   LIQUIBASE_VAULT_ADDR: ${{ inputs.vaultAddr }}
   LIQUIBASE_VAULT_NAMESPACE: ${{ inputs.vaultNamespace }}
-  LIQUIBASE_VAULT_TOKEN: ${{ inputs.vaultToken }}
 
 jobs:
   build:
@@ -209,6 +207,16 @@ jobs:
         shell: powershell
         run: |
           ${{ inputs.extraWindowsCommand }}
+
+      - name: Setup Vault token
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ inputs.vaultAddr }}
+          namespace: ${{ inputs.vaultNamespace }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportToken: true
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
@@ -373,6 +381,16 @@ jobs:
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
         run: |
           ${{ inputs.extraWindowsCommand }}
+
+      - name: Setup Vault token
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ inputs.vaultAddr }}
+          namespace: ${{ inputs.vaultNamespace }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportToken: true
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}

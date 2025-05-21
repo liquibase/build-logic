@@ -96,6 +96,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           permission-contents: read
           permission-actions: write
+          permission-pull-requests: read
 
       - uses: actions/checkout@v4
 

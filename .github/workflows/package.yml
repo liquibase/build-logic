@@ -83,9 +83,6 @@ jobs:
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - name: Get GitHub App token
         id: get-token

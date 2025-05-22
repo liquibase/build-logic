@@ -89,11 +89,20 @@ jobs:
         repository: ${{ fromJson(inputs.repositories) }}
 
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ matrix.repository }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           repository: "liquibase/${{ matrix.repository }}"
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Set up Git
         run: |
@@ -149,8 +158,6 @@ jobs:
         run: mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
 
       - name: Update pom.xml
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
           git add pom.xml
@@ -159,7 +166,7 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Update liquibase.version to ${{ inputs.version }}"
-            git remote set-url origin https://liquibot:${{ secrets.GITHUB_TOKEN }}@github.com/liquibase/${{ matrix.repository }}.git
+            git remote set-url origin https://x-access-token:${{ steps.get-token.outputs.token }}@github.com/liquibase/${{ matrix.repository }}.git
             git push
           fi
 

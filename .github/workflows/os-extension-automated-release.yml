@@ -68,6 +68,15 @@ jobs:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ matrix.repository }}
+          
       - name: Install Dependabot CLI
         run: |
           #https://github.com/dependabot/cli
@@ -76,6 +85,8 @@ jobs:
           sudo mv dependabot /usr/local/bin/
 
       - name: Run dependabot on extension
+        env:
+          GH_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
           echo "Running Dependabot on repository: ${{ matrix.repository }}"
           dependabot update maven "liquibase/${{ matrix.repository }}"

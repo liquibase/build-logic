@@ -48,7 +48,7 @@ jobs:
           security_fail=false
           echo "Checking repository: ${{ matrix.repository }}"
           security_url="https://api.github.com/repos/liquibase/${{ matrix.repository }}/dependabot/alerts?state=open"
-          response=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" $security_url | jq length)
+          response=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" $security_url | jq '[.[] | select(.state == "open")] | length')
           echo "Open Alerts: $response"
           if [[ $response == "0" ]]; then
             echo "Security vulnerabilities for ${{ matrix.repository }} are addressed."

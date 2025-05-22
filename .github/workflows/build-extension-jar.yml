@@ -37,6 +37,7 @@ jobs:
           package-type: "maven"
           min-versions-to-keep: 5 # Keep the last 5 versions so we don't break simultaneous builds
           delete-only-pre-release-versions: true
+          token: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
 
   build-and-deploy-extensions:
     needs: [delete-dependency-packages]

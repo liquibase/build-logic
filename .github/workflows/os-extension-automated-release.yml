@@ -40,8 +40,8 @@ jobs:
           app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
           private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          permission-security-events: read
-          
+          repositories: ${{ matrix.repository }}
+
       - name: Security
         run: |
           security_fail=false

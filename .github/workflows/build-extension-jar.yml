@@ -31,12 +31,24 @@ jobs:
     runs-on: ubuntu-22.04
     continue-on-error: true
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-actions: write
+          permission-packages: write
+
       - uses: actions/delete-package-versions@v5
         with:
           package-name: ${{ inputs.groupId }}.${{ inputs.extension }}
           package-type: "maven"
           min-versions-to-keep: 5 # Keep the last 5 versions so we don't break simultaneous builds
           delete-only-pre-release-versions: true
+          token: ${{ steps.get-token.outputs.token }}
 
   build-and-deploy-extensions:
     needs: [delete-dependency-packages]

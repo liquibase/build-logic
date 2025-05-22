@@ -78,15 +78,17 @@ jobs:
           repositories: ${{ matrix.repository }}
           
       - name: Install Dependabot CLI
+        env:
+          GH_TOKEN: ${{ github.steps.get-token.outputs.token }}
         run: |
-          #https://github.com/dependabot/cli
-          wget https://github.com/dependabot/cli/releases/download/v1.39.0/dependabot-v1.39.0-linux-amd64.tar.gz
-          tar xvzf dependabot-v1.39.0-linux-amd64.tar.gz
-          sudo mv dependabot /usr/local/bin/
+          gh release download --repo dependabot/cli -p "*linux-amd64.tar.gz"
+          tar xzvf *.tar.gz >/dev/null 2>&1
+          chmod +x ./dependabot
+          ./dependabot --version
 
       - name: Run dependabot on extension
         env:
-          GH_TOKEN: ${{ steps.get-token.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
           echo "Running Dependabot on repository: ${{ matrix.repository }}"
           dependabot update maven "liquibase/${{ matrix.repository }}"

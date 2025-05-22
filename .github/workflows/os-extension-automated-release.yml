@@ -76,6 +76,7 @@ jobs:
           private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repository }}
+          
       - name: Install Dependabot CLI
         run: |
           #https://github.com/dependabot/cli

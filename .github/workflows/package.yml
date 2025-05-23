@@ -274,13 +274,13 @@ jobs:
           pr_title=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
           echo "pr_title: $pr_title"
           # Set the environment variable based on whether the PR exists
-          if [ -z "$pr_match" ]; then
-            echo "PR_EXISTS=false" >> $GITHUB_OUTPUT
-              else
-            echo "PR_EXISTS=true" >> $GITHUB_OUTPUT
+          if [ -z "$pr_title" ]; then
+            PR_EXISTS=false
+          else
+            PR_EXISTS=true
           fi
 
-          # Store it in GitHub environment for later steps
+          # Store it in GitHub output for later steps
           echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_OUTPUT
 
           # Echo it immediately to see the value in logs

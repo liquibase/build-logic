@@ -96,170 +96,170 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      # - name: Set up Java
-      #   uses: actions/setup-java@v4
-      #   with:
-      #     java-version: "17"
-      #     distribution: "temurin"
-      #     cache: "maven"
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: "maven"
 
-      # - name: Set up Maven
-      #   uses: stCarolas/setup-maven@v4.5
-      #   with:
-      #     maven-version: ${{ env.MAVEN_VERSION }}
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: ${{ env.MAVEN_VERSION }}
 
-      # - name: Set up Ruby
-      #   uses: ruby/setup-ruby@v1
-      #   with:
-      #     ruby-version: 3.1.4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.1.4
 
-      # - name: Get Reusable Files
-      #   run: |
-      #     # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
-      #     mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
-      #     mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
-      #     curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/control
-      #     curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postinst
-      #     curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-      #     curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
-      #     curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
-      #     chmod +x $PWD/.github/sign_artifact.sh
+      - name: Get Reusable Files
+        run: |
+          # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
+          mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
+          mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/control
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postinst
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
+          curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
+          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
+          chmod +x $PWD/.github/sign_artifact.sh
 
-      # - name: Import GPG key
-      #   id: import_gpg
-      #   uses: crazy-max/ghaction-import-gpg@v6
-      #   with:
-      #     gpg_private_key: ${{ secrets.GPG_SECRET }}
-      #     passphrase: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_SECRET }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      # - name: Configure AWS credentials
-      #   uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
-      #     aws-region: us-east-1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+          aws-region: us-east-1
 
-      # - name: Download ${{ inputs.artifactId }} Release
-      #   if: ${{ inputs.dry_run == false }}
-      #   run: |
-      #     mkdir -p $PWD/.github/target
-      #     # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
-      #     wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+      - name: Download ${{ inputs.artifactId }} Release
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          mkdir -p $PWD/.github/target
+          # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
+          wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
 
-      # - name: Download ${{ inputs.artifactId }} dry-run Release
-      #   if: ${{ inputs.dry_run == true }}
-      #   uses: robinraju/release-downloader@v1.11
-      #   with:
-      #     repository: "liquibase/liquibase"
-      #     releaseId: "${{ inputs.dry_run_release_id }}"
-      #     fileName: "*"
-      #     out-file-path: ".github/target/"
-      #     token: "${{ steps.get-token.outputs.token }}"
+      - name: Download ${{ inputs.artifactId }} dry-run Release
+        if: ${{ inputs.dry_run == true }}
+        uses: robinraju/release-downloader@v1.11
+        with:
+          repository: "liquibase/liquibase"
+          releaseId: "${{ inputs.dry_run_release_id }}"
+          fileName: "*"
+          out-file-path: ".github/target/"
+          token: "${{ steps.get-token.outputs.token }}"
 
-      # - name: Build ${{ inputs.artifactId }} deb package
-      #   run: |
-      #     mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
+      - name: Build ${{ inputs.artifactId }} deb package
+        run: |
+          mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
 
-      # - name: Install deb-s3 gem
-      #   run: gem install deb-s3
+      - name: Install deb-s3 gem
+        run: gem install deb-s3
 
-      # - name: Upload ${{ inputs.artifactId }} deb package
-      #   if: ${{ inputs.dry_run == false }}
-      #   run: |
-      #     sudo apt install pinentry-tty
-      #     echo "2" | sudo update-alternatives --config pinentry
-      #     echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
-      #     export GPG_TTY=$(tty)
-      #     echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-      #     deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+      - name: Upload ${{ inputs.artifactId }} deb package
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          sudo apt install pinentry-tty
+          echo "2" | sudo update-alternatives --config pinentry
+          echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+          export GPG_TTY=$(tty)
+          echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
+          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-      # - name: Upload ${{ inputs.artifactId }} dry-run deb package
-      #   if: ${{ inputs.dry_run == true }}
-      #   run: |
-      #     sudo apt install pinentry-tty
-      #     echo "2" | sudo update-alternatives --config pinentry
-      #     echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
-      #     export GPG_TTY=$(tty)
-      #     echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-      #     deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+      - name: Upload ${{ inputs.artifactId }} dry-run deb package
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          sudo apt install pinentry-tty
+          echo "2" | sudo update-alternatives --config pinentry
+          echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+          export GPG_TTY=$(tty)
+          echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
+          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-      # - name: Convert deb to rpm
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y alien
-      #     sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+      - name: Convert deb to rpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y alien
+          sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
-      # - name: Upload ${{ inputs.artifactId }} rpm package
-      #   if: ${{ inputs.dry_run == false }}
-      #   run: |
-      #     sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-      #     ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
-      #     mkdir -p createrepo_folder
-      #     cd createrepo_folder
-      #     git clone https://github.com/rpm-software-management/createrepo_c
-      #     cd createrepo_c
-      #     mkdir -p build
-      #     cd build
-      #     # Modified CMake command with additional flags to properly disable documentation
-      #     cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
-      #     make -j || echo "Build failed but continuing..."
+      - name: Upload ${{ inputs.artifactId }} rpm package
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
+          ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+          mkdir -p createrepo_folder
+          cd createrepo_folder
+          git clone https://github.com/rpm-software-management/createrepo_c
+          cd createrepo_c
+          mkdir -p build
+          cd build
+          # Modified CMake command with additional flags to properly disable documentation
+          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
+          make -j || echo "Build failed but continuing..."
 
-      #     # Check if createrepo_c was built, otherwise try to find system createrepo
-      #     if [ -f src/createrepo_c ]; then
-      #       cp src/createrepo_c /opt/createrepo
-      #     elif command -v createrepo &> /dev/null; then
-      #       echo "Using system createrepo instead"
-      #       ln -sf $(which createrepo) /opt/createrepo
-      #     else
-      #       echo "Installing createrepo from package manager as fallback"
-      #       sudo apt-get install -y createrepo
-      #       ln -sf $(which createrepo) /opt/createrepo
-      #     fi
+          # Check if createrepo_c was built, otherwise try to find system createrepo
+          if [ -f src/createrepo_c ]; then
+            cp src/createrepo_c /opt/createrepo
+          elif command -v createrepo &> /dev/null; then
+            echo "Using system createrepo instead"
+            ln -sf $(which createrepo) /opt/createrepo
+          else
+            echo "Installing createrepo from package manager as fallback"
+            sudo apt-get install -y createrepo
+            ln -sf $(which createrepo) /opt/createrepo
+          fi
 
-      #     cd ../../..
-      #     mkdir -p $PWD/yum/noarch
-      #     aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-      #     mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
-      #     /opt/createrepo -dp $PWD/yum/noarch
-      #     ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
-      #     aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
+          cd ../../..
+          mkdir -p $PWD/yum/noarch
+          aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
+          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
+          /opt/createrepo -dp $PWD/yum/noarch
+          ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+          aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
-      # - name: Upload ${{ inputs.artifactId }} dry-run rpm package
-      #   if: ${{ inputs.dry_run == true }}
-      #   run: |
-      #     original_file=$(basename "$(find . -maxdepth 1 -name "*.rpm")")
-      #     new_name=$(echo "$original_file" | sed 's/+/-/g')
-      #     mv "$original_file" "$new_name"
-      #     sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-      #     ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
-      #     mkdir -p createrepo_folder
-      #     cd createrepo_folder
-      #     git clone https://github.com/rpm-software-management/createrepo_c
-      #     cd createrepo_c
-      #     mkdir -p build
-      #     cd build
-      #     # Modified CMake command with additional flags to properly disable documentation
-      #     cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
-      #     make -j || echo "Build failed but continuing..."
+      - name: Upload ${{ inputs.artifactId }} dry-run rpm package
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          original_file=$(basename "$(find . -maxdepth 1 -name "*.rpm")")
+          new_name=$(echo "$original_file" | sed 's/+/-/g')
+          mv "$original_file" "$new_name"
+          sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
+          ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+          mkdir -p createrepo_folder
+          cd createrepo_folder
+          git clone https://github.com/rpm-software-management/createrepo_c
+          cd createrepo_c
+          mkdir -p build
+          cd build
+          # Modified CMake command with additional flags to properly disable documentation
+          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
+          make -j || echo "Build failed but continuing..."
 
-      #     # Check if createrepo_c was built, otherwise try to find system createrepo
-      #     if [ -f src/createrepo_c ]; then
-      #       cp src/createrepo_c /opt/createrepo
-      #     elif command -v createrepo &> /dev/null; then
-      #       echo "Using system createrepo instead"
-      #       ln -sf $(which createrepo) /opt/createrepo
-      #     else
-      #       echo "Installing createrepo from package manager as fallback"
-      #       sudo apt-get install -y createrepo
-      #       ln -sf $(which createrepo) /opt/createrepo
-      #     fi
+          # Check if createrepo_c was built, otherwise try to find system createrepo
+          if [ -f src/createrepo_c ]; then
+            cp src/createrepo_c /opt/createrepo
+          elif command -v createrepo &> /dev/null; then
+            echo "Using system createrepo instead"
+            ln -sf $(which createrepo) /opt/createrepo
+          else
+            echo "Installing createrepo from package manager as fallback"
+            sudo apt-get install -y createrepo
+            ln -sf $(which createrepo) /opt/createrepo
+          fi
 
-      #     cd ../../..
-      #     mkdir -p $PWD/yum/noarch
-      #     aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
-      #     mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
-      #     /opt/createrepo -dp $PWD/yum/noarch
-      #     ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
-      #     aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
+          cd ../../..
+          mkdir -p $PWD/yum/noarch
+          aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
+          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
+          /opt/createrepo -dp $PWD/yum/noarch
+          ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+          aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
       - name: Check for existing Homebrew formula PR for ${{ inputs.artifactId }}
         id: check-brew-pr
@@ -302,84 +302,84 @@ jobs:
         env:
           COMMITTER_TOKEN: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
 
-      # - name: Update SDKMAN version for ${{ inputs.artifactId }}
-      #   if: ${{ inputs.dry_run == false }}
-      #   env:
-      #     SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
-      #     SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
-      #     VERSION: ${{ inputs.version }}
-      #     S3_WEB_URL: https://repo.liquibase.com/sdkman
-      #     S3_BUCKET: s3://repo.liquibase.com/sdkman/
-      #   run: |
-      #     wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
-      #     mkdir -p liquibase-$VERSION/bin/internal
-      #     unzip liquibase-$VERSION.zip -d liquibase-$VERSION
-      #     rm -rf liquibase-$VERSION.zip
-      #     mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
-      #     mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
-      #     zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
-      #     # Upload the release to S3
-      #     aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
-      #     echo "Uploaded liquibase-$VERSION.zip to s3"
-      #     # Send the release to SDKMAN
-      #     curl -s -X POST \
-      #     -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-      #     -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-      #     -H "Content-Type: application/json" \
-      #     -H "Accept: application/json" \
-      #     -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "'"$S3_WEB_URL"'/liquibase-'"$VERSION"'.zip"}' \
-      #     https://vendors.sdkman.io/release
-      #     echo "Sent liquibase-$VERSION.zip to SDKMAN"
-      #     # Set the default version for SDKMAN
-      #     curl -s -X PUT \
-      #     -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-      #     -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-      #     -H "Content-Type: application/json" \
-      #     -H "Accept: application/json" \
-      #     -d '{"candidate": "liquibase", "version": "'"$VERSION"'"}' \
-      #     https://vendors.sdkman.io/default
-      #     echo "Set liquibase-$VERSION.zip as default version for SDKMAN"
-      #     # Announce the release to SDKMAN
-      #     curl -s -X POST \
-      #     -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-      #     -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-      #     -H "Content-Type: application/json" \
-      #     -H "Accept: application/json" \
-      #     -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
-      #     https://vendors.sdkman.io/announce/struct
-      #     echo "Announced liquibase-$VERSION.zip to SDKMAN"
+      - name: Update SDKMAN version for ${{ inputs.artifactId }}
+        if: ${{ inputs.dry_run == false }}
+        env:
+          SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
+          SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          S3_WEB_URL: https://repo.liquibase.com/sdkman
+          S3_BUCKET: s3://repo.liquibase.com/sdkman/
+        run: |
+          wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
+          mkdir -p liquibase-$VERSION/bin/internal
+          unzip liquibase-$VERSION.zip -d liquibase-$VERSION
+          rm -rf liquibase-$VERSION.zip
+          mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
+          mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
+          zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
+          # Upload the release to S3
+          aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
+          echo "Uploaded liquibase-$VERSION.zip to s3"
+          # Send the release to SDKMAN
+          curl -s -X POST \
+          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+          -H "Content-Type: application/json" \
+          -H "Accept: application/json" \
+          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "'"$S3_WEB_URL"'/liquibase-'"$VERSION"'.zip"}' \
+          https://vendors.sdkman.io/release
+          echo "Sent liquibase-$VERSION.zip to SDKMAN"
+          # Set the default version for SDKMAN
+          curl -s -X PUT \
+          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+          -H "Content-Type: application/json" \
+          -H "Accept: application/json" \
+          -d '{"candidate": "liquibase", "version": "'"$VERSION"'"}' \
+          https://vendors.sdkman.io/default
+          echo "Set liquibase-$VERSION.zip as default version for SDKMAN"
+          # Announce the release to SDKMAN
+          curl -s -X POST \
+          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+          -H "Content-Type: application/json" \
+          -H "Accept: application/json" \
+          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
+          https://vendors.sdkman.io/announce/struct
+          echo "Announced liquibase-$VERSION.zip to SDKMAN"
 
-      # - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
-      #   if: ${{ inputs.dry_run == true }}
-      #   env:
-      #     SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
-      #     SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
-      #     VERSION: ${{ inputs.version }}
-      #     S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
-      #     S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
-      #   run: |
-      #     mkdir -p liquibase-$VERSION/bin/internal
-      #     unzip .github/target/liquibase-$VERSION.zip -d liquibase-$VERSION
-      #     rm -rf liquibase-$VERSION.zip
-      #     mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
-      #     mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
-      #     zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
-      #     # Upload the release to S3
-      #     aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
-      #     echo "Uploaded liquibase-$VERSION.zip to s3"
+      - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
+        if: ${{ inputs.dry_run == true }}
+        env:
+          SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
+          SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
+          S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
+        run: |
+          mkdir -p liquibase-$VERSION/bin/internal
+          unzip .github/target/liquibase-$VERSION.zip -d liquibase-$VERSION
+          rm -rf liquibase-$VERSION.zip
+          mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
+          mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
+          zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
+          # Upload the release to S3
+          aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
+          echo "Uploaded liquibase-$VERSION.zip to s3"
 
-  # upload_windows_package:
-  #   uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
-  #   secrets: inherit
-  #   with:
-  #     version: ${{ inputs.version }}
-  #     dry_run: ${{ inputs.dry_run }}
-  #     dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
+  upload_windows_package:
+    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+      dry_run: ${{ inputs.dry_run }}
+      dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
-  # upload_ansible_role:
-  #   uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
-  #   secrets: inherit
-  #   with:
-  #     version: ${{ inputs.version }}
-  #     dry_run: ${{ inputs.dry_run }}
-  #     dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
+  upload_ansible_role:
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+      dry_run: ${{ inputs.dry_run }}
+      dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}

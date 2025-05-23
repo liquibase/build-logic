@@ -79,10 +79,11 @@ jobs:
           
       - name: Install Dependabot CLI
         run: |
-          # https://github.com/dependabot/cli
-          curl -sSL https://github.com/dependabot/cli/releases/latest/download/dependabot-linux -o dependabot
+          gh release download --repo dependabot/cli -p "*linux-amd64.tar.gz"
+          tar xzvf *.tar.gz >/dev/null 2>&1
           chmod +x dependabot
           sudo mv dependabot /usr/local/bin
+          dependabot --version
           
 
       - name: Run dependabot on extension

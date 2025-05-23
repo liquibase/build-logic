@@ -275,19 +275,19 @@ jobs:
           echo "pr_title: $pr_title"
           # Set the environment variable based on whether the PR exists
           if [ -z "$pr_title" ]; then
-            echo "PR_EXISTS=false" 
+            PR_EXISTS=false
           else
-            echo "PR_EXISTS=true"
+            PR_EXISTS=true
           fi
 
           # Store it in GitHub environment for later steps
-          echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_ENV
+          echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_OUTPUT
 
           # Echo it immediately to see the value in logs
           echo "PR_EXISTS is set to $PR_EXISTS"
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
-        if: ${{ env.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: liquibase

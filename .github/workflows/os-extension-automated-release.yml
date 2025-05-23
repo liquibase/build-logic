@@ -132,7 +132,7 @@ jobs:
 
       - name: Run dependabot on extension
         env:
-          LOCAL_GITHUB_ACCESS_TOKEN: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
+          LOCAL_GITHUB_ACCESS_TOKEN: ${{ secrets.READ_ONLY_PERSONAL_ACCESS_TOKEN }}
         run: |
           echo "Running Dependabot on repository: ${{ matrix.repository }}"
           dependabot update maven "liquibase/${{ matrix.repository }}"

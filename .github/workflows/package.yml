@@ -300,7 +300,7 @@ jobs:
 
             Created by https://github.com/mislav/bump-homebrew-formula-action
         env:
-          COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMITTER_TOKEN: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
 
       # - name: Update SDKMAN version for ${{ inputs.artifactId }}
       #   if: ${{ inputs.dry_run == false }}

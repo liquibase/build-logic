@@ -71,6 +71,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `build-extension-jar.yml`               | Builds and deploys extension JARs to GitHub Package Manager                                                             |
 | `codeql.yml`                            | Runs CodeQL scanning                                                                                                    |
 | `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                                                                 |
+| `dependabot-automerge.yml` | Automatically merges Dependabot PRs for minor and patch updates                                                                      |
 | `fossa_ai.yml`                          | Runs FOSSA Scan for AI Generated Code                                                                                   |
 | `ephemeral-cloud-infra.yml`             | Creates/Destroys test automation cloud infrastructure                                                                   |
 | `extension-attach-artifact-release.yml` | Attaches a tested artifact to the draft release. Receives a `zip` input to upload generated zip files                   |

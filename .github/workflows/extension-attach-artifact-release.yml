@@ -470,8 +470,8 @@ jobs:
           version=${{ inputs.dry_run_version }}
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.artifactPath }}/target/${{ env.artifact_id }}-${version}-sources.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
+          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-sources.jar
 
       - name: Set draft release title
         if: ${{ inputs.dry_run == false }}

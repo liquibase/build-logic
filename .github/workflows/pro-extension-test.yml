@@ -58,6 +58,17 @@ on:
         required: false
         default: false
         type: boolean
+      vaultAddr:
+        description: "Hashicorp Vault server address"
+        required: false
+        default: ""
+        type: string
+      vaultNamespace:
+        description: "Hashicorp Vault namespace"
+        required: false
+        default: ""
+        type: string
+
     secrets:
       SONAR_TOKEN:
         description: "SONAR_TOKEN from the caller workflow"
@@ -80,6 +91,12 @@ on:
       LIQUIBASE_AZURE_STORAGE_ACCOUNT:
         description: "Azure Storage Account name for Liquibase."
         required: false
+      VAULT_ROLE_ID:
+        description: "Role ID for HashiCorp Vault authentication."
+        required: false
+      VAULT_SECRET_ID:
+        description: "Secret ID for HashiCorp Vault authentication."
+        required: false
 
 permissions:
   contents: write
@@ -96,6 +113,8 @@ env:
   LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ secrets.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MAVEN_VERSION: "3.9.5"
+  LIQUIBASE_VAULT_ADDR: ${{ inputs.vaultAddr }}
+  LIQUIBASE_VAULT_NAMESPACE: ${{ inputs.vaultNamespace }}
 
 jobs:
   build:
@@ -190,6 +209,17 @@ jobs:
         shell: powershell
         run: |
           ${{ inputs.extraWindowsCommand }}
+
+      - name: Setup Hashicorp Vault token
+        uses: hashicorp/vault-action@v3
+        if: ${{ inputs.vaultAddr != '' && inputs.vaultNamespace != '' }}
+        with:
+          url: ${{ inputs.vaultAddr }}
+          namespace: ${{ inputs.vaultNamespace }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportToken: true
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
@@ -354,6 +384,17 @@ jobs:
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
         run: |
           ${{ inputs.extraWindowsCommand }}
+
+      - name: Setup Hashicorp Vault token
+        uses: hashicorp/vault-action@v3
+        if: ${{ inputs.vaultAddr != '' && inputs.vaultNamespace != '' }}
+        with:
+          url: ${{ inputs.vaultAddr }}
+          namespace: ${{ inputs.vaultNamespace }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportToken: true
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}

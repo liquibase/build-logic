@@ -33,12 +33,21 @@ jobs:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ matrix.repository }}
+
       - name: Security
         run: |
           security_fail=false
           echo "Checking repository: ${{ matrix.repository }}"
           security_url="https://api.github.com/repos/liquibase/${{ matrix.repository }}/dependabot/alerts?state=open"
-          response=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" $security_url | jq length)
+          response=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" $security_url | jq length)
           echo "Open Alerts: $response"
           if [[ $response == "0" ]]; then
             echo "Security vulnerabilities for ${{ matrix.repository }} are addressed."
@@ -59,6 +68,15 @@ jobs:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ matrix.repository }}
+          
       - name: Install Dependabot CLI
         run: |
           #https://github.com/dependabot/cli
@@ -67,6 +85,8 @@ jobs:
           sudo mv dependabot /usr/local/bin/
 
       - name: Run dependabot on extension
+        env:
+          GH_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
           echo "Running Dependabot on repository: ${{ matrix.repository }}"
           dependabot update maven "liquibase/${{ matrix.repository }}"
@@ -80,11 +100,20 @@ jobs:
         repository: ${{ fromJson(inputs.repositories) }}
 
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ matrix.repository }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           repository: "liquibase/${{ matrix.repository }}"
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Set up Git
         run: |
@@ -140,8 +169,6 @@ jobs:
         run: mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
 
       - name: Update pom.xml
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
           git add pom.xml
@@ -150,7 +177,7 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Update liquibase.version to ${{ inputs.version }}"
-            git remote set-url origin https://liquibot:${{ secrets.GITHUB_TOKEN }}@github.com/liquibase/${{ matrix.repository }}.git
+            git remote set-url origin https://x-access-token:${{ steps.get-token.outputs.token }}@github.com/liquibase/${{ matrix.repository }}.git
             git push
           fi
 
@@ -166,13 +193,23 @@ jobs:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ matrix.repository }}
+          permission-contents: write
+          
       - name: Check for Artifact in Draft Releases
         run: |
           sleep 180
           published_drafts_file=published_drafts.txt
           found=false
           echo "Checking repository: ${{ matrix.repository }}"
-          assets=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases" | jq -r '.[] | select(.draft == true)' | jq -r '.assets[]')
+          assets=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases" | jq -r '.[] | select(.draft == true)' | jq -r '.assets[]')
           echo "Assets: $assets"
           # check if assests are empty
           if [ -z "$assets" ]; then
@@ -186,15 +223,15 @@ jobs:
             fi
             if [ "$found" = true ] ; then
               # Get the draft release ID
-              RELEASE_ID=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases" | jq -r '[.[] | select(.draft == true)] | sort_by(.created_at) | last | .id')
+              RELEASE_ID=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases" | jq -r '[.[] | select(.draft == true)] | sort_by(.created_at) | last | .id')
               echo "Newest Draft release ID: $RELEASE_ID"
               RELEASE_TITLE="v${{ inputs.version }}"
               # Update the release title
               # echo "Updating release title to $RELEASE_TITLE... for ${{ matrix.repository }}"
-              # curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'"}' "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
+              # curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" -d '{"name": "'"$RELEASE_TITLE"'"}' "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
               # Publish the draft release as the latest release
               echo "Publishing the draft release as the latest release to https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
-              curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -d '{"draft": false}' "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
+              curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" -d '{"draft": false}' "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
               echo "Draft release published as the latest release for ${{ matrix.repository }}"
               echo "${{ matrix.repository }}: v${{ inputs.version }}" >> $published_drafts_file
             else

@@ -1,5 +1,11 @@
 name: Attach Artifact to Release
 
+# Add permissions for the default GITHUB_TOKEN
+permissions:
+  contents: write
+  actions: read
+  packages: write
+
 on:
   workflow_call:
     inputs:
@@ -48,9 +54,6 @@ on:
         required: false
         type: string
     secrets:
-      BOT_TOKEN:
-        description: "BOT_TOKEN from the caller workflow"
-        required: true
       GPG_SECRET:
         description: "GPG_SECRET from the caller workflow"
         required: true
@@ -118,12 +121,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -147,7 +150,7 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         shell: bash
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
           git reset HEAD~ --hard
           mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }} -P '${{ inputs.mavenProfiles }}'
 
@@ -156,7 +159,7 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         shell: bash
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
           git reset HEAD~ --hard
           mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }} -P '${{ inputs.mavenProfiles }}'
 
@@ -307,12 +310,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -369,7 +372,7 @@ jobs:
         if: ${{ env.ARTIFACT_FOUND == '0' && inputs.dry_run == false }}
         id: build-release-artifacts
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
           git reset HEAD~ --hard
           # Determine the default branch (master or main)
           if git rev-parse --verify origin/master >/dev/null 2>&1; then
@@ -388,7 +391,7 @@ jobs:
         if: ${{ inputs.dry_run == true }}
         id: build-release-artifacts-dry-run
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}'
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
           git reset HEAD~ --hard
           # Determine the default branch (master or main)
           if git rev-parse --verify origin/master >/dev/null 2>&1; then
@@ -413,7 +416,7 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         id: get-release
         run: |
-          LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
+          LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
           echo "Latest Draft Release ID: $LATEST_DRAFT_RELEASE"
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
 
@@ -422,7 +425,7 @@ jobs:
         id: list-artifacts
         run: |
           RELEASE_ID="${{ env.RELEASE_ID }}"
-          ARTIFACTS=$(curl -X GET -H "Authorization: token ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | jq -r '.[].id')
+          ARTIFACTS=$(curl -X GET -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | jq -r '.[].id')
           echo "Artifacts to delete: $ARTIFACTS"
           ARTIFACTS_CLEANED=$(echo "$ARTIFACTS" | tr -s '[:space:]' ',' | sed 's/,$//')
           echo "ARTIFACTS_TO_DELETE=$ARTIFACTS_CLEANED" >> $GITHUB_ENV
@@ -434,7 +437,7 @@ jobs:
           ARTIFACTS_TO_DELETE="${{ env.ARTIFACTS_TO_DELETE }}"
           IFS=',' read -ra values <<< "$ARTIFACTS_TO_DELETE"
           for value in "${values[@]}"; do
-            curl -X DELETE -H "Authorization: token ${{ secrets.BOT_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/assets/$value"
+            curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/assets/$value"
             echo "Deleted artifact ID: $value"
           done
 
@@ -478,7 +481,7 @@ jobs:
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           RELEASE_TITLE="v$version"
           echo "Updating release title to $RELEASE_TITLE"
-          curl -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.BOT_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'", "tag_name": "'"v$version"'"}' "https://api.github.com/repos/${{ github.repository }}/releases/${{ env.RELEASE_ID }}"
+          curl -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'", "tag_name": "'"v$version"'"}' "https://api.github.com/repos/${{ github.repository }}/releases/${{ env.RELEASE_ID }}"
 
       - name: Attach Files to Draft Release
         if: ${{ inputs.dry_run == false }}
@@ -486,7 +489,7 @@ jobs:
         id: upload-release-asset
         run: ${{ env.REPO_ROOT }}/.github/upload_asset.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
         env:
-          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target
 
@@ -513,6 +516,6 @@ jobs:
         id: upload-release-zip
         run: ./.github/upload_zip.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
         env:
-          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target

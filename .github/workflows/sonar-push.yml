@@ -4,9 +4,9 @@ on:
   workflow_call:
     inputs:
       extraCommand:
-        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        description: "Specify it if you want to run an extra command before attaching the artifact"
         required: false
-        default: ''
+        default: ""
         type: string
       artifactPath:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
@@ -15,8 +15,13 @@ on:
         type: string
     secrets:
       SONAR_TOKEN:
-        description: 'SONAR_TOKEN from the caller workflow'
+        description: "SONAR_TOKEN from the caller workflow"
         required: true
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read # Required to access workflow runs and artifacts
 
 jobs:
   sonar-push:
@@ -29,15 +34,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           java-version: 17
-          distribution: 'temurin'
-          cache: 'maven'
-          
+          distribution: "temurin"
+          cache: "maven"
+
       - name: Cache SonarCloud packages
         uses: actions/cache@v4
         with:
@@ -60,13 +65,13 @@ jobs:
         id: download-artifact
         uses: dawidd6/action-download-artifact@v7
         with:
-          github_token: ${{secrets.BOT_TOKEN}}
+          github_token: ${{secrets.GITHUB_TOKEN}}
           workflow: test.yml
           name: test-reports-jdk-17-ubuntu-latest
           repo: ${{ github.repository }}
           if_no_artifact_found: warn
           workflow_conclusion: ""
-          
+
       # look for dependencies in maven
       - name: maven-settings-xml-action
         uses: whelk-io/maven-settings-xml-action@v22
@@ -101,12 +106,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 

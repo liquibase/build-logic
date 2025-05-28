@@ -498,6 +498,14 @@ jobs:
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-javadoc.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.pom
 
+  cleanup-individual-artifacts:
+    needs: [build, combineJars]
+    if: ${{ inputs.combineJars && always() }}
+    uses: liquibase/build-logic/.github/workflows/cleanup-individual-artifacts.yml@DAT-20250
+    with:
+      artifact_id: ${{needs.build.outputs.artifact_id}}
+      artifact_version: ${{needs.build.outputs.artifact_version}}
+
   sonar-pr:
     if: ${{ !inputs.nightly }}
     needs: [unit-test]

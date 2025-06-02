@@ -1,0 +1,82 @@
+name: Jira Ticket Linker
+
+on:
+  workflow_call:
+    inputs:
+      ticket_prefix:
+        description: "The ticket prefix to search for (e.g., IO, JIRA, ABC)"
+        required: true
+        type: string
+      atlassian_base_url:
+        description: "The base URL for Atlassian (e.g., https://company.atlassian.net/browse)"
+        required: true
+        type: string
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  add-jira-ticket-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check and add ticket link
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { pull_request } = context.payload;
+
+            // Get inputs from the workflow
+            const ticketPrefix = '${{ inputs.ticket_prefix }}';
+            const atlassianBaseUrl = '${{ inputs.atlassian_base_url }}';
+
+            // Extract ticket number from PR title, branch name, or body
+            const ticketRegex = new RegExp(`${ticketPrefix}-(\\d+)`, 'i');
+
+            const title = pull_request.title || '';
+            const branchName = pull_request.head.ref || '';
+            const body = pull_request.body || '';
+
+            // Look for ticket number in title, branch name, or body
+            let ticketMatch = title.match(ticketRegex) || 
+                             branchName.match(ticketRegex) || 
+                             body.match(ticketRegex);
+
+            if (!ticketMatch) {
+              console.log(`No ticket number found with prefix "${ticketPrefix}" in PR title, branch name, or body`);
+              return;
+            }
+
+            const ticketNumber = ticketMatch[1];
+            const ticketId = `${ticketPrefix}-${ticketNumber}`;
+            const ticketUrl = `${atlassianBaseUrl}/${ticketId}`;
+
+            console.log(`Found ticket number: ${ticketId}`);
+
+            // Check if the ticket link already exists in the PR body
+            if (body.includes(ticketUrl)) {
+              console.log('Ticket link already exists in PR description');
+              return;
+            }
+
+            // Prepare the new body with the ticket link
+            let newBody = body;
+
+            // Add ticket link at the bottom of the description
+            const ticketLinkText = `**Related Ticket:** [${ticketId}](${ticketUrl})`;
+
+            if (newBody.trim() === '') {
+              newBody = ticketLinkText;
+            } else {
+              newBody = `${newBody}\n\n${ticketLinkText}`;
+            }
+
+            // Update the PR description
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pull_request.number,
+              body: newBody
+            });
+
+            console.log(`Successfully added ticket link to PR description: ${ticketUrl}`);

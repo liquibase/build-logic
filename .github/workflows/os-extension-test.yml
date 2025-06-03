@@ -33,6 +33,11 @@ on:
         required: false
         default: ""
         type: string
+      skipSonar:
+        description: "Skip SonarQube analysis"
+        required: false
+        default: false
+        type: boolean
 
 env:
   MAVEN_VERSION: "3.9.5"
@@ -263,7 +268,7 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   sonar-pr:
-    if: ${{ !inputs.nightly }}
+    if: ${{ !inputs.skipSonar || !inputs.nightly }}
     needs: [unit-test]
     uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
     secrets: inherit

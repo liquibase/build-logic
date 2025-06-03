@@ -8,6 +8,11 @@ on:
         required: false
         default: "[11, 17, 21]"
         type: string
+      javaBuildVersion:
+        description: "Java version to build the project"
+        required: false
+        default: "17"
+        type: string
       os:
         description: "Operating system to test"
         required: false
@@ -46,10 +51,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
-      - name: Set up JDK 17
+      - name: Set up JDK ${{ inputs.javaBuildVersion }}
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
           cache: "maven"
 

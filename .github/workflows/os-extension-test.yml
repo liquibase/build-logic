@@ -268,7 +268,7 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   sonar-pr:
-    if: ${{ !inputs.skipSonar || !inputs.nightly }}
+    if: ${{ !inputs.skipSonar && !inputs.nightly }}
     needs: [unit-test]
     uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
     secrets: inherit

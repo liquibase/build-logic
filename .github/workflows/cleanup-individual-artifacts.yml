@@ -16,21 +16,12 @@ jobs:
   cleanup-individual-artifacts:
     name: Cleanup Individual OS Artifacts
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - name: Delete Ubuntu Artifacts
+      - name: Delete ${{ matrix.os }} Artifacts
         uses: geekyeggo/delete-artifact@v5
         with:
-          name: ${{ inputs.artifact_id }}-ubuntu-latest-${{ inputs.artifact_version }}-artifacts
-          failOnError: false
-
-      - name: Delete macOS Artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: ${{ inputs.artifact_id }}-macos-latest-${{ inputs.artifact_version }}-artifacts
-          failOnError: false
-
-      - name: Delete Windows Artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: ${{ inputs.artifact_id }}-windows-latest-${{ inputs.artifact_version }}-artifacts
+          name: ${{ inputs.artifact_id }}-${{ matrix.os }}-${{ inputs.artifact_version }}-artifacts
           failOnError: false

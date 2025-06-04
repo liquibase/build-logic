@@ -1,0 +1,27 @@
+name: Cleanup Individual OS Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      artifact_id:
+        description: "The artifact ID to cleanup"
+        required: true
+        type: string
+      artifact_version:
+        description: "The artifact version to cleanup"
+        required: true
+        type: string
+
+jobs:
+  cleanup-individual-artifacts:
+    name: Cleanup Individual OS Artifacts
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Delete ${{ matrix.os }} Artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: ${{ inputs.artifact_id }}-${{ matrix.os }}-${{ inputs.artifact_version }}-artifacts
+          failOnError: false

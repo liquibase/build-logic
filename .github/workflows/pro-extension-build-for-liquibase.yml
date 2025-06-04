@@ -308,3 +308,11 @@ jobs:
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}-sources.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}-javadoc.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}.pom
+
+  cleanup-individual-artifacts:
+    needs: [build, combineJars]
+    if: ${{ inputs.combineJars && always() }}
+    uses: liquibase/build-logic/.github/workflows/cleanup-individual-artifacts.yml@main
+    with:
+      artifact_id: ${{needs.build.outputs.artifact_id}}
+      artifact_version: ${{ inputs.version }}

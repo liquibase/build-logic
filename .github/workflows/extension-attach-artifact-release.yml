@@ -259,7 +259,7 @@ jobs:
   cleanup-individual-artifacts:
     needs: [build-multi-architecture, combineJars]
     if: ${{ inputs.combineJars && always() }}
-    uses: liquibase/build-logic/.github/workflows/cleanup-individual-artifacts.yml@DAT-20250
+    uses: liquibase/build-logic/.github/workflows/cleanup-individual-artifacts.yml@main
     with:
       artifact_id: ${{needs.build-multi-architecture.outputs.artifact_id}}
       artifact_version: ${{needs.build-multi-architecture.outputs.artifact_version}}

@@ -4,11 +4,7 @@ on:
   workflow_call:
     inputs:
       ticket_prefix:
-        description: "The ticket prefix to search for (e.g., IO, DAT, INT)"
-        required: true
-        type: string
-      atlassian_base_url:
-        description: "The base URL for Atlassian (e.g., https://company.atlassian.net/browse)"
+        description: "The ticket prefix to search for (IO, DAT, INT, etc.)"
         required: true
         type: string
 
@@ -28,7 +24,7 @@ jobs:
 
             // Get inputs from the workflow
             const ticketPrefix = '${{ inputs.ticket_prefix }}';
-            const atlassianBaseUrl = '${{ inputs.atlassian_base_url }}';
+            const atlassianBaseUrl = 'https://datical.atlassian.net/browse';
 
             // Extract ticket number from PR title, branch name, or body
             const ticketRegex = new RegExp(`${ticketPrefix}-(\\d+)`, 'i');

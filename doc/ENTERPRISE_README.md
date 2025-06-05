@@ -1,4 +1,4 @@
-# 📓 Fossa #rd Party Report Generation for Enterprise
+# 📓 Fossa 3rd Party Report Generation for Enterprise
 
 1. Manually trigger the workflow named Trigger Enterprise-FOSSA 3rd Party License Report in the build-logic repository <https://github.com/liquibase/build-logic/tree/main/.github/workflows>.
 2. Provide the required input, `<version_number_for_3p_fossa_report_generation>` (e.g., 8.7.352). This value is used to organize reports within the S3 bucket.

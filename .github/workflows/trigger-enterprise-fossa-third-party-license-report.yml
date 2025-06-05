@@ -1,11 +1,11 @@
-name: Enterprise- FOSSA Report Generation
+name: Trigger Enterprise-FOSSA 3rd Party License Report
 
 on:
   workflow_dispatch:
     inputs:
-      version_number_for_report_generation:
+      version_number_for_3p_fossa_report_generation:
         type: string
-        description: 'Supply the DaticalDb-installer version variable which is used during its report generation to be stored in the s3 bucket. eg 8.7.352'
+        description: 'Supply the DaticalDb-installer version number to be stored in the s3 bucket. eg 8.7.352'
         required: false
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
       - name: Set workflow inputs
         run: |
           if [[ "${{ matrix.repo.name }}" ]]; then
-            echo "WORKFLOW_INPUTS={ \"version_number_for_report_generation\": \"${{ github.event.inputs.version_number_for_report_generation }}\" }" >> $GITHUB_ENV
+            echo "WORKFLOW_INPUTS={ \"version_number_for_3p_fossa_report_generation\": \"${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}\" }" >> $GITHUB_ENV
           else
             echo "WORKFLOW_INPUTS={}" >> $GITHUB_ENV
           fi
@@ -86,7 +86,7 @@ jobs:
           poll_interval_ms: 120000 # 2 minutes Frequency to poll the run for a status.
 
 
-  combine-fossa-reports:
+  combine-3p-fossa-reports:
     runs-on: ubuntu-latest
     needs: wait-for-fossa-report-generation
     steps:
@@ -97,11 +97,10 @@ jobs:
           ref: main
           path: build-logic
 
-      - name: Set up AWS credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
           aws-region: us-east-1
 
       - name: Download reports from S3 and Rearrange CSV files
@@ -110,7 +109,7 @@ jobs:
           mkdir -p /home/runner/work/enterprise/fossa_reports_s3
 
           # Download all files from the specified S3 bucket to the created directory
-          aws s3 cp --recursive s3://liquibaseorg-origin/enterprise_fossa_report/${{ github.event.inputs.version_number_for_report_generation }}/raw_reports /home/runner/work/enterprise/fossa_reports_s3/
+          aws s3 cp --recursive s3://liquibaseorg-origin/enterprise_fossa_report/${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}/raw_reports /home/runner/work/enterprise/fossa_reports_s3/
 
           # List the contents of the directory to confirm successful download
           ls -l /home/runner/work/enterprise/fossa_reports_s3
@@ -158,7 +157,7 @@ jobs:
 
       - name: Upload merged CSV to S3
         if: always()
-        run: aws s3 cp enterprise_report.csv s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_report_generation }}/enterprise_report_${{ inputs.version_number_for_report_generation }}.csv
+        run: aws s3 cp enterprise_report.csv s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_3p_fossa_report_generation }}/enterprise_report_${{ inputs.version_number_for_3p_fossa_report_generation }}.csv
 
 
   trigger-datical-service:
@@ -173,5 +172,5 @@ jobs:
           token: ${{ secrets.FOSSA_TRIGGER_REPORT_GENERATION }}
           repository: Datical/datical-service
           event-type: trigger-fossa-report-generation
-          client-payload: '{"ref": "master", "version_number_for_report_generation": "${{ github.event.inputs.version_number_for_report_generation }}"}'
-
+          client-payload: '{"ref": "master", "version_number_for_3p_fossa_report_generation": "${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}"}'
+          

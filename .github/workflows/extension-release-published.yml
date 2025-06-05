@@ -151,22 +151,72 @@ jobs:
           fileName: "${{ env.artifact_id }}-*"
           out-file-path: ${{ inputs.artifactPath }}
 
-      - name: Publish to Maven Central
+      - name: Publish to Maven Central Portal
         working-directory: ${{ inputs.artifactPath }}
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN }}
         run: |
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          groupId=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
           
-          # Use central-publishing-maven-plugin to publish directly to Central Portal
-          mvn -B org.sonatype.central:central-publishing-maven-plugin:0.7.0:publish \
-              -Dcentral.autoPublish=false \
-              -Dcentral.checksums=all \
-              -Dfile=${{ env.artifact_id }}-${version}.jar \
-              -DpomFile=${{ env.artifact_id }}-${version}.pom \
-              -Dsources=${{ env.artifact_id }}-${version}-sources.jar \
-              -Djavadoc=${{ env.artifact_id }}-${version}-javadoc.jar
+          # Create Maven repository layout structure for the bundle
+          # Convert groupId dots to directory separators
+          groupPath=$(echo "$groupId" | tr '.' '/')
+          mkdir -p "bundle/${groupPath}/${{ env.artifact_id }}/${version}"
+          
+          # Copy all artifacts to proper Maven repository layout
+          cp ${{ env.artifact_id }}-${version}.jar "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          cp ${{ env.artifact_id }}-${version}.pom "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          cp ${{ env.artifact_id }}-${version}-sources.jar "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          cp ${{ env.artifact_id }}-${version}-javadoc.jar "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          
+          # Copy signature files if they exist
+          if [ -f "${{ env.artifact_id }}-${version}.jar.asc" ]; then
+            cp ${{ env.artifact_id }}-${version}.jar.asc "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          fi
+          if [ -f "${{ env.artifact_id }}-${version}.pom.asc" ]; then
+            cp ${{ env.artifact_id }}-${version}.pom.asc "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          fi
+          if [ -f "${{ env.artifact_id }}-${version}-sources.jar.asc" ]; then
+            cp ${{ env.artifact_id }}-${version}-sources.jar.asc "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          fi
+          if [ -f "${{ env.artifact_id }}-${version}-javadoc.jar.asc" ]; then
+            cp ${{ env.artifact_id }}-${version}-javadoc.jar.asc "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          fi
+          
+          # Create the bundle zip file
+          cd bundle
+          zip -r ../central-bundle.zip .
+          cd ..
+          
+          # Create base64 encoded credentials for Bearer auth
+          AUTH_HEADER=$(printf "%s:%s" "${MAVEN_USERNAME}" "${MAVEN_PASSWORD}" | base64 -w 0)
+          
+          # Upload bundle to Central Portal using curl with proper authentication
+          echo "Uploading bundle to Central Portal..."
+          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${AUTH_HEADER}" \
+            -F "bundle=@central-bundle.zip" \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED&name=${{ env.artifact_id }}-${version}")
+          
+          # Parse response
+          HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+          DEPLOYMENT_ID=$(echo "$UPLOAD_RESPONSE" | head -n1)
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "Upload failed with HTTP status $HTTP_CODE"
+            echo "Response: $DEPLOYMENT_ID"
+            exit 1
+          fi
+          
+          echo "Bundle uploaded successfully to Central Portal"
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          echo "Visit https://central.sonatype.com/publishing/deployments to view and publish your deployment"
 
   dry-run-release:
     if: ${{ inputs.dry_run == true }}

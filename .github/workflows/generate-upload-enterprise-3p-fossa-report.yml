@@ -1,9 +1,13 @@
-name: Generate and upload Fossa Report to s3
+# This workflow is invoked by individual Datical repositories to generate and upload the 3rd-party license report using FOSSA to S3. It is triggered by the central workflow located at: 
+# build-logic/.github/workflows/trigger-enterprise-fossa-third-party-license-report.yml
+# The workflow generates a CSV report of 3rd-party licenses and uploads it to S3 and as an artifact for the team to view under `raw_reports`.
+
+name: Generate and upload 3rd Party License Fossa Report to s3
 
 on:
   workflow_call:
     inputs:
-      version_number_for_report_generation:
+      version_number_for_3p_fossa_report_generation:
         type: string
         required: true
 
@@ -12,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
-      VERSION_NUMBER: ${{ inputs.version_number_for_report_generation }}
+      VERSION_NUMBER: ${{ inputs.version_number_for_3p_fossa_report_generation }}
     permissions:
       contents: read
       packages: write
@@ -40,7 +44,7 @@ jobs:
       - name: Analyze project
         run: fossa analyze --static-only-analysis
 
-      - name: Generate report
+      - name: Generate JSON report
         run: |
           # Run JSON report
           fossa report attribution --format json > fossa.json
@@ -61,17 +65,23 @@ jobs:
           @csv
           ' fossa.json >> $csv_filename
 
-      - name: Upload report to S3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
+          aws-region: us-east-1
+
+      - name: Upload 3rd Party report to S3
         if: always()
         run: |
           csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
           aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/${{ env.VERSION_NUMBER }}/raw_reports/
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.LIQUIBASEORIGIN_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.LIQUIBASEORIGIN_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
+                
+      - name: Set CSV filename
+        id: set_csv_filename
+        run: echo "csv_filename=${{ steps.get_repo_name.outputs.repo_name }}.csv" >> $GITHUB_OUTPUT    
 
-      - name: Upload to build page
+      - name: Upload 3rd Party report to build page
         if: always()
         uses: actions/upload-artifact@v4
         with:

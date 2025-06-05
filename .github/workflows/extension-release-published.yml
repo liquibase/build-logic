@@ -146,7 +146,7 @@ jobs:
           fileName: "${{ env.artifact_id }}-*"
           out-file-path: ${{ inputs.artifactPath }}
 
-      - name: Publish to Maven Central Portal
+      - name: Publish to Maven Central
         working-directory: ${{ inputs.artifactPath }}
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}

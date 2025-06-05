@@ -99,16 +99,6 @@ jobs:
                   "enabled": "true",
                   "updatePolicy": "always"
                 }
-              },
-              {
-                "id": "sonatype-nexus-staging",
-                "url": "https://oss.sonatype.org/service/local/staging/deploy/maven2/",
-                "releases": {
-                  "enabled": "true"
-                },
-                "snapshots": {
-                  "enabled": "false"
-                }
               }
             ]
           servers: |
@@ -124,7 +114,7 @@ jobs:
                 "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
-                "id": "sonatype-nexus-staging",
+                "id": "central",
                 "username": "${{ secrets.SONATYPE_USERNAME }}",
                 "password": "${{ secrets.SONATYPE_TOKEN }}"
               }
@@ -155,10 +145,10 @@ jobs:
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
       - name: Download Release Artifacts
-        uses: robinraju/release-downloader@v1.9
+        uses: robinraju/release-downloader@v1.12
         with:
           tag: "${{ github.event.release.tag_name }}"
-          filename: "${{ env.artifact_id }}-*"
+          fileName: "${{ env.artifact_id }}-*"
           out-file-path: ${{ inputs.artifactPath }}
 
       - name: Publish to Maven Central
@@ -167,18 +157,16 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN }}
         run: |
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)          
-          mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
-                      -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ \
-                      -DrepositoryId=sonatype-nexus-staging \
-                      -DpomFile=${{ env.artifact_id }}-${version}.pom \
-                      -DgeneratePom=false \
-                      -Dfile=${{ env.artifact_id }}-${version}.jar \
-                      -Dsources=${{ env.artifact_id }}-${version}-sources.jar \
-                      -Djavadoc=${{ env.artifact_id }}-${version}-javadoc.jar \
-                      -Dfiles=${{ env.artifact_id }}-${version}.jar.asc,${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
-                      -Dtypes=jar.asc,jar.asc,jar.asc,pom.asc \
-                      -Dclassifiers=,sources,javadoc,
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          
+          # Use central-publishing-maven-plugin to publish directly to Central Portal
+          mvn -B org.sonatype.central:central-publishing-maven-plugin:0.7.0:publish \
+              -Dcentral.autoPublish=false \
+              -Dcentral.checksums=all \
+              -Dfile=${{ env.artifact_id }}-${version}.jar \
+              -DpomFile=${{ env.artifact_id }}-${version}.pom \
+              -Dsources=${{ env.artifact_id }}-${version}-sources.jar \
+              -Djavadoc=${{ env.artifact_id }}-${version}-javadoc.jar
 
   dry-run-release:
     if: ${{ inputs.dry_run == true }}
@@ -262,10 +250,10 @@ jobs:
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
       - name: Download Release Artifacts
-        uses: robinraju/release-downloader@v1.9
+        uses: robinraju/release-downloader@v1.12
         with:
           releaseId: "${{ inputs.dry_run_release_id }}"
-          filename: "${{ env.artifact_id }}-*"
+          fileName: "${{ env.artifact_id }}-*"
           out-file-path: ${{ inputs.artifactPath }}
 
       - name: Publish to Maven Central

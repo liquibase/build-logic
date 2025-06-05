@@ -165,25 +165,8 @@ jobs:
           groupPath=$(echo "$groupId" | tr '.' '/')
           mkdir -p "bundle/${groupPath}/${{ env.artifact_id }}/${version}"
           
-          # Copy all artifacts to proper Maven repository layout
-          cp ${{ env.artifact_id }}-${version}.jar "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          cp ${{ env.artifact_id }}-${version}.pom "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          cp ${{ env.artifact_id }}-${version}-sources.jar "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          cp ${{ env.artifact_id }}-${version}-javadoc.jar "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          
-          # Copy signature files if they exist
-          if [ -f "${{ env.artifact_id }}-${version}.jar.asc" ]; then
-            cp ${{ env.artifact_id }}-${version}.jar.asc "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          fi
-          if [ -f "${{ env.artifact_id }}-${version}.pom.asc" ]; then
-            cp ${{ env.artifact_id }}-${version}.pom.asc "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          fi
-          if [ -f "${{ env.artifact_id }}-${version}-sources.jar.asc" ]; then
-            cp ${{ env.artifact_id }}-${version}-sources.jar.asc "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          fi
-          if [ -f "${{ env.artifact_id }}-${version}-javadoc.jar.asc" ]; then
-            cp ${{ env.artifact_id }}-${version}-javadoc.jar.asc "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          fi
+          # Copy all artifacts and their signatures/checksums to proper Maven repository layout
+          cp ${{ env.artifact_id }}-${version}.* "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
           
           # Create the bundle zip file
           cd bundle

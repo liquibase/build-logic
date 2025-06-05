@@ -166,7 +166,7 @@ jobs:
           mkdir -p "bundle/${groupPath}/${{ env.artifact_id }}/${version}"
           
           # Copy all artifacts and their signatures/checksums to proper Maven repository layout
-          cp ${{ env.artifact_id }}-${version}.* "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          cp ${{ env.artifact_id }}-${version}* "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
           
           # Create the bundle zip file
           cd bundle

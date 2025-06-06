@@ -501,10 +501,20 @@ jobs:
   cleanup-individual-artifacts:
     needs: [build, combineJars]
     if: ${{ inputs.combineJars && always() }}
-    uses: liquibase/build-logic/.github/workflows/cleanup-individual-artifacts.yml@main
-    with:
-      artifact_id: ${{needs.build.outputs.artifact_id}}
-      artifact_version: ${{needs.build.outputs.artifact_version}}
+    name: Trigger Cleanup Individual OS Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger cleanup workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: liquibase/build-logic
+          event-type: cleanup-individual-artifacts
+          client-payload: |
+            {
+              "artifact_id": "${{needs.build.outputs.artifact_id}}",
+              "artifact_version": "${{needs.build.outputs.artifact_version}}"
+            }
 
   sonar-pr:
     if: ${{ !inputs.nightly }}

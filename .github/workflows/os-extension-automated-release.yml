@@ -243,49 +243,137 @@ jobs:
             fi
           fi
 
-  create-and-close-nexus-stagging:
-    # 1. This job pauses the workflow for 60 seconds, allowing time for Sonatype Nexus stagging repos to be ready.
-    # 2. The job uses the Sonatype Nexus API to retrieve information about staging repositories.
-    # 3. It extracts the IDs of repositories containing the string "liquibase."
-    # 4. For each repository, it checks if it is an extension by examining its relative path.
-    # 5. If an extension is detected, the repository is closed using the Sonatype Nexus API.
-    # 6. A sleep of 120 seconds follows the closure before the final release step (commented out for safety).
+  publish-to-central-portal:
+    # 1. This job uses the new Central Portal API to automatically publish extension artifacts.
+    # 2. It downloads artifacts from published GitHub releases and creates Maven bundles.
+    # 3. Each bundle is uploaded to Central Portal with AUTOMATIC publishing type.
+    # 4. The job tracks successful uploads and automatically publishes to Maven Central.
     needs: release-draft-releases
     runs-on: ubuntu-latest
-    name: Nexus
+    name: Central Portal
+    strategy:
+      matrix:
+        repository: ${{ fromJson(inputs.repositories) }}
     steps:
-      - name: Wait for Sonatype Nexus
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ matrix.repository }}
+
+      - name: Wait for GitHub releases to be available
         run: sleep 120
 
-      - name: Publish OSS Extensions
+      - name: Check for published release and download artifacts
+        id: download-artifacts
         run: |
-          closed_nexus_repos_file=closed_nexus_repos.txt
-          api_output=$(curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" "https://oss.sonatype.org/service/local/staging/profile_repositories")
-          # Extract ids of repositories-item containing the string "liquibase"
-          repositories=$(echo "$api_output" | grep -B 8 "liquibase" | grep "<repositoryId>" | awk -F"<|>" '{print $3}')
-          echo "Repository IDs containing 'liquibase': $repositories"
-          # Loop through each repository and close it
-          for repo_id in $repositories; do
-            echo "Check if $repo_id repository is an extension"
-            api_output=$(curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" "https://oss.sonatype.org/service/local/repositories/$repo_id/content/org/liquibase/")
-            relative_path=$(echo "$api_output" | grep -oP '<relativePath>\K[^<]+' | awk 'NR==1')
-            echo "Relative path: $relative_path"
-            if [[ "$relative_path" == *"/org/liquibase/ext/"* ]]; then
-                echo "Relative path contains '/org/liquibase/ext/'. It is an extension."
-                curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" -H "Accept: application/json" -H "Content-Type: application/json" -d '{"data":{"stagedRepositoryIds":["'"$repo_id"'"],"description":"Closing '"$repo_id"'."}}' https://oss.sonatype.org/service/local/staging/bulk/close
-                api_output=$(curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" "https://oss.sonatype.org/service/local/repositories/$repo_id/content/org/liquibase/ext/")
-                relative_path=$(echo "$api_output" | grep -oP '<relativePath>\K[^<]+' | awk 'NR==1')
-                echo "Closed repository: $repo_id - $relative_path" >> $closed_nexus_repos_file
-                #sleep 120
-                #curl -s -u "${{ secrets.SONATYPE_USERNAME }}:${{ secrets.SONATYPE_TOKEN }}" -H "Accept: application/json" -H "Content-Type: application/json" -d '{"data":{"stagedRepositoryIds":["'"$repo_id"'"],"description":"Releasing '"$repo_id"'."}}' https://oss.sonatype.org/service/local/staging/bulk/promote
-                #echo "Released repository: $repo_id"
-            else
-                echo "Relative path does not contain '/org/liquibase/ext/'. It is not an extension."
+          echo "Checking repository: ${{ matrix.repository }}"
+          
+          # Get the latest published release for this version
+          RELEASE_DATA=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/tags/v${{ inputs.version }}")
+          
+          # Check if release exists and is published
+          if echo "$RELEASE_DATA" | jq -e '.draft == false' > /dev/null; then
+            echo "Found published release v${{ inputs.version }} for ${{ matrix.repository }}"
+            
+            # Create working directory
+            mkdir -p artifacts
+            cd artifacts
+            
+            # Download all assets from the release
+            ASSETS=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | test("\\.(jar|pom|asc|md5|sha1)$")) | .browser_download_url')
+            
+            if [ -z "$ASSETS" ]; then
+              echo "No artifacts found in release"
+              echo "has_artifacts=false" >> $GITHUB_OUTPUT
+              exit 0
             fi
-          done
+            
+            echo "Downloading artifacts..."
+            for asset_url in $ASSETS; do
+              echo "Downloading: $asset_url"
+              curl -L -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" -o "$(basename "$asset_url")" "$asset_url"
+            done
+            
+            # Get artifact info from pom file
+            POM_FILE=$(ls *.pom | head -1)
+            if [ -f "$POM_FILE" ]; then
+              # Extract groupId and artifactId from POM
+              GROUP_ID=$(grep -oP '<groupId>\K[^<]+' "$POM_FILE" | head -1)
+              ARTIFACT_ID=$(grep -oP '<artifactId>\K[^<]+' "$POM_FILE" | head -1)
+              
+              echo "GROUP_ID=$GROUP_ID" >> $GITHUB_OUTPUT
+              echo "ARTIFACT_ID=$ARTIFACT_ID" >> $GITHUB_OUTPUT
+              echo "has_artifacts=true" >> $GITHUB_OUTPUT
+              
+              echo "Found artifacts for $GROUP_ID:$ARTIFACT_ID:${{ inputs.version }}"
+            else
+              echo "No POM file found"
+              echo "has_artifacts=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No published release found for v${{ inputs.version }}"
+            echo "has_artifacts=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Archive closed_nexus_repos.txt
+      - name: Create and upload bundle to Central Portal
+        if: steps.download-artifacts.outputs.has_artifacts == 'true'
+        run: |
+          cd artifacts
+          
+          GROUP_ID="${{ steps.download-artifacts.outputs.GROUP_ID }}"
+          ARTIFACT_ID="${{ steps.download-artifacts.outputs.ARTIFACT_ID }}"
+          VERSION="${{ inputs.version }}"
+          
+          # Create Maven repository layout structure for the bundle
+          GROUP_PATH=$(echo "$GROUP_ID" | tr '.' '/')
+          mkdir -p "bundle/${GROUP_PATH}/${ARTIFACT_ID}/${VERSION}"
+          
+          # Copy all artifacts to proper Maven repository layout
+          cp ${ARTIFACT_ID}-${VERSION}* "bundle/${GROUP_PATH}/${ARTIFACT_ID}/${VERSION}/"
+          
+          # Create the bundle zip file
+          cd bundle
+          zip -r ../central-bundle.zip .
+          cd ..
+          
+          # Create base64 encoded credentials for Bearer auth
+          AUTH_HEADER=$(printf "%s:%s" "${{ secrets.SONATYPE_USERNAME }}" "${{ secrets.SONATYPE_TOKEN }}" | base64 -w 0)
+          
+          # Upload bundle to Central Portal with AUTOMATIC publishing
+          echo "Uploading bundle to Central Portal for ${ARTIFACT_ID}-${VERSION}..."
+          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${AUTH_HEADER}" \
+            -F "bundle=@central-bundle.zip" \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC&name=${ARTIFACT_ID}-${VERSION}")
+          
+          # Parse response
+          HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+          DEPLOYMENT_ID=$(echo "$UPLOAD_RESPONSE" | head -n1)
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "Upload failed with HTTP status $HTTP_CODE"
+            echo "Response: $DEPLOYMENT_ID"
+            exit 1
+          fi
+          
+          echo "Bundle uploaded successfully to Central Portal"
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          echo "Automatic publishing initiated for ${ARTIFACT_ID}-${VERSION}"
+          
+          # Track successful upload
+          echo "${{ matrix.repository }}: ${ARTIFACT_ID}-${VERSION} (${DEPLOYMENT_ID})" >> ../published_extensions.txt
+
+      - name: Archive published extensions
         uses: actions/upload-artifact@v4
         with:
-          name: closed_nexus_repos
-          path: closed_nexus_repos.txt
+          name: published-extensions-${{ matrix.repository }}
+          path: published_extensions.txt
+          if-no-files-found: ignore

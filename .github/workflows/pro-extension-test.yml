@@ -504,10 +504,20 @@ jobs:
     name: Trigger Cleanup Individual OS Artifacts
     runs-on: ubuntu-latest
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-packages: write
+          permission-actions: write
       - name: Trigger cleanup workflow
         uses: peter-evans/repository-dispatch@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.get-token.outputs.token }}
           repository: liquibase/build-logic
           event-type: cleanup-individual-artifacts
           client-payload: |

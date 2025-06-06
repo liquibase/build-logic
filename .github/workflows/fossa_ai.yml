@@ -22,7 +22,10 @@ on:
 jobs:
   fossa-scan:
     runs-on: ubuntu-latest
-    permissions: write-all
+    permissions:
+      contents: read        # For code checkout
+      pull-requests: write  # For adding/removing PR labels
+      actions: write        # For uploading artifacts
     env:
       FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
 

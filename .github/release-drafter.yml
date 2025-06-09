@@ -51,5 +51,3 @@ template: |
   ## Changes
 
   $CHANGES
-
-  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$REPOSITORY-v$RESOLVED_VERSION

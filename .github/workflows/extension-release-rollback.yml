@@ -8,6 +8,11 @@ on:
         required: false
         default: ''
         type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
+        required: false
+        default: "."
+        type: string
 
 permissions:
   contents: write
@@ -18,14 +23,13 @@ jobs:
     name: Release rollback
     runs-on: ubuntu-latest
     env:
-      GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
 
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.BOT_TOKEN }}
 
       - name: Configure Git
         run: |
@@ -41,7 +45,7 @@ jobs:
           
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v21
+        uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |
             [
@@ -73,29 +77,31 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
       - name: Download release files
         id: download-release-files
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: release-files
 
       - name: Run extra command
+        working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
         run: |
           ${{ inputs.extraCommand }}
 
       - name: Perform Maven Release Rollback
+        working-directory: ${{ inputs.artifactPath }}
         run: |
           mvn -B versions:revert release:rollback \
-          -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DconnectionUrl=scm:git:https://github.com/${{ github.repository }}.git \
-          -DcheckModificationExcludeList=pom.xml
+          -DcheckModificationExcludeList=** -DignoreSnapshots=true

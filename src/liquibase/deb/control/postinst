@@ -1,4 +1,4 @@
 #!/bin/bash
 
 # Define LIQUIBASE_HOME
-LIQUIBASE_HOME="/usr/bin"
+LIQUIBASE_HOME="/opt/liquibase"

@@ -4,9 +4,9 @@ on:
   workflow_call:
     inputs:
       extraCommand:
-        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        description: "Specify it if you want to run an extra command before attaching the artifact"
         required: false
-        default: ''
+        default: ""
         type: string
       artifactPath:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
@@ -14,11 +14,19 @@ on:
         default: "."
         type: string
       sonar:
-        description: 'Specify it if you want to run sonar scan'
+        description: "Specify it if you want to run sonar scan"
         required: false
         default: true
         type: boolean
-  
+
+permissions:
+  contents: write
+  pull-requests: read
+  issues: read
+  statuses: read
+  actions: read
+  security-events: write
+
 jobs:
   sonar:
     if: ${{ inputs.sonar == true }}
@@ -27,7 +35,7 @@ jobs:
     with:
       extraCommand: ${{ inputs.extraCommand }}
       artifactPath: ${{ inputs.artifactPath }}
-              
+
   create-release:
     name: Create Release
     runs-on: ubuntu-latest

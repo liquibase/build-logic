@@ -1,95 +1,104 @@
 # Terraform Action to lint and apply updated redirects
 name: Ephemeral Cloud Infrastructure
 on:
- workflow_call:
+  workflow_call:
     inputs:
-        deploy:
-            description: 'Deploy the ephemeral cloud infrastructure'
-            required: false
-            type: boolean
-        destroy:
-            description: 'Destroy the ephemeral cloud infrastructure'
-            required: false
-            type: boolean
-        dynamodb:
-            description: 'Deploy or destroy the dynamodb infrastructure'
-            required: false
-            type: boolean
-            default: false
-        documentdb:
-          description: 'Deploy or destroy the documentdb infrastructure'
-          required: false
-          type: boolean
-          default: false
-        snowflake_oss:
-          description: 'Deploy or destroy the snowflake OSS infrastructure'
-          required: false
-          type: boolean
-          default: false
-        snowflake_pro:
-          description: 'Deploy or destroy the snowflake PRO infrastructure'
-          required: false
-          type: boolean
-          default: false
-        snowflake_th:
-          description: 'Deploy or destroy the snowflake Test Harness infrastructure'
-          required: false
-          type: boolean
-          default: false
-        aws_postgresql:
-          description: 'Deploy or destroy the aws_postgresql infrastructure'
-          required: false
-          type: boolean
-          default: false
-        aws_oracle:
-          description: 'Deploy or destroy the aws_oracle infrastructure'
-          required: false
-          type: boolean
-          default: false
-        aws_mariadb:
-          description: 'Deploy or destroy the aws_mariadb infrastructure'
-          required: false
-          type: boolean
-          default: false
-        aws_aurora_mysql:
-          description: 'Deploy or destroy the aws_aurora_mysql infrastructure'
-          required: false
-          type: boolean
-          default: false
-        aws_mssql:
-          description: 'Deploy or destroy the aws_mssql infrastructure'
-          required: false
-          type: boolean
-          default: false
-        aws_aurora_postgres:
-          description: 'Deploy or destroy the aws_aurora_postgres infrastructure'
-          required: false
-          type: boolean
-          default: false
-        aws_mysql:
-          description: 'Deploy or destroy the aws_mysql infrastructure'
-          required: false
-          type: boolean
-          default: false
-        stack_id:
-            description: 'The stack ID to destroy'
-            required: false
-            type: string
+      deploy:
+        description: "Deploy the ephemeral cloud infrastructure"
+        required: false
+        type: boolean
+      destroy:
+        description: "Destroy the ephemeral cloud infrastructure"
+        required: false
+        type: boolean
+      dynamodb:
+        description: "Deploy or destroy the dynamodb infrastructure"
+        required: false
+        type: boolean
+        default: false
+      documentdb:
+        description: "Deploy or destroy the documentdb infrastructure"
+        required: false
+        type: boolean
+        default: false
+      snowflake_oss:
+        description: "Deploy or destroy the snowflake OSS infrastructure"
+        required: false
+        type: boolean
+        default: false
+      snowflake_pro:
+        description: "Deploy or destroy the snowflake PRO infrastructure"
+        required: false
+        type: boolean
+        default: false
+      snowflake_th:
+        description: "Deploy or destroy the snowflake Test Harness infrastructure"
+        required: false
+        type: boolean
+        default: false
+      aws_postgresql:
+        description: "Deploy or destroy the aws_postgresql infrastructure"
+        required: false
+        type: boolean
+        default: false
+      aws_oracle:
+        description: "Deploy or destroy the aws_oracle infrastructure"
+        required: false
+        type: boolean
+        default: false
+      aws_mariadb:
+        description: "Deploy or destroy the aws_mariadb infrastructure"
+        required: false
+        type: boolean
+        default: false
+      aws_aurora_mysql:
+        description: "Deploy or destroy the aws_aurora_mysql infrastructure"
+        required: false
+        type: boolean
+        default: false
+      aws_mssql:
+        description: "Deploy or destroy the aws_mssql infrastructure"
+        required: false
+        type: boolean
+        default: false
+      aws_aurora_postgres:
+        description: "Deploy or destroy the aws_aurora_postgres infrastructure"
+        required: false
+        type: boolean
+        default: false
+      aws_mysql:
+        description: "Deploy or destroy the aws_mysql infrastructure"
+        required: false
+        type: boolean
+        default: false
+      aws_redshift:
+        description: "Deploy or destroy the aws_redshift infrastructure"
+        required: false
+        type: boolean
+        default: false
+      stack_id:
+        description: "The stack ID to destroy"
+        required: false
+        type: string
     outputs:
-        stack_id:
-            description: 'The stack ID of the ephemeral cloud infrastructure'
-            value: ${{ jobs.ephemeral-cloud-infra.outputs.stack_id }}
-        resources_id:
-          description: 'The resources ID of the ephemeral cloud infrastructure'
-          value: ${{ jobs.ephemeral-cloud-infra.outputs.resources_id }}
+      stack_id:
+        description: "The stack ID of the ephemeral cloud infrastructure"
+        value: ${{ jobs.ephemeral-cloud-infra.outputs.stack_id }}
+      resources_id:
+        description: "The resources ID of the ephemeral cloud infrastructure"
+        value: ${{ jobs.ephemeral-cloud-infra.outputs.resources_id }}
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   ephemeral-cloud-infra:
     name: ${{ inputs.action}} Ephemeral Cloud Infrastructure
     runs-on: ubuntu-latest
-    permissions: 
-        contents: read
-        id-token: write
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       stack_id: ${{ steps.create_stack.outputs.stack_id }} # Used to reference the stack created in the ephemeral infra
       resources_id: ${{ steps.create_infra.outputs.resources_id }} # Used to reference the resources created in the ephemeral infra
@@ -99,23 +108,38 @@ jobs:
       SPACELIFT_API_KEY_SECRET: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
 
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+
       - name: Checkout liquibase-infrastructure
         uses: actions/checkout@v4
         with:
           ref: master
           repository: liquibase/liquibase-infrastructure
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ steps.get-token.outputs.token }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+          terraform_wrapper: false
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-            role-to-assume: ${{ secrets.AWS_DEV_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
-            aws-region: us-east-1
+          role-to-assume: ${{ secrets.AWS_DEV_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+          aws-region: us-east-1
 
       - name: Install spacectl
         uses: spacelift-io/setup-spacectl@main
         env:
-          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Terraform Init
         working-directory: test-automation-ephemeral/stack
@@ -127,57 +151,58 @@ jobs:
         if: ${{ inputs.deploy }}
         working-directory: test-automation-ephemeral/stack
         run: |
-            terraform apply -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"
-            echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
-            echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
-        
+          terraform apply -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"
+          echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
+          echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
+
       - name: Upload Terraform state as artifact
         if: ${{ inputs.deploy && always()}}
         uses: actions/upload-artifact@v4
         with:
-            name: terraform-state
-            path: test-automation-ephemeral/stack/terraform.tfstate
+          name: terraform-state
+          path: test-automation-ephemeral/stack/terraform.tfstate
 
       - name: Create ephemeral infra
         id: create_infra
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.deploy }}
         run: |
-            ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5)
-            echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_oss ${{ inputs.snowflake_oss }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_pro ${{ inputs.snowflake_pro }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_th ${{ inputs.snowflake_th }} 
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql ${{ inputs.aws_postgresql }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle ${{ inputs.aws_oracle }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mariadb ${{ inputs.aws_mariadb }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql ${{ inputs.aws_aurora_mysql }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mssql ${{ inputs.aws_mssql }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
-            spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql ${{ inputs.aws_mysql }}
-            spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
-    
+          ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5)
+          echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_oss ${{ inputs.snowflake_oss }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_pro ${{ inputs.snowflake_pro }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_th ${{ inputs.snowflake_th }} 
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql ${{ inputs.aws_postgresql }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle ${{ inputs.aws_oracle }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mariadb ${{ inputs.aws_mariadb }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql ${{ inputs.aws_aurora_mysql }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mssql ${{ inputs.aws_mssql }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql ${{ inputs.aws_mysql }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_redshift ${{ inputs.aws_redshift }}
+          spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
+
       - name: Destroy ephemeral infra
         continue-on-error: true
         env:
-            TF_VAR_stack_id: ${{ inputs.stack_id }}
+          TF_VAR_stack_id: ${{ inputs.stack_id }}
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |
-            spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve" || true
+          spacectl stack task --id ${{ inputs.stack_id }} --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve" || true
 
       - name: Download Terraform state
         if: ${{ inputs.destroy && always()}}
         uses: actions/download-artifact@v4
         with:
-            name: terraform-state
-            path: test-automation-ephemeral/stack
+          name: terraform-state
+          path: test-automation-ephemeral/stack
 
       - name: Destroy ephemeral stack
         if: ${{ inputs.destroy && always()}}
         working-directory: test-automation-ephemeral/stack
         run: |
-            terraform destroy -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"
+          terraform destroy -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"

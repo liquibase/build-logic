@@ -1,4 +1,4 @@
-name: FOSSA License Compliance and Security Check
+name: FOSSA Compliance and AI Analysis
 
 on:
   workflow_call:
@@ -13,15 +13,19 @@ on:
         required: false
         default: false
         type: boolean
-      generate_sbom:
-        description: "Generate FOSSA SBOM Report"
+      generate_fossa_3p_license_report:
+        description: "Generate FOSSA 3P License Report"
         required: false
         default: false
         type: boolean
+
 jobs:
   fossa-scan:
     runs-on: ubuntu-latest
-    permissions: write-all
+    permissions:
+      contents: read        # For code checkout
+      pull-requests: write  # For adding/removing PR labels
+      actions: write        # For uploading artifacts
     env:
       FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
 
@@ -35,7 +39,7 @@ jobs:
       - name: Get Fossa Configuration
         if: ${{ inputs.check_ai_generated_code }}
         run: |
-          curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/v0.7.8/.github/.fossa.yml
+          curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/.fossa.yml
 
       - name: Install FOSSA CLI
         run: |
@@ -128,15 +132,15 @@ jobs:
               })
             }
 
-      - name: Run FOSSA SBOM Report
-        if: ${{ inputs.generate_sbom }}
+      - name: Run FOSSA 3Party License Report
+        if: ${{ inputs.generate_fossa_3p_license_report }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-          fossa report -p ${{ github.event.repository.name }} attribution --format html 2>&1 | tee sbom.html
+          fossa report -p ${{ github.event.repository.name }} attribution --format html 2>&1 | tee fossa-3party-license-report.html
 
-      - name: Archive FOSSA SBOM Report
-        if: ${{ inputs.generate_sbom }}
+      - name: Archive FOSSA 3Party License Report
+        if: ${{ inputs.generate_fossa_3p_license_report }}
         uses: actions/upload-artifact@v4
         with:
-          name: sbom
-          path: sbom.html
+          name: fossa-3party-license-report
+          path: fossa-3party-license-report.html

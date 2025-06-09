@@ -4,6 +4,9 @@ on:
   repository_dispatch:
     types: [ test-failure ]
 
+permissions:
+  contents: read
+
 jobs:
     slack-notification:
         runs-on: ubuntu-latest

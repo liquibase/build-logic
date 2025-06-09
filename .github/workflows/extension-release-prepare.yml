@@ -4,9 +4,9 @@ on:
   workflow_call:
     inputs:
       extraCommand:
-        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        description: "Specify it if you want to run an extra command before attaching the artifact"
         required: false
-        default: ''
+        default: ""
         type: string
       artifactPath:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
@@ -17,29 +17,27 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  
+  packages: write
+
 jobs:
   prepare-release:
     name: Prepare release
     runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.BOT_TOKEN }}
 
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           java-version: 17
-          distribution: 'temurin'
-          cache: 'maven'
+          distribution: "temurin"
+          cache: "maven"
           overwrite-settings: false
-          
+
       # look for dependencies in maven
       - name: maven-settings-xml-action
         uses: whelk-io/maven-settings-xml-action@v22
@@ -74,19 +72,14 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
-
-      - name: Configure Git
-        run: |
-          git config --local user.email "64099989+liquibot@users.noreply.github.com"
-          git config --local user.name "liquibot"
 
       - name: Run extra command
         working-directory: ${{ inputs.artifactPath }}
@@ -94,16 +87,31 @@ jobs:
         run: |
           ${{ inputs.extraCommand }}
 
+      - name: Configure Git
+        run: |
+          git config --local user.email "64099989+liquibot@users.noreply.github.com"
+          git config --local user.name "liquibot"
+
       - name: Prepare Maven Release
         working-directory: ${{ inputs.artifactPath }}
         run: |
           mvn -B build-helper:parse-version release:clean release:prepare \
-          -Darguments="-Dusername=liquibot -Dpassword=${{ secrets.BOT_TOKEN }} -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
           -DcheckModificationExcludeList=pom.xml -DpushChanges=false -Dtag=temp
-          git tag -d temp
-          git push --force
 
+      - name: Create Pull Request for version bump
+        uses: peter-evans/create-pull-request@v7.0.8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update version after release"
+          title: "Version bump after release"
+          body: |
+            This PR updates the POM version after a release.
+
+            Automated changes by GitHub Actions.
+          branch: version-bump-after-release
+          delete-branch: true
 
       - name: Save Release files
         if: always()

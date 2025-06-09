@@ -6,6 +6,11 @@ on:
 env:
   MAVEN_VERSION: "3.9.5"
   
+
+permissions:
+  contents: read
+
+
 jobs:
   sonarcloud:
     name: SonarCloud
@@ -16,7 +21,7 @@ jobs:
       - name: Set up Node.js
         # This job is for Node.js and Java sonar scans, don't fail if npm is not found
         continue-on-error: true
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18.5'
           
@@ -41,7 +46,7 @@ jobs:
         continue-on-error: true
         run: |
           npm config set @liquibase:registry https://npm.pkg.github.com
-          npm config set //npm.pkg.github.com/:_authToken ${{ secrets.NPM_TOKEN }}
+          npm config set //npm.pkg.github.com/:_authToken ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         # This job is for Node.js and Java sonar scans, don't fail if npm is not found

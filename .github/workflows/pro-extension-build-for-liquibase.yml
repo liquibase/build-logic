@@ -50,15 +50,15 @@ on:
         type: boolean
       repository:
         required: true
-        description: 'Repository to check out'
+        description: "Repository to check out"
         type: string
       version:
         required: true
-        description: 'Version to publish'
+        description: "Version to publish"
         type: string
       branch:
         required: true
-        description: 'Branch to check out'
+        description: "Branch to check out"
         type: string
     secrets:
       SONAR_TOKEN:
@@ -70,6 +70,11 @@ on:
       AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA:
         description: "OIDC Role from the caller workflow"
         required: true
+
+permissions:
+  contents: read
+  id-token: write
+
 env:
   AWS_REGION: us-east-1
   LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
@@ -87,12 +92,23 @@ jobs:
     permissions:
       id-token: write
       contents: read
+
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+          permission-packages: write
+
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository || github.repository }}
           ref: ${{ inputs.branch }}
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -146,12 +162,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -228,11 +244,20 @@ jobs:
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+          permission-packages: write
 
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository || github.repository }}
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4
@@ -283,3 +308,31 @@ jobs:
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}-sources.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}-javadoc.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}.pom
+
+  cleanup-individual-artifacts:
+    needs: [build, combineJars]
+    if: ${{ inputs.combineJars && always() }}
+    name: Trigger Cleanup Individual OS Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-packages: write
+          permission-actions: write
+      - name: Trigger cleanup workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ steps.get-token.outputs.token }}
+          repository: liquibase/build-logic
+          event-type: cleanup-individual-artifacts
+          client-payload: |
+            {
+              "artifact_id": "${{needs.build.outputs.artifact_id}}",
+              "artifact_version": "${{ inputs.version }}"
+            }

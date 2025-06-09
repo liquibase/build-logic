@@ -11,6 +11,8 @@ on:
         description: "The artifact version to cleanup"
         required: true
         type: string
+  repository_dispatch:
+    types: [cleanup-individual-artifacts]
 
 jobs:
   cleanup-individual-artifacts:
@@ -23,5 +25,5 @@ jobs:
       - name: Delete ${{ matrix.os }} Artifacts
         uses: geekyeggo/delete-artifact@v5
         with:
-          name: ${{ inputs.artifact_id }}-${{ matrix.os }}-${{ inputs.artifact_version }}-artifacts
+          name: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.artifact_id || inputs.artifact_id }}-${{ matrix.os }}-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.artifact_version || inputs.artifact_version }}-artifacts
           failOnError: false

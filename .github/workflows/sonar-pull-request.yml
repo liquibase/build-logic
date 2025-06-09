@@ -18,6 +18,10 @@ on:
         description: 'SONAR_TOKEN from the caller workflow'
         required: true
         
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   sonar-pr:
     name: Sonar Scan
@@ -71,12 +75,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
             

@@ -4,14 +4,14 @@ on:
   workflow_call:
     inputs:
       extraCommand:
-        description: 'Specify it if you want to run an extra command before attaching the artifact'
+        description: "Specify it if you want to run an extra command before attaching the artifact"
         required: false
-        default: ''
+        default: ""
         type: string
       nameSpace:
-        description: 'xsd namespace'
+        description: "xsd namespace"
         required: false
-        default: ''
+        default: ""
         type: string
       artifactPath:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
@@ -19,30 +19,35 @@ on:
         default: "."
         type: string
       deployToMavenCentral:
-        description: 'Specify it if you want to deploy to maven'
+        description: "Specify it if you want to deploy to maven"
         required: false
         default: true
         type: boolean
       dry_run:
-        description: 'Specify it if you want to run a dry run'
+        description: "Specify it if you want to run a dry run"
         required: false
         default: false
         type: boolean
       dry_run_version:
-        description: 'The version of the dry-run release'
+        description: "The version of the dry-run release"
         required: false
         type: string
       dry_run_release_id:
-        description: 'The release id of the dry-run release'
+        description: "The release id of the dry-run release"
         required: false
         type: string
     secrets:
       SONATYPE_USERNAME:
-        description: 'SONATYPE_USERNAME from the caller workflow'
+        description: "SONATYPE_USERNAME from the caller workflow"
         required: true
       SONATYPE_TOKEN:
-        description: 'SONATYPE_TOKEN from the caller workflow'
+        description: "SONATYPE_TOKEN from the caller workflow"
         required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
 
 jobs:
   maven-release:
@@ -52,7 +57,7 @@ jobs:
     with:
       extraCommand: ${{ inputs.extraCommand }}
       artifactPath: ${{ inputs.artifactPath }}
-      
+
   release:
     if: inputs.deployToMavenCentral == true
     runs-on: ubuntu-latest
@@ -63,9 +68,9 @@ jobs:
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'maven'
+          java-version: "17"
+          distribution: "temurin"
+          cache: "maven"
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
@@ -94,16 +99,6 @@ jobs:
                   "enabled": "true",
                   "updatePolicy": "always"
                 }
-              },
-              {
-                "id": "sonatype-nexus-staging",
-                "url": "https://oss.sonatype.org/service/local/staging/deploy/maven2/",
-                "releases": {
-                  "enabled": "true"
-                },
-                "snapshots": {
-                  "enabled": "false"
-                }
               }
             ]
           servers: |
@@ -111,17 +106,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
-              },
-              {
-                "id": "sonatype-nexus-staging",
-                "username": "${{ secrets.SONATYPE_USERNAME }}",
-                "password": "${{ secrets.SONATYPE_TOKEN }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -141,7 +131,7 @@ jobs:
         id: build-release-artifacts
         continue-on-error: true
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dusername=liquibot -Dpassword=$GITHUB_TOKEN -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
           git reset HEAD~ --hard
 
       - name: Get Artifact ID
@@ -153,7 +143,7 @@ jobs:
         uses: robinraju/release-downloader@v1.12
         with:
           tag: "${{ github.event.release.tag_name }}"
-          filename: "${{ env.artifact_id }}-*"
+          fileName: "${{ env.artifact_id }}-*"
           out-file-path: ${{ inputs.artifactPath }}
 
       - name: Publish to Maven Central
@@ -162,18 +152,49 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN }}
         run: |
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)          
-          mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
-                      -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ \
-                      -DrepositoryId=sonatype-nexus-staging \
-                      -DpomFile=${{ env.artifact_id }}-${version}.pom \
-                      -DgeneratePom=false \
-                      -Dfile=${{ env.artifact_id }}-${version}.jar \
-                      -Dsources=${{ env.artifact_id }}-${version}-sources.jar \
-                      -Djavadoc=${{ env.artifact_id }}-${version}-javadoc.jar \
-                      -Dfiles=${{ env.artifact_id }}-${version}.jar.asc,${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
-                      -Dtypes=jar.asc,jar.asc,jar.asc,pom.asc \
-                      -Dclassifiers=,sources,javadoc,
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          groupId=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
+          
+          # Create Maven repository layout structure for the bundle
+          # Convert groupId dots to directory separators
+          groupPath=$(echo "$groupId" | tr '.' '/')
+          mkdir -p "bundle/${groupPath}/${{ env.artifact_id }}/${version}"
+          
+          # Copy all artifacts and their signatures/checksums to proper Maven repository layout
+          cp ${{ env.artifact_id }}-${version}* "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          
+          # Create the bundle zip file
+          cd bundle
+          zip -r ../central-bundle.zip .
+          cd ..
+          
+          # Create base64 encoded credentials for Bearer auth
+          AUTH_HEADER=$(printf "%s:%s" "${MAVEN_USERNAME}" "${MAVEN_PASSWORD}" | base64 -w 0)
+          
+          # Upload bundle to Central Portal using curl with proper authentication
+          echo "Uploading bundle to Central Portal..."
+          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${AUTH_HEADER}" \
+            -F "bundle=@central-bundle.zip" \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED&name=${{ env.artifact_id }}-${version}")
+          
+          # Parse response
+          HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+          DEPLOYMENT_ID=$(echo "$UPLOAD_RESPONSE" | head -n1)
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "Upload failed with HTTP status $HTTP_CODE"
+            echo "Response: $DEPLOYMENT_ID"
+            exit 1
+          fi
+          
+          echo "Bundle uploaded successfully to Central Portal"
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          echo "Visit https://central.sonatype.com/publishing/deployments to view and publish your deployment"
 
   dry-run-release:
     if: ${{ inputs.dry_run == true }}
@@ -184,9 +205,9 @@ jobs:
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'maven'
+          java-version: "17"
+          distribution: "temurin"
+          cache: "maven"
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
@@ -232,12 +253,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "dry-run-sonatype-nexus-staging",
@@ -260,7 +281,7 @@ jobs:
         uses: robinraju/release-downloader@v1.12
         with:
           releaseId: "${{ inputs.dry_run_release_id }}"
-          filename: "${{ env.artifact_id }}-*"
+          fileName: "${{ env.artifact_id }}-*"
           out-file-path: ${{ inputs.artifactPath }}
 
       - name: Publish to Maven Central
@@ -280,7 +301,7 @@ jobs:
                       -Djavadoc=${{ env.artifact_id }}-${version}-javadoc.jar \
                       -Dfiles=${{ env.artifact_id }}-${version}.jar.asc,${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
                       -Dtypes=jar.asc,jar.asc,jar.asc,pom.asc \
-                      -Dclassifiers=,sources,javadoc,                  
+                      -Dclassifiers=,sources,javadoc,
 
   deploy_xsd:
     if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true && inputs.dry_run == false
@@ -297,7 +318,6 @@ jobs:
           # Relative path under $GITHUB_WORKSPACE to place the repository
           path: ${{ github.event.repository.name }}
           repository: "liquibase/${{ github.event.repository.name }}"
-
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -325,5 +345,5 @@ jobs:
               sed -ie "s/<\/ul>/  <li><a href=\"\/xml\/ns\/${{ inputs.nameSpace }}\/${entry}\">${entry}<\/a><\/li>\n<\/ul>/" index-file/index.htm
             fi
           done
-          
+
           aws s3 sync index-file s3://liquibaseorg-origin/xml/ns/${{ inputs.nameSpace }}/ --only-show-errors

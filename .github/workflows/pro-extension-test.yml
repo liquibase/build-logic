@@ -58,6 +58,17 @@ on:
         required: false
         default: false
         type: boolean
+      vaultAddr:
+        description: "Hashicorp Vault server address"
+        required: false
+        default: ""
+        type: string
+      vaultNamespace:
+        description: "Hashicorp Vault namespace"
+        required: false
+        default: ""
+        type: string
+
     secrets:
       SONAR_TOKEN:
         description: "SONAR_TOKEN from the caller workflow"
@@ -80,7 +91,19 @@ on:
       LIQUIBASE_AZURE_STORAGE_ACCOUNT:
         description: "Azure Storage Account name for Liquibase."
         required: false
-  
+      VAULT_ROLE_ID:
+        description: "Role ID for HashiCorp Vault authentication."
+        required: false
+      VAULT_SECRET_ID:
+        description: "Secret ID for HashiCorp Vault authentication."
+        required: false
+
+permissions:
+  contents: write
+  id-token: write
+  packages: read
+  pull-requests: write
+
 env:
   AWS_REGION: us-east-1
   LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
@@ -90,6 +113,8 @@ env:
   LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ secrets.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MAVEN_VERSION: "3.9.5"
+  LIQUIBASE_VAULT_ADDR: ${{ inputs.vaultAddr }}
+  LIQUIBASE_VAULT_NAMESPACE: ${{ inputs.vaultNamespace }}
 
 jobs:
   build:
@@ -101,7 +126,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       id-token: write
-      contents: read
+      contents: write # Updated from 'read' to 'write' to allow tag operations
     steps:
       - uses: actions/checkout@v4
         with:
@@ -159,12 +184,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -184,7 +209,18 @@ jobs:
         shell: powershell
         run: |
           ${{ inputs.extraWindowsCommand }}
-          
+
+      - name: Setup Hashicorp Vault token
+        uses: hashicorp/vault-action@v3
+        if: ${{ inputs.vaultAddr != '' && inputs.vaultNamespace != '' }}
+        with:
+          url: ${{ inputs.vaultAddr }}
+          namespace: ${{ inputs.vaultNamespace }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportToken: true
+
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
         shell: bash
@@ -239,6 +275,14 @@ jobs:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
           path: ${{ github.event_path }}
 
+      - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-artifacts
+          path: |
+            target/*
+
     outputs:
       artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
@@ -272,7 +316,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
-          
+
       - name: Set up Maven
         uses: stCarolas/setup-maven@v5
         with:
@@ -312,12 +356,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -341,6 +385,17 @@ jobs:
         run: |
           ${{ inputs.extraWindowsCommand }}
 
+      - name: Setup Hashicorp Vault token
+        uses: hashicorp/vault-action@v3
+        if: ${{ inputs.vaultAddr != '' && inputs.vaultNamespace != '' }}
+        with:
+          url: ${{ inputs.vaultAddr }}
+          namespace: ${{ inputs.vaultNamespace }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportToken: true
+
       - name: Run Tests
         if: ${{ !inputs.nightly }}
         shell: bash
@@ -350,7 +405,7 @@ jobs:
           else
             mvn -B test -P '${{ inputs.mavenProfiles }}'
           fi
-  
+
       - name: Run Tests
         if: ${{ inputs.nightly }}
         shell: bash
@@ -384,12 +439,11 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   combineJars:
-    needs: [ build, unit-test ]
+    needs: [build, unit-test]
     if: ${{ inputs.combineJars }}
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
@@ -443,6 +497,34 @@ jobs:
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-sources.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-javadoc.jar
             /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.pom
+
+  cleanup-individual-artifacts:
+    needs: [build, combineJars]
+    if: ${{ inputs.combineJars && always() }}
+    name: Trigger Cleanup Individual OS Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-packages: write
+          permission-actions: write
+      - name: Trigger cleanup workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ steps.get-token.outputs.token }}
+          repository: liquibase/build-logic
+          event-type: cleanup-individual-artifacts
+          client-payload: |
+            {
+              "artifact_id": "${{needs.build.outputs.artifact_id}}",
+              "artifact_version": "${{needs.build.outputs.artifact_version}}"
+            }
 
   sonar-pr:
     if: ${{ !inputs.nightly }}

@@ -22,6 +22,12 @@ on:
         description: "Branch to check out"
         type: string
 
+permissions:
+  contents: write
+  packages: write
+  actions: read
+  id-token: write
+
 jobs:
   build:
     name: Build Extension
@@ -30,29 +36,35 @@ jobs:
     with:
       os: '["ubuntu-latest", "macos-latest", "windows-latest"]'
       java: "[17, 21]"
-      artifactPath: liquibase-checks
       combineJars: true
       repository: ${{ inputs.repository }}
       version: ${{ inputs.version }}
       branch: ${{ inputs.branch }}
-      
+
   publish-main-snapshots-to-gpm:
     name: Publish to GPM
     runs-on: ubuntu-latest
     needs: [build]
-    permissions:
-      contents: read
-      packages: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GIT_USERNAME: "liquibot"
       GIT_PASSWORD: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+          permission-packages: write
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository }}
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Download Multiplatform Artifacts
         uses: actions/download-artifact@v4
@@ -98,6 +110,17 @@ jobs:
                   "enabled": "true",
                   "updatePolicy": "always"
                 }
+              },
+              {
+                "id": "extension-repo",
+                "url": "https://maven.pkg.github.com/${{ inputs.repository }}",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
               }
             ]
           servers: |
@@ -109,6 +132,11 @@ jobs:
               },
               {
                 "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+              },
+              {
+                "id": "github",
                 "username": "liquibot",
                 "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
@@ -126,5 +154,4 @@ jobs:
           -DrepositoryId=liquibase \
           -Durl=https://maven.pkg.github.com/${{ inputs.repository }} \
           -Dusername=liquibot \
-          -Dpassword=${{ env.GIT_PASSWORD }}   
-
+          -Dpassword=${{ env.GIT_PASSWORD }} 

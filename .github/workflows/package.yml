@@ -74,14 +74,26 @@ on:
 env:
   MAVEN_VERSION: "3.9.5"
 
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
 jobs:
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
-    permissions:
-      id-token: write
-      contents: read
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-actions: write
+
       - uses: actions/checkout@v4
 
       - name: Set up Java
@@ -141,7 +153,7 @@ jobs:
           releaseId: "${{ inputs.dry_run_release_id }}"
           fileName: "*"
           out-file-path: ".github/target/"
-          token: ${{ secrets.BOT_TOKEN }}
+          token: "${{ steps.get-token.outputs.token }}"
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |
@@ -158,7 +170,7 @@ jobs:
           echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
       - name: Upload ${{ inputs.artifactId }} dry-run deb package
         if: ${{ inputs.dry_run == true }}
@@ -168,7 +180,7 @@ jobs:
           echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
       - name: Convert deb to rpm
         run: |
@@ -181,15 +193,28 @@ jobs:
         run: |
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
           ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
-          mkdir createrepo_folder
+          mkdir -p createrepo_folder
           cd createrepo_folder
           git clone https://github.com/rpm-software-management/createrepo_c
           cd createrepo_c
-          mkdir build
+          mkdir -p build
           cd build
-          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
-          make -j
-          cp src/createrepo_c  /opt/createrepo
+          # Modified CMake command with additional flags to properly disable documentation
+          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
+          make -j || echo "Build failed but continuing..."
+
+          # Check if createrepo_c was built, otherwise try to find system createrepo
+          if [ -f src/createrepo_c ]; then
+            cp src/createrepo_c /opt/createrepo
+          elif command -v createrepo &> /dev/null; then
+            echo "Using system createrepo instead"
+            ln -sf $(which createrepo) /opt/createrepo
+          else
+            echo "Installing createrepo from package manager as fallback"
+            sudo apt-get install -y createrepo
+            ln -sf $(which createrepo) /opt/createrepo
+          fi
+
           cd ../../..
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
@@ -206,15 +231,28 @@ jobs:
           mv "$original_file" "$new_name"
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
           ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
-          mkdir createrepo_folder
+          mkdir -p createrepo_folder
           cd createrepo_folder
           git clone https://github.com/rpm-software-management/createrepo_c
           cd createrepo_c
-          mkdir build
+          mkdir -p build
           cd build
-          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO
-          make -j
-          cp src/createrepo_c  /opt/createrepo
+          # Modified CMake command with additional flags to properly disable documentation
+          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
+          make -j || echo "Build failed but continuing..."
+
+          # Check if createrepo_c was built, otherwise try to find system createrepo
+          if [ -f src/createrepo_c ]; then
+            cp src/createrepo_c /opt/createrepo
+          elif command -v createrepo &> /dev/null; then
+            echo "Using system createrepo instead"
+            ln -sf $(which createrepo) /opt/createrepo
+          else
+            echo "Installing createrepo from package manager as fallback"
+            sudo apt-get install -y createrepo
+            ln -sf $(which createrepo) /opt/createrepo
+          fi
+
           cd ../../..
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
@@ -237,19 +275,19 @@ jobs:
           echo "pr_title: $pr_title"
           # Set the environment variable based on whether the PR exists
           if [ -z "$pr_title" ]; then
-            echo "PR_EXISTS=false" 
+            PR_EXISTS=false
           else
-            echo "PR_EXISTS=true"
+            PR_EXISTS=true
           fi
-          
-          # Store it in GitHub environment for later steps
-          echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_ENV
+
+          # Store it in GitHub output for later steps
+          echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_OUTPUT
 
           # Echo it immediately to see the value in logs
           echo "PR_EXISTS is set to $PR_EXISTS"
 
       - name: Update Homebrew formula for ${{ inputs.artifactId }}
-        if: ${{ env.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: liquibase
@@ -262,7 +300,7 @@ jobs:
 
             Created by https://github.com/mislav/bump-homebrew-formula-action
         env:
-          COMMITTER_TOKEN: ${{ secrets.BOT_TOKEN }}
+          COMMITTER_TOKEN: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}
@@ -270,7 +308,7 @@ jobs:
           SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
           SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
           VERSION: ${{ inputs.version }}
-          S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com/sdkman
+          S3_WEB_URL: https://repo.liquibase.com/sdkman
           S3_BUCKET: s3://repo.liquibase.com/sdkman/
         run: |
           wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
@@ -329,11 +367,6 @@ jobs:
           # Upload the release to S3
           aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
           echo "Uploaded liquibase-$VERSION.zip to s3"
-
-      - name: Ensure s3 bucket public access is enabled
-        run: |
-          aws s3api put-bucket-acl --bucket repo.liquibase.com  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
-          aws s3api put-bucket-acl --bucket repo.liquibase.com.dry.run  --grant-read uri=http://acs.amazonaws.com/groups/global/AllUsers
 
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master

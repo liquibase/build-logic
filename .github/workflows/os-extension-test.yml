@@ -8,6 +8,11 @@ on:
         required: false
         default: "[11, 17, 21]"
         type: string
+      javaBuildVersion:
+        description: "Java version to build the project"
+        required: false
+        default: "17"
+        type: string
       os:
         description: "Operating system to test"
         required: false
@@ -28,9 +33,19 @@ on:
         required: false
         default: ""
         type: string
+      skipSonar:
+        description: "Skip SonarQube analysis"
+        required: false
+        default: false
+        type: boolean
 
 env:
   MAVEN_VERSION: "3.9.5"
+
+permissions:
+  contents: read
+  pull-requests: write
+  packages: read
 
 jobs:
   build:
@@ -41,15 +56,15 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
-      - name: Set up JDK 17
+      - name: Set up JDK ${{ inputs.javaBuildVersion }}
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
           cache: "maven"
 
       - name: Set up Maven
-        uses: stCarolas/setup-maven@v4.5
+        uses: stCarolas/setup-maven@v5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
@@ -87,12 +102,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -165,7 +180,7 @@ jobs:
           cache: "maven"
 
       - name: Set up Maven
-        uses: stCarolas/setup-maven@v4.5
+        uses: stCarolas/setup-maven@v5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
@@ -203,15 +218,15 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
-            
+
       - uses: actions/download-artifact@v4
         with:
           name: ${{needs.build.outputs.artifact_id}}-artifacts
@@ -253,7 +268,7 @@ jobs:
             **/target/site/jacoco/jacoco.xml
 
   sonar-pr:
-    if: ${{ !inputs.nightly }}
+    if: ${{ !inputs.skipSonar && !inputs.nightly }}
     needs: [unit-test]
     uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
     secrets: inherit

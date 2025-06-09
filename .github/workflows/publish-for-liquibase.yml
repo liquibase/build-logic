@@ -31,7 +31,7 @@ permissions:
 jobs:
   build:
     name: Build Extension
-    uses: liquibase/build-logic/.github/workflows/pro-extension-build-for-liquibase.yml@DAT-20044
+    uses: liquibase/build-logic/.github/workflows/pro-extension-build-for-liquibase.yml@main
     secrets: inherit
     with:
       os: '["ubuntu-latest", "macos-latest", "windows-latest"]'

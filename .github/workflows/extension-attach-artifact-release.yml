@@ -379,7 +379,6 @@ jobs:
           fi
 
       - name: Build release artifacts
-        working-directory: ${{ inputs.artifactPath }}
         if: ${{ env.ARTIFACT_FOUND == '0' && inputs.dry_run == false }}
         id: build-release-artifacts
         run: |
@@ -398,7 +397,6 @@ jobs:
           mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$LAST_COMMIT_HASH
 
       - name: Build release artifacts (dry-run)
-        working-directory: ${{ inputs.artifactPath }}
         if: ${{ inputs.dry_run == true }}
         id: build-release-artifacts-dry-run
         run: |

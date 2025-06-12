@@ -5,16 +5,21 @@
 3. This workflow will trigger a matrix of runs across the relevant repositories using the `trigger-enterprise-fossa-third-party-license-report.yml`
 4. Each participating repository will invoke the reusable workflow: `generate-upload-enterprise-3p-fossa-report.yml`
 5. The purpose of `generate-upload-enterprise-3p-fossa-report.yml` workflow is to:
+
     a. Upload individual reports to the S3 bucket path: `/enterprise_fossa_report/raw_reports/` in our AWS s3 bucket under prod account for the team to review the individual reports.
+
     b. Upload the combined report (excluding datical-service) to: `/enterprise_fossa_report/<version_number_for_3p_fossa_report_generation>`
+
     c. Upload the datical-service report separately to: `/enterprise_fossa_report/datical-service.csv`
 
 6. **Note**: Some columns in the FOSSA-generated reports may be incomplete or require manual adjustment. This is due to the way FOSSA outputs certain metadata.
 7. To exclude specific dependencies from the final report, add them to the file: `liquibase/build-logic/blob/main/.github/workflows/ignore_dependencies_fossa.txt`
 8. Final report outputs:
-    1. Combined report for all repositories (excluding datical-service): `enterprise_report_<version_number_for_3p_fossa_report_generation>.csv`
-    2. Separate report for datical-service: `datical-service.csv`
 
-## 🪣 Store SBOMs for OSS and Pro on every release
+    a. Combined report for all repositories (excluding datical-service): `enterprise_report_<version_number_for_3p_fossa_report_generation>.csv`
 
-<https://datical.atlassian.net/wiki/x/CQAkCwE>
+    b. Separate report for datical-service: `datical-service.csv`
+
+## 🪣 Storage of SBOMs for OSS and Pro on every release
+
+   Find the Confluence Space here: <https://datical.atlassian.net/wiki/x/CQAkCwE>

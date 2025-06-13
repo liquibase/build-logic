@@ -25,7 +25,7 @@ permissions:
 jobs:
   sonar-pr:
     name: Sonar Scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     env:
       LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
 
@@ -105,7 +105,7 @@ jobs:
       - name: Download unit tests report
         uses: actions/download-artifact@v4
         with:
-          name: test-reports-jdk-17-ubuntu-latest
+          name: test-reports-jdk-17-ubuntu-24.04-arm
 
       - name: Sonar Scan
         working-directory: ${{ inputs.artifactPath }}

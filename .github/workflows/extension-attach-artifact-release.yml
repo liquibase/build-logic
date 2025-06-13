@@ -27,7 +27,7 @@ on:
       os:
         description: "Operating system to build/test on"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-24.04-arm", "windows-latest"]'
         type: string
       extraMavenArgs:
         description: "Specify it if you want to run an extra maven argument"
@@ -71,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{fromJson(inputs.os || '["ubuntu-latest"]')}}
+        os: ${{fromJson(inputs.os || '["ubuntu-24.04-arm"]')}}
     name: Build & Package - ${{ matrix.os }}
     if: ${{ inputs.combineJars }}
     runs-on: ${{ matrix.os }}
@@ -205,14 +205,14 @@ jobs:
     needs: [build-multi-architecture]
     if: ${{ inputs.combineJars }}
     name: Combine Jars
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-ubuntu-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-ubuntu-24.04-arm-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts

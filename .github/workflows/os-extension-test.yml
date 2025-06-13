@@ -16,7 +16,7 @@ on:
       os:
         description: "Operating system to test"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-24.04-arm", "windows-latest"]'
         type: string
       nightly:
         description: "Specifies nightly builds against liquibase master-SNAPSHOT"
@@ -50,7 +50,7 @@ permissions:
 jobs:
   build:
     name: Build & Package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
@@ -163,7 +163,7 @@ jobs:
       fail-fast: false
       matrix:
         java: ${{fromJson(inputs.java || '[11, 17, 21]')}}
-        os: ${{fromJson(inputs.os || '["ubuntu-latest", "windows-latest"]')}}
+        os: ${{fromJson(inputs.os || '["ubuntu-24.04-arm", "windows-latest"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build

@@ -40,7 +40,7 @@ jobs:
           fi
 
       - name: Dispatch an action and get the run ID
-        uses: codex-/return-dispatch@v1
+        uses: codex-/return-dispatch@v2
         id: return_dispatch
         continue-on-error: true
         with:

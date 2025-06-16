@@ -63,7 +63,7 @@ jobs:
 
       - name: Download Test Results Artifact
         id: download-artifact
-        uses: dawidd6/action-download-artifact@v7
+        uses: dawidd6/action-download-artifact@v11
         with:
           github_token: ${{secrets.GITHUB_TOKEN}}
           workflow: test.yml

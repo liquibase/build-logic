@@ -65,7 +65,27 @@ on:
       GPG_PASSPHRASE:
         description: "GPG_PASSPHRASE from the caller workflow"
         required: true
-
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Specify it if you want to run a dry run"
+        required: false
+        default: false
+        type: boolean
+      dry_run_version:
+        description: "The version of the dry-run release"
+        required: false
+        type: string
+      zip:
+        description: "Specify it if you want to attach a zip file to the release"
+        required: false
+        default: "false"
+        type: string
+      os:
+        description: "Operating system to build/test on"
+        required: false
+        default: '["ubuntu-latest", "windows-latest"]'
+        type: string
 jobs:
   build-multi-architecture:
     strategy:

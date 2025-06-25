@@ -74,7 +74,7 @@ jobs:
           distribution: "temurin"
           cache: "maven"
           gpg-private-key: ${{ secrets.GPG_SECRET }}
-          gpg-passphrase: GPG_PASSPHRASE
+          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
         env:
           GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
 

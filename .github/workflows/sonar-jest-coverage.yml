@@ -46,7 +46,7 @@ jobs:
         continue-on-error: true
         run: |
           npm config set @liquibase:registry https://npm.pkg.github.com
-          npm config set //npm.pkg.github.com/:_authToken ${{ secrets.GITHUB_TOKEN }}
+          npm config set //npm.pkg.github.com/:_authToken ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
 
       - name: Install dependencies
         # This job is for Node.js and Java sonar scans, don't fail if npm is not found
@@ -95,12 +95,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT }}"
+                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 

@@ -39,6 +39,11 @@ on:
         required: false
         default: "."
         type: string
+      artifactId:
+        description: "Specify the artifact ID to be used in the release"
+        required: false
+        default: ""
+        type: string  
       combineJars:
         description: "Specify it if you want to combine jars into one"
         required: false
@@ -171,7 +176,12 @@ jobs:
         id: get-artifact-id
         shell: bash
         run: |
-          artifact_id=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
+          # If artifactId is provided as input, use it; otherwise, evaluate from pom.xml
+          if [ -n "${{ inputs.artifactId }}" ]; then
+            artifact_id="${{ inputs.artifactId }}"
+          else
+            artifact_id=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
+          fi
           echo "artifact_id=$artifact_id" >> $GITHUB_OUTPUT
 
       - name: Get Artifact Version
@@ -347,7 +357,15 @@ jobs:
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
-        run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
+        shell: bash
+        run: |
+          # If artifactId is provided as input, use it; otherwise, evaluate from pom.xml
+          if [ -n "${{ inputs.artifactId }}" ]; then
+            artifact_id="${{ inputs.artifactId }}"
+          else
+            artifact_id=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
+          fi
+          echo "artifact_id=$artifact_id" >> $GITHUB_ENV
 
       - name: Run extra command
         if: inputs.extraCommand

@@ -46,12 +46,27 @@ permissions:
   contents: read
   pull-requests: write
   packages: read
+  id-token: write
 
 jobs:
   build:
     name: Build & Package
     runs-on: ubuntu-latest
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
@@ -102,12 +117,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -129,7 +144,7 @@ jobs:
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ Build failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
@@ -168,6 +183,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: build
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
@@ -218,12 +247,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -253,7 +282,7 @@ jobs:
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true

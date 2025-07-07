@@ -26,8 +26,7 @@ jobs:
       contents: read        # For code checkout
       pull-requests: write  # For adding/removing PR labels
       actions: write        # For uploading artifacts
-    env:
-      FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+      id-token: write       # For AWS credentials
 
     steps:
       - name: Checkout Code
@@ -35,6 +34,20 @@ jobs:
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
 
       - name: Get Fossa Configuration
         if: ${{ inputs.check_ai_generated_code }}
@@ -48,6 +61,8 @@ jobs:
       - name: Run FOSSA Snippets Detection
         if: ${{ inputs.check_snippets }}
         id: snippets
+        env:
+          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
           fossa snippets analyze -o snippets 2>&1 | tee snippets.out
@@ -65,6 +80,8 @@ jobs:
 
       - name: Generate Snippet Dependencies
         if: ${{ inputs.check_snippets }}
+        env:
+          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/commit.md
           fossa snippets commit --analyze-output snippets --overwrite-fossa-deps --format yml
@@ -72,6 +89,8 @@ jobs:
       - name: Run FOSSA Analyze with AI Generated Code Detection
         id: analyze-ai
         if: ${{ inputs.check_ai_generated_code }}
+        env:
+          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
           mkdir patch
@@ -84,6 +103,8 @@ jobs:
 
       - name: Run FOSSA Analyze
         id: analyze
+        env:
+          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
           # Run the full analyze on the current branch to be checked by the test command
@@ -91,6 +112,8 @@ jobs:
 
       - name: Run FOSSA Test
         id: test
+        env:
+          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
           fossa test -p ${{ github.event.repository.name }} 2>&1 | tee test.out
@@ -134,6 +157,8 @@ jobs:
 
       - name: Run FOSSA 3Party License Report
         if: ${{ inputs.generate_fossa_3p_license_report }}
+        env:
+          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
           fossa report -p ${{ github.event.repository.name }} attribution --format html 2>&1 | tee fossa-3party-license-report.html

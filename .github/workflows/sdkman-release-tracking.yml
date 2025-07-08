@@ -1,0 +1,108 @@
+name: SDKMAN Release Tracking
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check-sdkman-releases:
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check-releases.outputs.has_updates }}
+      status_message: ${{ steps.check-releases.outputs.status_message }}
+      status_color: ${{ steps.check-releases.outputs.status_color }}
+    steps:
+      - name: Check and close tracking issues
+        id: check-releases
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let updatedIssues = [];
+            
+            // Get all open issues with 'sdkman-tracking' label
+            const issues = await github.rest.issues.listForRepo({
+              owner: 'liquibase',
+              repo: 'liquibase',
+              labels: 'sdkman-tracking',
+              state: 'open'
+            });
+
+            console.log(`Found ${issues.data.length} open tracking issues`);
+
+            for (const issue of issues.data) {
+              console.log(`Processing issue #${issue.number}: ${issue.title}`);
+              
+              // Extract version from issue body
+              const versionMatch = issue.body.match(/- Version: ([\d\.]+)/);
+              if (!versionMatch) continue;
+              
+              const version = versionMatch[1];
+              
+              try {
+                // Check SDKMAN API for version
+                const response = await fetch(`https://api.sdkman.io/2/candidates/liquibase/${version}`);
+                const isAvailable = response.ok;
+                
+                if (isAvailable) {
+                  // Version is available in SDKMAN
+                  await github.rest.issues.createComment({
+                    owner: 'liquibase',
+                    repo: 'liquibase',
+                    issue_number: issue.number,
+                    body: `🎉 Liquibase v${version} is now available on SDKMAN!\n\nClosing this tracking issue.`
+                  });
+                  
+                  await github.rest.issues.update({
+                    owner: 'liquibase',
+                    repo: 'liquibase',
+                    issue_number: issue.number,
+                    state: 'closed',
+                    state_reason: 'completed'
+                  });
+                  
+                  updatedIssues.push({
+                    version,
+                    available: true
+                  });
+                }
+              } catch (error) {
+                console.error(`Error checking SDKMAN for version ${version}: ${error.message}`);
+                
+                if (error.status === 404) {
+                  console.log(`Version ${version} not yet available on SDKMAN`);
+                }
+              }
+            }
+            
+            if (updatedIssues.length > 0) {
+              const message = updatedIssues
+                .map(status => `• Liquibase v${status.version}: ✅ Available on SDKMAN`)
+                .join('\n');
+              
+              core.setOutput('has_updates', 'true');
+              core.setOutput('status_message', message);
+              core.setOutput('status_color', 'good');
+            }
+
+  notify:
+    needs: check-sdkman-releases
+    if: needs.check-sdkman-releases.outputs.has_updates == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.DOCKER_SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: sdkman-updates
+          SLACK_USERNAME: SDKMAN Release Bot
+          SLACK_ICON_EMOJI: ':sdk:'
+          SLACK_TITLE: SDKMAN Release Update
+          SLACK_MESSAGE: ${{ needs.check-sdkman-releases.outputs.status_message }}
+          SLACK_COLOR: ${{ needs.check-sdkman-releases.outputs.status_color }}

@@ -1,0 +1,138 @@
+name: Homebrew PR Tracking
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check-homebrew-prs:
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check-prs.outputs.has_updates }}
+      status_message: ${{ steps.check-prs.outputs.status_message }}
+      status_color: ${{ steps.check-prs.outputs.status_color }}
+    steps:
+      - name: Check and close tracking issues
+        id: check-prs
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let updatedIssues = [];
+            
+            // Get all open issues with 'homebrew-tracking' label
+            const issues = await github.rest.issues.listForRepo({
+              owner: 'liquibase',
+              repo: 'liquibase',
+              labels: 'homebrew-tracking',
+              state: 'open'
+            });
+
+            console.log(`Found ${issues.data.length} open tracking issues`);
+
+            for (const issue of issues.data) {
+              console.log(`Processing issue #${issue.number}: ${issue.title}`);
+              
+              // Extract Homebrew PR URL and version from issue body
+              const prUrlMatch = issue.body.match(/- Homebrew PR: (https:\/\/github\.com\/Homebrew\/homebrew-core\/pull\/\d+)/);
+              const versionMatch = issue.body.match(/- Version: ([\d\.]+)/);
+              
+              if (!prUrlMatch) {
+                console.log(`No Homebrew PR URL found in issue #${issue.number}`);
+                continue;
+              }
+              
+              const prUrl = prUrlMatch[1];
+              const prNumber = prUrl.match(/\/pull\/(\d+)$/)[1];
+              const version = versionMatch ? versionMatch[1] : 'unknown';
+              
+              try {
+                // Check the status of the Homebrew PR
+                const prData = await github.rest.pulls.get({
+                  owner: 'Homebrew',
+                  repo: 'homebrew-core',
+                  pull_number: parseInt(prNumber)
+                });
+                
+                if (prData.data.state === 'closed') {
+                  const status = {
+                    merged: prData.data.merged,
+                    version,
+                    prNumber,
+                    prUrl
+                  };
+                  
+                  // Add comment and close issue
+                  await github.rest.issues.createComment({
+                    owner: 'liquibase',
+                    repo: 'liquibase',
+                    issue_number: issue.number,
+                    body: status.merged
+                      ? '🎉 Homebrew PR has been merged! Closing this tracking issue.\n\nMerged PR: ' + prUrl + '\nClosed automatically by homebrew-pr-tracking workflow.'
+                      : '❌ Homebrew PR was closed without merging. Closing this tracking issue.\n\nClosed PR: ' + prUrl + '\nYou may need to investigate why the PR was not merged.\nClosed automatically by homebrew-pr-tracking workflow.'
+                  });
+                  
+                  await github.rest.issues.update({
+                    owner: 'liquibase',
+                    repo: 'liquibase',
+                    issue_number: issue.number,
+                    state: 'closed'
+                  });
+                  
+                  updatedIssues.push(status);
+                }
+              } catch (error) {
+                console.error(`Error checking PR #${prNumber}: ${error.message}`);
+                
+                if (error.status === 404) {
+                  await github.rest.issues.createComment({
+                    owner: 'liquibase',
+                    repo: 'liquibase',
+                    issue_number: issue.number,
+                    body: '⚠️ Warning: Homebrew PR could not be found. It may have been deleted.\n\nReferenced PR: ' + prUrl + '\nPlease manually verify the status of this PR and close this issue if appropriate.'
+                  });
+                }
+              }
+            }
+            
+            // Process results and create notification message
+            if (updatedIssues.length > 0) {
+              const message = updatedIssues
+                .map(status => `• Liquibase v${status.version} (PR #${status.prNumber}): ${status.merged ? '✅ Merged' : '❌ Closed'}`)
+                .join('\n');
+
+              const anyMerged = updatedIssues.some(s => s.merged);
+              console.log(`Found ${updatedIssues.length} updated PRs, ${anyMerged ? 'some' : 'none'} were merged`);
+              
+              // Write results to a temporary file to avoid issues with special characters
+              const { writeFileSync } = require('fs');
+              writeFileSync('/tmp/pr-status', message);
+              
+              core.exportVariable('PR_STATUS_FILE', '/tmp/pr-status');
+              core.exportVariable('PR_STATUS_COLOR', anyMerged ? 'good' : 'danger');
+              core.setOutput('has_updates', 'true');
+            } else {
+              core.setOutput('has_updates', 'false');
+            }
+
+  notify:
+    needs: check-homebrew-prs
+    if: needs.check-homebrew-prs.outputs.has_updates == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.DOCKER_SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: homebrew-updates
+          SLACK_USERNAME: Homebrew PR Bot
+          SLACK_ICON_EMOJI: ':beer:'
+          SLACK_TITLE: Homebrew PR Status Update
+          SLACK_MESSAGE: ${{ needs.check-homebrew-prs.outputs.status_message }}
+          SLACK_COLOR: ${{ needs.check-homebrew-prs.outputs.status_color }}

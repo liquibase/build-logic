@@ -1,15 +1,14 @@
 # Release Tracking Workflows
 
-This document describes the automated tracking workflows for Liquibase releases to Homebrew and SDKMAN package managers.
+This document describes the automated tracking workflows for Liquibase releases to Homebrew package managers.
 
 ## Overview
 
 The build system includes automated tracking for:
 
 - Homebrew formula pull requests
-- SDKMAN version releases
 
-These workflows help maintain visibility of the release process and provide notifications when releases are available.
+This workflows help maintain visibility of the release process and automatically close tracking issues once release is available.
 
 ## Homebrew PR Tracking
 
@@ -47,49 +46,17 @@ This workflow tracks the status of Homebrew formula pull requests for Liquibase 
 - Checked by: homebrew-pr-tracking.yml workflow (daily at midnight UTC)
 - Closed by: homebrew-pr-tracking.yml workflow
 
-#### Key Improvements
-
-- **Fixed GraphQL Query**: Uses proper variable declaration and usage to avoid GitHub API errors
-- **PR Number Labeling**: Uses labels to store PR numbers for reliable tracking
-- **Simplified Logic**: Focuses on the first open tracking issue (assumes one active release at a time)
-- **Daily Schedule**: Reduces API calls while ensuring timely closure
-- Closed by: homebrew-pr-tracking.yml workflow
-
 #### Efficiency Features
 
 - No runner waste: Uses scheduled execution instead of long-running jobs
 - 24-hour minimum age: Only checks PRs that have had time to be processed
 - Batch processing: Handles multiple tracking issues in a single run
 
-## SDKMAN Release Tracking
-
-### Workflow: `.github/workflows/sdkman-release-tracking.yml`
-
-This workflow checks the availability of new Liquibase versions on SDKMAN and sends Slack notifications.
-
-#### Process Flow
-
-1. When a new Liquibase version is released, the `package.yml` workflow:
-   - Uploads the release to SDKMAN
-   - Calls the `sdkman-release-tracking.yml` workflow to check availability
-
-2. The `sdkman-release-tracking.yml` workflow:
-   - Checks the SDKMAN website for the specified version
-   - Sends a Slack notification with the result (available or not yet available)
-
-#### Features
-
-- No tracking issues created (simplified approach)
-- Direct check against https://sdkman.io/sdks/ website
-- Immediate Slack notification with status
-- Can be triggered manually via workflow_dispatch
-
 ## Notifications
 
-Both workflows send notifications to Slack when:
+The workflow send notifications to Slack when:
 
-- PRs are merged (Homebrew)
-- Versions are checked for availability (SDKMAN)
+- Issue is closed (Homebrew)
 - Any errors occur during tracking
 
 ## Troubleshooting
@@ -105,10 +72,6 @@ Both workflows send notifications to Slack when:
    - Verify Slack webhook configurations
    - Check workflow permissions and secrets
 
-3. **SDKMAN Check Fails**
-   - Check if the SDKMAN website is accessible
-   - Verify the version format matches expectations
-
 ### Manual Intervention
 
 If needed, you can:
@@ -121,4 +84,3 @@ If needed, you can:
 
 - `.github/workflows/package.yml` - Main packaging workflow
 - `.github/workflows/homebrew-pr-tracking.yml` - Homebrew tracking workflow
-- `.github/workflows/sdkman-release-tracking.yml` - SDKMAN tracking workflow

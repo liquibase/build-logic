@@ -426,23 +426,6 @@ jobs:
           aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
           echo "Uploaded liquibase-$VERSION.zip to s3"
 
-  track_homebrew_pr:
-    needs: upload_packages
-    if: ${{ inputs.dry_run == false && needs.upload_packages.outputs.homebrew_pr_number != '' }}
-    uses: ./.github/workflows/homebrew-pr-tracking.yml
-    secrets: inherit
-    with:
-      pr_number: ${{ needs.upload_packages.outputs.homebrew_pr_number }}
-      version: ${{ inputs.version }}
-
-  check_sdkman_release:
-    needs: upload_packages
-    if: ${{ inputs.dry_run == false }}
-    uses: ./.github/workflows/sdkman-release-tracking.yml
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
     secrets: inherit

@@ -62,6 +62,7 @@ jobs:
     with:
       extraCommand: ${{ inputs.extraCommand }}
       artifactPath: ${{ inputs.artifactPath }}
+      javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:
     if: inputs.deployToMavenCentral == true

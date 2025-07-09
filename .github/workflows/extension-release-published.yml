@@ -18,7 +18,7 @@ on:
         required: false
         default: "."
         type: string
-      java:
+      javaBuildVersion:
         description: "Java version to use when building the extension"
         required: false
         default: "17"
@@ -73,7 +73,7 @@ jobs:
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
         with:
-          java-version: ${{ inputs.java }}
+          java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
           cache: "maven"
 
@@ -210,7 +210,7 @@ jobs:
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
         with:
-          java-version: ${{ inputs.java }}
+          java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
           cache: "maven"
 

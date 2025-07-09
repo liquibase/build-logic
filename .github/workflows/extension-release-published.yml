@@ -56,7 +56,7 @@ permissions:
 
 jobs:
   maven-release:
-    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@allow-defining-java-build-version
+    uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@main
     if: inputs.deployToMavenCentral == true
     secrets: inherit
     with:

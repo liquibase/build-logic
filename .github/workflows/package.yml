@@ -86,6 +86,9 @@ jobs:
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
+    outputs:
+      homebrew_pr_number: ${{ steps.capture-pr.outputs.PR_NUMBER }}
+      homebrew_pr_url: ${{ steps.capture-pr.outputs.PR_URL }}
     steps:
       - name: Get GitHub App token
         id: get-token
@@ -317,28 +320,28 @@ jobs:
           
           # Search for the PR
           PR_DATA=$(gh api graphql -f query='
-            query($version: String!) {
-              search(query: "is:pr is:open repo:Homebrew/homebrew-core liquibase $version in:title", type: ISSUE, first: 1) {
-                nodes {
-                  ... on PullRequest {
-                    number
-                    url
-                  }
+          query($search_query: String!) {
+            search(query: $search_query, type: ISSUE, first: 1) { 
+              nodes {               
+                ... on PullRequest {
+                  url,
+                  number
                 }
               }
-            }' -f version="${{ inputs.version }}" --jq '.data.search.nodes[0]')
+            }
+          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
           
           if [ ! -z "$PR_DATA" ]; then
-            echo "PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
-            echo "PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
-            echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.number')"
+            echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
+            echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
+            echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # create a tracking issue for the Homebrew PR in liquibase/liquibase repo
       - name: Create Tracking Issue
-        if: ${{ steps.capture-pr.outputs.PR_NUMBER != '' }}
+        if: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL != '' }}
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -349,28 +352,14 @@ jobs:
               title: `Track Homebrew PR for v${{ inputs.version }}`,
               body: `Tracking Homebrew PR for Liquibase v${{ inputs.version }}
               
-              - Homebrew PR: ${{ steps.capture-pr.outputs.PR_URL }}
+              - Homebrew PR: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
               - Version: ${{ inputs.version }}
               - Created: ${new Date().toISOString()}
-              
-              This issue will be used to track the status of the Homebrew formula update PR. Please close this issue once the PR is merged.`,
-              labels: ['homebrew-tracking']
-            });
-            
-            // Add a comment to the Homebrew PR
-            const comment = `Tracking this PR from ${context.repo.owner}/${context.repo.repo}
-            Tracking issue: ${issue.data.html_url}`;
-            
-            await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-              owner: 'Homebrew',
-              repo: 'homebrew-core',
-              issue_number: parseInt('${{ steps.capture-pr.outputs.PR_NUMBER }}'),
-              body: comment,
-              headers: {
-                'X-GitHub-Api-Version': '2022-11-28'
-              }
-            });
 
+              This issue will be used to track the status of the Homebrew formula update PR. This issue will be closed by automation when the Homebrew PR is merged or closed.`,
+              labels: ['homebrew-tracking', 'PR-${{ steps.capture-pr.outputs.HOMEBREW_PR_NUMBER }}']
+            });
+            
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}
         env:
@@ -417,12 +406,6 @@ jobs:
           -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
           https://vendors.sdkman.io/announce/struct
           echo "Announced liquibase-$VERSION.zip to SDKMAN"
-          # Create tracking issue for SDKMAN release in liquibase/liquibase repo
-          gh issue create \
-            --repo liquibase/liquibase \
-            --title "Track SDKMAN Release: Liquibase v${VERSION}" \
-            --body "Tracking SDKMAN release for Liquibase v${VERSION} | Version: ${VERSION} | Status: Pending | Release requested: $(date -u +'%Y-%m-%d %H:%M:%S UTC') | This issue will automatically be closed once the version is available on SDKMAN." \
-            --label "sdkman-tracking"
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
         if: ${{ inputs.dry_run == true }}
@@ -442,6 +425,23 @@ jobs:
           # Upload the release to S3
           aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
           echo "Uploaded liquibase-$VERSION.zip to s3"
+
+  track_homebrew_pr:
+    needs: upload_packages
+    if: ${{ inputs.dry_run == false && needs.upload_packages.outputs.homebrew_pr_number != '' }}
+    uses: ./.github/workflows/homebrew-pr-tracking.yml
+    secrets: inherit
+    with:
+      pr_number: ${{ needs.upload_packages.outputs.homebrew_pr_number }}
+      version: ${{ inputs.version }}
+
+  check_sdkman_release:
+    needs: upload_packages
+    if: ${{ inputs.dry_run == false }}
+    uses: ./.github/workflows/sdkman-release-tracking.yml
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
 
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master

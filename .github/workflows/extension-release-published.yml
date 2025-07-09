@@ -18,6 +18,11 @@ on:
         required: false
         default: "."
         type: string
+      javaBuildVersion:
+        description: "Java version to use when building the extension"
+        required: false
+        default: "17"
+        type: string
       deployToMavenCentral:
         description: "Specify it if you want to deploy to maven"
         required: false
@@ -57,6 +62,7 @@ jobs:
     with:
       extraCommand: ${{ inputs.extraCommand }}
       artifactPath: ${{ inputs.artifactPath }}
+      javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:
     if: inputs.deployToMavenCentral == true
@@ -68,7 +74,7 @@ jobs:
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
         with:
-          java-version: "17"
+          java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
           cache: "maven"
 
@@ -205,7 +211,7 @@ jobs:
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
         with:
-          java-version: "17"
+          java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
           cache: "maven"
 

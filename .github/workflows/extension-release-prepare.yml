@@ -13,6 +13,11 @@ on:
         required: false
         default: "."
         type: string
+      javaBuildVersion:
+        description: "Java version to use when building the extension"
+        required: false
+        default: "17"
+        type: string
 
 permissions:
   contents: write
@@ -33,7 +38,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
           cache: "maven"
           overwrite-settings: false

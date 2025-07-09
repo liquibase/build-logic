@@ -78,11 +78,17 @@ permissions:
   id-token: write
   contents: write
   pull-requests: write
+  issues: write       # Required for creating/updating issues
+  packages: write     # Required for package operations
+  actions: write      # Required for workflow operations
 
 jobs:
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
+    outputs:
+      homebrew_pr_number: ${{ steps.capture-pr.outputs.PR_NUMBER }}
+      homebrew_pr_url: ${{ steps.capture-pr.outputs.PR_URL }}
     steps:
       - name: Get GitHub App token
         id: get-token
@@ -302,6 +308,58 @@ jobs:
         env:
           COMMITTER_TOKEN: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
 
+      # This step captures the PR details after it has been created
+      # and stores the PR number and URL in GitHub outputs for later use.
+      # This is useful for tracking the PR status and creating a tracking issue.
+      - name: Capture Homebrew PR Details
+        if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        id: capture-pr
+        run: |
+          # Wait briefly for PR to be created
+          sleep 30
+          
+          # Search for the PR
+          PR_DATA=$(gh api graphql -f query='
+          query($search_query: String!) {
+            search(query: $search_query, type: ISSUE, first: 1) { 
+              nodes {               
+                ... on PullRequest {
+                  url,
+                  number
+                }
+              }
+            }
+          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
+          
+          if [ ! -z "$PR_DATA" ]; then
+            echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
+            echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
+            echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # create a tracking issue for the Homebrew PR in liquibase/liquibase repo
+      - name: Create Tracking Issue
+        if: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL != '' }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: 'liquibase',
+              repo: 'liquibase',
+              title: `Track Homebrew PR for v${{ inputs.version }}`,
+              body: `Tracking Homebrew PR for Liquibase v${{ inputs.version }}
+              
+              - Homebrew PR: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
+              - Version: ${{ inputs.version }}
+              - Created: ${new Date().toISOString()}
+
+              This issue will be used to track the status of the Homebrew formula update PR. This issue will be closed by automation when the Homebrew PR is merged or closed.`,
+              labels: ['homebrew-tracking', 'PR-${{ steps.capture-pr.outputs.HOMEBREW_PR_NUMBER }}']
+            });
+            
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}
         env:

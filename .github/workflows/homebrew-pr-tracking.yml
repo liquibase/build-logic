@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Check and close tracking issues
         id: check-prs
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |    
@@ -75,10 +75,11 @@ jobs:
       - name: Send Slack Notification
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_WEBHOOK: ${{ secrets.DOCKER_SLACK_WEBHOOK_URL }}
-          SLACK_CHANNEL: homebrew-updates
-          SLACK_USERNAME: Homebrew PR Bot
-          SLACK_ICON_EMOJI: ':beer:'
-          SLACK_TITLE: Homebrew PR Status Update
+          SLACK_COLOR: ${{ job.status }}
           SLACK_MESSAGE: "Homebrew PR tracking issue has been closed as the PR is no longer open."
-          SLACK_COLOR: good
+          SLACK_TITLE: "Homebrew PR Status Update"
+          SLACK_USERNAME: liquibot
+          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_ICON_EMOJI: ":robot_face:"
+          SLACK_FOOTER: "${{ github.repository }}"
+          SLACK_LINK_NAMES: true

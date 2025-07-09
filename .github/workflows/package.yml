@@ -342,7 +342,7 @@ jobs:
     # create a tracking issue for the Homebrew PR in liquibase/liquibase repo
       - name: Create Tracking Issue
         if: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL != '' }}
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

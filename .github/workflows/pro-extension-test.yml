@@ -106,11 +106,6 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
-  LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
-  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-  AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ secrets.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MAVEN_VERSION: "3.9.5"
   LIQUIBASE_VAULT_ADDR: ${{ inputs.vaultAddr }}
@@ -128,6 +123,20 @@ jobs:
       id-token: write
       contents: write # Updated from 'read' to 'write' to allow tag operations
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
@@ -135,7 +144,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
       - name: Set up JDK 17
@@ -184,12 +193,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -217,13 +226,19 @@ jobs:
           url: ${{ inputs.vaultAddr }}
           namespace: ${{ inputs.vaultNamespace }}
           method: approle
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          roleId: ${{ env.VAULT_ROLE_ID }}
+          secretId: ${{ env.VAULT_SECRET_ID }}
           exportToken: true
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
         shell: bash
+        env:
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
         run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
@@ -234,7 +249,7 @@ jobs:
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ Build failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
@@ -242,6 +257,12 @@ jobs:
       - name: Build and Package
         if: ${{ !inputs.nightly }}
         shell: bash
+        env:
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
         run: |
           if [ -n "${{ inputs.extraMavenArgs }}" ]; then
             mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
@@ -300,6 +321,20 @@ jobs:
       contents: read
     needs: build
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
@@ -314,7 +349,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
       - name: Set up Maven
@@ -356,12 +391,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -392,13 +427,19 @@ jobs:
           url: ${{ inputs.vaultAddr }}
           namespace: ${{ inputs.vaultNamespace }}
           method: approle
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          roleId: ${{ env.VAULT_ROLE_ID }}
+          secretId: ${{ env.VAULT_SECRET_ID }}
           exportToken: true
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}
         shell: bash
+        env:
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
         run: |
           if [ -n "${{ inputs.extraMavenArgs }}" ]; then
             mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}"
@@ -409,6 +450,12 @@ jobs:
       - name: Run Tests
         if: ${{ inputs.nightly }}
         shell: bash
+        env:
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
         run: |
           if [ -n "${{ inputs.extraMavenArgs }}" ]; then
             mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"
@@ -424,7 +471,7 @@ jobs:
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
@@ -504,12 +551,26 @@ jobs:
     name: Trigger Cleanup Individual OS Artifacts
     runs-on: ubuntu-latest
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
-          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-contents: write
           permission-packages: write

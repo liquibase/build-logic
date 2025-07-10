@@ -8,9 +8,7 @@ on:
             required: false
 permissions:
   checks: write
-
-env:
-  LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
+  id-token: write
 
 jobs:
   liquibase-test-harness:
@@ -25,6 +23,20 @@ jobs:
     steps:
       - name: Checkout code # Checkout the code from the repository
         uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
 
       - name: Start database container # Start the database container using Docker Compose
         run: docker compose -f src/test/resources/docker/docker-compose.yml up -d
@@ -42,7 +54,7 @@ jobs:
       - name: Run ${{ matrix.liquibase-support-level }} Liquibase Test Harness # Run the Liquibase test harness at each test level
         continue-on-error: false # Continue to run the action even if the previous steps fail
         env:
-          LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }} # Set the environment variable for the Liquibase Pro license key
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }} # Set the environment variable for the Liquibase Pro license key
         run: mvn -ntp -Dtest=${{ matrix.liquibase-support-level }}ExtensionHarnessSuite test # Run the Liquibase test harness at each test level
 
       - name: Test Reporter # Generate a test report using the Test Reporter action

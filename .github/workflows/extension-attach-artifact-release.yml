@@ -5,6 +5,7 @@ permissions:
   contents: write
   actions: read
   packages: write
+  id-token: write
 
 on:
   workflow_call:
@@ -85,6 +86,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - name: Set up JDK ${{ inputs.javaBuildVersion }}
         uses: actions/setup-java@v4
         with:
@@ -131,12 +146,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -290,6 +305,20 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - name: Set up JDK ${{ inputs.javaBuildVersion }}
         uses: actions/setup-java@v4
         with:
@@ -331,12 +360,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -446,6 +475,7 @@ jobs:
           LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
           echo "Latest Draft Release ID: $LATEST_DRAFT_RELEASE"
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
+          
 
       - name: List artifacts in release
         if: ${{ env.RELEASE_ID != '' && env.RELEASE_ID != null && inputs.dry_run == false }}
@@ -467,13 +497,22 @@ jobs:
             curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/assets/$value"
             echo "Deleted artifact ID: $value"
           done
+  
+      - name: Convert escaped newlines and set GPG key
+        run: |
+          {
+            echo "GPG_KEY_CONTENT<<GPG_EOF"
+            printf '%b' "${{ env.GPG_SECRET }}"
+            echo
+            echo "GPG_EOF"
+          } >> $GITHUB_ENV
 
       - name: Import GPG key
         id: import_gpg
         uses: crazy-max/ghaction-import-gpg@v6
         with:
-          gpg_private_key: ${{ secrets.GPG_SECRET }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
+          passphrase: ${{ env.GPG_PASSPHRASE }}
 
       - name: Set root directory variable
         run: echo "REPO_ROOT=$(git rev-parse --show-toplevel)" >> $GITHUB_ENV
@@ -546,3 +585,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target
+

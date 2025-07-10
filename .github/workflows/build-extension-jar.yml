@@ -31,12 +31,26 @@ jobs:
     runs-on: ubuntu-22.04
     continue-on-error: true
     steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
-          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-contents: write
           permission-actions: write
@@ -61,6 +75,19 @@ jobs:
       GIT_USERNAME: "liquibot"
       GIT_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
       - name: Checkout Dependencies
         run: |
           git config --global credential.helper store
@@ -73,17 +100,17 @@ jobs:
           java-version: 21
           distribution: "temurin"
           cache: "maven"
-          gpg-private-key: ${{ secrets.GPG_SECRET }}
-          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          gpg-private-key: ${{ env.GPG_SECRET }}
+          gpg-passphrase: ${{ env.GPG_PASSPHRASE }}
         env:
-          GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_PASSWORD: ${{ env.GPG_PASSPHRASE }}
 
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
-          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ inputs.extension }}
           permission-packages: write
@@ -133,23 +160,23 @@ jobs:
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "extension-repo",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
       - name: Build and deploy Extension to GPM
         env:
-          GPG_PASSWORD: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_PASSWORD: ${{ env.GPG_PASSPHRASE }}
           APP_TOKEN: ${{ steps.get-token.outputs.token }}
           ACTIONS_RUNNER_DEBUG: true
           ACTIONS_STEP_DEBUG: true

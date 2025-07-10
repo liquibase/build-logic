@@ -15,7 +15,6 @@ jobs:
   fossa-scan:
     runs-on: ubuntu-latest
     env:
-      FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
       VERSION_NUMBER: ${{ inputs.version_number_for_3p_fossa_report_generation }}
     permissions:
       contents: read
@@ -26,6 +25,20 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
 
       - name: Get the commit sha
         id: get_commit_sha
@@ -38,14 +51,20 @@ jobs:
         run: echo "repo_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
 
       - name: Setup Fossa CLI
+        env:
+          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
         run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
-          export FOSSA_API_KEY="${{ secrets.FOSSA_API_KEY }}"
+          export FOSSA_API_KEY="${{ env.FOSSA_API_KEY }}"
 
       - name: Analyze project
+        env:
+          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
         run: fossa analyze --static-only-analysis
 
       - name: Generate JSON report
+        env:
+          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
         run: |
           # Run JSON report
           fossa report attribution --format json > fossa.json
@@ -66,10 +85,10 @@ jobs:
           @csv
           ' fossa.json >> $csv_filename
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials for S3 access
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
+          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
           aws-region: us-east-1
 
       - name: Upload 3rd Party report to S3

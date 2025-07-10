@@ -84,12 +84,26 @@ jobs:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
     steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
-          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-contents: write
           permission-actions: write
@@ -129,13 +143,13 @@ jobs:
         id: import_gpg
         uses: crazy-max/ghaction-import-gpg@v6
         with:
-          gpg_private_key: ${{ secrets.GPG_SECRET }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          gpg_private_key: ${{ env.GPG_SECRET }}
+          passphrase: ${{ env.GPG_PASSPHRASE }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1
 
       - name: Download ${{ inputs.artifactId }} Release
@@ -167,20 +181,20 @@ jobs:
         run: |
           sudo apt install pinentry-tty
           echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+          echo "${{ env.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
-          echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
+          deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
       - name: Upload ${{ inputs.artifactId }} dry-run deb package
         if: ${{ inputs.dry_run == true }}
         run: |
           sudo apt install pinentry-tty
           echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ secrets.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+          echo "${{ env.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
-          echo '${{ secrets.GPG_PASSPHRASE }}' > pass.txt
-          deb-s3 upload --preserve-versions --sign "${{ secrets.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
+          deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
       - name: Convert deb to rpm
         run: |
@@ -300,13 +314,13 @@ jobs:
 
             Created by https://github.com/mislav/bump-homebrew-formula-action
         env:
-          COMMITTER_TOKEN: ${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}
+          COMMITTER_TOKEN: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}
         env:
-          SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
-          SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
+          SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
+          SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
           VERSION: ${{ inputs.version }}
           S3_WEB_URL: https://repo.liquibase.com/sdkman
           S3_BUCKET: s3://repo.liquibase.com/sdkman/
@@ -352,8 +366,8 @@ jobs:
       - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
         if: ${{ inputs.dry_run == true }}
         env:
-          SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
-          SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
+          SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
+          SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
           VERSION: ${{ inputs.version }}
           S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
           S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/

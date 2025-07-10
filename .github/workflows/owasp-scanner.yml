@@ -27,11 +27,25 @@ on:
 permissions:
       contents: read
       packages: read
+      id-token: write
 
 jobs:
   scan:
     runs-on: ubuntu-22.04
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -79,18 +93,18 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
       - name: Run the scanner
         id: run_owasp
-        run: mvn org.owasp:dependency-check-maven:aggregate -DnvdApiKey=${{ secrets.NVD_API_KEY }} -DfailOnError=true
+        run: mvn org.owasp:dependency-check-maven:aggregate -DnvdApiKey=${{ env.NVD_API_KEY }} -DfailOnError=true
     
       - name: Upload OWASP Dependency-Check results
         if: always()

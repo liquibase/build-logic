@@ -15,6 +15,9 @@ permissions:
 jobs:
   wait-for-fossa-report-generation:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       matrix:
         repo: [
@@ -31,6 +34,19 @@ jobs:
 
     name: "${{ matrix.repo.name }} - Fossa Report"
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
       - name: Set workflow inputs
         run: |
           if [[ "${{ matrix.repo.name }}" ]]; then
@@ -44,7 +60,7 @@ jobs:
         id: return_dispatch
         continue-on-error: true
         with:
-          token: ${{ secrets.FOSSA_TRIGGER_REPORT_GENERATION  }}
+          token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
           ref: ${{ matrix.repo.ref }}
           repo: ${{ matrix.repo.name }}
           owner: ${{ matrix.repo.owner }}
@@ -78,7 +94,7 @@ jobs:
       - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
         uses: Codex-/await-remote-run@v1
         with:
-          token: ${{ secrets.FOSSA_TRIGGER_REPORT_GENERATION }}
+          token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
           run_id: ${{ steps.return_dispatch.outputs.run_id }}
           repo: ${{ matrix.repo.name }}
           owner: ${{ matrix.repo.owner }}
@@ -89,7 +105,23 @@ jobs:
   combine-3p-fossa-reports:
     runs-on: ubuntu-latest
     needs: wait-for-fossa-report-generation
+    permissions:
+      id-token: write
+      contents: read
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -97,10 +129,10 @@ jobs:
           ref: main
           path: build-logic
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials for S3 access
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
+          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
           aws-region: us-east-1
 
       - name: Download reports from S3 and Rearrange CSV files
@@ -162,14 +194,31 @@ jobs:
 
   trigger-datical-service:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - name: Dispatch an action for datical-service
         uses: peter-evans/repository-dispatch@v3
         with:
-          token: ${{ secrets.FOSSA_TRIGGER_REPORT_GENERATION }}
+          token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
           repository: Datical/datical-service
           event-type: trigger-fossa-report-generation
           client-payload: '{"ref": "master", "version_number_for_3p_fossa_report_generation": "${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}"}'

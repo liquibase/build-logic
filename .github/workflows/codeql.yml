@@ -36,6 +36,7 @@ permissions:
   contents: read
   security-events: write
   packages: read
+  id-token: write
 
 jobs:
   analyze:
@@ -56,6 +57,22 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Configure AWS credentials for vault access
+      if: matrix.language == 'java'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+        aws-region: us-east-1
+
+    - name: Get secrets from vault
+      if: matrix.language == 'java'
+      id: vault-secrets
+      uses: aws-actions/aws-secretsmanager-get-secrets@v2
+      with:
+        secret-ids: |
+          ,/vault/liquibase
+        parse-json-secrets: true
 
     # setting a build mode based on whether a buildCommand is provided or not.
     # If a buildCommand is provided, it sets the build mode to "manual"; otherwise, it sets it to "autobuild".
@@ -138,12 +155,12 @@ jobs:
             {
               "id": "liquibase-pro",
               "username": "liquibot",
-              "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+              "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
             },
             {
               "id": "liquibase",
               "username": "liquibot",
-              "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+              "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
             }
           ]
 

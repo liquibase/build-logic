@@ -102,18 +102,27 @@ jobs:
     outputs:
       stack_id: ${{ steps.create_stack.outputs.stack_id }} # Used to reference the stack created in the ephemeral infra
       resources_id: ${{ steps.create_infra.outputs.resources_id }} # Used to reference the resources created in the ephemeral infra
-    env:
-      SPACELIFT_API_KEY_ENDPOINT: ${{ secrets.SPACELIFT_API_KEY_ENDPOINT }}
-      SPACELIFT_API_KEY_ID: ${{ secrets.SPACELIFT_API_KEY_ID }}
-      SPACELIFT_API_KEY_SECRET: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
-
     steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
-          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-contents: read
 
@@ -133,13 +142,16 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEV_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+          role-to-assume: ${{ env.AWS_DEV_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1
 
       - name: Install spacectl
         uses: spacelift-io/setup-spacectl@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}
+          SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
+          SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
 
       - name: Terraform Init
         working-directory: test-automation-ephemeral/stack
@@ -166,6 +178,10 @@ jobs:
         id: create_infra
         working-directory: test-automation-ephemeral/infra
         if: ${{ inputs.deploy }}
+        env:
+          SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}
+          SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
+          SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
         run: |
           ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5)
           echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
@@ -189,6 +205,9 @@ jobs:
         continue-on-error: true
         env:
           TF_VAR_stack_id: ${{ inputs.stack_id }}
+          SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}
+          SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
+          SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |

@@ -87,8 +87,8 @@ jobs:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
     outputs:
-      homebrew_pr_number: ${{ steps.capture-pr.outputs.PR_NUMBER }}
-      homebrew_pr_url: ${{ steps.capture-pr.outputs.PR_URL }}
+      HOMEBREW_PR_NUMBER: ${{ steps.capture-pr.outputs.HOMEBREW_PR_NUMBER }}
+      HOMEBREW_PR_URL: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
     steps:
       - name: Get GitHub App token
         id: get-token
@@ -338,27 +338,6 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    # create a tracking issue for the Homebrew PR in liquibase/liquibase repo
-      - name: Create Tracking Issue
-        if: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL != '' }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const issue = await github.rest.issues.create({
-              owner: 'liquibase',
-              repo: 'liquibase',
-              title: `Track Homebrew PR for v${{ inputs.version }}`,
-              body: `Tracking Homebrew PR for Liquibase v${{ inputs.version }}
-              
-              - Homebrew PR: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
-              - Version: ${{ inputs.version }}
-              - Created: ${new Date().toISOString()}
-
-              This issue will be used to track the status of the Homebrew formula update PR. This issue will be closed by automation when the Homebrew PR is merged or closed.`,
-              labels: ['homebrew-tracking', 'PR-${{ steps.capture-pr.outputs.HOMEBREW_PR_NUMBER }}']
-            });
             
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}
@@ -406,6 +385,40 @@ jobs:
           -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
           https://vendors.sdkman.io/announce/struct
           echo "Announced liquibase-$VERSION.zip to SDKMAN"
+
+  # create a placeholder branch to check if tracking branch exists for this version
+  # Branch is created when package is submitted to Homebrew and SDKMAN
+  # Branch is deleted when package becomes available on Homebrew and SDKMAN
+  create-placeholder-branch:
+    runs-on: ubuntu-latest
+    needs: upload_packages
+    if: ${{ inputs.dry_run == true }}
+    steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: liquibase
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/liquibase
+          token: ${{ steps.get-token.outputs.token }} 
+
+      - name: Create placeholder branches
+        id: create-placeholder-branch
+        run: |
+          git fetch origin
+          git checkout -b ci-oss-sdkman-package-check
+          git checkout -b ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+          git push origin ci-oss-sdkman-package-check
+          git push origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+          echo "This is a placeholder branch for oss sdkman package v.${{ inputs.version }}. If this branch is open, it means the sdkman package is not yet approved" > README.md
+          echo "This is a placeholder branch for oss homebrew package v.${{ inputs.version }}. If this branch is open, it means the homebrew package is not yet approved" > README.md
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
         if: ${{ inputs.dry_run == true }}

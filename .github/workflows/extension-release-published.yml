@@ -61,7 +61,6 @@ jobs:
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
-      artifactPath: ${{ inputs.artifactPath }}
       javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:

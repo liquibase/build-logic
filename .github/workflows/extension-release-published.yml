@@ -336,11 +336,13 @@ jobs:
           aws-region: us-east-1
 
       - name: Upload to s3
+        working-directory: ${{ inputs.artifactPath }}
         # aws s3 sync syncs directories and S3 prefixes.
         run: |
           aws s3 sync ${{ github.event.repository.name }}/src/main/resources/www.liquibase.org/xml/ns/${{ inputs.nameSpace }}/ s3://liquibaseorg-origin/xml/ns/${{ inputs.nameSpace }}/ --content-type application/octet-stream --only-show-errors
 
       - name: Index.htm file upload
+        working-directory: ${{ inputs.artifactPath }}
         # List all xsd and htm files in repository. Copy index.htm to temporary folder
         # Add links for all xsd files to index.htm file (except liquibase-${{ inputs.nameSpace }}-latest.xsd and index.htm)
         # Sync index.htm with the s3

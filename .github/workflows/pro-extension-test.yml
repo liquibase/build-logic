@@ -273,39 +273,21 @@ jobs:
             mvn -B dependency:go-offline clean package -DskipTests=true
           fi
 
-      - name: Get Artifact ID
+      - name: Get Project Artifact Name
         working-directory: ${{ inputs.artifactPath }}
-        id: get-artifact-id
+        id: get-artifact-name
         shell: bash
         run: |
-          ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
-          # Create character-split version to avoid masking detection
-          CHARS=$(echo "${ARTIFACT_ID}" | sed 's/./& /g' | sed 's/ $//')
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "project_artifact_name=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_OUTPUT
           # Store in environment for this job
-          echo "UNMASKED_ARTIFACT_ID=${ARTIFACT_ID}" >> $GITHUB_ENV
-          echo "ARTIFACT_ID_CHARS=${CHARS}" >> $GITHUB_ENV
-          # Use a different approach for output - reverse and then reverse again
-          REVERSED=$(echo "${ARTIFACT_ID}" | rev)
-          echo "artifact_id_reversed=${REVERSED}" >> $GITHUB_OUTPUT
-          echo "unmasked_artifact_id=${ARTIFACT_ID}" >> $GITHUB_OUTPUT
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
 
-      - name: Reconstruct Artifact ID
-        id: reconstruct-artifact-id
+      - name: Display Project Artifact Name
         shell: bash
         run: |
-          # Reconstruct from reversed
-          ARTIFACT_ID=$(echo "${{ steps.get-artifact-id.outputs.artifact_id_reversed }}" | rev)
-          echo "artifact_id=${ARTIFACT_ID}" >> $GITHUB_OUTPUT
-
-      - name: Unmask Artifact ID
-        shell: bash
-        run: |
-          # Use printf and character splitting to bypass masking
-          printf "Artifact ID: %s\n" "${UNMASKED_ARTIFACT_ID}"
-          echo "Artifact ID chars: ${ARTIFACT_ID_CHARS}"
-          # Debug outputs
-          echo "Reversed output: ${{ steps.get-artifact-id.outputs.artifact_id_reversed }}"
-          echo "Reconstructed output: ${{ steps.reconstruct-artifact-id.outputs.artifact_id }}"
+          echo "Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
+          echo "Step output: ${{ steps.get-artifact-name.outputs.project_artifact_name }}"
 
       - name: Get Artifact Version
         working-directory: ${{ inputs.artifactPath }}
@@ -318,7 +300,7 @@ jobs:
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.UNMASKED_ARTIFACT_ID }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
             ${{ inputs.artifactPath }}/target/*
 
@@ -326,20 +308,19 @@ jobs:
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: ${{ env.UNMASKED_ARTIFACT_ID }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
           path: ${{ github.event_path }}
 
       - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.UNMASKED_ARTIFACT_ID }}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
             target/*
 
     outputs:
-      artifact_id: ${{ steps.reconstruct-artifact-id.outputs.artifact_id }}
-      unmasked_artifact_id: ${{ steps.get-artifact-id.outputs.unmasked_artifact_id }}
+      project_artifact_name: ${{ steps.get-artifact-name.outputs.project_artifact_name }}
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
 
   unit-test:
@@ -439,7 +420,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.unmasked_artifact_id}}-${{ matrix.os }}-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{needs.build.outputs.project_artifact_name}}-${{ matrix.os }}-${{needs.build.outputs.artifact_version}}-artifacts
           path: ./target
 
       - name: Run extra command
@@ -535,62 +516,60 @@ jobs:
       - name: Debug Artifact Information
         shell: bash
         run: |
-          ARTIFACT_ID="${{needs.build.outputs.unmasked_artifact_id}}"
+          PROJECT_ARTIFACT_NAME="${{needs.build.outputs.project_artifact_name}}"
           ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
-          # Use printf and character splitting to bypass masking
-          printf "Artifact ID: %s\n" "${ARTIFACT_ID}"
-          printf "Artifact Version: %s\n" "${ARTIFACT_VERSION}"
-          echo "Artifact ID chars: $(echo "${ARTIFACT_ID}" | sed 's/./& /g')"
+          echo "Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
+          echo "Artifact Version: ${ARTIFACT_VERSION}"
 
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.unmasked_artifact_id}}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{needs.build.outputs.project_artifact_name}}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.unmasked_artifact_id}}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{needs.build.outputs.project_artifact_name}}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/macos
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.unmasked_artifact_id}}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{needs.build.outputs.project_artifact_name}}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/windows
 
       - name: Create multiplatform jar
         run: |
           rm -rf /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
           mkdir -p /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
-          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/windows /tmp/windows/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/macos /tmp/macos/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          rm -r -f /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}
-          mkdir /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}
-          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          rm /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          rm -f /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          cd /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          zip -r ../${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}.jar *
+          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/windows /tmp/windows/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/macos /tmp/macos/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
+          rm -r -f /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}
+          mkdir /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}
+          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/
+          rm /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          rm -f /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
+          cd /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/
+          zip -r ../${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar *
           cd ..
-          cp /tmp/ubuntu/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
-          cp /tmp/ubuntu/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
-          cp /tmp/ubuntu/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
+          cp /tmp/ubuntu/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
+          cp /tmp/ubuntu/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
+          cp /tmp/ubuntu/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
 
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v4
         with:
           name: multiplatform-artifacts
           path: |
-            /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-            /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}-sources.jar
-            /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}-javadoc.jar
-            /tmp/combined/${{needs.build.outputs.unmasked_artifact_id}}-${{needs.build.outputs.artifact_version}}.pom
+            /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
+            /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}-sources.jar
+            /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}-javadoc.jar
+            /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.pom
 
   cleanup-individual-artifacts:
     needs: [build, combineJars]
@@ -632,12 +611,10 @@ jobs:
       - name: Debug Cleanup Payload
         shell: bash
         run: |
-          ARTIFACT_ID="${{needs.build.outputs.unmasked_artifact_id}}"
+          PROJECT_ARTIFACT_NAME="${{needs.build.outputs.project_artifact_name}}"
           ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
-          # Use printf and character splitting to bypass masking
-          printf "Cleanup Artifact ID: %s\n" "${ARTIFACT_ID}"
-          printf "Cleanup Artifact Version: %s\n" "${ARTIFACT_VERSION}"
-          echo "Artifact ID chars: $(echo "${ARTIFACT_ID}" | sed 's/./& /g')"
+          echo "Cleanup Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
+          echo "Cleanup Artifact Version: ${ARTIFACT_VERSION}"
 
       - name: Trigger cleanup workflow
         uses: peter-evans/repository-dispatch@v3
@@ -647,7 +624,7 @@ jobs:
           event-type: cleanup-individual-artifacts
           client-payload: |
             {
-              "artifact_id": "${{needs.build.outputs.unmasked_artifact_id}}",
+              "artifact_id": "${{needs.build.outputs.project_artifact_name}}",
               "artifact_version": "${{needs.build.outputs.artifact_version}}"
             }
 

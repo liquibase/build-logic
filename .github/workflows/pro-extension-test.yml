@@ -320,7 +320,6 @@ jobs:
             target/*
 
     outputs:
-      project_artifact_name: ${{ steps.get-artifact-name.outputs.project_artifact_name }}
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
 
   unit-test:
@@ -356,6 +355,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - name: Get Project Artifact Name
+        working-directory: ${{ inputs.artifactPath }}
+        id: get-artifact-name
+        shell: bash
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
 
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
@@ -420,7 +427,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.project_artifact_name}}-${{ matrix.os }}-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ matrix.os }}-${{needs.build.outputs.artifact_version}}-artifacts
           path: ./target
 
       - name: Run extra command
@@ -513,10 +520,17 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
+      - name: Get Project Artifact Name
+        working-directory: ${{ inputs.artifactPath }}
+        id: get-artifact-name
+        shell: bash
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
+
       - name: Debug Artifact Information
         shell: bash
         run: |
-          PROJECT_ARTIFACT_NAME="${{needs.build.outputs.project_artifact_name}}"
           ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
           echo "Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
           echo "Artifact Version: ${ARTIFACT_VERSION}"
@@ -524,52 +538,52 @@ jobs:
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.project_artifact_name}}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.project_artifact_name}}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/macos
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.project_artifact_name}}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/windows
 
       - name: Create multiplatform jar
         run: |
           rm -rf /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
           mkdir -p /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
-          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/windows /tmp/windows/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/macos /tmp/macos/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
-          rm -r -f /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}
-          mkdir /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}
-          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/
-          cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/
-          cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/
-          rm /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          rm -f /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
-          cd /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}/
-          zip -r ../${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar *
+          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/windows /tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/macos /tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          rm -r -f /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}
+          mkdir /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}
+          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/windows/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/macos/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
+          rm /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          rm -f /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          cd /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
+          zip -r ../${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar *
           cd ..
-          cp /tmp/ubuntu/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
-          cp /tmp/ubuntu/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
-          cp /tmp/ubuntu/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
+          cp /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
+          cp /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
+          cp /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
 
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v4
         with:
           name: multiplatform-artifacts
           path: |
-            /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.jar
-            /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}-sources.jar
-            /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}-javadoc.jar
-            /tmp/combined/${{needs.build.outputs.project_artifact_name}}-${{needs.build.outputs.artifact_version}}.pom
+            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar
+            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar
+            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom
 
   cleanup-individual-artifacts:
     needs: [build, combineJars]
@@ -597,6 +611,18 @@ jobs:
           role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - name: Get Project Artifact Name
+        working-directory: ${{ inputs.artifactPath }}
+        id: get-artifact-name
+        shell: bash
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
+
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v2
@@ -611,7 +637,6 @@ jobs:
       - name: Debug Cleanup Payload
         shell: bash
         run: |
-          PROJECT_ARTIFACT_NAME="${{needs.build.outputs.project_artifact_name}}"
           ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
           echo "Cleanup Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
           echo "Cleanup Artifact Version: ${ARTIFACT_VERSION}"
@@ -624,7 +649,7 @@ jobs:
           event-type: cleanup-individual-artifacts
           client-payload: |
             {
-              "artifact_id": "${{needs.build.outputs.project_artifact_name}}",
+              "artifact_id": "${{ env.PROJECT_ARTIFACT_NAME }}",
               "artifact_version": "${{needs.build.outputs.artifact_version}}"
             }
 

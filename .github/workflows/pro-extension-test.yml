@@ -279,10 +279,10 @@ jobs:
         shell: bash
         run: |
           ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
-          echo "::set-output name=artifact_id::${ARTIFACT_ID}"
-          # Store unmasked version for use throughout workflow
+          echo "artifact_id=${ARTIFACT_ID}" >> $GITHUB_OUTPUT
+          echo "unmasked_artifact_id=${ARTIFACT_ID}" >> $GITHUB_OUTPUT
+          # Store unmasked version for use in this job
           echo "UNMASKED_ARTIFACT_ID=${ARTIFACT_ID}" >> $GITHUB_ENV
-          echo "::set-output name=unmasked_artifact_id::${ARTIFACT_ID}"
 
       - name: Unmask Artifact ID
         shell: bash
@@ -290,12 +290,17 @@ jobs:
           # Use printf and character splitting to bypass masking
           printf "Artifact ID: %s\n" "${UNMASKED_ARTIFACT_ID}"
           echo "Artifact ID chars: $(echo "${UNMASKED_ARTIFACT_ID}" | sed 's/./& /g')"
+          # Debug outputs
+          echo "Step output artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}"
+          echo "Step output unmasked_artifact_id: ${{ steps.get-artifact-id.outputs.unmasked_artifact_id }}"
 
       - name: Get Artifact Version
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
         shell: bash
-        run: echo "::set-output name=artifact_version::$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
+        run: |
+          ARTIFACT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "artifact_version=${ARTIFACT_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Save Artifacts
         uses: actions/upload-artifact@v4

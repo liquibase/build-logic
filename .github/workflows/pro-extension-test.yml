@@ -120,10 +120,11 @@ jobs:
     name: Build & Package - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Configure AWS Credentials
+
+      - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
@@ -133,6 +134,12 @@ jobs:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
 
       - uses: actions/checkout@v4
         with:
@@ -315,10 +322,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: build
     steps:
-      - name: Configure AWS Credentials
+
+      - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
@@ -328,6 +336,12 @@ jobs:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
 
       - uses: actions/checkout@v4
         with:
@@ -545,10 +559,11 @@ jobs:
     name: Trigger Cleanup Individual OS Artifacts
     runs-on: ubuntu-latest
     steps:
-      - name: Configure AWS Credentials
+
+      - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
@@ -558,6 +573,12 @@ jobs:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
+          
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
 
       - name: Get GitHub App token
         id: get-token

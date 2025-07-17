@@ -68,9 +68,6 @@ jobs:
   build-and-deploy-extensions:
     needs: [delete-dependency-packages]
     runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-      packages: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GIT_USERNAME: "liquibot"

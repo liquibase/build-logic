@@ -78,11 +78,17 @@ permissions:
   id-token: write
   contents: write
   pull-requests: write
+  issues: write       # Required for creating/updating issues
+  packages: write     # Required for package operations
+  actions: write      # Required for workflow operations
 
 jobs:
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
+    outputs:
+      HOMEBREW_PR_NUMBER: ${{ steps.capture-pr.outputs.HOMEBREW_PR_NUMBER }}
+      HOMEBREW_PR_URL: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
     steps:
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
@@ -316,6 +322,37 @@ jobs:
         env:
           COMMITTER_TOKEN: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
 
+      # This step captures the PR details after it has been created
+      # and stores the PR number and URL in GitHub outputs for later use.
+      # This is useful for tracking the PR status and creating a tracking issue.
+      - name: Capture Homebrew PR Details
+        if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        id: capture-pr
+        run: |
+          # Wait briefly for PR to be created
+          sleep 30
+          
+          # Search for the PR
+          PR_DATA=$(gh api graphql -f query='
+          query($search_query: String!) {
+            search(query: $search_query, type: ISSUE, first: 1) { 
+              nodes {               
+                ... on PullRequest {
+                  url,
+                  number
+                }
+              }
+            }
+          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
+          
+          if [ ! -z "$PR_DATA" ]; then
+            echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
+            echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
+            echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}
         env:
@@ -362,6 +399,40 @@ jobs:
           -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
           https://vendors.sdkman.io/announce/struct
           echo "Announced liquibase-$VERSION.zip to SDKMAN"
+
+  # create a placeholder branch to check if tracking branch exists for this version
+  # Branch is created when package is submitted to Homebrew and SDKMAN
+  # Branch is deleted when package becomes available on Homebrew and SDKMAN
+  create-placeholder-branch:
+    runs-on: ubuntu-latest
+    needs: upload_packages
+    if: ${{ inputs.dry_run == true }}
+    steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: liquibase
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/liquibase
+          token: ${{ steps.get-token.outputs.token }} 
+
+      - name: Create placeholder branches
+        id: create-placeholder-branch
+        run: |
+          git fetch origin
+          git checkout -b ci-oss-sdkman-package-check
+          git checkout -b ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+          git push origin ci-oss-sdkman-package-check
+          git push origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+          echo "This is a placeholder branch for oss sdkman package v.${{ inputs.version }}. If this branch is open, it means the sdkman package is not yet approved" > README.md
+          echo "This is a placeholder branch for oss homebrew package v.${{ inputs.version }}. If this branch is open, it means the homebrew package is not yet approved" > README.md
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
         if: ${{ inputs.dry_run == true }}

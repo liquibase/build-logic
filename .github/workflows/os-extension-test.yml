@@ -172,9 +172,6 @@ jobs:
           name: Event File
           path: ${{ github.event_path }}
 
-    outputs:
-      build_complete: true
-
   unit-test:
     strategy:
       fail-fast: false

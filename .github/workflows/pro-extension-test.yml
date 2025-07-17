@@ -120,7 +120,6 @@ jobs:
     name: Build & Package - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
-
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -280,6 +279,12 @@ jobs:
         shell: bash
         run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
 
+      - name: Unmask Artifact ID
+        shell: bash
+        run: |
+          echo "::remove-matcher owner=*::"
+          echo "Artifact ID: ${{ steps.get-artifact-id.outputs.artifact_id }}"
+
       - name: Get Artifact Version
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
@@ -322,7 +327,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: build
     steps:
-
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -503,6 +507,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
+      - name: Debug Artifact Information
+        shell: bash
+        run: |
+          echo "::remove-matcher owner=*::"
+          echo "Artifact ID: ${{needs.build.outputs.artifact_id}}"
+          echo "Artifact Version: ${{needs.build.outputs.artifact_version}}"
+
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -559,7 +570,6 @@ jobs:
     name: Trigger Cleanup Individual OS Artifacts
     runs-on: ubuntu-latest
     steps:
-
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -573,7 +583,7 @@ jobs:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
-          
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -590,6 +600,14 @@ jobs:
           permission-contents: write
           permission-packages: write
           permission-actions: write
+
+      - name: Debug Cleanup Payload
+        shell: bash
+        run: |
+          echo "::remove-matcher owner=*::"
+          echo "Cleanup Artifact ID: ${{needs.build.outputs.artifact_id}}"
+          echo "Cleanup Artifact Version: ${{needs.build.outputs.artifact_version}}"
+
       - name: Trigger cleanup workflow
         uses: peter-evans/repository-dispatch@v3
         with:

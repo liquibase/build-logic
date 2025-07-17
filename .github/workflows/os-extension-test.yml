@@ -155,6 +155,7 @@ jobs:
 
       - name: Get Project Artifact Name
         id: get-artifact-name
+        shell: bash
         run: |
           PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
           echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
@@ -202,6 +203,7 @@ jobs:
 
       - name: Get Project Artifact Name
         id: get-artifact-name
+        shell: bash
         run: |
           PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
           echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV

@@ -97,7 +97,7 @@ jobs:
     name: ${{ inputs.action}} Ephemeral Cloud Infrastructure
     runs-on: ubuntu-latest
     outputs:
-      stack_id: ${{ steps.create_stack.outputs.stack_id }} # Used to reference the stack created in the ephemeral infra
+      stack_id: ${{ steps.set_stack_id.outputs.stack_id }} # Used to reference the stack created in the ephemeral infra
       resources_id: ${{ steps.create_infra.outputs.resources_id }} # Used to reference the resources created in the ephemeral infra
     steps:
       - name: Configure AWS credentials for vault access
@@ -163,6 +163,13 @@ jobs:
           terraform apply -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"
           echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
           echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
+
+      - name: Set stack ID output
+        id: set_stack_id
+        if: ${{ inputs.deploy }}
+        run: |
+          echo "Ephemeral stack created with ID: ${{ steps.create_stack.outputs.stack_id }}"
+          echo "stack_id=${{ steps.create_stack.outputs.stack_id }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Terraform state as artifact
         if: ${{ inputs.deploy && always()}}

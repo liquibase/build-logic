@@ -72,8 +72,10 @@ on:
         required: true
 
 permissions:
-  contents: read
   id-token: write
+  contents: write
+  packages: write
+  actions: write
 
 env:
   AWS_REGION: us-east-1
@@ -88,9 +90,6 @@ jobs:
         os: ${{fromJson(inputs.os || '["ubuntu-latest"]')}}
     name: Build & Package - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - name: Configure AWS Credentials
@@ -258,9 +257,6 @@ jobs:
     if: ${{ inputs.combineJars }}
     name: Combine Jars
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -346,11 +342,6 @@ jobs:
     if: ${{ inputs.combineJars && always() }}
     name: Trigger Cleanup Individual OS Artifacts
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: write
-      packages: write
-      actions: write
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4

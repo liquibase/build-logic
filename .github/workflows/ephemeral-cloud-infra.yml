@@ -96,9 +96,6 @@ jobs:
   ephemeral-cloud-infra:
     name: ${{ inputs.action}} Ephemeral Cloud Infrastructure
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     outputs:
       stack_id: ${{ steps.create_stack.outputs.stack_id }} # Used to reference the stack created in the ephemeral infra
       resources_id: ${{ steps.create_infra.outputs.resources_id }} # Used to reference the resources created in the ephemeral infra

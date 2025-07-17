@@ -15,9 +15,6 @@ permissions:
 jobs:
   wait-for-fossa-report-generation:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     strategy:
       matrix:
         repo: [
@@ -105,9 +102,6 @@ jobs:
   combine-3p-fossa-reports:
     runs-on: ubuntu-latest
     needs: wait-for-fossa-report-generation
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -194,9 +188,6 @@ jobs:
 
   trigger-datical-service:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

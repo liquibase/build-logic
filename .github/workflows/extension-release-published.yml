@@ -347,10 +347,6 @@ jobs:
     if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true && inputs.dry_run == false
     name: Upload xsds
     runs-on: ubuntu-22.04
-    # These permissions are needed to interact with GitHub's OIDC Token endpoint.
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - name: Download xsd files
         uses: actions/checkout@v4

@@ -282,8 +282,9 @@ jobs:
       - name: Unmask Artifact ID
         shell: bash
         run: |
-          echo "::remove-matcher owner=*::"
-          echo "Artifact ID: ${{ steps.get-artifact-id.outputs.artifact_id }}"
+          ARTIFACT_ID="${{ steps.get-artifact-id.outputs.artifact_id }}"
+          echo "Artifact ID: ${ARTIFACT_ID}"
+          echo "::$(date +%s)::"
 
       - name: Get Artifact Version
         working-directory: ${{ inputs.artifactPath }}
@@ -510,9 +511,11 @@ jobs:
       - name: Debug Artifact Information
         shell: bash
         run: |
-          echo "::remove-matcher owner=*::"
-          echo "Artifact ID: ${{needs.build.outputs.artifact_id}}"
-          echo "Artifact Version: ${{needs.build.outputs.artifact_version}}"
+          ARTIFACT_ID="${{needs.build.outputs.artifact_id}}"
+          ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
+          echo "Artifact ID: ${ARTIFACT_ID}"
+          echo "Artifact Version: ${ARTIFACT_VERSION}"
+          echo "::$(date +%s)::"
 
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4
@@ -604,9 +607,11 @@ jobs:
       - name: Debug Cleanup Payload
         shell: bash
         run: |
-          echo "::remove-matcher owner=*::"
-          echo "Cleanup Artifact ID: ${{needs.build.outputs.artifact_id}}"
-          echo "Cleanup Artifact Version: ${{needs.build.outputs.artifact_version}}"
+          ARTIFACT_ID="${{needs.build.outputs.artifact_id}}"
+          ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
+          echo "Cleanup Artifact ID: ${ARTIFACT_ID}"
+          echo "Cleanup Artifact Version: ${ARTIFACT_VERSION}"
+          echo "::$(date +%s)::"
 
       - name: Trigger cleanup workflow
         uses: peter-evans/repository-dispatch@v3

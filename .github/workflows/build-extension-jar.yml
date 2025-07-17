@@ -25,6 +25,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write # Required for OIDC authentication
 
 jobs:
   delete-dependency-packages:

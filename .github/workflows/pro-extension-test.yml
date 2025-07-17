@@ -106,11 +106,6 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
-  LIQUIBASE_PRO_LICENSE_KEY: ${{ secrets.PRO_LICENSE_KEY }}
-  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-  AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ secrets.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MAVEN_VERSION: "3.9.5"
   LIQUIBASE_VAULT_ADDR: ${{ inputs.vaultAddr }}
@@ -124,10 +119,27 @@ jobs:
         os: ${{fromJson(inputs.os || '["ubuntu-latest"]')}}
     name: Build & Package - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    permissions:
-      id-token: write
-      contents: write # Updated from 'read' to 'write' to allow tag operations
     steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
@@ -135,7 +147,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
       - name: Set up JDK 17
@@ -184,12 +196,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -217,13 +229,19 @@ jobs:
           url: ${{ inputs.vaultAddr }}
           namespace: ${{ inputs.vaultNamespace }}
           method: approle
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          roleId: ${{ env.VAULT_ROLE_ID }}
+          secretId: ${{ env.VAULT_SECRET_ID }}
           exportToken: true
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
         shell: bash
+        env:
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
         run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
@@ -234,7 +252,7 @@ jobs:
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ Build failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
@@ -242,6 +260,12 @@ jobs:
       - name: Build and Package
         if: ${{ !inputs.nightly }}
         shell: bash
+        env:
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
         run: |
           if [ -n "${{ inputs.extraMavenArgs }}" ]; then
             mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
@@ -249,22 +273,34 @@ jobs:
             mvn -B dependency:go-offline clean package -DskipTests=true
           fi
 
-      - name: Get Artifact ID
+      - name: Get Project Artifact Name
         working-directory: ${{ inputs.artifactPath }}
-        id: get-artifact-id
+        id: get-artifact-name
         shell: bash
-        run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "project_artifact_name=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+          # Store in environment for this job
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
+
+      - name: Display Project Artifact Name
+        shell: bash
+        run: |
+          echo "Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
+          echo "Step output: ${{ steps.get-artifact-name.outputs.project_artifact_name }}"
 
       - name: Get Artifact Version
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
         shell: bash
-        run: echo "::set-output name=artifact_version::$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
+        run: |
+          ARTIFACT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "artifact_version=${ARTIFACT_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
             ${{ inputs.artifactPath }}/target/*
 
@@ -272,19 +308,18 @@ jobs:
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
           path: ${{ github.event_path }}
 
       - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
             target/*
 
     outputs:
-      artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
 
   unit-test:
@@ -295,14 +330,39 @@ jobs:
         os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "windows-latest"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    permissions:
-      id-token: write
-      contents: read
     needs: build
     steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - name: Get Project Artifact Name
+        working-directory: ${{ inputs.artifactPath }}
+        id: get-artifact-name
+        shell: bash
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
 
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
@@ -314,7 +374,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
       - name: Set up Maven
@@ -356,18 +416,18 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
       - uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.artifact_id}}-${{ matrix.os }}-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ matrix.os }}-${{needs.build.outputs.artifact_version}}-artifacts
           path: ./target
 
       - name: Run extra command
@@ -392,13 +452,19 @@ jobs:
           url: ${{ inputs.vaultAddr }}
           namespace: ${{ inputs.vaultNamespace }}
           method: approle
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          roleId: ${{ env.VAULT_ROLE_ID }}
+          secretId: ${{ env.VAULT_SECRET_ID }}
           exportToken: true
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}
         shell: bash
+        env:
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
         run: |
           if [ -n "${{ inputs.extraMavenArgs }}" ]; then
             mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}"
@@ -409,6 +475,12 @@ jobs:
       - name: Run Tests
         if: ${{ inputs.nightly }}
         shell: bash
+        env:
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
         run: |
           if [ -n "${{ inputs.extraMavenArgs }}" ]; then
             mvn -B test -P '${{ inputs.mavenProfiles }}' "${{ inputs.extraMavenArgs }}" "-Dliquibase.version=master-SNAPSHOT"
@@ -424,7 +496,7 @@ jobs:
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
@@ -448,55 +520,70 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
+      - name: Get Project Artifact Name
+        working-directory: ${{ inputs.artifactPath }}
+        id: get-artifact-name
+        shell: bash
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
+
+      - name: Debug Artifact Information
+        shell: bash
+        run: |
+          ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
+          echo "Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
+          echo "Artifact Version: ${ARTIFACT_VERSION}"
+
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.artifact_id}}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.artifact_id}}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/macos
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.artifact_id}}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/windows
 
       - name: Create multiplatform jar
         run: |
           rm -rf /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
           mkdir -p /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
-          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/windows /tmp/windows/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/macos /tmp/macos/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          rm -r -f /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}
-          mkdir /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}
-          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          rm /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          rm -f /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-          cd /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}/
-          zip -r ../${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar *
+          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/windows /tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/macos /tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          rm -r -f /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}
+          mkdir /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}
+          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/windows/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
+          cp -a /tmp/combined/macos/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
+          rm /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          rm -f /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          cd /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
+          zip -r ../${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar *
           cd ..
-          cp /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
-          cp /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
-          cp /tmp/ubuntu/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
+          cp /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
+          cp /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
+          cp /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
 
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v4
         with:
           name: multiplatform-artifacts
           path: |
-            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.jar
-            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-sources.jar
-            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}-javadoc.jar
-            /tmp/combined/${{needs.build.outputs.artifact_id}}-${{needs.build.outputs.artifact_version}}.pom
+            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar
+            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar
+            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom
 
   cleanup-individual-artifacts:
     needs: [build, combineJars]
@@ -504,16 +591,56 @@ jobs:
     name: Trigger Cleanup Individual OS Artifacts
     runs-on: ubuntu-latest
     steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
+          aws-region: us-east-1
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - name: Get Project Artifact Name
+        working-directory: ${{ inputs.artifactPath }}
+        id: get-artifact-name
+        shell: bash
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
+
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
-          private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-contents: write
           permission-packages: write
           permission-actions: write
+
+      - name: Debug Cleanup Payload
+        shell: bash
+        run: |
+          ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
+          echo "Cleanup Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
+          echo "Cleanup Artifact Version: ${ARTIFACT_VERSION}"
+
       - name: Trigger cleanup workflow
         uses: peter-evans/repository-dispatch@v3
         with:
@@ -522,7 +649,7 @@ jobs:
           event-type: cleanup-individual-artifacts
           client-payload: |
             {
-              "artifact_id": "${{needs.build.outputs.artifact_id}}",
+              "artifact_id": "${{ env.PROJECT_ARTIFACT_NAME }}",
               "artifact_version": "${{needs.build.outputs.artifact_version}}"
             }
 

@@ -12,12 +12,27 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
 
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
@@ -53,8 +68,8 @@ jobs:
 
       - name: Publish to Maven Central
         env:
-          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN }}
+          MAVEN_USERNAME: ${{ env.SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ env.SONATYPE_TOKEN }}
         run: |
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)          
           mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \

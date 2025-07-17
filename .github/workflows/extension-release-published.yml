@@ -53,6 +53,7 @@ permissions:
   contents: write
   pull-requests: write
   packages: write
+  id-token: write
 
 jobs:
   maven-release:
@@ -61,7 +62,6 @@ jobs:
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
-      artifactPath: ${{ inputs.artifactPath }}
       javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:
@@ -70,6 +70,20 @@ jobs:
     needs: maven-release
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
 
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
@@ -112,12 +126,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -155,28 +169,33 @@ jobs:
       - name: Publish to Maven Central
         working-directory: ${{ inputs.artifactPath }}
         env:
-          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN }}
+          MAVEN_USERNAME: ${{ env.SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ env.SONATYPE_TOKEN }}
         run: |
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           groupId=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
-          
+
           # Create Maven repository layout structure for the bundle
           # Convert groupId dots to directory separators
           groupPath=$(echo "$groupId" | tr '.' '/')
           mkdir -p "bundle/${groupPath}/${{ env.artifact_id }}/${version}"
-          
+
           # Copy all artifacts and their signatures/checksums to proper Maven repository layout
-          cp ${{ env.artifact_id }}-${version}* "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          
+          # Skip files containing "-full" in their names
+          for file in ${{ env.artifact_id }}-${version}*; do
+            if [[ ! "$file" == *"-full"* ]]; then
+              cp "$file" "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+            fi
+          done
+
           # Create the bundle zip file
           cd bundle
           zip -r ../central-bundle.zip .
           cd ..
-          
+
           # Create base64 encoded credentials for Bearer auth
           AUTH_HEADER=$(printf "%s:%s" "${MAVEN_USERNAME}" "${MAVEN_PASSWORD}" | base64 -w 0)
-          
+
           # Upload bundle to Central Portal using curl with proper authentication
           echo "Uploading bundle to Central Portal..."
           UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
@@ -184,20 +203,20 @@ jobs:
             -H "Authorization: Bearer ${AUTH_HEADER}" \
             -F "bundle=@central-bundle.zip" \
             "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED&name=${{ env.artifact_id }}-${version}")
-          
+
           # Parse response
           HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
           DEPLOYMENT_ID=$(echo "$UPLOAD_RESPONSE" | head -n1)
-          
+
           echo "HTTP Status: $HTTP_CODE"
           echo "Deployment ID: $DEPLOYMENT_ID"
-          
+
           if [ "$HTTP_CODE" != "201" ]; then
             echo "Upload failed with HTTP status $HTTP_CODE"
             echo "Response: $DEPLOYMENT_ID"
             exit 1
           fi
-          
+
           echo "Bundle uploaded successfully to Central Portal"
           echo "Deployment ID: $DEPLOYMENT_ID"
           echo "Visit https://central.sonatype.com/publishing/deployments to view and publish your deployment"
@@ -207,6 +226,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
 
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@v4
@@ -259,17 +292,17 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "dry-run-sonatype-nexus-staging",
-                "username": "${{ secrets.REPO_LIQUIBASE_NET_USER }}",
-                "password": "${{ secrets.REPO_LIQUIBASE_NET_PASSWORD }}"
+                "username": "${{ env.REPO_LIQUIBASE_NET_USER }}",
+                "password": "${{ env.REPO_LIQUIBASE_NET_PASSWORD }}"
               }
             ]
 
@@ -293,8 +326,8 @@ jobs:
       - name: Publish to Maven Central
         working-directory: ${{ inputs.artifactPath }}
         env:
-          MAVEN_USERNAME: ${{ secrets.REPO_LIQUIBASE_NET_USER }}
-          MAVEN_PASSWORD: ${{ secrets.REPO_LIQUIBASE_NET_PASSWORD }}
+          MAVEN_USERNAME: ${{ env.REPO_LIQUIBASE_NET_USER }}
+          MAVEN_PASSWORD: ${{ env.REPO_LIQUIBASE_NET_PASSWORD }}
         run: |
           version=${{ inputs.dry_run_version }}         
           mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
@@ -313,10 +346,6 @@ jobs:
     if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true && inputs.dry_run == false
     name: Upload xsds
     runs-on: ubuntu-22.04
-    # These permissions are needed to interact with GitHub's OIDC Token endpoint.
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - name: Download xsd files
         uses: actions/checkout@v4
@@ -325,18 +354,34 @@ jobs:
           path: ${{ github.event.repository.name }}
           repository: "liquibase/${{ github.event.repository.name }}"
 
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1
 
       - name: Upload to s3
+        working-directory: ${{ inputs.artifactPath }}
         # aws s3 sync syncs directories and S3 prefixes.
         run: |
           aws s3 sync ${{ github.event.repository.name }}/src/main/resources/www.liquibase.org/xml/ns/${{ inputs.nameSpace }}/ s3://liquibaseorg-origin/xml/ns/${{ inputs.nameSpace }}/ --content-type application/octet-stream --only-show-errors
 
       - name: Index.htm file upload
+        working-directory: ${{ inputs.artifactPath }}
         # List all xsd and htm files in repository. Copy index.htm to temporary folder
         # Add links for all xsd files to index.htm file (except liquibase-${{ inputs.nameSpace }}-latest.xsd and index.htm)
         # Sync index.htm with the s3
@@ -353,3 +398,4 @@ jobs:
           done
 
           aws s3 sync index-file s3://liquibaseorg-origin/xml/ns/${{ inputs.nameSpace }}/ --only-show-errors
+          

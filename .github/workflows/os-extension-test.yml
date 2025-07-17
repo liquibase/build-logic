@@ -46,12 +46,27 @@ permissions:
   contents: read
   pull-requests: write
   packages: read
+  id-token: write
 
 jobs:
   build:
     name: Build & Package
     runs-on: ubuntu-latest
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
@@ -102,12 +117,12 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
@@ -129,7 +144,7 @@ jobs:
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ Build failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
@@ -138,14 +153,17 @@ jobs:
         if: ${{ !inputs.nightly }}
         run: mvn -B dependency:go-offline clean package -DskipTests=true
 
-      - name: Get Artifact ID
-        id: get-artifact-id
-        run: echo "::set-output name=artifact_id::$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)"
+      - name: Get Project Artifact Name
+        id: get-artifact-name
+        shell: bash
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
 
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
             target/*
 
@@ -154,9 +172,6 @@ jobs:
         with:
           name: Event File
           path: ${{ github.event_path }}
-
-    outputs:
-      artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
 
   unit-test:
     strategy:
@@ -168,9 +183,30 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: build
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - name: Get Project Artifact Name
+        id: get-artifact-name
+        shell: bash
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
 
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
@@ -218,18 +254,18 @@ jobs:
               {
                 "id": "liquibase-pro",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               },
               {
                 "id": "liquibase",
                 "username": "liquibot",
-                "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
 
       - uses: actions/download-artifact@v4
         with:
-          name: ${{needs.build.outputs.artifact_id}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: ./target
 
       - name: Run extra command
@@ -253,7 +289,7 @@ jobs:
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ Tests failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{github.repository}}"
           SLACK_USERNAME: liquibot
-          SLACK_WEBHOOK: ${{ secrets.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true

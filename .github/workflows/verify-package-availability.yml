@@ -50,6 +50,20 @@ jobs:
       HOMEBREW_PR_OPEN: ${{ steps.check-homebrew-pr.outputs.pr_open }}
     runs-on: ubuntu-latest
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+          
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v2
@@ -105,7 +119,7 @@ jobs:
               core.setOutput("pr_open", false);
             }
 
-  check-placeholder-branch-exists-sdkman:
+  check-sdkman-placeholder-branch-exists:
     # check liquibase/liquibase repo for existence of ci-oss-sdkman-package-check branch. If it exists, only then run the check-sdkman-availability job
     runs-on: ubuntu-latest
     outputs:
@@ -128,9 +142,9 @@ jobs:
 
   check-sdkman-availability:
     runs-on: ubuntu-latest
-    needs: check-placeholder-branch-exists-sdkman
+    needs: check-sdkman-placeholder-branch-exists
     # Only run if the placeholder branch exists
-    if: ${{ needs.check-placeholder-branch-exists-sdkman.outputs.branch_exists == 'true' }}
+    if: ${{ needs.check-sdkman-placeholder-branch-exists.outputs.branch_exists == 'true' }}
     steps:
       - name: Install SDKMAN CLI
         run: |

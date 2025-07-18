@@ -105,7 +105,7 @@ jobs:
 
               // Now switch to GitHub App token to delete the branch. This creates a second Octokit client with different credentials
               const appToken = process.env.GITHUB_APP_TOKEN;
-              const appOctokit = require('@actions/github').getOctokit(appToken);
+              const appOctokit = new github.constructor(appToken);
 
               try {
                 await appOctokit.rest.git.deleteRef({

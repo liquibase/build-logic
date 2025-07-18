@@ -13,6 +13,7 @@ on:
 permissions:
   issues: write
   contents: read
+  id-token: write
 
 jobs:
   check-homebrew-placeholder-branch:
@@ -21,7 +22,7 @@ jobs:
       HOMEBREW_PR_NUMBER: ${{ steps.check-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}
       HOMEBREW_BRANCH: ${{ steps.check-placeholder-branch.outputs.HOMEBREW_BRANCH }}
     steps:
-      - name: Checkout homebrew branch
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           repository: liquibase/liquibase
@@ -31,14 +32,16 @@ jobs:
         id: check-placeholder-branch
         run: |
           git fetch origin
-          branch=$(git branch -r | grep -o 'ci-oss-homebrew-package-check-[^[:space:]]*')
-          homebrew_pr_number=$(echo $branch |grep -o '[0-9]\+$')
+          # Use fallback to prevent grep from exiting with error
+          branch=$(git branch -r | grep -o 'ci-oss-homebrew-package-check-[^[:space:]]*' || true)
+          homebrew_pr_number=$(echo "$branch" | grep -o '[0-9]\+$' || true)
           if [ -n "$branch" ]; then
             echo "HOMEBREW_BRANCH=$branch" >> $GITHUB_OUTPUT
             echo "HOMEBREW_PR_NUMBER=$homebrew_pr_number" >> $GITHUB_OUTPUT
           else
+            echo "Branch does not exist"
             echo "HOMEBREW_BRANCH=$branch" >> $GITHUB_OUTPUT
-            echo "HOMEBREW_PR_NUMBER=" >> $GITHUB_OUTPUT
+            echo "HOMEBREW_PR_NUMBER=$homebrew_pr_number" >> $GITHUB_OUTPUT
           fi
 
   check-homebrew-prs:
@@ -48,39 +51,82 @@ jobs:
       HOMEBREW_PR_OPEN: ${{ steps.check-homebrew-pr.outputs.pr_open }}
     runs-on: ubuntu-latest
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
 
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/liquibase
+          token: ${{ steps.get-token.outputs.token }}
+              
       - name: Check for open Homebrew PR
         id: check-homebrew-pr
-        run: |
-          // Check if the PR is still open
+        uses: actions/github-script@v7
+        env:
+          GITHUB_APP_TOKEN: ${{ steps.get-token.outputs.token }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = Number("${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}");
+            const branch = "${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_BRANCH }}";
+            
+            // First: check PR state using the default token (public Homebrew repo)
             const pr = await github.rest.pulls.get({
               owner: 'Homebrew',
               repo: 'homebrew-core',
-              pull_number: ${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}
+              pull_number: prNumber
             });
 
             if (pr.data.state === 'open') {
-              console.log(`PR #${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }} is still open. Will try again tomorrow on schedule.`);
-              // Set github output to indicate pr is still open
-              return {
-                pr_open: true,
-              };
+              console.log(`PR #${prNumber} is still open. Will try again tomorrow on schedule.`);
+              core.setOutput("pr_open", true);
             } else {
-              console.log(`Homebrew PR #${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }} is closed or merged. Deleting tracking branch.`);
-              git push origin --delete ${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_BRANCH }} || true;
-              echo "${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_BRANCH }} placeholder branch deleted as Homebrew PR is closed or merged.";
-              return {
-                pr_open: false,
-              };
+              console.log(`Homebrew PR #${prNumber} is closed or merged. Deleting tracking branch.`);
+
+              // Now switch to GitHub App token to delete the branch. This creates a second Octokit client with different credentials
+              const appToken = process.env.GITHUB_APP_TOKEN;
+              const appOctokit = new github.constructor(appToken);
+
+              try {
+                await appOctokit.rest.git.deleteRef({
+                  owner: 'liquibase',
+                  repo: 'liquibase',
+                  ref: `heads/${branch}`
+                });
+                console.log(`${branch} placeholder branch deleted as Homebrew PR is closed or merged.`);
+              } catch (error) {
+                console.log(`Failed to delete branch ${branch}: ${error.message}`);
+              }
+              core.setOutput("pr_open", false);
             }
 
-  check-placeholder-branch-exists-sdkman:
+  check-sdkman-placeholder-branch-exists:
     # check liquibase/liquibase repo for existence of ci-oss-sdkman-package-check branch. If it exists, only then run the check-sdkman-availability job
     runs-on: ubuntu-latest
     outputs:
       branch_exists: ${{ steps.check-placeholder-branch.outputs.branch_exists }}
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           repository: liquibase/liquibase
@@ -93,13 +139,15 @@ jobs:
             echo "branch_exists=true" >> $GITHUB_OUTPUT
           else
             echo "branch_exists=false" >> $GITHUB_OUTPUT
+            echo "Placeholder branch ci-oss-sdkman-package-check does not exist. Skipping SDKMAN availability check."
+            exit 0
           fi
 
   check-sdkman-availability:
     runs-on: ubuntu-latest
-    needs: check-placeholder-branch-exists-sdkman
+    needs: check-sdkman-placeholder-branch-exists
     # Only run if the placeholder branch exists
-    if: ${{ needs.check-placeholder-branch-exists-sdkman.outputs.branch_exists == 'true' }}
+    if: ${{ needs.check-sdkman-placeholder-branch-exists.outputs.branch_exists == 'true' }}
     steps:
       - name: Install SDKMAN CLI
         run: |
@@ -134,6 +182,7 @@ jobs:
 
   notify-homebrew:
     needs: [check-homebrew-prs]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Set slack color and message
@@ -163,6 +212,9 @@ jobs:
 
   notify-sdkman:
     needs: [check-sdkman-availability]
+    env:
+      SDKMAN_RESULT: ${{ needs.check-sdkman-availability.result }}
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Set slack color and message
@@ -170,7 +222,7 @@ jobs:
         run: |
           oss_latest_version=$(curl -s "https://api.github.com/repos/liquibase/liquibase/releases/latest" | jq -r '.tag_name' | sed 's/^v//') 
           echo "oss_latest_version=$oss_latest_version" >> $GITHUB_OUTPUT
-          if [[ "${{ needs.check-sdkman-availability.result }}" == "success" ]]; then
+          if [[ "$SDKMAN_RESULT" == "skipped" ]]; then
             echo "status_color=good" >> $GITHUB_OUTPUT
             echo "status_message=SDKMAN package v$oss_latest_version is approved and available." >> $GITHUB_OUTPUT
           else

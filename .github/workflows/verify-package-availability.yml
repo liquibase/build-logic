@@ -212,6 +212,8 @@ jobs:
 
   notify-sdkman:
     needs: [check-sdkman-availability]
+    env:
+      SDKMAN_RESULT: ${{ needs.check-sdkman-availability.result }}
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -220,7 +222,7 @@ jobs:
         run: |
           oss_latest_version=$(curl -s "https://api.github.com/repos/liquibase/liquibase/releases/latest" | jq -r '.tag_name' | sed 's/^v//') 
           echo "oss_latest_version=$oss_latest_version" >> $GITHUB_OUTPUT
-          if [[ "${{ needs.check-sdkman-availability.result }}" == "success" ]]; then
+          if [[ "$SDKMAN_RESULT" == "skipped" ]]; then
             echo "status_color=good" >> $GITHUB_OUTPUT
             echo "status_message=SDKMAN package v$oss_latest_version is approved and available." >> $GITHUB_OUTPUT
           else

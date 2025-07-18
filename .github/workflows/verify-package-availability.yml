@@ -21,7 +21,7 @@ jobs:
       HOMEBREW_PR_NUMBER: ${{ steps.check-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}
       HOMEBREW_BRANCH: ${{ steps.check-placeholder-branch.outputs.HOMEBREW_BRANCH }}
     steps:
-      - name: Checkout homebrew branch
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           repository: liquibase/liquibase
@@ -31,14 +31,16 @@ jobs:
         id: check-placeholder-branch
         run: |
           git fetch origin
-          branch=$(git branch -r | grep -o 'ci-oss-homebrew-package-check-[^[:space:]]*')
-          homebrew_pr_number=$(echo $branch |grep -o '[0-9]\+$')
+          # Use fallback to prevent grep from exiting with error
+          branch=$(git branch -r | grep -o 'ci-oss-homebrew-package-check-[^[:space:]]*' || true)
+          homebrew_pr_number=$(echo "$branch" | grep -o '[0-9]\+$' || true)
           if [ -n "$branch" ]; then
             echo "HOMEBREW_BRANCH=$branch" >> $GITHUB_OUTPUT
             echo "HOMEBREW_PR_NUMBER=$homebrew_pr_number" >> $GITHUB_OUTPUT
           else
+            echo "Branch does not exist"
             echo "HOMEBREW_BRANCH=$branch" >> $GITHUB_OUTPUT
-            echo "HOMEBREW_PR_NUMBER=" >> $GITHUB_OUTPUT
+            echo "HOMEBREW_PR_NUMBER=$homebrew_pr_number" >> $GITHUB_OUTPUT
           fi
 
   check-homebrew-prs:
@@ -80,7 +82,7 @@ jobs:
     outputs:
       branch_exists: ${{ steps.check-placeholder-branch.outputs.branch_exists }}
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           repository: liquibase/liquibase

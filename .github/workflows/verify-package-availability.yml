@@ -13,6 +13,7 @@ on:
 permissions:
   issues: write
   contents: read
+  id-token: write
 
 jobs:
   check-homebrew-placeholder-branch:
@@ -63,7 +64,7 @@ jobs:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
-          
+
       - name: Get GitHub App token
         id: get-token
         uses: actions/create-github-app-token@v2

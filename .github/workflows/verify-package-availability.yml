@@ -50,29 +50,59 @@ jobs:
       HOMEBREW_PR_OPEN: ${{ steps.check-homebrew-pr.outputs.pr_open }}
     runs-on: ubuntu-latest
     steps:
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
 
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/liquibase
+          token: ${{ steps.get-token.outputs.token }}
+              
       - name: Check for open Homebrew PR
         id: check-homebrew-pr
-        run: |
+        uses: actions/github-script@v7
+        env:
+          GITHUB_APP_TOKEN: ${{ steps.get-token.outputs.token }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = Number("${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}");
+            const branch = "${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_BRANCH }}";
+            
+            // First: check PR state using the default token (public Homebrew repo)
             const pr = await github.rest.pulls.get({
               owner: 'Homebrew',
               repo: 'homebrew-core',
-              pull_number: ${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}
+              pull_number: prNumber
             });
 
             if (pr.data.state === 'open') {
-              console.log(`PR #${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }} is still open. Will try again tomorrow on schedule.`);
-              // Set github output to indicate pr is still open
-              return {
-                pr_open: true,
-              };
+              console.log(`PR #${prNumber} is still open. Will try again tomorrow on schedule.`);
+              core.setOutput("pr_open", true);
             } else {
-              console.log(`Homebrew PR #${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }} is closed or merged. Deleting tracking branch.`);
-              git push origin --delete ${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_BRANCH }} || true;
-              echo "${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_BRANCH }} placeholder branch deleted as Homebrew PR is closed or merged.";
-              return {
-                pr_open: false,
-              };
+              console.log(`Homebrew PR #${prNumber} is closed or merged. Deleting tracking branch.`);
+
+              // Now switch to GitHub App token to delete the branch. This creates a second Octokit client with different credentials
+              const appToken = process.env.GITHUB_APP_TOKEN;
+              const appOctokit = require('@actions/github').getOctokit(appToken);
+
+              try {
+                await appOctokit.rest.git.deleteRef({
+                  owner: 'liquibase',
+                  repo: 'liquibase',
+                  ref: `heads/${branch}`
+                });
+                console.log(`${branch} placeholder branch deleted as Homebrew PR is closed or merged.`);
+              } catch (error) {
+                console.log(`Failed to delete branch ${branch}: ${error.message}`);
+              }
+              core.setOutput("pr_open", false);
             }
 
   check-placeholder-branch-exists-sdkman:

@@ -54,7 +54,6 @@ jobs:
       - name: Check for open Homebrew PR
         id: check-homebrew-pr
         run: |
-          // Check if the PR is still open
             const pr = await github.rest.pulls.get({
               owner: 'Homebrew',
               repo: 'homebrew-core',
@@ -136,6 +135,7 @@ jobs:
 
   notify-homebrew:
     needs: [check-homebrew-prs]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Set slack color and message
@@ -165,6 +165,7 @@ jobs:
 
   notify-sdkman:
     needs: [check-sdkman-availability]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Set slack color and message

@@ -139,6 +139,8 @@ jobs:
             echo "branch_exists=true" >> $GITHUB_OUTPUT
           else
             echo "branch_exists=false" >> $GITHUB_OUTPUT
+            echo "Placeholder branch ci-oss-sdkman-package-check does not exist. Skipping SDKMAN availability check."
+            exit 0
           fi
 
   check-sdkman-availability:

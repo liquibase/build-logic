@@ -38,6 +38,11 @@ on:
         required: false
         default: false
         type: boolean
+      runIntegrationTests:
+        description: "Specify it if you want to run the integration tests in addition to the normal tests"
+        required: false
+        default: false
+        type: boolean
 
 env:
   MAVEN_VERSION: "3.9.5"
@@ -281,6 +286,14 @@ jobs:
         if: ${{ inputs.nightly }}
         run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
 
+      - name: Run Integration Tests
+        if: ${{ !inputs.nightly && inputs.runIntegrationTests }}
+        run: mvn -B integration-test -P 'coverage' ${{ inputs.extraMavenArgs }}
+
+      - name: Run Integration Tests
+        if: ${{ inputs.nightly && inputs.runIntegrationTests }}
+        run: mvn -B integration-test -P 'coverage' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
+
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
         uses: rtCamp/action-slack-notify@v2
@@ -301,6 +314,7 @@ jobs:
           name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
           path: |
             **/target/surefire-reports
+            **/target/failsafe-reports
             **/target/site/jacoco/jacoco.xml
 
   sonar-pr:

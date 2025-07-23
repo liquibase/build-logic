@@ -199,7 +199,16 @@ jobs:
           echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
-          deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          
+          # Debug: List available GPG keys
+          echo "Available GPG keys:"
+          gpg --list-secret-keys --keyid-format LONG
+          
+          # Get the actual key ID from the imported key
+          ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
+          echo "Using key ID: $ACTUAL_KEY_ID"
+          
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
       - name: Upload ${{ inputs.artifactId }} dry-run deb package
         if: ${{ inputs.dry_run == true }}
@@ -209,7 +218,16 @@ jobs:
           echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
-          deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          
+          # Debug: List available GPG keys
+          echo "Available GPG keys:"
+          gpg --list-secret-keys --keyid-format LONG
+          
+          # Get the actual key ID from the imported key
+          ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
+          echo "Using key ID: $ACTUAL_KEY_ID"
+          
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
 
       - name: Convert deb to rpm
         run: |

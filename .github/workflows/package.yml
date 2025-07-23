@@ -427,13 +427,32 @@ jobs:
           https://vendors.sdkman.io/announce/struct
           echo "Announced liquibase-$VERSION.zip to SDKMAN"
 
+      - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
+        if: ${{ inputs.dry_run == true }}
+        env:
+          SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
+          SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
+          S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
+        run: |
+          mkdir -p liquibase-$VERSION/bin/internal
+          unzip .github/target/liquibase-$VERSION.zip -d liquibase-$VERSION
+          rm -rf liquibase-$VERSION.zip
+          mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
+          mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
+          zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
+          # Upload the release to S3
+          aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
+          echo "Uploaded liquibase-$VERSION.zip to s3"
+          
   # create a placeholder branch to check if tracking branch exists for this version
   # Branch is created when package is submitted to Homebrew and SDKMAN
   # Branch is deleted when package becomes available on Homebrew and SDKMAN
   create-placeholder-branch:
     runs-on: ubuntu-latest
     needs: upload_packages
-    if: ${{ inputs.dry_run == true }}
+    if: ${{ inputs.dry_run == false }}
     steps:
       - name: Get GitHub App token
         id: get-token
@@ -460,25 +479,6 @@ jobs:
           git push origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
           echo "This is a placeholder branch for oss sdkman package v.${{ inputs.version }}. If this branch is open, it means the sdkman package is not yet approved" > README.md
           echo "This is a placeholder branch for oss homebrew package v.${{ inputs.version }}. If this branch is open, it means the homebrew package is not yet approved" > README.md
-
-      - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
-        if: ${{ inputs.dry_run == true }}
-        env:
-          SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
-          SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
-          VERSION: ${{ inputs.version }}
-          S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
-          S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
-        run: |
-          mkdir -p liquibase-$VERSION/bin/internal
-          unzip .github/target/liquibase-$VERSION.zip -d liquibase-$VERSION
-          rm -rf liquibase-$VERSION.zip
-          mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
-          mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
-          zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
-          # Upload the release to S3
-          aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
-          echo "Uploaded liquibase-$VERSION.zip to s3"
 
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master

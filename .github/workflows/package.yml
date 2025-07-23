@@ -145,11 +145,20 @@ jobs:
           curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
           chmod +x $PWD/.github/sign_artifact.sh
 
+      - name: Convert escaped newlines and set GPG key
+        run: |
+          {
+            echo "GPG_KEY_CONTENT<<GPG_EOF"
+            printf '%b' "${{ env.GPG_SECRET }}"
+            echo
+            echo "GPG_EOF"
+          } >> $GITHUB_ENV
+
       - name: Import GPG key
         id: import_gpg
         uses: crazy-max/ghaction-import-gpg@v6
         with:
-          gpg_private_key: ${{ env.GPG_SECRET }}
+          gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
 
       - name: Configure AWS credentials
@@ -187,7 +196,7 @@ jobs:
         run: |
           sudo apt install pinentry-tty
           echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
+          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
           deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
@@ -197,7 +206,7 @@ jobs:
         run: |
           sudo apt install pinentry-tty
           echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
+          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
           deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb

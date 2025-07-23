@@ -90,20 +90,6 @@ jobs:
       HOMEBREW_PR_NUMBER: ${{ steps.capture-pr.outputs.HOMEBREW_PR_NUMBER }}
       HOMEBREW_PR_URL: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
     steps:
-      - name: Decode Base64 URLs
-        id: decode-urls
-        if: ${{ inputs.dry_run == true }}
-        run: |
-          if [ -n "${{ inputs.dry_run_zip_url }}" ]; then
-            decoded_zip_url=$(echo "${{ inputs.dry_run_zip_url }}" | base64 -d)
-            echo "decoded_zip_url=$decoded_zip_url" >> $GITHUB_OUTPUT
-            echo "Decoded zip URL: $decoded_zip_url"
-          fi
-          if [ -n "${{ inputs.dry_run_tar_gz_url }}" ]; then
-            decoded_tar_gz_url=$(echo "${{ inputs.dry_run_tar_gz_url }}" | base64 -d) 
-            echo "decoded_tar_gz_url=$decoded_tar_gz_url" >> $GITHUB_OUTPUT
-            echo "Decoded tar.gz URL: $decoded_tar_gz_url"
-          fi
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -159,20 +145,11 @@ jobs:
           curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
           chmod +x $PWD/.github/sign_artifact.sh
 
-      - name: Convert escaped newlines and set GPG key
-        run: |
-          {
-            echo "GPG_KEY_CONTENT<<GPG_EOF"
-            printf '%b' "${{ env.GPG_SECRET }}"
-            echo
-            echo "GPG_EOF"
-          } >> $GITHUB_ENV
-
       - name: Import GPG key
         id: import_gpg
         uses: crazy-max/ghaction-import-gpg@v6
         with:
-          gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
+          gpg_private_key: ${{ env.GPG_SECRET }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
 
       - name: Configure AWS credentials
@@ -190,19 +167,13 @@ jobs:
 
       - name: Download ${{ inputs.artifactId }} dry-run Release
         if: ${{ inputs.dry_run == true }}
-        run: |
-          mkdir -p .github/target/
-          # Use decoded URL to download the tar.gz file directly
-          if [ -n "${{ steps.decode-urls.outputs.decoded_tar_gz_url }}" ]; then
-            echo "Downloading from: ${{ steps.decode-urls.outputs.decoded_tar_gz_url }}"
-            wget -q -O .github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz "${{ steps.decode-urls.outputs.decoded_tar_gz_url }}"
-          else
-            echo "No decoded tar.gz URL available, falling back to release downloader"
-            # Fallback to release downloader if URL not available
-            curl -L -H "Authorization: token ${{ steps.get-token.outputs.token }}" \
-                 -o .github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz \
-                 "https://api.github.com/repos/liquibase/liquibase/releases/${{ inputs.dry_run_release_id }}/assets"
-          fi
+        uses: robinraju/release-downloader@v1.12
+        with:
+          repository: "liquibase/liquibase"
+          releaseId: "${{ inputs.dry_run_release_id }}"
+          fileName: "*"
+          out-file-path: ".github/target/"
+          token: "${{ steps.get-token.outputs.token }}"
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |
@@ -216,7 +187,7 @@ jobs:
         run: |
           sudo apt install pinentry-tty
           echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
+          echo "${{ env.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
           deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
@@ -226,7 +197,7 @@ jobs:
         run: |
           sudo apt install pinentry-tty
           echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
+          echo "${{ env.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
           deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
@@ -473,17 +444,8 @@ jobs:
           S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
         run: |
           mkdir -p liquibase-$VERSION/bin/internal
-          # Download and extract the zip file using decoded URL
-          if [ -n "${{ steps.decode-urls.outputs.decoded_zip_url }}" ]; then
-            echo "Downloading zip from decoded URL: ${{ steps.decode-urls.outputs.decoded_zip_url }}"
-            wget -q -O liquibase-$VERSION.zip "${{ steps.decode-urls.outputs.decoded_zip_url }}"
-            unzip liquibase-$VERSION.zip -d liquibase-$VERSION
-            rm -rf liquibase-$VERSION.zip
-          else
-            echo "Using pre-downloaded file from .github/target/"
-            unzip .github/target/liquibase-$VERSION.zip -d liquibase-$VERSION
-            rm -rf liquibase-$VERSION.zip
-          fi
+          unzip .github/target/liquibase-$VERSION.zip -d liquibase-$VERSION
+          rm -rf liquibase-$VERSION.zip
           mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
           mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
           zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
@@ -506,3 +468,4 @@ jobs:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
       dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
+      

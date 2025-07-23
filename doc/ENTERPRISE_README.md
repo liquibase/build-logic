@@ -2,7 +2,7 @@
 
 1. Manually trigger the workflow named Trigger Enterprise-FOSSA 3rd Party License Report in the build-logic repository <https://github.com/liquibase/build-logic/tree/main/.github/workflows/trigger-enterprise-fossa-third-party-license-report.yml>
 ![](./doc/img/trigger-fossa-report-enterprise.png)
-2. Provide the required input, `<version_number_for_3p_fossa_report_generation>` (e.g., 8.7.352). This value is used to organize reports within the S3 bucket.
+2. Provide the required input, `<version_number_for_3p_fossa_report_generation>` (e.g., 8.7.352). This value is used to organize reports within the S3 bucket (https://us-east-1.console.aws.amazon.com/s3/buckets/liquibaseorg-origin?region=us-east-1&bucketType=general&prefix=enterprise_fossa_report/&showversions=false).
 3. This workflow will trigger a matrix of runs across the relevant repositories using the `trigger-enterprise-fossa-third-party-license-report.yml`
 4. Each participating repository will invoke the reusable workflow: `generate-upload-enterprise-3p-fossa-report.yml`
 5. The purpose of `generate-upload-enterprise-3p-fossa-report.yml` workflow is to:

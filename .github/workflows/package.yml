@@ -196,7 +196,7 @@ jobs:
         run: |
           sudo apt install pinentry-tty
           echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
+          echo "${{ env.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
           deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
@@ -206,7 +206,7 @@ jobs:
         run: |
           sudo apt install pinentry-tty
           echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
+          echo "${{ env.GPG_SECRET }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
           export GPG_TTY=$(tty)
           echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
           deb-s3 upload --preserve-versions --sign "${{ env.GPG_SECRET_KEY_ID }}" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb

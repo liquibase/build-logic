@@ -186,18 +186,18 @@ jobs:
           git reset HEAD~ --hard
           mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }} -P '${{ inputs.mavenProfiles }}'
 
-      - name: Get Project Artifact Name
+      - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}
-        id: get-artifact-name
+        id: get-artifact-id
         shell: bash
         run: |
           # If artifactId is provided as input, use it; otherwise, evaluate from pom.xml
           if [ -n "${{ inputs.artifactId }}" ]; then
-            PROJECT_ARTIFACT_NAME="${{ inputs.artifactId }}"
+            artifact_id="${{ inputs.artifactId }}"
           else
-            PROJECT_ARTIFACT_NAME=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
+            artifact_id=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
           fi
-          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
+          echo "artifact_id=$artifact_id" >> $GITHUB_OUTPUT
 
       - name: Get Artifact Version
         if: ${{ inputs.dry_run == false }}
@@ -219,10 +219,11 @@ jobs:
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
             ${{ inputs.artifactPath }}/target/*
     outputs:
+      artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
 
   combineJars:
@@ -233,75 +234,62 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get Project Artifact Name
-        working-directory: ${{ inputs.artifactPath }}
-        id: get-artifact-name
-        shell: bash
-        run: |
-          # If artifactId is provided as input, use it; otherwise, evaluate from pom.xml
-          if [ -n "${{ inputs.artifactId }}" ]; then
-            PROJECT_ARTIFACT_NAME="${{ inputs.artifactId }}"
-          else
-            PROJECT_ARTIFACT_NAME=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
-          fi
-          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
-
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.PROJECT_ARTIFACT_NAME }}-ubuntu-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-ubuntu-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.PROJECT_ARTIFACT_NAME }}-macos-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-macos-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/macos
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.PROJECT_ARTIFACT_NAME }}-windows-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-windows-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/windows
 
       - name: Create multiplatform jar
         run: |
           rm -rf /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
           mkdir -p /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
-          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/windows /tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/macos /tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
-          rm -r -f /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}
-          mkdir /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}
-          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}/
-          cp -a /tmp/combined/windows/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}/
-          cp -a /tmp/combined/macos/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}/
-          rm /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          rm -f /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
-          cd /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}/
-          zip -r ../${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar *
+          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/windows /tmp/windows/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
+          unzip -d /tmp/combined/macos /tmp/macos/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
+          rm -r -f /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}
+          mkdir /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}
+          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
+          cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
+          cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
+          rm /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          rm -f /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
+          cd /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
+          zip -r ../${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar *
           cd ..
-          cp /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}-sources.jar /tmp/combined/
-          cp /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}-javadoc.jar /tmp/combined/
-          cp /tmp/ubuntu/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom /tmp/combined/
+          cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-sources.jar /tmp/combined/
+          cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-javadoc.jar /tmp/combined/
+          cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom /tmp/combined/
 
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v4
         with:
           name: multiplatform-artifacts
           path: |
-            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
-            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}-sources.jar
-            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}-javadoc.jar
-            /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom
+            /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
+            /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-sources.jar
+            /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-javadoc.jar
+            /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom
 
   cleanup-individual-artifacts:
     needs: [build-multi-architecture, combineJars]
     if: ${{ inputs.combineJars && always() }}
     uses: liquibase/build-logic/.github/workflows/cleanup-individual-artifacts.yml@main
     with:
-      artifact_id: ${{ inputs.artifactId || github.event.repository.name }}
+      artifact_id: ${{needs.build-multi-architecture.outputs.artifact_id}}
       artifact_version: ${{needs.build-multi-architecture.outputs.artifact_version}}
 
   attach-to-release:
@@ -597,4 +585,3 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target
-

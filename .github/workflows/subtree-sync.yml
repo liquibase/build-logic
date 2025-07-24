@@ -99,7 +99,8 @@ jobs:
           
           # Attempt subtree pull
           set +e
-          git subtree pull --prefix ${{ inputs.subtree_prefix }} ${{ inputs.remote_name }} ${{ inputs.source_branch }} -m "Merging latest ${{ inputs.remote_name }} from ${{ inputs.source_branch }} into subtree"
+          COMMIT_MESSAGE="Merging latest ${{ inputs.remote_name }} from ${{ inputs.source_branch }} into subtree"
+          git subtree pull --prefix ${{ inputs.subtree_prefix }} ${{ inputs.remote_name }} ${{ inputs.source_branch }} -m "$COMMIT_MESSAGE"
           PULL_EXIT_CODE=$?
           set -e
           

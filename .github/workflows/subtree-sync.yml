@@ -114,16 +114,25 @@ jobs:
               echo "status=success" >> $GITHUB_OUTPUT
               echo "changed=false" >> $GITHUB_OUTPUT
             fi
-          elif [ $PULL_EXIT_CODE -eq 1 ] && git status --porcelain | grep -q "^UU"; then
-            # Merge conflicts detected
-            echo "status=conflict" >> $GITHUB_OUTPUT
-            echo "changed=true" >> $GITHUB_OUTPUT
-            
-            # Stage all files including conflict markers
-            git add -A
-            git commit -m "Subtree sync with conflicts - manual resolution required"
+          elif [ $PULL_EXIT_CODE -eq 1 ]; then
+            # Check if it's a conflict vs other error using git write-tree (fastest and most reliable method)
+            if ! git write-tree >/dev/null 2>&1; then
+              # Conflicts detected - create PR with conflict markers
+              echo "status=conflict" >> $GITHUB_OUTPUT
+              echo "changed=true" >> $GITHUB_OUTPUT
+              
+              # Stage all files including conflict markers
+              git add -A
+              git commit -m "Subtree sync with conflicts - manual resolution required"
+            else
+              # Other merge error
+              echo "status=error" >> $GITHUB_OUTPUT
+              echo "changed=false" >> $GITHUB_OUTPUT
+              echo "error_code=$PULL_EXIT_CODE" >> $GITHUB_OUTPUT
+              exit $PULL_EXIT_CODE
+            fi
           else
-            # Other error
+            # Non-merge related error
             echo "status=error" >> $GITHUB_OUTPUT
             echo "changed=false" >> $GITHUB_OUTPUT
             echo "error_code=$PULL_EXIT_CODE" >> $GITHUB_OUTPUT

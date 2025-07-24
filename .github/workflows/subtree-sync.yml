@@ -1,0 +1,173 @@
+name: Reusable Subtree Sync Workflow
+
+on:
+  workflow_call:
+    inputs:
+      remote_name:
+        description: 'Name for the remote (e.g., "core", "oss-mongodb")'
+        required: true
+        type: string
+      remote_url:
+        description: 'URL of the remote repository'
+        required: true
+        type: string
+      subtree_prefix:
+        description: 'Directory prefix for the subtree (e.g., "core/", "liquibase-mongodb/")'
+        required: true
+        type: string
+      source_branch:
+        description: 'Branch to sync from (e.g., "master", "main")'
+        required: true
+        type: string
+      pr_branch_name:
+        description: 'Name for the PR branch (e.g., "core-subtree-updates")'
+        required: true
+        type: string
+      pr_title:
+        description: 'Title for the pull request'
+        required: true
+        type: string
+      pr_labels:
+        description: 'Comma-separated labels for the PR'
+        default: 'sdou'
+        type: string
+      slack_webhook_env_var:
+        description: 'Environment variable name containing the Slack webhook URL'
+        required: true
+        type: string
+    secrets:
+      LIQUIBASE_VAULT_OIDC_ROLE_ARN:
+        description: 'AWS role ARN for vault access'
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  sync-subtree:
+    name: Sync Subtree
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-metadata: read
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.get-token.outputs.token }}
+          fetch-depth: 0 # Required for subtree operations to work correctly
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add remote for subtree
+        run: |
+          git remote add ${{ inputs.remote_name }} ${{ inputs.remote_url }} || true
+          git fetch ${{ inputs.remote_name }}
+
+      - name: Pull updates from subtree
+        id: pull_subtree
+        run: |
+          # Store the current commit count
+          BEFORE_PULL_COUNT=$(git rev-list --count HEAD)
+          
+          # Attempt subtree pull
+          set +e
+          git subtree pull --prefix ${{ inputs.subtree_prefix }} ${{ inputs.remote_name }} ${{ inputs.source_branch }} -m "Merging latest ${{ inputs.remote_name }} from ${{ inputs.source_branch }} into subtree"
+          PULL_EXIT_CODE=$?
+          set -e
+          
+          # Check the result
+          if [ $PULL_EXIT_CODE -eq 0 ]; then
+            # Success - check if there were changes
+            AFTER_PULL_COUNT=$(git rev-list --count HEAD)
+            if [ "$BEFORE_PULL_COUNT" != "$AFTER_PULL_COUNT" ]; then
+              echo "status=success" >> $GITHUB_OUTPUT
+              echo "changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "status=success" >> $GITHUB_OUTPUT
+              echo "changed=false" >> $GITHUB_OUTPUT
+            fi
+          elif [ $PULL_EXIT_CODE -eq 1 ] && git status --porcelain | grep -q "^UU"; then
+            # Merge conflicts detected
+            echo "status=conflict" >> $GITHUB_OUTPUT
+            echo "changed=true" >> $GITHUB_OUTPUT
+            
+            # Stage all files including conflict markers
+            git add -A
+            git commit -m "Subtree sync with conflicts - manual resolution required"
+          else
+            # Other error
+            echo "status=error" >> $GITHUB_OUTPUT
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "error_code=$PULL_EXIT_CODE" >> $GITHUB_OUTPUT
+            exit $PULL_EXIT_CODE
+          fi
+
+      - name: Create Pull Request
+        if: steps.pull_subtree.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        id: create-pr
+        with:
+          token: ${{ steps.get-token.outputs.token }}
+          commit-message: "Sync ${{ inputs.remote_name }} subtree"
+          branch: ${{ inputs.pr_branch_name }}
+          title: ${{ steps.pull_subtree.outputs.status == 'conflict' && format('⚠️ {0} (conflicts need resolution)', inputs.pr_title) || inputs.pr_title }}
+          labels: ${{ steps.pull_subtree.outputs.status == 'conflict' && format('{0},merge-conflicts', inputs.pr_labels) || inputs.pr_labels }}
+          body: |
+            ${{ steps.pull_subtree.outputs.status == 'conflict' && '⚠️ **This PR contains merge conflicts that must be resolved manually before merging.**' || '' }}
+            
+            This PR updates the `${{ inputs.subtree_prefix }}` subtree with the latest changes from ${{ inputs.remote_url }} on ${{ inputs.source_branch }}.
+            
+            ${{ steps.pull_subtree.outputs.status == 'conflict' && '### Merge Conflicts Detected' || '' }}
+            ${{ steps.pull_subtree.outputs.status == 'conflict' && 'Please resolve the conflicts in the files marked with conflict markers before merging this PR.' || '' }}
+
+      - name: Enable auto-merge
+        if: steps.create-pr.outputs.pull-request-number && steps.pull_subtree.outputs.status != 'conflict'
+        run: |
+          gh pr merge --auto --merge "${{ steps.create-pr.outputs.pull-request-number }}"
+        env:
+          GH_TOKEN: ${{ steps.get-token.outputs.token }}
+
+      - name: Notify Slack on failure or conflicts
+        if: failure() || steps.pull_subtree.outputs.status == 'conflict'
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: ${{ steps.pull_subtree.outputs.status == 'conflict' && 'warning' || 'danger' }}
+          SLACK_MESSAGE: |
+            ${{ steps.pull_subtree.outputs.status == 'conflict' && '⚠️ Subtree sync created PR with conflicts that need manual resolution' || '❌ Subtree sync failed' }}
+            View workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            ${{ steps.create-pr.outputs.pull-request-number && format('PR: {0}/{1}/pull/{2}', github.server_url, github.repository, steps.create-pr.outputs.pull-request-number) || '' }}
+            <!here>
+          SLACK_TITLE: "${{ github.repository }} - Subtree Sync ${{ steps.pull_subtree.outputs.status == 'conflict' && 'Conflicts' || 'Failed' }}"
+          SLACK_USERNAME: liquibot
+          SLACK_WEBHOOK: ${{ env[inputs.slack_webhook_env_var] }}
+          SLACK_ICON_EMOJI: ":robot_face:"
+          SLACK_FOOTER: "${{ github.repository }}"
+          SLACK_LINK_NAMES: true

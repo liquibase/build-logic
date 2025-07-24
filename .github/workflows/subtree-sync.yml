@@ -116,6 +116,8 @@ jobs:
             fi
           elif [ $PULL_EXIT_CODE -eq 1 ]; then
             # Check if it's a conflict vs other error using git write-tree (fastest and most reliable method)
+            # git write-tree will fail if there are unresolved conflicts in the working tree,
+            # making it a reliable way to detect merge conflicts.
             if ! git write-tree >/dev/null 2>&1; then
               # Conflicts detected - create PR with conflict markers
               echo "status=conflict" >> $GITHUB_OUTPUT

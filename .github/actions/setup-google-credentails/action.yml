@@ -1,0 +1,28 @@
+name: 'Setup Google Credentials'
+description: 'Get Google credentials from vault and configure authentication'
+inputs:
+  aws-region:
+    description: 'AWS region for vault access'
+    required: false
+    default: 'us-east-1'
+  vault-secret-id:
+    description: 'Vault secret ID'
+    required: false
+    default: '/vault/liquibase'
+runs:
+  using: 'composite'
+  steps:
+    - name: Get Google credentials from vault
+      id: vault-secrets-google-creds-no-json
+      shell: bash
+      run: |
+        GOOGLE_CREDENTIALS=$(aws secretsmanager get-secret-value --secret-id "${{ inputs.vault-secret-id }}" --region "${{ inputs.aws-region }}" --query 'SecretString' --output text | jq -r '.GOOGLE_CREDENTIALS')
+        echo "GOOGLE_CREDENTIALS=$GOOGLE_CREDENTIALS" >> $GITHUB_ENV
+    
+    - name: configure auth
+      id: auth
+      uses: "google-github-actions/auth@v2"
+      env:
+        GOOGLE_IMPERSONATE_SERVICE_ACCOUNT: ${{ env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT }}
+      with:
+        credentials_json: ${{ env.GOOGLE_CREDENTIALS }}

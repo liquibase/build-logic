@@ -473,12 +473,28 @@ jobs:
         id: create-placeholder-branch
         run: |
           git fetch origin
-          git checkout -b ci-oss-sdkman-package-check
-          git checkout -b ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
-          git push origin ci-oss-sdkman-package-check
-          git push origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
-          echo "This is a placeholder branch for oss sdkman package v.${{ inputs.version }}. If this branch is open, it means the sdkman package is not yet approved" > README.md
-          echo "This is a placeholder branch for oss homebrew package v.${{ inputs.version }}. If this branch is open, it means the homebrew package is not yet approved" > README.md
+          
+          # Create SDKMAN tracking branch if it doesn't exist
+          if ! git ls-remote --exit-code --heads origin ci-oss-sdkman-package-check; then
+            git checkout -b ci-oss-sdkman-package-check
+            echo "This is a placeholder branch for oss sdkman package v.${{ inputs.version }}. If this branch is open, it means the sdkman package is not yet approved" > README.md
+            git add README.md
+            git commit -m "Create placeholder branch for SDKMAN package v.${{ inputs.version }}"
+            git push origin ci-oss-sdkman-package-check
+          else
+            echo "SDKMAN tracking branch already exists, skipping creation"
+          fi
+          
+          # Create Homebrew tracking branch if it doesn't exist and PR number is available
+          if [[ -n "${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}; then
+            git checkout -b ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+            echo "This is a placeholder branch for oss homebrew package v.${{ inputs.version }}. If this branch is open, it means the homebrew package is not yet approved" > README.md
+            git add README.md
+            git commit -m "Create placeholder branch for Homebrew package v.${{ inputs.version }}"
+            git push origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+          else
+            echo "Homebrew tracking branch already exists or PR number not available, skipping creation"
+          fi
 
   upload_windows_package:
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master

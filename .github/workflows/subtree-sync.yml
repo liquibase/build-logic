@@ -151,7 +151,7 @@ jobs:
           commit-message: "Sync ${{ inputs.remote_name }} subtree"
           branch: ${{ inputs.pr_branch_name }}
           title: ${{ steps.pull_subtree.outputs.status == 'conflict' && format('⚠️ {0} (conflicts need resolution)', inputs.pr_title) || inputs.pr_title }}
-          labels: ${{ steps.pull_subtree.outputs.status == 'conflict' && format('{0},merge-conflicts', inputs.pr_labels) || inputs.pr_labels }}
+          labels: ${{ inputs.pr_labels }}
           body: |
             ${{ steps.pull_subtree.outputs.status == 'conflict' && '⚠️ **This PR contains merge conflicts that must be resolved manually before merging.**' || '' }}
             
@@ -174,8 +174,7 @@ jobs:
           SLACK_COLOR: ${{ steps.pull_subtree.outputs.status == 'conflict' && 'warning' || 'danger' }}
           SLACK_MESSAGE: |
             ${{ steps.pull_subtree.outputs.status == 'conflict' && '⚠️ Subtree sync created PR with conflicts that need manual resolution' || '❌ Subtree sync failed' }}
-            View workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            ${{ steps.create-pr.outputs.pull-request-number && format('PR: {0}/{1}/pull/{2}', github.server_url, github.repository, steps.create-pr.outputs.pull-request-number) || '' }}
+            ${{ steps.create-pr.outputs.pull-request-number && format('PR: {0}/{1}/pull/{2}', github.server_url, github.repository, steps.create-pr.outputs.pull-request-number) || format('Workflow: {0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
             <!here>
           SLACK_TITLE: "${{ github.repository }} - Subtree Sync ${{ steps.pull_subtree.outputs.status == 'conflict' && 'Conflicts' || 'Failed' }}"
           SLACK_USERNAME: liquibot

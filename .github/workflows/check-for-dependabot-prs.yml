@@ -1,0 +1,35 @@
+name: Check for open Dependabot PRs
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: The repository that should be checked for open Dependabot PRs
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: The repository that should be checked for open Dependabot PRs
+        required: true
+        type: string
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  check_for_prs:
+    name: Check for open Dependabot PRs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for open Dependabot PRs
+        run: |
+          open_prs=$(gh pr list --repo ${{ inputs.repository }} --author dependabot[bot] --state open --json title,url \
+            | jq -r '.[] | "\(.title) \(.url)"')
+
+          if [ -n "$open_prs" ]; then
+            echo "Found open Dependabot PRs:"
+            echo "$open_prs"
+            exit 1
+          else
+            echo "No open Dependabot PRs found."
+          fi

@@ -1,17 +1,7 @@
 name: Check for open Dependabot PRs
 on:
   workflow_call:
-    inputs:
-      repository:
-        description: The repository that should be checked for open Dependabot PRs
-        required: true
-        type: string
   workflow_dispatch:
-    inputs:
-      repository:
-        description: The repository that should be checked for open Dependabot PRs
-        required: true
-        type: string
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

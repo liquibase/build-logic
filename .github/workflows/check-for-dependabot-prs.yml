@@ -13,8 +13,7 @@ jobs:
     steps:
       - name: Check for open Dependabot PRs
         run: |
-          echo $GITHUB_REPOSITORY
-          gh pr list --repo $GITHUB_REPOSITORY
+          echo "Checking for open Dependabot PRs in $GITHUB_REPOSITORY..."
           open_prs=$(gh pr list --repo $GITHUB_REPOSITORY --author dependabot[bot] --state open --json title,url \
             | jq -r '.[] | "\(.title) \(.url)"')
 

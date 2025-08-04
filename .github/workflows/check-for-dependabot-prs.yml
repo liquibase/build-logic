@@ -23,12 +23,8 @@ jobs:
     steps:
       - name: Check for open Dependabot PRs
         run: |
-          echo gh pr list --repo ${{ inputs.repository }} --author dependabot[bot] --state open
-          gh pr list --repo ${{ inputs.repository }} --author dependabot[bot] --state open
-          gh pr list --repo ${{ inputs.repository }} --author dependabot[bot]
-          gh pr list --repo ${{ inputs.repository }}
-          
-          open_prs=$(gh pr list --repo ${{ inputs.repository }} --author dependabot[bot] --state open --json title,url \
+          gh pr list
+          open_prs=$(gh pr list --author dependabot[bot] --state open --json title,url \
             | jq -r '.[] | "\(.title) \(.url)"')
 
           if [ -n "$open_prs" ]; then

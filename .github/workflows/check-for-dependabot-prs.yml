@@ -25,6 +25,8 @@ jobs:
         run: |
           echo gh pr list --repo ${{ inputs.repository }} --author dependabot[bot] --state open
           gh pr list --repo ${{ inputs.repository }} --author dependabot[bot] --state open
+          gh pr list --repo ${{ inputs.repository }} --author dependabot[bot]
+          gh pr list --repo ${{ inputs.repository }}
           
           open_prs=$(gh pr list --repo ${{ inputs.repository }} --author dependabot[bot] --state open --json title,url \
             | jq -r '.[] | "\(.title) \(.url)"')

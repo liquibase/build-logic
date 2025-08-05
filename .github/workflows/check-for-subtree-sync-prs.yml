@@ -1,0 +1,26 @@
+name: Check for open subtree sync PRs
+on:
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  check_for_prs:
+    name: Check for open subtree sync PRs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for open subtree sync PRs
+        run: |
+          echo "Checking for open subtree sync PRs in $GITHUB_REPOSITORY..."
+          open_prs=$(gh pr list --repo liquibase/liquibase-pro --head core-subtree-updates --state open --json title,url \
+            | jq -r '.[] | "\(.title) \(.url)"')
+
+          if [ -n "$open_prs" ]; then
+            echo "Found open subtree sync PRs:"
+            echo "$open_prs"
+            exit 1
+          else
+            echo "No open subtree sync PRs found."
+          fi

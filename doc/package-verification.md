@@ -21,9 +21,9 @@ This workflow verifies the availability of Liquibase packages across different p
 
 The workflow runs:
 
-- **After Linux packaging workflow completes** (`workflow_run`)
-- **Daily at midnight UTC** via scheduled cron (`schedule`)
-- **Manual dispatch** for testing (`workflow_dispatch`)
+- **After Linux packaging workflow completes** (`workflow_run`) - runs all jobs
+- **Daily at midnight UTC** via scheduled cron (`schedule`) - runs only Homebrew and SDKMAN verification (deb/rpm excluded)
+- **Manual dispatch** for testing (`workflow_dispatch`) - runs all jobs
 
 ## Homebrew Package Verification
 
@@ -155,6 +155,8 @@ Placeholder branches serve as triggers and state indicators for package verifica
 
 The Debian package verification process checks if the latest Liquibase version is available as a .deb package at repo.liquibase.com after deployment.
 
+**Trigger Conditions**: Only runs on `workflow_run` (after Linux packaging) and `workflow_dispatch` (manual trigger). Does not run on scheduled cron jobs.
+
 ### Debian Package Process Flow
 
 1. **Version Detection**
@@ -167,31 +169,42 @@ The Debian package verification process checks if the latest Liquibase version i
    - Applies production S3 access role for bucket operations
 
 3. **Primary S3 Check**
-   - Verifies package existence directly in S3 bucket: `s3://repo.liquibase.com/pool/main/l/liquibase/liquibase_{VERSION}_all.deb`
+   - Verifies package existence directly in S3 bucket: `s3://repo.liquibase.com/pool/stable/l/li/liquibase-{VERSION}.deb`
    - Uses `aws s3 ls` command for efficient existence check
    - Follows Debian repository pool structure conventions
 
 4. **Fallback URL Check**
    - If S3 check fails, attempts verification via public URL
-   - Checks: `https://repo.liquibase.com/pool/main/l/liquibase/liquibase_{VERSION}_all.deb`
+   - Checks: `https://repo.liquibase.com/pool/stable/l/li/liquibase-{VERSION}.deb`
    - Uses HTTP HEAD request to avoid downloading the package
 
-5. **Notification**
+5. **Error Handling**
+   - **Throws error and fails workflow** if package is not available in S3 or via public URL
+   - Uses `exit 1` and GitHub Actions error annotation (`::error::`) for clear failure indication
+   - Ensures failed package availability is visible in workflow results
+
+6. **Notification**
    - Sends Slack notification with package availability status
+   - **Success (Green)**: When DEB package is available in S3
+   - **Error (Red)**: When DEB package is not yet available in S3
    - Always runs to ensure notifications are sent regardless of check results
 
 ### Debian Package Technical Details
 
 - **Storage**: S3-backed Nexus repository at repo.liquibase.com
-- **Path Structure**: `/pool/main/l/liquibase/` (Debian repository conventions)
-- **Package Format**: `liquibase_{VERSION}_all.deb`
+- **Path Structure**: `/pool/stable/l/li/` (Debian repository conventions)
+- **Package Format**: `liquibase-{VERSION}.deb`
 - **Verification**: Direct S3 access with public URL fallback
+- **Error Handling**: Workflow fails with clear error if package not found
+- **Trigger Conditions**: Only runs on workflow_run and workflow_dispatch (excluded from cron jobs)
 
 ## RPM Package Verification
 
 ### RPM Package Overview
 
 The RPM package verification process checks if the latest Liquibase version is available as a .rpm package at repo.liquibase.com after deployment.
+
+**Trigger Conditions**: Only runs on `workflow_run` (after Linux packaging) and `workflow_dispatch` (manual trigger). Does not run on scheduled cron jobs.
 
 ### RPM Package Process Flow
 
@@ -214,8 +227,15 @@ The RPM package verification process checks if the latest Liquibase version is a
    - Checks: `https://repo.liquibase.com/yum/noarch/liquibase-{VERSION}-1.noarch.rpm`
    - Uses HTTP HEAD request to avoid downloading the package
 
-5. **Notification**
+5. **Error Handling**
+   - **Throws error and fails workflow** if package is not available in S3 or via public URL
+   - Uses `exit 1` and GitHub Actions error annotation (`::error::`) for clear failure indication
+   - Ensures failed package availability is visible in workflow results
+
+6. **Notification**
    - Sends Slack notification with package availability status
+   - **Success (Green)**: When RPM package is available in S3
+   - **Error (Red)**: When RPM package is not yet available in S3
    - Always runs to ensure notifications are sent regardless of check results
 
 ### RPM Package Technical Details
@@ -224,3 +244,5 @@ The RPM package verification process checks if the latest Liquibase version is a
 - **Path Structure**: `/yum/noarch/` (YUM repository conventions)
 - **Package Format**: `liquibase-{VERSION}-1.noarch.rpm`
 - **Verification**: Direct S3 access with public URL fallback
+- **Error Handling**: Workflow fails with clear error if package not found
+- **Trigger Conditions**: Only runs on workflow_run and workflow_dispatch (excluded from cron jobs)

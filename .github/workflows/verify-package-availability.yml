@@ -16,231 +16,231 @@ permissions:
   id-token: write
 
 jobs:
-  # check-homebrew-placeholder-branch:
-  #   runs-on: ubuntu-latest
-  #   outputs:
-  #     HOMEBREW_PR_NUMBER: ${{ steps.check-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}
-  #     HOMEBREW_BRANCH: ${{ steps.check-placeholder-branch.outputs.HOMEBREW_BRANCH }}
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #       with:
-  #         repository: liquibase/liquibase
+  check-homebrew-placeholder-branch:
+    runs-on: ubuntu-latest
+    outputs:
+      HOMEBREW_PR_NUMBER: ${{ steps.check-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}
+      HOMEBREW_BRANCH: ${{ steps.check-placeholder-branch.outputs.HOMEBREW_BRANCH }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/liquibase
           
-  #     - name: check-placeholder-branch-exists-homebrew 
-  #     # check for the branch that starts with ci-oss-homebrew-package-check- in the liquibase/liquibase repo. If it exists, only then run the check-homebrew-prs job
-  #       id: check-placeholder-branch
-  #       run: |
-  #         git fetch origin
-  #         # Use fallback to prevent grep from exiting with error
-  #         branch=$(git branch -r | grep -o 'ci-oss-homebrew-package-check-[^[:space:]]*' || true)
-  #         homebrew_pr_number=$(echo "$branch" | grep -o '[0-9]\+$' || true)
-  #         if [ -n "$branch" ]; then
-  #           echo "HOMEBREW_BRANCH=$branch" >> $GITHUB_OUTPUT
-  #           echo "HOMEBREW_PR_NUMBER=$homebrew_pr_number" >> $GITHUB_OUTPUT
-  #         else
-  #           echo "Branch does not exist"
-  #           echo "HOMEBREW_BRANCH=$branch" >> $GITHUB_OUTPUT
-  #           echo "HOMEBREW_PR_NUMBER=$homebrew_pr_number" >> $GITHUB_OUTPUT
-  #         fi
+      - name: check-placeholder-branch-exists-homebrew 
+      # check for the branch that starts with ci-oss-homebrew-package-check- in the liquibase/liquibase repo. If it exists, only then run the check-homebrew-prs job
+        id: check-placeholder-branch
+        run: |
+          git fetch origin
+          # Use fallback to prevent grep from exiting with error
+          branch=$(git branch -r | grep -o 'ci-oss-homebrew-package-check-[^[:space:]]*' || true)
+          homebrew_pr_number=$(echo "$branch" | grep -o '[0-9]\+$' || true)
+          if [ -n "$branch" ]; then
+            echo "HOMEBREW_BRANCH=$branch" >> $GITHUB_OUTPUT
+            echo "HOMEBREW_PR_NUMBER=$homebrew_pr_number" >> $GITHUB_OUTPUT
+          else
+            echo "Branch does not exist"
+            echo "HOMEBREW_BRANCH=$branch" >> $GITHUB_OUTPUT
+            echo "HOMEBREW_PR_NUMBER=$homebrew_pr_number" >> $GITHUB_OUTPUT
+          fi
 
-  # check-homebrew-prs:
-  #   needs: check-homebrew-placeholder-branch
-  #   if: ${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER != '' }}
-  #   outputs:
-  #     HOMEBREW_PR_OPEN: ${{ steps.check-homebrew-pr.outputs.pr_open }}
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-  #         aws-region: us-east-1
+  check-homebrew-prs:
+    needs: check-homebrew-placeholder-branch
+    if: ${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER != '' }}
+    outputs:
+      HOMEBREW_PR_OPEN: ${{ steps.check-homebrew-pr.outputs.pr_open }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
 
-  #     - name: Get secrets from vault
-  #       id: vault-secrets
-  #       uses: aws-actions/aws-secretsmanager-get-secrets@v2
-  #       with:
-  #         secret-ids: |
-  #           ,/vault/liquibase
-  #         parse-json-secrets: true
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
 
-  #     - name: Get GitHub App token
-  #       id: get-token
-  #       uses: actions/create-github-app-token@v2
-  #       with:
-  #         app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
-  #         private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
-  #         owner: ${{ github.repository_owner }}
+      - name: Get GitHub App token
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
 
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #       with:
-  #         repository: liquibase/liquibase
-  #         token: ${{ steps.get-token.outputs.token }}
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/liquibase
+          token: ${{ steps.get-token.outputs.token }}
               
-  #     - name: Check for open Homebrew PR
-  #       id: check-homebrew-pr
-  #       uses: actions/github-script@v7
-  #       env:
-  #         GITHUB_APP_TOKEN: ${{ steps.get-token.outputs.token }}
-  #       with:
-  #         github-token: ${{ secrets.GITHUB_TOKEN }}
-  #         script: |
-  #           const prNumber = Number("${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}");
-  #           const branch = "${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_BRANCH }}";
+      - name: Check for open Homebrew PR
+        id: check-homebrew-pr
+        uses: actions/github-script@v7
+        env:
+          GITHUB_APP_TOKEN: ${{ steps.get-token.outputs.token }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = Number("${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_PR_NUMBER }}");
+            const branch = "${{ needs.check-homebrew-placeholder-branch.outputs.HOMEBREW_BRANCH }}";
             
-  #           // First: check PR state using the default token (public Homebrew repo)
-  #           const pr = await github.rest.pulls.get({
-  #             owner: 'Homebrew',
-  #             repo: 'homebrew-core',
-  #             pull_number: prNumber
-  #           });
+            // First: check PR state using the default token (public Homebrew repo)
+            const pr = await github.rest.pulls.get({
+              owner: 'Homebrew',
+              repo: 'homebrew-core',
+              pull_number: prNumber
+            });
 
-  #           if (pr.data.state === 'open') {
-  #             console.log(`PR #${prNumber} is still open. Will try again tomorrow on schedule.`);
-  #             core.setOutput("pr_open", true);
-  #           } else {
-  #             console.log(`Homebrew PR #${prNumber} is closed or merged. Deleting tracking branch.`);
+            if (pr.data.state === 'open') {
+              console.log(`PR #${prNumber} is still open. Will try again tomorrow on schedule.`);
+              core.setOutput("pr_open", true);
+            } else {
+              console.log(`Homebrew PR #${prNumber} is closed or merged. Deleting tracking branch.`);
 
-  #             // Now switch to GitHub App token to delete the branch. This creates a second Octokit client with different credentials
-  #             const appToken = process.env.GITHUB_APP_TOKEN;
-  #             const appOctokit = new github.constructor(appToken);
+              // Now switch to GitHub App token to delete the branch. This creates a second Octokit client with different credentials
+              const appToken = process.env.GITHUB_APP_TOKEN;
+              const appOctokit = new github.constructor(appToken);
 
-  #             try {
-  #               await appOctokit.rest.git.deleteRef({
-  #                 owner: 'liquibase',
-  #                 repo: 'liquibase',
-  #                 ref: `heads/${branch}`
-  #               });
-  #               console.log(`${branch} placeholder branch deleted as Homebrew PR is closed or merged.`);
-  #             } catch (error) {
-  #               console.log(`Failed to delete branch ${branch}: ${error.message}`);
-  #             }
-  #             core.setOutput("pr_open", false);
-  #           }
+              try {
+                await appOctokit.rest.git.deleteRef({
+                  owner: 'liquibase',
+                  repo: 'liquibase',
+                  ref: `heads/${branch}`
+                });
+                console.log(`${branch} placeholder branch deleted as Homebrew PR is closed or merged.`);
+              } catch (error) {
+                console.log(`Failed to delete branch ${branch}: ${error.message}`);
+              }
+              core.setOutput("pr_open", false);
+            }
 
-  # check-sdkman-placeholder-branch-exists:
-  #   # check liquibase/liquibase repo for existence of ci-oss-sdkman-package-check branch. If it exists, only then run the check-sdkman-availability job
-  #   runs-on: ubuntu-latest
-  #   outputs:
-  #     branch_exists: ${{ steps.check-placeholder-branch.outputs.branch_exists }}
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #       with:
-  #         repository: liquibase/liquibase
+  check-sdkman-placeholder-branch-exists:
+    # check liquibase/liquibase repo for existence of ci-oss-sdkman-package-check branch. If it exists, only then run the check-sdkman-availability job
+    runs-on: ubuntu-latest
+    outputs:
+      branch_exists: ${{ steps.check-placeholder-branch.outputs.branch_exists }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/liquibase
 
-  #     - name: Check for placeholder branch
-  #       id: check-placeholder-branch
-  #       run: |
-  #         git fetch origin
-  #         if git show-ref --quiet refs/heads/ci-oss-sdkman-package-check; then
-  #           echo "branch_exists=true" >> $GITHUB_OUTPUT
-  #         else
-  #           echo "branch_exists=false" >> $GITHUB_OUTPUT
-  #           echo "Placeholder branch ci-oss-sdkman-package-check does not exist. Skipping SDKMAN availability check."
-  #           exit 0
-  #         fi
+      - name: Check for placeholder branch
+        id: check-placeholder-branch
+        run: |
+          git fetch origin
+          if git show-ref --quiet refs/heads/ci-oss-sdkman-package-check; then
+            echo "branch_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "branch_exists=false" >> $GITHUB_OUTPUT
+            echo "Placeholder branch ci-oss-sdkman-package-check does not exist. Skipping SDKMAN availability check."
+            exit 0
+          fi
 
-  # check-sdkman-availability:
-  #   runs-on: ubuntu-latest
-  #   needs: check-sdkman-placeholder-branch-exists
-  #   # Only run if the placeholder branch exists
-  #   if: ${{ needs.check-sdkman-placeholder-branch-exists.outputs.branch_exists == 'true' }}
-  #   steps:
-  #     - name: Install SDKMAN CLI
-  #       run: |
-  #         curl -s "https://get.sdkman.io" | bash
-  #         source "$HOME/.sdkman/bin/sdkman-init.sh"
+  check-sdkman-availability:
+    runs-on: ubuntu-latest
+    needs: check-sdkman-placeholder-branch-exists
+    # Only run if the placeholder branch exists
+    if: ${{ needs.check-sdkman-placeholder-branch-exists.outputs.branch_exists == 'true' }}
+    steps:
+      - name: Install SDKMAN CLI
+        run: |
+          curl -s "https://get.sdkman.io" | bash
+          source "$HOME/.sdkman/bin/sdkman-init.sh"
 
-  #     - name: Get Latest GitHub Version
-  #       id: oss-latest-version
-  #       run: |
-  #         # Get latest release from GitHub
-  #         LATEST_OSS_VERSION=$(curl -s "https://api.github.com/repos/liquibase/liquibase/releases/latest" | jq -r '.tag_name' | sed 's/^v//')
-  #         echo "oss_latest_version=$LATEST_OSS_VERSION" >> $GITHUB_OUTPUT
-  #         echo "Using GitHub latest version: $LATEST_OSS_VERSION"
+      - name: Get Latest GitHub Version
+        id: oss-latest-version
+        run: |
+          # Get latest release from GitHub
+          LATEST_OSS_VERSION=$(curl -s "https://api.github.com/repos/liquibase/liquibase/releases/latest" | jq -r '.tag_name' | sed 's/^v//')
+          echo "oss_latest_version=$LATEST_OSS_VERSION" >> $GITHUB_OUTPUT
+          echo "Using GitHub latest version: $LATEST_OSS_VERSION"
 
-  #     - name: Get latest SDKMAN package version
-  #       id: extract-package-details
-  #       run: |
-  #         SDKMAN_OSS_VERSION=$(sdk list liquibase | grep -o ${{ steps.oss-latest-version.outputs.oss_latest_version }})
-  #         echo "sdkman_oss_latest_version=$SDKMAN_OSS_VERSION" >> $GITHUB_OUTPUT
-  #         echo "Latest SDKMAN version: $SDKMAN_OSS_VERSION"
+      - name: Get latest SDKMAN package version
+        id: extract-package-details
+        run: |
+          SDKMAN_OSS_VERSION=$(sdk list liquibase | grep -o ${{ steps.oss-latest-version.outputs.oss_latest_version }})
+          echo "sdkman_oss_latest_version=$SDKMAN_OSS_VERSION" >> $GITHUB_OUTPUT
+          echo "Latest SDKMAN version: $SDKMAN_OSS_VERSION"
 
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #       with:
-  #         repository: liquibase/liquibase
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/liquibase
 
-  #     # delete the placeholder branch if the package is approved
-  #     - name: Delete placeholder branch if approved
-  #       if: ${{ steps.extract-package-details.outputs.sdkman_oss_latest_version != '' }}
-  #       run: |
-  #         git push origin --delete ci-oss-sdkman-package-check || true      
+      # delete the placeholder branch if the package is approved
+      - name: Delete placeholder branch if approved
+        if: ${{ steps.extract-package-details.outputs.sdkman_oss_latest_version != '' }}
+        run: |
+          git push origin --delete ci-oss-sdkman-package-check || true      
 
-  # notify-homebrew:
-  #   needs: [check-homebrew-prs]
-  #   if: always()
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Set slack color and message
-  #       id: set-slack-details
-  #       run: |
-  #         oss_latest_version=$(curl -s "https://api.github.com/repos/liquibase/liquibase/releases/latest" | jq -r '.tag_name' | sed 's/^v//') 
-  #         echo "oss_latest_version=$oss_latest_version" >> $GITHUB_OUTPUT
-  #         if [[ "${{ needs.check-homebrew-prs.outputs.HOMEBREW_PR_OPEN }}" != "true" ]]; then
-  #           echo "status_color=good" >> $GITHUB_OUTPUT
-  #           echo "status_message=Homebrew package v$oss_latest_version is approved and available." >> $GITHUB_OUTPUT
-  #         else
-  #           echo "status_color=#ffc107" >> $GITHUB_OUTPUT
-  #           echo "status_message=Homebrew package v$oss_latest_version is not yet approved." >> $GITHUB_OUTPUT
-  #         fi
+  notify-homebrew:
+    needs: [check-homebrew-prs]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set slack color and message
+        id: set-slack-details
+        run: |
+          oss_latest_version=$(curl -s "https://api.github.com/repos/liquibase/liquibase/releases/latest" | jq -r '.tag_name' | sed 's/^v//') 
+          echo "oss_latest_version=$oss_latest_version" >> $GITHUB_OUTPUT
+          if [[ "${{ needs.check-homebrew-prs.outputs.HOMEBREW_PR_OPEN }}" != "true" ]]; then
+            echo "status_color=good" >> $GITHUB_OUTPUT
+            echo "status_message=Homebrew package v$oss_latest_version is approved and available." >> $GITHUB_OUTPUT
+          else
+            echo "status_color=#ffc107" >> $GITHUB_OUTPUT
+            echo "status_message=Homebrew package v$oss_latest_version is not yet approved." >> $GITHUB_OUTPUT
+          fi
           
-  #     - name: Send Slack Notification
-  #       uses: rtCamp/action-slack-notify@v2
-  #       env:
-  #         SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
-  #         SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ>"
-  #         SLACK_TITLE: "LB Homebrew package v${{ steps.set-slack-details.outputs.oss_latest_version }} status check"
-  #         SLACK_USERNAME: liquibot
-  #         SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
-  #         SLACK_ICON_EMOJI: ":robot_face:"
-  #         SLACK_FOOTER: "${{ github.repository }}"
-  #         SLACK_LINK_NAMES: true
+      - name: Send Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ>"
+          SLACK_TITLE: "LB Homebrew package v${{ steps.set-slack-details.outputs.oss_latest_version }} status check"
+          SLACK_USERNAME: liquibot
+          SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
+          SLACK_ICON_EMOJI: ":robot_face:"
+          SLACK_FOOTER: "${{ github.repository }}"
+          SLACK_LINK_NAMES: true
 
-  # notify-sdkman:
-  #   needs: [check-sdkman-availability]
-  #   env:
-  #     SDKMAN_RESULT: ${{ needs.check-sdkman-availability.result }}
-  #   if: always()
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Set slack color and message
-  #       id: set-slack-details
-  #       run: |
-  #         oss_latest_version=$(curl -s "https://api.github.com/repos/liquibase/liquibase/releases/latest" | jq -r '.tag_name' | sed 's/^v//') 
-  #         echo "oss_latest_version=$oss_latest_version" >> $GITHUB_OUTPUT
-  #         if [[ "$SDKMAN_RESULT" == "skipped" ]]; then
-  #           echo "status_color=good" >> $GITHUB_OUTPUT
-  #           echo "status_message=SDKMAN package v$oss_latest_version is approved and available." >> $GITHUB_OUTPUT
-  #         else
-  #           echo "status_color=#ffc107" >> $GITHUB_OUTPUT
-  #           echo "status_message=SDKMAN package v$oss_latest_version is not yet approved." >> $GITHUB_OUTPUT
-  #         fi
+  notify-sdkman:
+    needs: [check-sdkman-availability]
+    env:
+      SDKMAN_RESULT: ${{ needs.check-sdkman-availability.result }}
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set slack color and message
+        id: set-slack-details
+        run: |
+          oss_latest_version=$(curl -s "https://api.github.com/repos/liquibase/liquibase/releases/latest" | jq -r '.tag_name' | sed 's/^v//') 
+          echo "oss_latest_version=$oss_latest_version" >> $GITHUB_OUTPUT
+          if [[ "$SDKMAN_RESULT" == "skipped" ]]; then
+            echo "status_color=good" >> $GITHUB_OUTPUT
+            echo "status_message=SDKMAN package v$oss_latest_version is approved and available." >> $GITHUB_OUTPUT
+          else
+            echo "status_color=#ffc107" >> $GITHUB_OUTPUT
+            echo "status_message=SDKMAN package v$oss_latest_version is not yet approved." >> $GITHUB_OUTPUT
+          fi
           
-  #     - name: Send Slack Notification
-  #       uses: rtCamp/action-slack-notify@v2
-  #       env:
-  #         SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
-  #         SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ>"
-  #         SLACK_TITLE: "LB SDKMAN package v${{ steps.set-slack-details.outputs.oss_latest_version }} status check"
-  #         SLACK_USERNAME: liquibot
-  #         SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
-  #         SLACK_ICON_EMOJI: ":robot_face:"
-  #         SLACK_FOOTER: "${{ github.repository }}"
-  #         SLACK_LINK_NAMES: true
+      - name: Send Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ>"
+          SLACK_TITLE: "LB SDKMAN package v${{ steps.set-slack-details.outputs.oss_latest_version }} status check"
+          SLACK_USERNAME: liquibot
+          SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
+          SLACK_ICON_EMOJI: ":robot_face:"
+          SLACK_FOOTER: "${{ github.repository }}"
+          SLACK_LINK_NAMES: true
 
   check-deb-and-rpm-package-availability:
     runs-on: ubuntu-latest

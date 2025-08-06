@@ -202,7 +202,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
-          SLACK_MESSAGE: ${{ steps.set-slack-details.outputs.status_message }}
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ>"
           SLACK_TITLE: "LB Homebrew package v${{ steps.set-slack-details.outputs.oss_latest_version }} status check"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
@@ -234,7 +234,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
-          SLACK_MESSAGE: ${{ steps.set-slack-details.outputs.status_message }}
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ>"
           SLACK_TITLE: "LB SDKMAN package v${{ steps.set-slack-details.outputs.oss_latest_version }} status check"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
@@ -242,14 +242,15 @@ jobs:
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
 
-  check-package-availability:
+  check-deb-and-rpm-package-availability:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'
     strategy:
       matrix:
         package_type: [deb, rpm]
         include:
           - package_type: deb
-            s3_path_template: "pool/main/l/liquibase/liquibase_%s_all.deb"
+            s3_path_template: "pool/stable/l/li/liquibase-%s.deb"
             package_name_template: "liquibase_%s_all.deb"
           - package_type: rpm
             s3_path_template: "yum/noarch/liquibase-%s-1.noarch.rpm"
@@ -285,7 +286,6 @@ jobs:
           echo "Using GitHub latest version: $LATEST_OSS_VERSION"
 
       - name: Configure AWS credentials for S3 access
-        if: matrix.package_type == 'rpm'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
@@ -317,18 +317,38 @@ jobs:
           fi
           
           echo "package_available=$PACKAGE_AVAILABLE" >> $GITHUB_OUTPUT
+          
+          # Throw error if package is not available
+          if [ "$PACKAGE_AVAILABLE" = "false" ]; then
+            echo "::error::${PACKAGE_TYPE^^} package v$LATEST_VERSION is not yet available in S3"
+            exit 1
+          fi
 
   notify-debian:
-    needs: [check-package-availability]
-    if: always()
+    needs: [check-deb-and-rpm-package-availability]
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run')
     runs-on: ubuntu-latest
     steps:
+      - name: Set slack color and message
+        id: set-slack-details
+        run: |
+          LATEST_VERSION="${{ needs.check-deb-and-rpm-package-availability.outputs.LATEST_OSS_VERSION }}"
+          DEB_AVAILABLE="${{ needs.check-deb-and-rpm-package-availability.outputs.PACKAGE_AVAILABLE_DEB }}"
+          
+          if [[ "${{ needs.check-deb-and-rpm-package-availability.result }}" == "success" ]] && [[ "$DEB_AVAILABLE" == "true" ]]; then
+            echo "status_color=good" >> $GITHUB_OUTPUT
+            echo "status_message=DEB package v$LATEST_VERSION is available in S3." >> $GITHUB_OUTPUT
+          else
+            echo "status_color=danger" >> $GITHUB_OUTPUT
+            echo "status_message=DEB package v$LATEST_VERSION is not yet available in S3" >> $GITHUB_OUTPUT
+          fi
+
       - name: Send Slack Notification
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
-          SLACK_TITLE: "LB Debian package v${{ needs.check-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
+          SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ> "
+          SLACK_TITLE: "LB Debian package v${{ needs.check-deb-and-rpm-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
@@ -336,16 +356,30 @@ jobs:
           SLACK_LINK_NAMES: true
 
   notify-rpm:
-    needs: [check-package-availability]
-    if: always()
+    needs: [check-deb-and-rpm-package-availability]
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run')
     runs-on: ubuntu-latest
     steps:
+      - name: Set slack color and message
+        id: set-slack-details
+        run: |
+          LATEST_VERSION="${{ needs.check-deb-and-rpm-package-availability.outputs.LATEST_OSS_VERSION }}"
+          RPM_AVAILABLE="${{ needs.check-deb-and-rpm-package-availability.outputs.PACKAGE_AVAILABLE_RPM }}"
+          
+          if [[ "${{ needs.check-deb-and-rpm-package-availability.result }}" == "success" ]] && [[ "$RPM_AVAILABLE" == "true" ]]; then
+            echo "status_color=good" >> $GITHUB_OUTPUT
+            echo "status_message=RPM package v$LATEST_VERSION is available in S3." >> $GITHUB_OUTPUT
+          else
+            echo "status_color=danger" >> $GITHUB_OUTPUT
+            echo "status_message=RPM package v$LATEST_VERSION is not yet available in S3" >> $GITHUB_OUTPUT
+          fi
+
       - name: Send Slack Notification
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
-          SLACK_TITLE: "LB RPM package v${{ needs.check-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
+          SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ> "
+          SLACK_TITLE: "LB RPM package v${{ needs.check-deb-and-rpm-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"

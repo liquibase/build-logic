@@ -242,7 +242,7 @@ jobs:
   #         SLACK_FOOTER: "${{ github.repository }}"
   #         SLACK_LINK_NAMES: true
 
-  check-package-availability:
+  check-deb-and-rpm-package-availability:
     runs-on: ubuntu-latest
     strategy:
       matrix:

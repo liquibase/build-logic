@@ -241,3 +241,113 @@ jobs:
           SLACK_ICON_EMOJI: ":robot_face:"
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
+
+  check-package-availability:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package_type: [deb, rpm]
+        include:
+          - package_type: deb
+            s3_path_template: "pool/main/l/liquibase/liquibase_%s_all.deb"
+            package_name_template: "liquibase_%s_all.deb"
+          - package_type: rpm
+            s3_path_template: "yum/noarch/liquibase-%s-1.noarch.rpm"
+            package_name_template: "liquibase-%s-1.noarch.rpm"
+    outputs:
+      PACKAGE_AVAILABLE_DEB: ${{ matrix.package_type == 'deb' && steps.check-package.outputs.package_available || '' }}
+      PACKAGE_AVAILABLE_RPM: ${{ matrix.package_type == 'rpm' && steps.check-package.outputs.package_available || '' }}
+      LATEST_OSS_VERSION: ${{ steps.oss-latest-version.outputs.oss_latest_version }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get Latest GitHub Version
+        id: oss-latest-version
+        run: |
+          # Get latest release from GitHub
+          LATEST_OSS_VERSION=$(curl -s "https://api.github.com/repos/liquibase/liquibase/releases/latest" | jq -r '.tag_name' | sed 's/^v//')
+          echo "oss_latest_version=$LATEST_OSS_VERSION" >> $GITHUB_OUTPUT
+          echo "Using GitHub latest version: $LATEST_OSS_VERSION"
+
+      - name: Configure AWS credentials for S3 access
+        if: matrix.package_type == 'rpm'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+          aws-region: us-east-1
+
+      - name: Check ${{ matrix.package_type }} package availability in S3
+        id: check-package
+        run: |
+          LATEST_VERSION="${{ steps.oss-latest-version.outputs.oss_latest_version }}"
+          PACKAGE_TYPE="${{ matrix.package_type }}"
+          echo "Checking for ${PACKAGE_TYPE^^} package version: $LATEST_VERSION"
+          
+          # Generate the S3 path using the template
+          PACKAGE_S3_PATH=$(printf "${{ matrix.s3_path_template }}" "$LATEST_VERSION")
+          PACKAGE_AVAILABLE=false
+          
+          if aws s3 ls "s3://repo.liquibase.com/$PACKAGE_S3_PATH" > /dev/null 2>&1; then
+            PACKAGE_AVAILABLE=true
+            echo "${PACKAGE_TYPE^^} package v$LATEST_VERSION is available in S3 at $PACKAGE_S3_PATH"
+          else
+            echo "${PACKAGE_TYPE^^} package v$LATEST_VERSION is not yet available in S3"
+            
+            # Also check the public URL as fallback
+            PACKAGE_URL="https://repo.liquibase.com/$PACKAGE_S3_PATH"
+            if curl --output /dev/null --silent --head --fail "$PACKAGE_URL"; then
+              PACKAGE_AVAILABLE=true
+              echo "${PACKAGE_TYPE^^} package v$LATEST_VERSION is available at public URL $PACKAGE_URL"
+            fi
+          fi
+          
+          echo "package_available=$PACKAGE_AVAILABLE" >> $GITHUB_OUTPUT
+
+  notify-debian:
+    needs: [check-package-availability]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
+          SLACK_TITLE: "LB Debian package v${{ needs.check-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
+          SLACK_USERNAME: liquibot
+          SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
+          SLACK_ICON_EMOJI: ":robot_face:"
+          SLACK_FOOTER: "${{ github.repository }}"
+          SLACK_LINK_NAMES: true
+
+  notify-rpm:
+    needs: [check-package-availability]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
+          SLACK_TITLE: "LB RPM package v${{ needs.check-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
+          SLACK_USERNAME: liquibot
+          SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
+          SLACK_ICON_EMOJI: ":robot_face:"
+          SLACK_FOOTER: "${{ github.repository }}"
+          SLACK_LINK_NAMES: true

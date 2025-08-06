@@ -319,7 +319,7 @@ jobs:
           echo "package_available=$PACKAGE_AVAILABLE" >> $GITHUB_OUTPUT
 
   notify-debian:
-    needs: [check-package-availability]
+    needs: [check-deb-and-rpm-package-availability]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -328,7 +328,7 @@ jobs:
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
-          SLACK_TITLE: "LB Debian package v${{ needs.check-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
+          SLACK_TITLE: "LB Debian package v${{ needs.check-deb-and-rpm-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"
@@ -336,7 +336,7 @@ jobs:
           SLACK_LINK_NAMES: true
 
   notify-rpm:
-    needs: [check-package-availability]
+    needs: [check-deb-and-rpm-package-availability]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -345,7 +345,7 @@ jobs:
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
-          SLACK_TITLE: "LB RPM package v${{ needs.check-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
+          SLACK_TITLE: "LB RPM package v${{ needs.check-deb-and-rpm-package-availability.outputs.LATEST_OSS_VERSION }} availability check"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ secrets.LIQUIBASE_PACKAGE_DEPLOY_STATUS_WEBHOOK }}
           SLACK_ICON_EMOJI: ":robot_face:"

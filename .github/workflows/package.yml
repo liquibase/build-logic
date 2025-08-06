@@ -469,7 +469,7 @@ jobs:
           repository: liquibase/liquibase
           token: ${{ steps.get-token.outputs.token }} 
 
-      - name: Create placeholder branches
+      - name: Create placeholder branches for SDKMAN and Homebrew
         id: create-placeholder-branch
         run: |
           git fetch origin

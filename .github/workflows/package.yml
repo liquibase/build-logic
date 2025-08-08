@@ -147,10 +147,20 @@ jobs:
 
       - name: Convert escaped newlines and set GPG key
         run: |
-          # Convert GPG_SECRET to proper format and store in environment
+          # Capture GPG key and immediately mask it to prevent exposure
+          GPG_KEY_CONTENT="$(echo "${{ env.GPG_SECRET }}" | sed 's/\\n/\n/g')"
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//%/%25}"
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\r'/%0D}"
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\n'/%0A}"
+          if ! echo "::add-mask::${GPG_KEY_CONTENT}"; then
+            echo "::error::Failed to mask GPG key"
+            exit 1
+          fi
+          
+          # Now safe to store in environment (already masked)
           {
             echo "GPG_KEY_CONTENT<<GPG_EOF"
-            echo "${{ env.GPG_SECRET }}" | sed 's/\\n/\n/g'
+            echo "$GPG_KEY_CONTENT"
             echo "GPG_EOF"
           } >> $GITHUB_ENV
 
@@ -191,15 +201,17 @@ jobs:
       - name: Install deb-s3 gem
         run: gem install deb-s3
 
+      - name: Import GPG key for deb signing
+        if: ${{ inputs.dry_run == false }}
+        id: import_gpg_deb
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
+          passphrase: ${{ env.GPG_PASSPHRASE }}
+
       - name: Upload ${{ inputs.artifactId }} deb package
         if: ${{ inputs.dry_run == false }}
         run: |
-          sudo apt install pinentry-tty
-          echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
-          export GPG_TTY=$(tty)
-          echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
-          
           # Debug: List available GPG keys
           echo "Available GPG keys:"
           gpg --list-secret-keys --keyid-format LONG
@@ -208,17 +220,27 @@ jobs:
           ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using key ID: $ACTUAL_KEY_ID"
           
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          # Create temporary passphrase file securely (not logged)
+          TEMP_PASSPHRASE_FILE=$(mktemp)
+          echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
+          chmod 600 "$TEMP_PASSPHRASE_FILE"
+          
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          
+          # Securely clean up passphrase file
+          rm -f "$TEMP_PASSPHRASE_FILE"
+
+      - name: Import GPG key for dry-run deb signing
+        if: ${{ inputs.dry_run == true }}
+        id: import_gpg_deb_dryrun
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
+          passphrase: ${{ env.GPG_PASSPHRASE }}
 
       - name: Upload ${{ inputs.artifactId }} dry-run deb package
         if: ${{ inputs.dry_run == true }}
         run: |
-          sudo apt install pinentry-tty
-          echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
-          export GPG_TTY=$(tty)
-          echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
-          
           # Debug: List available GPG keys
           echo "Available GPG keys:"
           gpg --list-secret-keys --keyid-format LONG
@@ -227,7 +249,15 @@ jobs:
           ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using key ID: $ACTUAL_KEY_ID"
           
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          # Create temporary passphrase file securely (not logged)
+          TEMP_PASSPHRASE_FILE=$(mktemp)
+          echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
+          chmod 600 "$TEMP_PASSPHRASE_FILE"
+          
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          
+          # Securely clean up passphrase file
+          rm -f "$TEMP_PASSPHRASE_FILE"
 
       - name: Convert deb to rpm
         run: |

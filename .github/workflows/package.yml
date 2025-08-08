@@ -147,13 +147,8 @@ jobs:
 
       - name: Convert escaped newlines and set GPG key
         run: |
-          # Convert GPG_SECRET to proper format and store in environment
+          # Capture GPG key and immediately mask it to prevent exposure
           GPG_KEY_CONTENT="$(echo "${{ env.GPG_SECRET }}" | sed 's/\\n/\n/g')"
-          {
-            echo "GPG_KEY_CONTENT<<GPG_EOF"
-            echo "$GPG_KEY_CONTENT"
-            echo "GPG_EOF"
-          } >> $GITHUB_ENV
           GPG_KEY_CONTENT="${GPG_KEY_CONTENT//%/%25}"
           GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\r'/%0D}"
           GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\n'/%0A}"
@@ -161,6 +156,13 @@ jobs:
             echo "::error::Failed to mask GPG key"
             exit 1
           fi
+          
+          # Now safe to store in environment (already masked)
+          {
+            echo "GPG_KEY_CONTENT<<GPG_EOF"
+            echo "$GPG_KEY_CONTENT"
+            echo "GPG_EOF"
+          } >> $GITHUB_ENV
 
       - name: Import GPG key
         id: import_gpg

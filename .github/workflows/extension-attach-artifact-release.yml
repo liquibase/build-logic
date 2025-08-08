@@ -500,23 +500,17 @@ jobs:
   
       - name: Convert escaped newlines and set GPG key
         run: |
-          # Capture GPG key and immediately mask it to prevent exposure
           GPG_KEY_CONTENT="$(printf '%b' "${{ env.GPG_SECRET }}")"
-          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//%/%25}"
-          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\r'/%0D}"
-          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\n'/%0A}"
-          if ! echo "::add-mask::${GPG_KEY_CONTENT}"; then
-            echo "::error::Failed to mask GPG key"
-            exit 1
-          fi
-          
-          # Now safe to store in environment (already masked)
           {
             echo "GPG_KEY_CONTENT<<GPG_EOF"
             echo "$GPG_KEY_CONTENT"
             echo
             echo "GPG_EOF"
           } >> $GITHUB_ENV
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//%/%25}"
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\r'/%0D}"
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\n'/%0A}"
+          echo "::add-mask::${GPG_KEY_CONTENT}"
 
       - name: Import GPG key
         id: import_gpg

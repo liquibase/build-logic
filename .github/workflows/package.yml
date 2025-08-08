@@ -196,15 +196,17 @@ jobs:
       - name: Install deb-s3 gem
         run: gem install deb-s3
 
+      - name: Import GPG key for deb signing
+        if: ${{ inputs.dry_run == false }}
+        id: import_gpg_deb
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
+          passphrase: ${{ env.GPG_PASSPHRASE }}
+
       - name: Upload ${{ inputs.artifactId }} deb package
         if: ${{ inputs.dry_run == false }}
         run: |
-          sudo apt install pinentry-tty
-          echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
-          export GPG_TTY=$(tty)
-          echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
-          
           # Debug: List available GPG keys
           echo "Available GPG keys:"
           gpg --list-secret-keys --keyid-format LONG
@@ -213,17 +215,26 @@ jobs:
           ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using key ID: $ACTUAL_KEY_ID"
           
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          # Create temporary passphrase file securely (not logged)
+          echo "${{ env.GPG_PASSPHRASE }}" > /tmp/gpg_passphrase
+          chmod 600 /tmp/gpg_passphrase
+          
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file /tmp/gpg_passphrase \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          
+          # Securely clean up passphrase file
+          rm -f /tmp/gpg_passphrase
+
+      - name: Import GPG key for dry-run deb signing
+        if: ${{ inputs.dry_run == true }}
+        id: import_gpg_deb_dryrun
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
+          passphrase: ${{ env.GPG_PASSPHRASE }}
 
       - name: Upload ${{ inputs.artifactId }} dry-run deb package
         if: ${{ inputs.dry_run == true }}
         run: |
-          sudo apt install pinentry-tty
-          echo "2" | sudo update-alternatives --config pinentry
-          echo "${{ env.GPG_KEY_CONTENT }}" | gpg --batch --import --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}"
-          export GPG_TTY=$(tty)
-          echo '${{ env.GPG_PASSPHRASE }}' > pass.txt
-          
           # Debug: List available GPG keys
           echo "Available GPG keys:"
           gpg --list-secret-keys --keyid-format LONG
@@ -232,7 +243,14 @@ jobs:
           ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using key ID: $ACTUAL_KEY_ID"
           
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file pass.txt \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          # Create temporary passphrase file securely (not logged)
+          echo "${{ env.GPG_PASSPHRASE }}" > /tmp/gpg_passphrase
+          chmod 600 /tmp/gpg_passphrase
+          
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file /tmp/gpg_passphrase \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          
+          # Securely clean up passphrase file
+          rm -f /tmp/gpg_passphrase
 
       - name: Convert deb to rpm
         run: |

@@ -102,9 +102,12 @@ jobs:
             echo "GPG_EOF"
           } >> $GITHUB_ENV
           GPG_KEY_CONTENT="${GPG_KEY_CONTENT//%/%25}"
-          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//'\r'/%0D}"
-          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//'\n'/%0A}"
-          echo "::add-mask::${GPG_KEY_CONTENT}"
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\r'/%0D}"
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\n'/%0A}"
+          if ! echo "::add-mask::${GPG_KEY_CONTENT}"; then
+            echo "::error::Failed to mask GPG key"
+            exit 1
+          fi
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4

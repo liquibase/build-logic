@@ -155,9 +155,12 @@ jobs:
             echo "GPG_EOF"
           } >> $GITHUB_ENV
           GPG_KEY_CONTENT="${GPG_KEY_CONTENT//%/%25}"
-          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//'\r'/%0D}"
-          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//'\n'/%0A}"
-          echo "::add-mask::${GPG_KEY_CONTENT}"
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\r'/%0D}"
+          GPG_KEY_CONTENT="${GPG_KEY_CONTENT//$'\n'/%0A}"
+          if ! echo "::add-mask::${GPG_KEY_CONTENT}"; then
+            echo "::error::Failed to mask GPG key"
+            exit 1
+          fi
 
       - name: Import GPG key
         id: import_gpg
@@ -216,13 +219,14 @@ jobs:
           echo "Using key ID: $ACTUAL_KEY_ID"
           
           # Create temporary passphrase file securely (not logged)
-          echo "${{ env.GPG_PASSPHRASE }}" > /tmp/gpg_passphrase
-          chmod 600 /tmp/gpg_passphrase
+          TEMP_PASSPHRASE_FILE=$(mktemp)
+          echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
+          chmod 600 "$TEMP_PASSPHRASE_FILE"
           
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file /tmp/gpg_passphrase \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
           
           # Securely clean up passphrase file
-          rm -f /tmp/gpg_passphrase
+          rm -f "$TEMP_PASSPHRASE_FILE"
 
       - name: Import GPG key for dry-run deb signing
         if: ${{ inputs.dry_run == true }}
@@ -244,13 +248,14 @@ jobs:
           echo "Using key ID: $ACTUAL_KEY_ID"
           
           # Create temporary passphrase file securely (not logged)
-          echo "${{ env.GPG_PASSPHRASE }}" > /tmp/gpg_passphrase
-          chmod 600 /tmp/gpg_passphrase
+          TEMP_PASSPHRASE_FILE=$(mktemp)
+          echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
+          chmod 600 "$TEMP_PASSPHRASE_FILE"
           
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file /tmp/gpg_passphrase \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
           
           # Securely clean up passphrase file
-          rm -f /tmp/gpg_passphrase
+          rm -f "$TEMP_PASSPHRASE_FILE"
 
       - name: Convert deb to rpm
         run: |

@@ -6,8 +6,8 @@ on:
   workflow_call:
     inputs:
       github-token:
-        description: 'GitHub App token with bypass permissions'
-        required: true
+        description: 'GitHub App token with bypass permissions (optional - falls back to GITHUB_TOKEN)'
+        required: false
         type: string
 
 jobs:
@@ -40,5 +40,5 @@ jobs:
         env:
           # The URL of the PR to be merged and approved
           PR_URL: ${{github.event.pull_request.html_url}}
-          # Use GitHub App token with bypass permissions
-          GITHUB_TOKEN: ${{ inputs.github-token }}
+          # Use GitHub App token if provided, otherwise fall back to default GITHUB_TOKEN
+          GITHUB_TOKEN: ${{ inputs.github-token || secrets.GITHUB_TOKEN }}

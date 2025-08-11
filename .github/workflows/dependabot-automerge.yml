@@ -4,6 +4,11 @@ name: Automerge Dependabot PRs
 # The event that triggers the workflow
 on:
   workflow_call:
+    inputs:
+      github-token:
+        description: 'GitHub App token with bypass permissions'
+        required: true
+        type: string
 
 jobs:
   dependabot:
@@ -35,5 +40,5 @@ jobs:
         env:
           # The URL of the PR to be merged and approved
           PR_URL: ${{github.event.pull_request.html_url}}
-          # The GitHub token secret
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          # Use GitHub App token with bypass permissions
+          GITHUB_TOKEN: ${{ inputs.github-token }}

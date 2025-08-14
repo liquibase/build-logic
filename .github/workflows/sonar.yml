@@ -8,11 +8,13 @@ jobs:
     permissions:
       id-token: write
       contents: read
+
     steps:
       - uses: actions/checkout@v4
         with:
-          # Disabling shallow clones is recommended for improving the relevancy of reporting
           fetch-depth: 0
+
+      # -------- Build on Java 8 --------
       - name: Set up JDK 8
         uses: actions/setup-java@v4
         with:
@@ -32,9 +34,8 @@ jobs:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
-          
-      # look for dependencies in maven
-      - name: maven-settings-xml-action
+
+      - name: Configure Maven repositories (for private deps)
         uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |
@@ -42,13 +43,8 @@ jobs:
               {
                 "id": "premier-api",
                 "url": "https://maven.pkg.github.com/liquibase/premier-api",
-                "releases": {
-                  "enabled": "true"
-                },
-                "snapshots": {
-                  "enabled": "true",
-                  "updatePolicy": "always"
-                }
+                "releases": {"enabled":"true"},
+                "snapshots": {"enabled":"true","updatePolicy":"always"}
               }
             ]
           servers: |
@@ -59,21 +55,37 @@ jobs:
                 "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
-          
-      - name: Cache SonarQube packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-          
+
       - name: Cache Maven packages
         uses: actions/cache@v4
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
-      - name: Build and analyze
+
+      - name: Build (Java 8 toolchain)
+        run: |
+          # If your POM isn't already set, you can enforce Java 8 bytecode with:
+          # mvn -B -V -DskipTests verify -Dmaven.compiler.release=8
+          mvn -B -V verify
+
+      # -------- Switch to Java 17 just for Sonar --------
+      - name: Set up JDK 17 (for Sonar)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Run Sonar analysis (Java 17 runtime)
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:3.9.1.2184:sonar -Dsonar.projectKey=liquibase_liquibase-io-runner
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+        run: |
+          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:3.9.1.2184:sonar \
+            -Dsonar.projectKey=liquibase_liquibase-io-runner

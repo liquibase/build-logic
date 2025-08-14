@@ -63,7 +63,7 @@ jobs:
                 ]
               }
             ]
-          active-profiles: |
+         active_profiles: |
             [ "use-gh-packages" ]
 
       - name: Cache Maven packages
@@ -113,7 +113,7 @@ jobs:
                 ]
               }
             ]
-          active-profiles: |
+         active_profiles: |
             [ "use-gh-packages" ]
 
       - name: Cache SonarQube packages

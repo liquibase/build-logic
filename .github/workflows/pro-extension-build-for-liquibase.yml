@@ -60,16 +60,6 @@ on:
         required: true
         description: "Branch to check out"
         type: string
-    secrets:
-      SONAR_TOKEN:
-        description: "SONAR_TOKEN from the caller workflow"
-        required: true
-      PRO_LICENSE_KEY:
-        description: "PRO_LICENSE_KEY from the caller workflow"
-        required: true
-      AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA:
-        description: "OIDC Role from the caller workflow"
-        required: true
 
 permissions:
   id-token: write

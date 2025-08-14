@@ -13,10 +13,6 @@ on:
         required: false
         default: "."
         type: string
-    secrets:
-      SONAR_TOKEN:
-        description: "SONAR_TOKEN from the caller workflow"
-        required: true
 
 permissions:
   contents: read

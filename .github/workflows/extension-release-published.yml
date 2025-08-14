@@ -41,13 +41,6 @@ on:
         description: "The release id of the dry-run release"
         required: false
         type: string
-    secrets:
-      SONATYPE_USERNAME:
-        description: "SONATYPE_USERNAME from the caller workflow"
-        required: true
-      SONATYPE_TOKEN:
-        description: "SONATYPE_TOKEN from the caller workflow"
-        required: true
 
 permissions:
   contents: write

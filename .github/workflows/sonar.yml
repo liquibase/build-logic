@@ -38,33 +38,16 @@ jobs:
           parse-json-secrets: true
 
       # Apply Maven settings for private GitHub Packages repo (for the BUILD)
-      - name: Configure Maven (GitHub Packages) - JDK 8
+      - name: Configure Maven (GitHub Packages)
         uses: whelk-io/maven-settings-xml-action@v22
         with:
           servers: |
-            [
-              {
-                "id": "premier-api",
-                "username": "liquibot",
-                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
-              }
-            ]
+            [{"id":"premier-api","username":"liquibot","password":"${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"}]
           profiles: |
-            [
-              {
-                "id": "use-gh-packages",
-                "repositories": [
-                  {
-                    "id": "premier-api",
-                    "url": "https://maven.pkg.github.com/liquibase/premier-api",
-                    "releases": { "enabled": "true" },
-                    "snapshots": { "enabled": "true", "updatePolicy": "always" }
-                  }
-                ]
-              }
-            ]
+            [{"id":"use-gh-packages","repositories":[{"id":"premier-api","url":"https://maven.pkg.github.com/liquibase/premier-api","releases":{"enabled":"true"},"snapshots":{"enabled":"true","updatePolicy":"always"}}]}]
           active_profiles: |
-                [ "use-gh-packages" ]
+            ["use-gh-packages"]
+
 
       - name: Cache Maven packages
         uses: actions/cache@v4
@@ -92,29 +75,11 @@ jobs:
         uses: whelk-io/maven-settings-xml-action@v22
         with:
           servers: |
-            [
-              {
-                "id": "premier-api",
-                "username": "liquibot",
-                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
-              }
-            ]
+            [{"id":"premier-api","username":"liquibot","password":"${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"}]
           profiles: |
-            [
-              {
-                "id": "use-gh-packages",
-                "repositories": [
-                  {
-                    "id": "premier-api",
-                    "url": "https://maven.pkg.github.com/liquibase/premier-api",
-                    "releases": { "enabled": "true" },
-                    "snapshots": { "enabled": "true", "updatePolicy": "always" }
-                  }
-                ]
-              }
-            ]
+            [{"id":"use-gh-packages","repositories":[{"id":"premier-api","url":"https://maven.pkg.github.com/liquibase/premier-api","releases":{"enabled":"true"},"snapshots":{"enabled":"true","updatePolicy":"always"}}]}]
           active_profiles: |
-              [ "use-gh-packages" ]
+            ["use-gh-packages"]
 
       - name: Cache SonarQube packages
         uses: actions/cache@v4

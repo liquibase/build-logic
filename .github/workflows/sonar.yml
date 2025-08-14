@@ -20,8 +20,8 @@ jobs:
         with:
           java-version: '8'
           distribution: 'temurin'
-          # keep setup-java from writing/overwriting ~/.m2/settings.xml
           overwrite-settings: false
+          token: ""  # prevent setup-java from overwriting settings.xml
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -48,7 +48,6 @@ jobs:
           active_profiles: |
             ["use-gh-packages"]
 
-
       - name: Cache Maven packages
         uses: actions/cache@v4
         with:
@@ -58,7 +57,6 @@ jobs:
 
       - name: Build (Java 8 toolchain)
         run: |
-          # If needed, enforce Java 8 bytecode: -Dmaven.compiler.release=8
           mvn -B -V -U verify
 
       # -------- Switch to Java 17 just for Sonar --------
@@ -67,8 +65,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          # keep setup-java from writing/overwriting ~/.m2/settings.xml
           overwrite-settings: false
+          token: ""  # prevent setup-java from overwriting settings.xml
 
       # Re-apply Maven settings AFTER the JDK switch to ensure they aren't clobbered
       - name: Re-configure Maven settings (ensure not overwritten)

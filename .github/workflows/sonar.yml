@@ -33,6 +33,33 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
           
+      # look for dependencies in maven
+      - name: maven-settings-xml-action
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          repositories: |
+            [
+              {
+                "id": "premier-api",
+                "url": "https://maven.pkg.github.com/liquibase/premier-api",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "premier-api",
+                "username": "liquibot",
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
+              }
+            ]
+          
       - name: Cache SonarQube packages
         uses: actions/cache@v4
         with:

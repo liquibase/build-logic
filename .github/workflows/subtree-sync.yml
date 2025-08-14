@@ -35,10 +35,6 @@ on:
         description: 'Environment variable name containing the Slack webhook URL'
         required: true
         type: string
-    secrets:
-      LIQUIBASE_VAULT_OIDC_ROLE_ARN:
-        description: 'AWS role ARN for vault access'
-        required: true
 
 permissions:
   contents: write

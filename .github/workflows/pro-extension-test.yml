@@ -69,35 +69,6 @@ on:
         default: ""
         type: string
 
-    secrets:
-      SONAR_TOKEN:
-        description: "SONAR_TOKEN from the caller workflow"
-        required: true
-      PRO_LICENSE_KEY:
-        description: "PRO_LICENSE_KEY from the caller workflow"
-        required: true
-      AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA:
-        description: "OIDC Role from the caller workflow"
-        required: true
-      AZURE_TENANT_ID:
-        description: "Azure Active Directory (AD) tenant ID."
-        required: false
-      AZURE_CLIENT_SECRET:
-        description: "Secret key for Azure authentication."
-        required: false
-      AZURE_CLIENT_ID:
-        description: "Client ID for Azure service authentication."
-        required: false
-      LIQUIBASE_AZURE_STORAGE_ACCOUNT:
-        description: "Azure Storage Account name for Liquibase."
-        required: false
-      VAULT_ROLE_ID:
-        description: "Role ID for HashiCorp Vault authentication."
-        required: false
-      VAULT_SECRET_ID:
-        description: "Secret ID for HashiCorp Vault authentication."
-        required: false
-
 permissions:
   contents: write
   id-token: write

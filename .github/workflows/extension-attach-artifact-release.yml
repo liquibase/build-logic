@@ -64,13 +64,6 @@ on:
         required: false
         default: "17"
         type: string
-    secrets:
-      GPG_SECRET:
-        description: "GPG_SECRET from the caller workflow"
-        required: true
-      GPG_PASSPHRASE:
-        description: "GPG_PASSPHRASE from the caller workflow"
-        required: true
 
 jobs:
   build-multi-architecture:

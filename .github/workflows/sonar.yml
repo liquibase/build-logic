@@ -63,7 +63,7 @@ jobs:
                 ]
               }
             ]
-             active_profiles: |
+          active_profiles: |
                 [ "use-gh-packages" ]
 
       - name: Cache Maven packages
@@ -113,8 +113,8 @@ jobs:
                 ]
               }
             ]
-             active_profiles: |
-                [ "use-gh-packages" ]
+          active_profiles: |
+              [ "use-gh-packages" ]
 
       - name: Cache SonarQube packages
         uses: actions/cache@v4

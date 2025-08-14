@@ -20,6 +20,8 @@ jobs:
         with:
           java-version: '8'
           distribution: 'temurin'
+          # keep setup-java from writing/overwriting ~/.m2/settings.xml
+          overwrite-settings: false
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -35,18 +37,10 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
 
-      - name: Configure Maven repositories (for private deps)
+      # Apply Maven settings for private GitHub Packages repo (for the BUILD)
+      - name: Configure Maven (GitHub Packages) - JDK 8
         uses: whelk-io/maven-settings-xml-action@v22
         with:
-          repositories: |
-            [
-              {
-                "id": "premier-api",
-                "url": "https://maven.pkg.github.com/liquibase/premier-api",
-                "releases": {"enabled":"true"},
-                "snapshots": {"enabled":"true","updatePolicy":"always"}
-              }
-            ]
           servers: |
             [
               {
@@ -55,6 +49,22 @@ jobs:
                 "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
+          profiles: |
+            [
+              {
+                "id": "use-gh-packages",
+                "repositories": [
+                  {
+                    "id": "premier-api",
+                    "url": "https://maven.pkg.github.com/liquibase/premier-api",
+                    "releases": { "enabled": "true" },
+                    "snapshots": { "enabled": "true", "updatePolicy": "always" }
+                  }
+                ]
+              }
+            ]
+          active-profiles: |
+            [ "use-gh-packages" ]
 
       - name: Cache Maven packages
         uses: actions/cache@v4
@@ -65,9 +75,8 @@ jobs:
 
       - name: Build (Java 8 toolchain)
         run: |
-          # If your POM isn't already set, you can enforce Java 8 bytecode with:
-          # mvn -B -V -DskipTests verify -Dmaven.compiler.release=8
-          mvn -B -V verify
+          # If needed, enforce Java 8 bytecode: -Dmaven.compiler.release=8
+          mvn -B -V -U verify
 
       # -------- Switch to Java 17 just for Sonar --------
       - name: Set up JDK 17 (for Sonar)
@@ -75,6 +84,37 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          # keep setup-java from writing/overwriting ~/.m2/settings.xml
+          overwrite-settings: false
+
+      # Re-apply Maven settings AFTER the JDK switch to ensure they aren't clobbered
+      - name: Re-configure Maven settings (ensure not overwritten)
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          servers: |
+            [
+              {
+                "id": "premier-api",
+                "username": "liquibot",
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
+              }
+            ]
+          profiles: |
+            [
+              {
+                "id": "use-gh-packages",
+                "repositories": [
+                  {
+                    "id": "premier-api",
+                    "url": "https://maven.pkg.github.com/liquibase/premier-api",
+                    "releases": { "enabled": "true" },
+                    "snapshots": { "enabled": "true", "updatePolicy": "always" }
+                  }
+                ]
+              }
+            ]
+          active-profiles: |
+            [ "use-gh-packages" ]
 
       - name: Cache SonarQube packages
         uses: actions/cache@v4
@@ -85,7 +125,8 @@ jobs:
 
       - name: Run Sonar analysis (Java 17 runtime)
         env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # SONAR_HOST_URL: https://sonarcloud.io   # set if needed
         run: |
           mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:3.9.1.2184:sonar \
             -Dsonar.projectKey=liquibase_liquibase-io-runner

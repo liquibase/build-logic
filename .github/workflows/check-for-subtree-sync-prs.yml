@@ -11,7 +11,13 @@ jobs:
     name: Check for open subtree sync PRs
     runs-on: ubuntu-latest
     steps:
+      - name: Skip check if PR creator is dependabot
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        run: |
+          echo "Skipping check because this PR was created by dependabot"
+          
       - name: Check for open subtree sync PRs
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         run: |
           echo "Checking for open subtree sync PRs in $GITHUB_REPOSITORY..."
           open_prs=$(gh pr list --repo liquibase/liquibase-pro --head core-subtree-updates --state open --json title,url \

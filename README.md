@@ -566,8 +566,8 @@ For operations that require cross-repository access or elevated permissions with
   id: get-token
   uses: actions/create-github-app-token@v2
   with:
-    app-id: ${{ secrets.LIQUIBASE_GITHUB_APP_ID }}
-    private-key: ${{ secrets.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+    app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+    private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
     owner: ${{ github.repository_owner }}
     permission-contents: read
     permission-packages: write
@@ -620,7 +620,7 @@ While we minimize their use, PATs are sometimes necessary for specific scenarios
         {
           "id": "github",
           "username": "${{ github.actor }}",
-          "password": "${{ secrets.LIQUIBOT_PAT_GPM_ACCESS }}"
+          "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
         }
       ]
 ```

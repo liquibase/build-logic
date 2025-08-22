@@ -203,6 +203,11 @@ jobs:
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql ${{ inputs.aws_mysql }}
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_redshift ${{ inputs.aws_redshift }}
+          # Taint the LTHDB database resource to force recreation (ignore errors if resource doesn't exist)
+          if [[ "${{ inputs.snowflake_pro }}" == "true" || "${{ inputs.snowflake_th }}" == "true" ]]; then
+            echo "Tainting LTHDB database resource to ensure clean state..."
+            spacectl stack task --id $EPHEMERAL_STACK_ID --command "terraform taint 'snowflake_database.LIQUIBASETH_ORIGINAL[0]'" || echo "Resource doesn't exist or already tainted, continuing..."
+          fi
           spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
 
       - name: Destroy ephemeral infra

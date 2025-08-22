@@ -151,8 +151,15 @@ jobs:
           mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
           curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/control
           curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postinst
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postrm https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postrm
           curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-          curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
+          
+          # Download appropriate pom.xml based on formula_name
+          if [ "${{ inputs.formula_name }}" = "liquibase-secure" ]; then
+            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom-secure.xml
+          else
+            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
+          fi
           curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
           chmod +x $PWD/.github/sign_artifact.sh
 

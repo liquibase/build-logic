@@ -534,6 +534,14 @@ jobs:
       dry_run: ${{ inputs.dry_run }}
       dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
+  upload_windows_secure_package:
+    uses: liquibase/liquibase-secure-chocolatey/.github/workflows/deploy-package.yml@master
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+      dry_run: ${{ inputs.dry_run }}
+      dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
+
   upload_ansible_role:
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
     secrets: inherit

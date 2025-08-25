@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# unset LIQUIBASE_HOME
+unset LIQUIBASE_HOME

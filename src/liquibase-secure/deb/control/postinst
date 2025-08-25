@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Define LIQUIBASE_HOME for liquibase-secure
+LIQUIBASE_HOME="/opt/liquibase"

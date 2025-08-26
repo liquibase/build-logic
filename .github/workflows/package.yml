@@ -197,7 +197,7 @@ jobs:
           if [ "${{ inputs.formula_name }}" = "liquibase-secure" ]; then
             # Download from S3 for liquibase-secure
             wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz \
-              ${{ inputs.download_base_url }}/${{ inputs.version }}/liquibase-pro-${{ inputs.version }}.tar.gz
+              ${{ inputs.download_base_url }}/${{ inputs.version }}/liquibase-secure-${{ inputs.version }}.tar.gz
           else
             # Download from GitHub for liquibase (community)
             wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz \
@@ -391,7 +391,7 @@ jobs:
           formula-path: Formula/l/${{ inputs.formula_name }}.rb
           homebrew-tap: Homebrew/homebrew-core
           tag-name: ${{ inputs.version }}
-          download-url: ${{ inputs.formula_name == 'liquibase-secure' && format('{0}/{1}/liquibase-pro-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/v{1}/{2}-{1}.tar.gz', inputs.download_base_url, inputs.version, inputs.artifactId) }}
+          download-url: ${{ inputs.formula_name == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/v{1}/{2}-{1}.tar.gz', inputs.download_base_url, inputs.version, inputs.artifactId) }}
           commit-message: |
             {{formulaName}} {{version}}
 

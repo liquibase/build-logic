@@ -383,118 +383,118 @@ jobs:
           # Echo it immediately to see the value in logs
           echo "PR_EXISTS is set to $PR_EXISTS"
 
-      - name: Update Homebrew formula for ${{ inputs.distribution }}
-        if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
-        uses: mislav/bump-homebrew-formula-action@v3
-        with:
-          formula-name: ${{ inputs.distribution }}
-          formula-path: Formula/l/${{ inputs.distribution }}.rb
-          homebrew-tap: Homebrew/homebrew-core
-          tag-name: ${{ inputs.version }}
-          download-url: ${{ inputs.distribution == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/v{1}/{2}-{1}.tar.gz', inputs.download_base_url, inputs.version, inputs.artifactId) }}
-          commit-message: |
-            {{formulaName}} {{version}}
+      # - name: Update Homebrew formula for ${{ inputs.distribution }}
+      #   if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+      #   uses: mislav/bump-homebrew-formula-action@v3
+      #   with:
+      #     formula-name: ${{ inputs.distribution }}
+      #     formula-path: Formula/l/${{ inputs.distribution }}.rb
+      #     homebrew-tap: Homebrew/homebrew-core
+      #     tag-name: ${{ inputs.version }}
+      #     download-url: ${{ inputs.distribution == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/v{1}/{2}-{1}.tar.gz', inputs.download_base_url, inputs.version, inputs.artifactId) }}
+      #     commit-message: |
+      #       {{formulaName}} {{version}}
 
-            Created by https://github.com/mislav/bump-homebrew-formula-action
-        env:
-          COMMITTER_TOKEN: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
+      #       Created by https://github.com/mislav/bump-homebrew-formula-action
+      #   env:
+      #     COMMITTER_TOKEN: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
 
       # This step captures the PR details after it has been created
       # and stores the PR number and URL in GitHub outputs for later use.
       # This is useful for tracking the PR status and creating a tracking issue.
-      - name: Capture Homebrew PR Details
-        if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
-        id: capture-pr
-        run: |
-          # Wait briefly for PR to be created
-          sleep 30
+      # - name: Capture Homebrew PR Details
+      #   if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+      #   id: capture-pr
+      #   run: |
+      #     # Wait briefly for PR to be created
+      #     sleep 30
           
-          # Search for the PR
-          PR_DATA=$(gh api graphql -f query='
-          query($search_query: String!) {
-            search(query: $search_query, type: ISSUE, first: 1) { 
-              nodes {               
-                ... on PullRequest {
-                  url,
-                  number
-                }
-              }
-            }
-          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
+      #     # Search for the PR
+      #     PR_DATA=$(gh api graphql -f query='
+      #     query($search_query: String!) {
+      #       search(query: $search_query, type: ISSUE, first: 1) { 
+      #         nodes {               
+      #           ... on PullRequest {
+      #             url,
+      #             number
+      #           }
+      #         }
+      #       }
+      #     }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
           
-          if [ ! -z "$PR_DATA" ]; then
-            echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
-            echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
-            echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     if [ ! -z "$PR_DATA" ]; then
+      #       echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
+      #       echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
+      #       echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
+      #     fi
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             
-      - name: Update SDKMAN version for ${{ inputs.artifactId }}
-        if: ${{ inputs.dry_run == false }}
-        env:
-          SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
-          SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
-          VERSION: ${{ inputs.version }}
-          S3_WEB_URL: https://repo.liquibase.com/sdkman
-          S3_BUCKET: s3://repo.liquibase.com/sdkman/
-        run: |
-          wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
-          mkdir -p liquibase-$VERSION/bin/internal
-          unzip liquibase-$VERSION.zip -d liquibase-$VERSION
-          rm -rf liquibase-$VERSION.zip
-          mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
-          mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
-          zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
-          # Upload the release to S3
-          aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
-          echo "Uploaded liquibase-$VERSION.zip to s3"
-          # Send the release to SDKMAN
-          curl -s -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "'"$S3_WEB_URL"'/liquibase-'"$VERSION"'.zip"}' \
-          https://vendors.sdkman.io/release
-          echo "Sent liquibase-$VERSION.zip to SDKMAN"
-          # Set the default version for SDKMAN
-          curl -s -X PUT \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "'"$VERSION"'"}' \
-          https://vendors.sdkman.io/default
-          echo "Set liquibase-$VERSION.zip as default version for SDKMAN"
-          # Announce the release to SDKMAN
-          curl -s -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
-          https://vendors.sdkman.io/announce/struct
-          echo "Announced liquibase-$VERSION.zip to SDKMAN"
+      # - name: Update SDKMAN version for ${{ inputs.artifactId }}
+      #   if: ${{ inputs.dry_run == false }}
+      #   env:
+      #     SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
+      #     SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
+      #     VERSION: ${{ inputs.version }}
+      #     S3_WEB_URL: https://repo.liquibase.com/sdkman
+      #     S3_BUCKET: s3://repo.liquibase.com/sdkman/
+      #   run: |
+      #     wget -q https://github.com/liquibase/liquibase/releases/download/v$VERSION/liquibase-$VERSION.zip
+      #     mkdir -p liquibase-$VERSION/bin/internal
+      #     unzip liquibase-$VERSION.zip -d liquibase-$VERSION
+      #     rm -rf liquibase-$VERSION.zip
+      #     mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
+      #     mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
+      #     zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
+      #     # Upload the release to S3
+      #     aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
+      #     echo "Uploaded liquibase-$VERSION.zip to s3"
+      #     # Send the release to SDKMAN
+      #     curl -s -X POST \
+      #     -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+      #     -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+      #     -H "Content-Type: application/json" \
+      #     -H "Accept: application/json" \
+      #     -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "'"$S3_WEB_URL"'/liquibase-'"$VERSION"'.zip"}' \
+      #     https://vendors.sdkman.io/release
+      #     echo "Sent liquibase-$VERSION.zip to SDKMAN"
+      #     # Set the default version for SDKMAN
+      #     curl -s -X PUT \
+      #     -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+      #     -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+      #     -H "Content-Type: application/json" \
+      #     -H "Accept: application/json" \
+      #     -d '{"candidate": "liquibase", "version": "'"$VERSION"'"}' \
+      #     https://vendors.sdkman.io/default
+      #     echo "Set liquibase-$VERSION.zip as default version for SDKMAN"
+      #     # Announce the release to SDKMAN
+      #     curl -s -X POST \
+      #     -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+      #     -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+      #     -H "Content-Type: application/json" \
+      #     -H "Accept: application/json" \
+      #     -d '{"candidate": "liquibase", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
+      #     https://vendors.sdkman.io/announce/struct
+      #     echo "Announced liquibase-$VERSION.zip to SDKMAN"
 
-      - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
-        if: ${{ inputs.dry_run == true }}
-        env:
-          SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
-          SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
-          VERSION: ${{ inputs.version }}
-          S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
-          S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
-        run: |
-          mkdir -p liquibase-$VERSION/bin/internal
-          unzip .github/target/liquibase-$VERSION.zip -d liquibase-$VERSION
-          rm -rf liquibase-$VERSION.zip
-          mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
-          mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
-          zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
-          # Upload the release to S3
-          aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
-          echo "Uploaded liquibase-$VERSION.zip to s3"
+      # - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
+      #   if: ${{ inputs.dry_run == true }}
+      #   env:
+      #     SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
+      #     SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
+      #     VERSION: ${{ inputs.version }}
+      #     S3_WEB_URL: https://s3.amazonaws.com/repo.liquibase.com.dry.run/sdkman
+      #     S3_BUCKET: s3://repo.liquibase.com.dry.run/sdkman/
+      #   run: |
+      #     mkdir -p liquibase-$VERSION/bin/internal
+      #     unzip .github/target/liquibase-$VERSION.zip -d liquibase-$VERSION
+      #     rm -rf liquibase-$VERSION.zip
+      #     mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
+      #     mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
+      #     zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
+      #     # Upload the release to S3
+      #     aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
+      #     echo "Uploaded liquibase-$VERSION.zip to s3"
           
   # create a placeholder branch to check if tracking branch exists for this version
   # Branch is created when package is submitted to Homebrew and SDKMAN
@@ -560,13 +560,13 @@ jobs:
             echo "Homebrew tracking branch already exists or PR number not available, skipping creation"
           fi
 
-  upload_windows_package:
-    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-      dry_run: ${{ inputs.dry_run }}
-      dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
+  # upload_windows_package:
+  #   uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
+  #   secrets: inherit
+  #   with:
+  #     version: ${{ inputs.version }}
+  #     dry_run: ${{ inputs.dry_run }}
+  #     dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   upload_ansible_role:
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main

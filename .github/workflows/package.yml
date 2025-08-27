@@ -147,12 +147,19 @@ jobs:
       - name: Get Reusable Files
         run: |
           # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
+          # Determine the correct source directory based on distribution
+          if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
+            SRC_DIR="liquibase-secure"
+          else
+            SRC_DIR="${{ inputs.artifactId }}"
+          fi
+          
           mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
           mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/control
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postinst
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postrm https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postrm
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/control
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/postinst
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postrm https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/postrm
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/main/archive/${SRC_DIR}-env.sh
 
           # Download appropriate pom.xml based on distribution
           if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then

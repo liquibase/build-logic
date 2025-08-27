@@ -569,7 +569,7 @@ jobs:
   #     dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   upload_ansible_role:
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@DAT-20702
     secrets: inherit
     with:
       version: ${{ inputs.version }}

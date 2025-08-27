@@ -291,12 +291,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y alien
           sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          # Find the actual generated RPM file (alien may change naming)
+          RPM_FILE=$(ls -1 *.rpm 2>/dev/null | head -1)
+          if [ -n "$RPM_FILE" ]; then
+            echo "Generated RPM: $RPM_FILE"
+            echo "RPM_FILENAME=$RPM_FILE" >> $GITHUB_ENV
+          else
+            echo "Error: No RPM file found after conversion"
+            exit 1
+          fi
 
       - name: Upload ${{ inputs.artifactId }} rpm package
         if: ${{ inputs.dry_run == false }}
         run: |
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-          ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+          ./.github/sign_artifact.sh "${{ env.RPM_FILENAME }}"
           mkdir -p createrepo_folder
           cd createrepo_folder
           git clone https://github.com/rpm-software-management/createrepo_c
@@ -322,7 +331,10 @@ jobs:
           cd ../../..
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
+          mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
+          if [ -f "${{ env.RPM_FILENAME }}.asc" ]; then
+            mv "${{ env.RPM_FILENAME }}.asc" $PWD/yum/noarch/
+          fi
           /opt/createrepo -dp $PWD/yum/noarch
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
           aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
@@ -330,11 +342,10 @@ jobs:
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
         if: ${{ inputs.dry_run == true }}
         run: |
-          original_file=$(basename "$(find . -maxdepth 1 -name "*.rpm")")
-          new_name=$(echo "$original_file" | sed 's/+/-/g')
-          mv "$original_file" "$new_name"
+          # Use the RPM filename from the previous step
+          echo "Using RPM file: ${{ env.RPM_FILENAME }}"
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-          ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+          ./.github/sign_artifact.sh "${{ env.RPM_FILENAME }}"
           mkdir -p createrepo_folder
           cd createrepo_folder
           git clone https://github.com/rpm-software-management/createrepo_c
@@ -360,7 +371,10 @@ jobs:
           cd ../../..
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
-          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
+          mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
+          if [ -f "${{ env.RPM_FILENAME }}.asc" ]; then
+            mv "${{ env.RPM_FILENAME }}.asc" $PWD/yum/noarch/
+          fi
           /opt/createrepo -dp $PWD/yum/noarch
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum

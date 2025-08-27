@@ -30,6 +30,16 @@ on:
         description: "ID of the dry-run release"
         required: false
         type: string
+      distribution:
+        description: "liquibase or liquibase-secure"
+        required: false
+        type: string
+        default: "liquibase"
+      download_base_url:
+        description: "Base URL for downloading artifacts"
+        required: false
+        type: string
+        default: "https://github.com/liquibase/liquibase/releases/download"
         
   workflow_dispatch:
     inputs:
@@ -61,6 +71,16 @@ on:
         description: "ID of the dry-run release"
         required: false
         type: string
+      distribution:
+        description: "liquibase or liquibase-secure"
+        required: false
+        type: string
+        default: "liquibase"
+      download_base_url:
+        description: "Base URL for downloading artifacts"
+        required: false
+        type: string
+        default: "https://github.com/liquibase/liquibase/releases/download"
 
 env:
   MAVEN_VERSION: "3.9.5"
@@ -131,8 +151,15 @@ jobs:
           mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
           curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/control
           curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postinst
+          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postrm https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postrm
           curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-          curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
+          
+          # Download appropriate pom.xml based on distribution
+          if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
+            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom-secure.xml
+          else
+            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
+          fi
           curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
           chmod +x $PWD/.github/sign_artifact.sh
 
@@ -167,8 +194,15 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         run: |
           mkdir -p $PWD/.github/target
-          # Creating deb packages needs to get release assets from somewhere so be sure to follow this pattern in the artifact repo: https://github.com/liquibase/ARTIFACT_ID/releases/download/vVERSION/ARTIFACT_ID-VERSION.tar.gz
-          wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz https://github.com/liquibase/${{ inputs.artifactId }}/releases/download/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+          if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
+            # Download from S3 for liquibase-secure
+            wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz \
+              ${{ inputs.download_base_url }}/${{ inputs.version }}/liquibase-secure-${{ inputs.version }}.tar.gz
+          else
+            # Download from GitHub for liquibase (community)
+            wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz \
+              ${{ inputs.download_base_url }}/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+          fi
 
       - name: Download ${{ inputs.artifactId }} dry-run Release
         if: ${{ inputs.dry_run == true }}
@@ -324,14 +358,14 @@ jobs:
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
-      - name: Check for existing Homebrew formula PR for ${{ inputs.artifactId }}
+      - name: Check for existing Homebrew formula PR for ${{ inputs.distribution }}
         id: check-brew-pr
         run: |
           # Authenticate GitHub CLI
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
           # Define the PR title
-          pr_title="liquibase ${{ inputs.version }}"
+          pr_title="${{ inputs.distribution }} ${{ inputs.version }}"
 
           # Search for open pull requests with the specified title in the Homebrew/homebrew-core repo
           pr_title=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
@@ -349,15 +383,15 @@ jobs:
           # Echo it immediately to see the value in logs
           echo "PR_EXISTS is set to $PR_EXISTS"
 
-      - name: Update Homebrew formula for ${{ inputs.artifactId }}
+      - name: Update Homebrew formula for ${{ inputs.distribution }}
         if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         uses: mislav/bump-homebrew-formula-action@v3
         with:
-          formula-name: liquibase
-          formula-path: Formula/l/liquibase.rb
+          formula-name: ${{ inputs.distribution }}
+          formula-path: Formula/l/${{ inputs.distribution }}.rb
           homebrew-tap: Homebrew/homebrew-core
           tag-name: ${{ inputs.version }}
-          download-url: "https://github.com/liquibase/liquibase/releases/download/v${{ inputs.version }}/liquibase-${{ inputs.version }}.tar.gz"
+          download-url: ${{ inputs.distribution == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/v{1}/{2}-{1}.tar.gz', inputs.download_base_url, inputs.version, inputs.artifactId) }}
           commit-message: |
             {{formulaName}} {{version}}
 

@@ -40,7 +40,7 @@ on:
         required: false
         type: string
         default: "https://github.com/liquibase/liquibase/releases/download"
-        
+
   workflow_dispatch:
     inputs:
       groupId:
@@ -89,9 +89,9 @@ permissions:
   id-token: write
   contents: write
   pull-requests: write
-  issues: write       # Required for creating/updating issues
-  packages: write     # Required for package operations
-  actions: write      # Required for workflow operations
+  issues: write # Required for creating/updating issues
+  packages: write # Required for package operations
+  actions: write # Required for workflow operations
 
 jobs:
   upload_packages:
@@ -153,7 +153,7 @@ jobs:
           curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postinst
           curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postrm https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postrm
           curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-          
+
           # Download appropriate pom.xml based on distribution
           if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
             curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom-secure.xml
@@ -235,18 +235,18 @@ jobs:
           # Debug: List available GPG keys
           echo "Available GPG keys:"
           gpg --list-secret-keys --keyid-format LONG
-          
+
           # Get the actual key ID from the imported key
           ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using key ID: $ACTUAL_KEY_ID"
-          
+
           # Create temporary passphrase file securely (not logged)
           TEMP_PASSPHRASE_FILE=$(mktemp)
           echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
           chmod 600 "$TEMP_PASSPHRASE_FILE"
-          
+
           deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
-          
+
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
 
@@ -264,18 +264,18 @@ jobs:
           # Debug: List available GPG keys
           echo "Available GPG keys:"
           gpg --list-secret-keys --keyid-format LONG
-          
+
           # Get the actual key ID from the imported key
           ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using key ID: $ACTUAL_KEY_ID"
-          
+
           # Create temporary passphrase file securely (not logged)
           TEMP_PASSPHRASE_FILE=$(mktemp)
           echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
           chmod 600 "$TEMP_PASSPHRASE_FILE"
-          
+
           deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
-          
+
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
 
@@ -408,12 +408,12 @@ jobs:
       #   run: |
       #     # Wait briefly for PR to be created
       #     sleep 30
-          
+
       #     # Search for the PR
       #     PR_DATA=$(gh api graphql -f query='
       #     query($search_query: String!) {
-      #       search(query: $search_query, type: ISSUE, first: 1) { 
-      #         nodes {               
+      #       search(query: $search_query, type: ISSUE, first: 1) {
+      #         nodes {
       #           ... on PullRequest {
       #             url,
       #             number
@@ -421,7 +421,7 @@ jobs:
       #         }
       #       }
       #     }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
-          
+
       #     if [ ! -z "$PR_DATA" ]; then
       #       echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
       #       echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
@@ -429,7 +429,7 @@ jobs:
       #     fi
       #   env:
       #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            
+
       # - name: Update SDKMAN version for ${{ inputs.artifactId }}
       #   if: ${{ inputs.dry_run == false }}
       #   env:
@@ -495,7 +495,7 @@ jobs:
       #     # Upload the release to S3
       #     aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
       #     echo "Uploaded liquibase-$VERSION.zip to s3"
-          
+
   # create a placeholder branch to check if tracking branch exists for this version
   # Branch is created when package is submitted to Homebrew and SDKMAN
   # Branch is deleted when package becomes available on Homebrew and SDKMAN
@@ -531,13 +531,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: liquibase/liquibase
-          token: ${{ steps.get-token.outputs.token }} 
+          token: ${{ steps.get-token.outputs.token }}
 
       - name: Create placeholder branches for SDKMAN and Homebrew
         id: create-placeholder-branch
         run: |
           git fetch origin
-          
+
           # Create SDKMAN tracking branch if it doesn't exist
           if ! git ls-remote --exit-code --heads origin ci-oss-sdkman-package-check; then
             git checkout -b ci-oss-sdkman-package-check
@@ -548,7 +548,7 @@ jobs:
           else
             echo "SDKMAN tracking branch already exists, skipping creation"
           fi
-          
+
           # Create Homebrew tracking branch if it doesn't exist and PR number is available
           if [[ -n "${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}; then
             git checkout -b ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
@@ -575,3 +575,4 @@ jobs:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
       dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
+      distribution: ${{ inputs.distribution }}

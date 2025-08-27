@@ -324,3 +324,4 @@ jobs:
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
+      javaBuildVersion: ${{ inputs.javaBuildVersion }}

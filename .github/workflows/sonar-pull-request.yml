@@ -13,6 +13,11 @@ on:
         required: false
         default: "."
         type: string
+      javaBuildVersion:
+        description: "Java version to build the project"
+        required: false
+        default: "17"
+        type: string
         
 permissions:
   contents: read
@@ -46,7 +51,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: ${{ inputs.javaBuildVersion }}
           distribution: 'temurin'
           cache: 'maven'
           
@@ -114,7 +119,7 @@ jobs:
       - name: Download unit tests report
         uses: actions/download-artifact@v4
         with:
-          name: test-reports-jdk-17-ubuntu-latest
+          name: test-reports-jdk-${{ inputs.javaBuildVersion }}-ubuntu-latest
 
       - name: Sonar Scan
         working-directory: ${{ inputs.artifactPath }}

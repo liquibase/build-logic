@@ -566,6 +566,11 @@ jobs:
           repository: liquibase/liquibase
           token: ${{ steps.get-token.outputs.token }}
 
+      - name: Configure Git
+        run: |
+          git config --local user.email "64099989+liquibot@users.noreply.github.com"
+          git config --local user.name "liquibot"
+
       - name: Create placeholder branches for SDKMAN and Homebrew
         id: create-placeholder-branch
         run: |

@@ -155,10 +155,10 @@ jobs:
             SRC_DIR="${{ inputs.artifactId }}"
             PACKAGE_NAME="${{ inputs.artifactId }}"
           fi
-          
+
           # Export for use in later steps
           echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
-          
+
           mkdir -p $PWD/.github/src/$PACKAGE_NAME/deb/control
           mkdir -p $PWD/.github/src/$PACKAGE_NAME/main/archive
           curl -o $PWD/.github/src/$PACKAGE_NAME/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/control
@@ -607,7 +607,7 @@ jobs:
       dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   upload_ansible_role:
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@DAT-20702
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
     secrets: inherit
     with:
       version: ${{ inputs.version }}

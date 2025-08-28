@@ -432,9 +432,9 @@ jobs:
         env:
           COMMITTER_TOKEN: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
 
-      This step captures the PR details after it has been created
-      and stores the PR number and URL in GitHub outputs for later use.
-      This is useful for tracking the PR status and creating a tracking issue.
+      # This step captures the PR details after it has been created
+      # and stores the PR number and URL in GitHub outputs for later use.
+      # This is useful for tracking the PR status and creating a tracking issue.
       - name: Capture Homebrew PR Details
         if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         id: capture-pr

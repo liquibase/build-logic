@@ -40,7 +40,7 @@ on:
         required: false
         type: string
         default: "https://github.com/liquibase/liquibase/releases/download"
-        
+
   workflow_dispatch:
     inputs:
       groupId:
@@ -89,9 +89,9 @@ permissions:
   id-token: write
   contents: write
   pull-requests: write
-  issues: write       # Required for creating/updating issues
-  packages: write     # Required for package operations
-  actions: write      # Required for workflow operations
+  issues: write # Required for creating/updating issues
+  packages: write # Required for package operations
+  actions: write # Required for workflow operations
 
 jobs:
   upload_packages:
@@ -147,13 +147,25 @@ jobs:
       - name: Get Reusable Files
         run: |
           # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
-          mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/deb/control
-          mkdir -p $PWD/.github/src/${{ inputs.artifactId }}/main/archive
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/control
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postinst
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/deb/control/postrm https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/deb/control/postrm
-          curl -o $PWD/.github/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${{ inputs.artifactId }}/main/archive/${{ inputs.artifactId }}-env.sh
-          
+          # Determine the correct source directory and package name based on distribution
+          if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
+            SRC_DIR="liquibase-secure"
+            PACKAGE_NAME="liquibase-secure"
+          else
+            SRC_DIR="${{ inputs.artifactId }}"
+            PACKAGE_NAME="${{ inputs.artifactId }}"
+          fi
+
+          # Export for use in later steps
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
+
+          mkdir -p $PWD/.github/src/$PACKAGE_NAME/deb/control
+          mkdir -p $PWD/.github/src/$PACKAGE_NAME/main/archive
+          curl -o $PWD/.github/src/$PACKAGE_NAME/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/control
+          curl -o $PWD/.github/src/$PACKAGE_NAME/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/postinst
+          curl -o $PWD/.github/src/$PACKAGE_NAME/deb/control/postrm https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/postrm
+          curl -o $PWD/.github/src/$PACKAGE_NAME/main/archive/$PACKAGE_NAME-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/main/archive/${SRC_DIR}-env.sh
+
           # Download appropriate pom.xml based on distribution
           if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
             curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom-secure.xml
@@ -196,7 +208,7 @@ jobs:
           mkdir -p $PWD/.github/target
           if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
             # Download from S3 for liquibase-secure
-            wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz \
+            wget -q -O $PWD/.github/target/liquibase-secure-${{ inputs.version }}.tar.gz \
               ${{ inputs.download_base_url }}/${{ inputs.version }}/liquibase-secure-${{ inputs.version }}.tar.gz
           else
             # Download from GitHub for liquibase (community)
@@ -216,7 +228,7 @@ jobs:
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |
-          mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ inputs.artifactId }} -Drevision=${{ inputs.version }} -DskipTests
+          mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ env.PACKAGE_NAME }} -Drevision=${{ inputs.version }} -DskipTests
 
       - name: Install deb-s3 gem
         run: gem install deb-s3
@@ -235,18 +247,18 @@ jobs:
           # Debug: List available GPG keys
           echo "Available GPG keys:"
           gpg --list-secret-keys --keyid-format LONG
-          
+
           # Get the actual key ID from the imported key
           ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using key ID: $ACTUAL_KEY_ID"
-          
+
           # Create temporary passphrase file securely (not logged)
           TEMP_PASSPHRASE_FILE=$(mktemp)
           echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
           chmod 600 "$TEMP_PASSPHRASE_FILE"
-          
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
-          
+
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
+
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
 
@@ -264,18 +276,18 @@ jobs:
           # Debug: List available GPG keys
           echo "Available GPG keys:"
           gpg --list-secret-keys --keyid-format LONG
-          
+
           # Get the actual key ID from the imported key
           ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using key ID: $ACTUAL_KEY_ID"
-          
+
           # Create temporary passphrase file securely (not logged)
           TEMP_PASSPHRASE_FILE=$(mktemp)
           echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
           chmod 600 "$TEMP_PASSPHRASE_FILE"
-          
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
-          
+
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
+
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
 
@@ -283,13 +295,29 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y alien
-          sudo alien --to-rpm --keep-version $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.deb
+          sudo alien --to-rpm --keep-version $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
+          # Find the actual generated RPM file (alien may change naming)
+          RPM_FILE=$(ls -1 *.rpm 2>/dev/null | head -1)
+          if [ -n "$RPM_FILE" ]; then
+            echo "Generated RPM: $RPM_FILE"
+            # For liquibase-secure, ensure the RPM has the correct name format
+            EXPECTED_RPM="${{ env.PACKAGE_NAME }}-${{ inputs.version }}-1.noarch.rpm"
+            if [ "$RPM_FILE" != "$EXPECTED_RPM" ]; then
+              echo "Renaming $RPM_FILE to $EXPECTED_RPM"
+              mv "$RPM_FILE" "$EXPECTED_RPM"
+              RPM_FILE="$EXPECTED_RPM"
+            fi
+            echo "RPM_FILENAME=$RPM_FILE" >> $GITHUB_ENV
+          else
+            echo "Error: No RPM file found after conversion"
+            exit 1
+          fi
 
       - name: Upload ${{ inputs.artifactId }} rpm package
         if: ${{ inputs.dry_run == false }}
         run: |
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-          ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+          ./.github/sign_artifact.sh "${{ env.RPM_FILENAME }}"
           mkdir -p createrepo_folder
           cd createrepo_folder
           git clone https://github.com/rpm-software-management/createrepo_c
@@ -315,7 +343,10 @@ jobs:
           cd ../../..
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
+          mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
+          if [ -f "${{ env.RPM_FILENAME }}.asc" ]; then
+            mv "${{ env.RPM_FILENAME }}.asc" $PWD/yum/noarch/
+          fi
           /opt/createrepo -dp $PWD/yum/noarch
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
           aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
@@ -323,11 +354,10 @@ jobs:
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
         if: ${{ inputs.dry_run == true }}
         run: |
-          original_file=$(basename "$(find . -maxdepth 1 -name "*.rpm")")
-          new_name=$(echo "$original_file" | sed 's/+/-/g')
-          mv "$original_file" "$new_name"
+          # Use the RPM filename from the previous step
+          echo "Using RPM file: ${{ env.RPM_FILENAME }}"
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-          ./.github/sign_artifact.sh ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch.rpm
+          ./.github/sign_artifact.sh "${{ env.RPM_FILENAME }}"
           mkdir -p createrepo_folder
           cd createrepo_folder
           git clone https://github.com/rpm-software-management/createrepo_c
@@ -353,7 +383,10 @@ jobs:
           cd ../../..
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
-          mv ${{ inputs.artifactId }}-${{ inputs.version }}-1.noarch* $PWD/yum/noarch
+          mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
+          if [ -f "${{ env.RPM_FILENAME }}.asc" ]; then
+            mv "${{ env.RPM_FILENAME }}.asc" $PWD/yum/noarch/
+          fi
           /opt/createrepo -dp $PWD/yum/noarch
           ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
@@ -408,12 +441,12 @@ jobs:
         run: |
           # Wait briefly for PR to be created
           sleep 30
-          
+
           # Search for the PR
           PR_DATA=$(gh api graphql -f query='
           query($search_query: String!) {
-            search(query: $search_query, type: ISSUE, first: 1) { 
-              nodes {               
+            search(query: $search_query, type: ISSUE, first: 1) {
+              nodes {
                 ... on PullRequest {
                   url,
                   number
@@ -421,7 +454,7 @@ jobs:
               }
             }
           }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
-          
+
           if [ ! -z "$PR_DATA" ]; then
             echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
             echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
@@ -429,7 +462,7 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            
+
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.dry_run == false }}
         env:
@@ -495,7 +528,7 @@ jobs:
           # Upload the release to S3
           aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
           echo "Uploaded liquibase-$VERSION.zip to s3"
-          
+
   # create a placeholder branch to check if tracking branch exists for this version
   # Branch is created when package is submitted to Homebrew and SDKMAN
   # Branch is deleted when package becomes available on Homebrew and SDKMAN
@@ -531,13 +564,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: liquibase/liquibase
-          token: ${{ steps.get-token.outputs.token }} 
+          token: ${{ steps.get-token.outputs.token }}
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "64099989+liquibot@users.noreply.github.com"
+          git config --local user.name "liquibot"
 
       - name: Create placeholder branches for SDKMAN and Homebrew
         id: create-placeholder-branch
         run: |
           git fetch origin
-          
+
           # Create SDKMAN tracking branch if it doesn't exist
           if ! git ls-remote --exit-code --heads origin ci-oss-sdkman-package-check; then
             git checkout -b ci-oss-sdkman-package-check
@@ -548,7 +586,7 @@ jobs:
           else
             echo "SDKMAN tracking branch already exists, skipping creation"
           fi
-          
+
           # Create Homebrew tracking branch if it doesn't exist and PR number is available
           if [[ -n "${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}; then
             git checkout -b ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
@@ -575,3 +613,4 @@ jobs:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
       dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
+      distribution: ${{ inputs.distribution }}

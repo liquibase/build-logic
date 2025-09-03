@@ -37,10 +37,10 @@ jobs:
       - name: Start database container # Start the database container using Docker Compose
         run: docker compose -f src/test/resources/docker/docker-compose.yml up -d
 
-      - name: Setup Temurin Java 17 # Set up Java 17 with Temurin distribution and cache the Maven packages
+      - name: Setup Temurin Java 21 # Set up Java 21 with Temurin distribution and cache the Maven packages
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: 21
           distribution: temurin
           cache: 'maven'
 

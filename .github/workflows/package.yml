@@ -620,5 +620,5 @@ jobs:
     with:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
-      dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
+      dry_run_release_id: ${{ inputs.dry_run_release_id }}
       distribution: ${{ inputs.distribution }}

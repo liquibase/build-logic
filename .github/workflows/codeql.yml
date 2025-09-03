@@ -33,7 +33,7 @@ on:
       javaBuildVersion:
         description: "Java version to build the project"
         required: false
-        default: "17"
+        default: "21"
         type: string
 
 permissions:

@@ -6,7 +6,7 @@ on:
       java:
         description: "Java version to test"
         required: false
-        default: "[11, 17, 21]"
+        default: "[17, 21]"
         type: string
       os:
         description: "Operating system to build/test on"
@@ -121,10 +121,10 @@ jobs:
           role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: 21
           distribution: "temurin"
           cache: "maven"
 
@@ -297,7 +297,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: ${{fromJson(inputs.java || '[8, 11, 17, 18]')}}
+        java: ${{fromJson(inputs.java || '[17, 21]')}}
         os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "windows-latest"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

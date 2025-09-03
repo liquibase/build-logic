@@ -6,7 +6,7 @@ on:
       java:
         description: "Java version to test"
         required: false
-        default: "[11, 17, 21]"
+        default: "[17, 21]"
         type: string
       os:
         description: "Operating system to build/test on"
@@ -118,10 +118,10 @@ jobs:
           role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: 21
           distribution: "temurin"
           cache: "maven"
 
@@ -368,4 +368,3 @@ jobs:
               "artifact_id": "${{needs.build.outputs.artifact_id}}",
               "artifact_version": "${{ inputs.version }}"
             }
-            

@@ -87,7 +87,7 @@ jobs:
       - name: Set up JDK for Build
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: 21
           distribution: 'temurin'
           cache: 'maven'
           overwrite-settings: false
@@ -301,7 +301,7 @@ jobs:
       - name: Set up JDK for Sonar
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: 21
           distribution: 'temurin'
           cache: 'maven'
           overwrite-settings: false

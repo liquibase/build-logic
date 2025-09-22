@@ -121,10 +121,10 @@ jobs:
           role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
-      - name: Set up JDK 21
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: 21
+          java-version: 17
           distribution: "temurin"
           cache: "maven"
 

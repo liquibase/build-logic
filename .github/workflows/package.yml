@@ -619,7 +619,6 @@ jobs:
 
   upload_windows_package:
     if: ${{ inputs.distribution == 'liquibase' }}
-    continue-on-error: true
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
     secrets: inherit
     with:
@@ -629,7 +628,6 @@ jobs:
 
   upload_windows_secure_package:
     if: ${{ inputs.distribution == 'liquibase-secure' }}
-    continue-on-error: true
     uses: liquibase/liquibase-secure-chocolatey/.github/workflows/deploy-package.yml@master
     secrets: inherit
     with:
@@ -638,7 +636,6 @@ jobs:
       dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   upload_ansible_role:
-    continue-on-error: true
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
     secrets: inherit
     with:

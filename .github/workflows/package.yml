@@ -307,13 +307,16 @@ jobs:
           # Check if createrepo_c was built, otherwise try to find system createrepo
           if [ -f src/createrepo_c ]; then
             cp src/createrepo_c /opt/createrepo
+          elif command -v createrepo_c &> /dev/null; then
+            echo "Using system createrepo_c instead"
+            ln -sf $(which createrepo_c) /opt/createrepo
           elif command -v createrepo &> /dev/null; then
             echo "Using system createrepo instead"
             ln -sf $(which createrepo) /opt/createrepo
           else
-            echo "Installing createrepo from package manager as fallback"
-            sudo apt-get install -y createrepo
-            ln -sf $(which createrepo) /opt/createrepo
+            echo "Installing createrepo-c from package manager as fallback"
+            sudo apt-get install -y createrepo-c
+            ln -sf $(which createrepo_c) /opt/createrepo
           fi
 
           cd ../../..

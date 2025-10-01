@@ -243,21 +243,6 @@ jobs:
           gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
 
-      - name: Delete old ${{ inputs.artifactId }} deb packages
-        if: ${{ inputs.dry_run == false }}
-        continue-on-error: true
-        run: |
-          # Delete old test versions before uploading new package
-          deb-s3 delete --bucket repo.liquibase.com \
-            --versions "5+secure+release+test" \
-            --arch all \
-            ${{ env.PACKAGE_NAME }}
-
-          deb-s3 delete --bucket repo.liquibase.com \
-            --versions "secure+5.0.0+uat1" \
-            --arch all \
-            ${{ env.PACKAGE_NAME }}
-
       - name: Upload ${{ inputs.artifactId }} deb package
         if: ${{ inputs.dry_run == false }}
         continue-on-error: true
@@ -387,7 +372,7 @@ jobs:
   #         aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
   #     - name: Check for existing Homebrew formula PR for ${{ inputs.distribution }}
-  #       continue-on-error: true  
+  #       continue-on-error: true
   #       id: check-brew-pr
   #       run: |
   #         # Authenticate GitHub CLI

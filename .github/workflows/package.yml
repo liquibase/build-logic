@@ -126,6 +126,8 @@ jobs:
           permission-actions: write
 
       - uses: actions/checkout@v4
+        with:
+          ref: DAT-20878
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -263,97 +265,67 @@ jobs:
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
 
-      # - name: Import GPG key for dry-run deb signing
-      #   if: ${{ inputs.dry_run == true }}
-      #   id: import_gpg_deb_dryrun
-      #   uses: crazy-max/ghaction-import-gpg@v6
-      #   with:
-      #     gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
-      #     passphrase: ${{ env.GPG_PASSPHRASE }}
+      - name: Convert deb to rpm
+        continue-on-error: true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y alien
+          sudo alien --to-rpm --keep-version $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
+          # Find the actual generated RPM file (alien may change naming)
+          RPM_FILE=$(ls -1 *.rpm 2>/dev/null | head -1)
+          if [ -n "$RPM_FILE" ]; then
+            echo "Generated RPM: $RPM_FILE"
+            # For liquibase-secure, ensure the RPM has the correct name format
+            EXPECTED_RPM="${{ env.PACKAGE_NAME }}-${{ inputs.version }}-1.noarch.rpm"
+            if [ "$RPM_FILE" != "$EXPECTED_RPM" ]; then
+              echo "Renaming $RPM_FILE to $EXPECTED_RPM"
+              mv "$RPM_FILE" "$EXPECTED_RPM"
+              RPM_FILE="$EXPECTED_RPM"
+            fi
+            echo "RPM_FILENAME=$RPM_FILE" >> $GITHUB_ENV
+          else
+            echo "Error: No RPM file found after conversion"
+            exit 1
+          fi
 
-      # - name: Upload ${{ inputs.artifactId }} dry-run deb package
-      #   if: ${{ inputs.dry_run == true }}
-      #   continue-on-error: true
-      #   run: |
-      #     # Debug: List available GPG keys
-      #     echo "Available GPG keys:"
-      #     gpg --list-secret-keys --keyid-format LONG
+      - name: Upload ${{ inputs.artifactId }} rpm package
+        if: ${{ inputs.dry_run == false }}
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
+          ./.github/sign_artifact.sh "${{ env.RPM_FILENAME }}"
+          mkdir -p createrepo_folder
+          cd createrepo_folder
+          git clone https://github.com/rpm-software-management/createrepo_c
+          cd createrepo_c
+          mkdir -p build
+          cd build
+          # Modified CMake command with additional flags to properly disable documentation
+          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
+          make -j || echo "Build failed but continuing..."
 
-      #     # Get the actual key ID from the imported key
-      #     ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
-      #     echo "Using key ID: $ACTUAL_KEY_ID"
+          # Check if createrepo_c was built, otherwise try to find system createrepo
+          if [ -f src/createrepo_c ]; then
+            cp src/createrepo_c /opt/createrepo
+          elif command -v createrepo &> /dev/null; then
+            echo "Using system createrepo instead"
+            ln -sf $(which createrepo) /opt/createrepo
+          else
+            echo "Installing createrepo from package manager as fallback"
+            sudo apt-get install -y createrepo
+            ln -sf $(which createrepo) /opt/createrepo
+          fi
 
-      #     # Create temporary passphrase file securely (not logged)
-      #     TEMP_PASSPHRASE_FILE=$(mktemp)
-      #     echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
-      #     chmod 600 "$TEMP_PASSPHRASE_FILE"
-
-      #     deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
-
-      #     # Securely clean up passphrase file
-      #     rm -f "$TEMP_PASSPHRASE_FILE"
-
-  #     - name: Convert deb to rpm
-  #       continue-on-error: true
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y alien
-  #         sudo alien --to-rpm --keep-version $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
-  #         # Find the actual generated RPM file (alien may change naming)
-  #         RPM_FILE=$(ls -1 *.rpm 2>/dev/null | head -1)
-  #         if [ -n "$RPM_FILE" ]; then
-  #           echo "Generated RPM: $RPM_FILE"
-  #           # For liquibase-secure, ensure the RPM has the correct name format
-  #           EXPECTED_RPM="${{ env.PACKAGE_NAME }}-${{ inputs.version }}-1.noarch.rpm"
-  #           if [ "$RPM_FILE" != "$EXPECTED_RPM" ]; then
-  #             echo "Renaming $RPM_FILE to $EXPECTED_RPM"
-  #             mv "$RPM_FILE" "$EXPECTED_RPM"
-  #             RPM_FILE="$EXPECTED_RPM"
-  #           fi
-  #           echo "RPM_FILENAME=$RPM_FILE" >> $GITHUB_ENV
-  #         else
-  #           echo "Error: No RPM file found after conversion"
-  #           exit 1
-  #         fi
-
-  #     - name: Upload ${{ inputs.artifactId }} rpm package
-  #       if: ${{ inputs.dry_run == false }}
-  #       continue-on-error: true
-  #       run: |
-  #         sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-  #         ./.github/sign_artifact.sh "${{ env.RPM_FILENAME }}"
-  #         mkdir -p createrepo_folder
-  #         cd createrepo_folder
-  #         git clone https://github.com/rpm-software-management/createrepo_c
-  #         cd createrepo_c
-  #         mkdir -p build
-  #         cd build
-  #         # Modified CMake command with additional flags to properly disable documentation
-  #         cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
-  #         make -j || echo "Build failed but continuing..."
-
-  #         # Check if createrepo_c was built, otherwise try to find system createrepo
-  #         if [ -f src/createrepo_c ]; then
-  #           cp src/createrepo_c /opt/createrepo
-  #         elif command -v createrepo &> /dev/null; then
-  #           echo "Using system createrepo instead"
-  #           ln -sf $(which createrepo) /opt/createrepo
-  #         else
-  #           echo "Installing createrepo from package manager as fallback"
-  #           sudo apt-get install -y createrepo
-  #           ln -sf $(which createrepo) /opt/createrepo
-  #         fi
-
-  #         cd ../../..
-  #         mkdir -p $PWD/yum/noarch
-  #         aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-  #         mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
-  #         if [ -f "${{ env.RPM_FILENAME }}.asc" ]; then
-  #           mv "${{ env.RPM_FILENAME }}.asc" $PWD/yum/noarch/
-  #         fi
-  #         /opt/createrepo -dp $PWD/yum/noarch
-  #         ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
-  #         aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
+          cd ../../..
+          mkdir -p $PWD/yum/noarch
+          aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
+          mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
+          if [ -f "${{ env.RPM_FILENAME }}.asc" ]; then
+            mv "${{ env.RPM_FILENAME }}.asc" $PWD/yum/noarch/
+          fi
+          /opt/createrepo -dp $PWD/yum/noarch
+          ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+          aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
   #     - name: Upload ${{ inputs.artifactId }} dry-run rpm package
   #       if: ${{ inputs.dry_run == true }}

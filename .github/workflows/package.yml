@@ -129,7 +129,6 @@ jobs:
         with:
           ref: DAT-20878-test
 
-          
 
       - name: Set up Java
         uses: actions/setup-java@v4

@@ -293,6 +293,25 @@ jobs:
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
 
+      - name: Invalidate CloudFront cache
+        if: ${{ inputs.dry_run == false }}
+        continue-on-error: true
+        run: |
+          # Get CloudFront distribution ID for repo.liquibase.com
+          DISTRIBUTION_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Aliases.Items[?@=='repo.liquibase.com']].Id" \
+            --output text)
+
+          if [ -n "$DISTRIBUTION_ID" ]; then
+            echo "Invalidating CloudFront cache for distribution: $DISTRIBUTION_ID"
+            aws cloudfront create-invalidation \
+              --distribution-id "$DISTRIBUTION_ID" \
+              --paths "/dists/stable/*"
+            echo "CloudFront cache invalidation created for /dists/stable/*"
+          else
+            echo "Warning: Could not find CloudFront distribution for repo.liquibase.com"
+          fi
+
       - name: Convert deb to rpm
         continue-on-error: true
         run: |
@@ -335,13 +354,16 @@ jobs:
           # Check if createrepo_c was built, otherwise try to find system createrepo
           if [ -f src/createrepo_c ]; then
             cp src/createrepo_c /opt/createrepo
+          elif command -v createrepo_c &> /dev/null; then
+            echo "Using system createrepo_c instead"
+            ln -sf $(which createrepo_c) /opt/createrepo
           elif command -v createrepo &> /dev/null; then
             echo "Using system createrepo instead"
             ln -sf $(which createrepo) /opt/createrepo
           else
-            echo "Installing createrepo from package manager as fallback"
-            sudo apt-get install -y createrepo
-            ln -sf $(which createrepo) /opt/createrepo
+            echo "Installing createrepo-c from package manager as fallback"
+            sudo apt-get install -y createrepo-c
+            ln -sf $(which createrepo_c) /opt/createrepo
           fi
 
           cd ../../..
@@ -397,7 +419,7 @@ jobs:
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
       - name: Check for existing Homebrew formula PR for ${{ inputs.distribution }}
-        continue-on-error: true  
+        continue-on-error: true
         id: check-brew-pr
         run: |
           # Authenticate GitHub CLI

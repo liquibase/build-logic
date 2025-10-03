@@ -419,6 +419,7 @@ jobs:
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
       - name: Check for existing Homebrew formula PR for ${{ inputs.distribution }}
+        if: ${{ inputs.distribution != 'liquibase-secure' }}
         continue-on-error: true
         id: check-brew-pr
         run: |
@@ -445,7 +446,7 @@ jobs:
           echo "PR_EXISTS is set to $PR_EXISTS"
 
       - name: Update Homebrew formula for ${{ inputs.distribution }}
-        if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        if: ${{ inputs.distribution != 'liquibase-secure' && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         continue-on-error: true
         uses: mislav/bump-homebrew-formula-action@v3
         with:
@@ -466,7 +467,7 @@ jobs:
       # This is useful for tracking the PR status and creating a tracking issue.
       - name: Capture Homebrew PR Details
         continue-on-error: true
-        if: ${{ steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        if: ${{ inputs.distribution != 'liquibase-secure' && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         id: capture-pr
         run: |
           # Wait briefly for PR to be created
@@ -494,7 +495,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
-        if: ${{ inputs.dry_run == false }}
+        if: ${{ inputs.distribution != 'liquibase-secure' && inputs.dry_run == false }}
         continue-on-error: true
         env:
           SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
@@ -551,7 +552,7 @@ jobs:
           echo "Announced $ZIP_FILENAME to SDKMAN"
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
-        if: ${{ inputs.dry_run == true }}
+        if: ${{ inputs.distribution != 'liquibase-secure' && inputs.dry_run == true }}
         continue-on-error: true
         env:
           SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
@@ -576,7 +577,7 @@ jobs:
   create-placeholder-branch:
     runs-on: ubuntu-latest
     needs: upload_packages
-    if: ${{ inputs.dry_run == false }}
+    if: ${{ inputs.distribution != 'liquibase-secure' && inputs.dry_run == false }}
     steps:
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
@@ -648,14 +649,17 @@ jobs:
       dry_run: ${{ inputs.dry_run }}
       dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
-  upload_windows_secure_package:
-    if: ${{ inputs.distribution == 'liquibase-secure' }}
-    uses: liquibase/liquibase-secure-chocolatey/.github/workflows/deploy-package.yml@master
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-      dry_run: ${{ inputs.dry_run }}
-      dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
+  # Chocolatey does not accept commercial/proprietary software in their community repository
+  # This job is commented out as liquibase-secure cannot be distributed via Chocolatey
+  # See: DAT-20985
+  #upload_windows_secure_package:
+  #  if: ${{ inputs.distribution == 'liquibase-secure' }}
+  #  uses: liquibase/liquibase-secure-chocolatey/.github/workflows/deploy-package.yml@master
+  #  secrets: inherit
+  #  with:
+  #    version: ${{ inputs.version }}
+  #    dry_run: ${{ inputs.dry_run }}
+  #    dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   upload_ansible_role:
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main

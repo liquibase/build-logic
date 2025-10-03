@@ -3,8 +3,8 @@ Version: [[version]]
 Section: misc
 Priority: optional
 Architecture: all
-Depends:
 Maintainer: Liquibase <support@liquibase.com>
 Description: Liquibase Secure Debian Installer
 Distribution: development
-Conflicts: liquibase
+Provides: liquibase
+Replaces: liquibase

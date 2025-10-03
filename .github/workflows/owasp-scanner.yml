@@ -47,11 +47,23 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
 
+      - name: Get GitHub App token
+        if: inputs.repository == 'liquibase-pro'
+        id: get-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
+          private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           repository: liquibase/${{ inputs.repository }}
           ref: ${{ inputs.branch }}
+          path: ${{ inputs.repository }}
+          submodules: ${{ inputs.repository == 'liquibase-pro' && 'true' || 'false' }}
+          token: ${{ inputs.repository == 'liquibase-pro' && steps.get-token.outputs.token || github.token }}
 
       - name: Set up Java for publishing to GitHub Repository
         uses: actions/setup-java@v4
@@ -69,7 +81,7 @@ jobs:
                 "id": "liquibase",
                 "url": "https://maven.pkg.github.com/liquibase/liquibase",
                 "releases": {
-                  "enabled": "false"
+                  "enabled": "true"
                 },
                 "snapshots": {
                   "enabled": "true",
@@ -80,7 +92,7 @@ jobs:
                 "id": "liquibase-pro",
                 "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
                 "releases": {
-                  "enabled": "false"
+                  "enabled": "true"
                 },
                 "snapshots": {
                   "enabled": "true",
@@ -102,14 +114,29 @@ jobs:
               }
             ]
 
+      - name: Build liquibase-pro dependencies
+        if: inputs.repository == 'liquibase-pro'
+        run: |
+          cd ${{ inputs.repository }}
+          # Build using pom-pro-distribution.xml which includes all dependencies
+          mvn -B -f pom-pro-distribution.xml clean install -DskipTests -P '!oss,!obfuscate,!run-proguard'
+
+      - name: Build project (non-pro repositories)
+        if: inputs.repository != 'liquibase-pro'
+        run: |
+          cd ${{ inputs.repository }}
+          mvn clean install -DskipTests
+
       - name: Run the scanner
         id: run_owasp
-        run: mvn org.owasp:dependency-check-maven:aggregate -DnvdApiKey=${{ env.NVD_API_KEY }} -DfailOnError=true
+        run: |
+          cd ${{ inputs.repository }}
+          mvn org.owasp:dependency-check-maven:aggregate -DnvdApiKey=${{ env.NVD_API_KEY }} -DfailOnError=true
     
       - name: Upload OWASP Dependency-Check results
         if: always()
         uses: actions/upload-artifact@v4
         with:
             name: owasp-dependency-check
-            path: ./target/dependency-check-report.html
+            path: ${{ inputs.repository }}/target/dependency-check-report.html
   

@@ -419,7 +419,7 @@ jobs:
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
       - name: Check for existing Homebrew formula PR for ${{ inputs.distribution }}
-        if: ${{ inputs.distribution != 'liquibase-secure' }}
+        if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') }}
         continue-on-error: true
         id: check-brew-pr
         run: |
@@ -446,7 +446,7 @@ jobs:
           echo "PR_EXISTS is set to $PR_EXISTS"
 
       - name: Update Homebrew formula for ${{ inputs.distribution }}
-        if: ${{ inputs.distribution != 'liquibase-secure' && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         continue-on-error: true
         uses: mislav/bump-homebrew-formula-action@v3
         with:
@@ -467,7 +467,7 @@ jobs:
       # This is useful for tracking the PR status and creating a tracking issue.
       - name: Capture Homebrew PR Details
         continue-on-error: true
-        if: ${{ inputs.distribution != 'liquibase-secure' && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         id: capture-pr
         run: |
           # Wait briefly for PR to be created
@@ -656,14 +656,15 @@ jobs:
           fi
 
           # Create Homebrew tracking branch if it doesn't exist and PR number is available
-          if [[ -n "${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}; then
+          # Only create for 4.x versions due to Homebrew licensing restrictions
+          if [[ "${{ inputs.version }}" == 4.* ]] && [[ -n "${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}; then
             git checkout -b ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
             echo "This is a placeholder branch for oss homebrew package v.${{ inputs.version }}. If this branch is open, it means the homebrew package is not yet approved" > README.md
             git add README.md
             git commit -m "Create placeholder branch for Homebrew package v.${{ inputs.version }}"
             git push origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
           else
-            echo "Homebrew tracking branch already exists or PR number not available, skipping creation"
+            echo "Homebrew tracking branch skipped (only 4.x versions supported) or already exists or PR number not available"
           fi
 
   upload_windows_package:

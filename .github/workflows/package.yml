@@ -497,9 +497,22 @@ jobs:
         run: |
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
 
-          # Verify RPM is signed before uploading
+          # Get absolute path to the signed RPM file
+          SIGNED_RPM_PATH="$(pwd)/${{ env.RPM_FILENAME }}"
+          echo "Signed RPM location: $SIGNED_RPM_PATH"
+
+          # Verify the signed RPM exists and is actually signed
+          if [ ! -f "$SIGNED_RPM_PATH" ]; then
+            echo "✗ ERROR: Signed RPM not found at $SIGNED_RPM_PATH"
+            exit 1
+          fi
+
           echo "Verifying RPM signature before upload:"
-          rpm --checksig "${{ env.RPM_FILENAME }}" || echo "Warning: RPM signature verification failed"
+          if rpm --checksig "$SIGNED_RPM_PATH" 2>&1 | grep -q "RSA/SHA"; then
+            echo "✓ RPM is signed with GPG signature"
+          else
+            echo "✗ WARNING: RPM may not be properly signed"
+          fi
 
           mkdir -p createrepo_folder
           cd createrepo_folder
@@ -526,29 +539,66 @@ jobs:
             ln -sf $(which createrepo_c) /opt/createrepo
           fi
 
-          cd ../../..
-          mkdir -p $PWD/yum/noarch
-          aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
-          mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
-          /opt/createrepo -dp $PWD/yum/noarch
+          # Return to workspace root
+          cd $GITHUB_WORKSPACE
+
+          # Create YUM repository directory structure
+          mkdir -p yum/noarch
+
+          # Download existing RPMs from S3 (excluding the current version to avoid conflicts)
+          echo "Downloading existing RPMs from S3..."
+          aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | while read rpm; do
+            # Skip if it's the same version we're uploading
+            if [[ "$rpm" != "${{ env.RPM_FILENAME }}" ]]; then
+              aws s3 cp "s3://repo.liquibase.com/yum/noarch/$rpm" yum/noarch/
+            fi
+          done
+
+          # Copy the signed RPM to the repository directory
+          echo "Copying signed RPM to repository..."
+          cp "$SIGNED_RPM_PATH" yum/noarch/
+
+          # Verify the copied file is still signed
+          echo "Verifying copied RPM signature:"
+          rpm --checksig "yum/noarch/${{ env.RPM_FILENAME }}"
+
+          # Generate repository metadata with the signed RPM
+          echo "Generating repository metadata..."
+          /opt/createrepo -dp yum/noarch
 
           # Sign the repository metadata
+          echo "Signing repository metadata..."
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
-          gpg --batch --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --detach-sign --armor -u "$GPG_KEY_ID" $PWD/yum/noarch/repodata/repomd.xml
+          gpg --batch --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
 
-          aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
+          # Upload to S3
+          echo "Uploading repository to S3..."
+          aws s3 sync yum s3://repo.liquibase.com/yum --delete
+
+          echo "✓ RPM repository updated successfully"
 
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
         if: ${{ inputs.dry_run == true }}
         continue-on-error: true
         run: |
-          # Use the RPM filename from the previous step
-          echo "Using RPM file: ${{ env.RPM_FILENAME }}"
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
 
-          # Verify RPM is signed before uploading
+          # Get absolute path to the signed RPM file
+          SIGNED_RPM_PATH="$(pwd)/${{ env.RPM_FILENAME }}"
+          echo "Signed RPM location: $SIGNED_RPM_PATH"
+
+          # Verify the signed RPM exists and is actually signed
+          if [ ! -f "$SIGNED_RPM_PATH" ]; then
+            echo "✗ ERROR: Signed RPM not found at $SIGNED_RPM_PATH"
+            exit 1
+          fi
+
           echo "Verifying RPM signature before upload:"
-          rpm --checksig "${{ env.RPM_FILENAME }}" || echo "Warning: RPM signature verification failed"
+          if rpm --checksig "$SIGNED_RPM_PATH" 2>&1 | grep -q "RSA/SHA"; then
+            echo "✓ RPM is signed with GPG signature"
+          else
+            echo "✗ WARNING: RPM may not be properly signed"
+          fi
 
           mkdir -p createrepo_folder
           cd createrepo_folder
@@ -563,6 +613,9 @@ jobs:
           # Check if createrepo_c was built, otherwise try to find system createrepo
           if [ -f src/createrepo_c ]; then
             cp src/createrepo_c /opt/createrepo
+          elif command -v createrepo_c &> /dev/null; then
+            echo "Using system createrepo_c instead"
+            ln -sf $(which createrepo_c) /opt/createrepo
           elif command -v createrepo &> /dev/null; then
             echo "Using system createrepo instead"
             ln -sf $(which createrepo) /opt/createrepo
@@ -572,14 +625,40 @@ jobs:
             ln -sf $(which createrepo) /opt/createrepo
           fi
 
-          cd ../../..
-          mkdir -p $PWD/yum/noarch
-          aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
-          mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
-          /opt/createrepo -dp $PWD/yum/noarch
+          # Return to workspace root
+          cd $GITHUB_WORKSPACE
+
+          # Create YUM repository directory structure
+          mkdir -p yum/noarch
+
+          # Download existing RPMs from S3 (excluding the current version to avoid conflicts)
+          echo "Downloading existing RPMs from S3..."
+          aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | while read rpm; do
+            # Skip if it's the same version we're uploading
+            if [[ "$rpm" != "${{ env.RPM_FILENAME }}" ]]; then
+              aws s3 cp "s3://repo.liquibase.com.dry.run/yum/noarch/$rpm" yum/noarch/
+            fi
+          done
+
+          # Copy the signed RPM to the repository directory
+          echo "Copying signed RPM to repository..."
+          cp "$SIGNED_RPM_PATH" yum/noarch/
+
+          # Verify the copied file is still signed
+          echo "Verifying copied RPM signature:"
+          rpm --checksig "yum/noarch/${{ env.RPM_FILENAME }}"
+
+          # Generate repository metadata with the signed RPM
+          echo "Generating repository metadata..."
+          /opt/createrepo -dp yum/noarch
 
           # Sign the repository metadata
+          echo "Signing repository metadata..."
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
-          gpg --batch --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --detach-sign --armor -u "$GPG_KEY_ID" $PWD/yum/noarch/repodata/repomd.xml
+          gpg --batch --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
 
-          aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
+          # Upload to S3
+          echo "Uploading repository to S3..."
+          aws s3 sync yum s3://repo.liquibase.com.dry.run/yum --delete
+
+          echo "✓ RPM repository updated successfully"

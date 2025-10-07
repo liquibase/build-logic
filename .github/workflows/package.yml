@@ -297,26 +297,24 @@ jobs:
 
           # Set GPG environment to avoid TTY warnings
           export GPG_TTY=$(tty)
-          
+
           # Import GPG public key into RPM database
           gpg --export -a "$GPG_KEY_ID" > /tmp/gpg-pubkey.asc
           sudo rpm --import /tmp/gpg-pubkey.asc
           rm /tmp/gpg-pubkey.asc
-          
-          # Create RPM macros file for signing (no indentation)
-          cat > ~/.rpmmacros << 'MACROS_EOF'
-%_signature gpg
-%_gpg_name GPG_KEY_ID_PLACEHOLDER
-%__gpg /usr/bin/gpg
-%_gpg_path ~/.gnupg
-%_gpgbin /usr/bin/gpg
-%__gpg_sign_cmd %{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase "GPG_PASSPHRASE_PLACEHOLDER" --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
-MACROS_EOF
+
+          # Create RPM macros file for signing
+          printf '%%_signature gpg\n' > ~/.rpmmacros
+          printf '%%_gpg_name GPG_KEY_ID_PLACEHOLDER\n' >> ~/.rpmmacros
+          printf '%%__gpg /usr/bin/gpg\n' >> ~/.rpmmacros
+          printf '%%_gpg_path ~/.gnupg\n' >> ~/.rpmmacros
+          printf '%%_gpgbin /usr/bin/gpg\n' >> ~/.rpmmacros
+          printf '%%__gpg_sign_cmd %%{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase "GPG_PASSPHRASE_PLACEHOLDER" --no-secmem-warning -u "%%{_gpg_name}" -sbo %%{__signature_filename} %%{__plaintext_filename}\n' >> ~/.rpmmacros
 
           # Replace placeholders in .rpmmacros
           sed -i "s/GPG_KEY_ID_PLACEHOLDER/$GPG_KEY_ID/g" ~/.rpmmacros
           sed -i "s/GPG_PASSPHRASE_PLACEHOLDER/${{ env.GPG_PASSPHRASE }}/g" ~/.rpmmacros
-          
+
           # Debug: Show .rpmmacros content
           echo "=== Contents of ~/.rpmmacros ==="
           cat ~/.rpmmacros
@@ -396,26 +394,24 @@ MACROS_EOF
 
           # Set GPG environment to avoid TTY warnings
           export GPG_TTY=$(tty)
-          
+
           # Import GPG public key into RPM database
           gpg --export -a "$GPG_KEY_ID" > /tmp/gpg-pubkey.asc
           sudo rpm --import /tmp/gpg-pubkey.asc
           rm /tmp/gpg-pubkey.asc
-          
-          # Create RPM macros file for signing (no indentation)
-          cat > ~/.rpmmacros << 'MACROS_EOF'
-%_signature gpg
-%_gpg_name GPG_KEY_ID_PLACEHOLDER
-%__gpg /usr/bin/gpg
-%_gpg_path ~/.gnupg
-%_gpgbin /usr/bin/gpg
-%__gpg_sign_cmd %{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase "GPG_PASSPHRASE_PLACEHOLDER" --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
-MACROS_EOF
+
+          # Create RPM macros file for signing
+          printf '%%_signature gpg\n' > ~/.rpmmacros
+          printf '%%_gpg_name GPG_KEY_ID_PLACEHOLDER\n' >> ~/.rpmmacros
+          printf '%%__gpg /usr/bin/gpg\n' >> ~/.rpmmacros
+          printf '%%_gpg_path ~/.gnupg\n' >> ~/.rpmmacros
+          printf '%%_gpgbin /usr/bin/gpg\n' >> ~/.rpmmacros
+          printf '%%__gpg_sign_cmd %%{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase "GPG_PASSPHRASE_PLACEHOLDER" --no-secmem-warning -u "%%{_gpg_name}" -sbo %%{__signature_filename} %%{__plaintext_filename}\n' >> ~/.rpmmacros
 
           # Replace placeholders in .rpmmacros
           sed -i "s/GPG_KEY_ID_PLACEHOLDER/$GPG_KEY_ID/g" ~/.rpmmacros
           sed -i "s/GPG_PASSPHRASE_PLACEHOLDER/${{ env.GPG_PASSPHRASE }}/g" ~/.rpmmacros
-          
+
           # Debug: Show .rpmmacros content
           echo "=== Contents of ~/.rpmmacros ==="
           cat ~/.rpmmacros

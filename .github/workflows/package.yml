@@ -293,6 +293,44 @@ jobs:
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
 
+      - name: Import GPG key for dry-run RPM signing
+        if: ${{ inputs.dry_run == true }}
+        id: import_gpg_rpm_dryrun
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
+          passphrase: ${{ env.GPG_PASSPHRASE }}
+
+      - name: Sign dry-run RPM package
+        if: ${{ inputs.dry_run == true }}
+        continue-on-error: true
+        run: |
+          # Install rpm-sign package
+          sudo apt-get install -y rpm
+
+          # Get the GPG key ID
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
+          echo "Using GPG key ID: $GPG_KEY_ID"
+
+          # Create RPM macros file for signing
+          mkdir -p ~/.rpmmacros
+          cat > ~/.rpmmacros << EOF
+          %_signature gpg
+          %_gpg_name $GPG_KEY_ID
+          %__gpg /usr/bin/gpg
+          %_gpg_path ~/.gnupg
+          %_gpgbin /usr/bin/gpg
+          %__gpg_sign_cmd %{__gpg} gpg --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
+          EOF
+
+          # Sign the RPM
+          echo "Signing RPM: ${{ env.RPM_FILENAME }}"
+          rpm --addsign "${{ env.RPM_FILENAME }}"
+
+          # Verify the signature
+          echo "Verifying RPM signature:"
+          rpm --checksig "${{ env.RPM_FILENAME }}"
+
       - name: Invalidate CloudFront cache
         if: ${{ inputs.dry_run == false }}
         continue-on-error: true
@@ -335,12 +373,54 @@ jobs:
             exit 1
           fi
 
+      - name: Import GPG key for RPM signing
+        if: ${{ inputs.dry_run == false }}
+        id: import_gpg_rpm
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
+          passphrase: ${{ env.GPG_PASSPHRASE }}
+
+      - name: Sign RPM package
+        if: ${{ inputs.dry_run == false }}
+        continue-on-error: true
+        run: |
+          # Install rpm-sign package
+          sudo apt-get install -y rpm
+
+          # Get the GPG key ID
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
+          echo "Using GPG key ID: $GPG_KEY_ID"
+
+          # Create RPM macros file for signing
+          mkdir -p ~/.rpmmacros
+          cat > ~/.rpmmacros << EOF
+          %_signature gpg
+          %_gpg_name $GPG_KEY_ID
+          %__gpg /usr/bin/gpg
+          %_gpg_path ~/.gnupg
+          %_gpgbin /usr/bin/gpg
+          %__gpg_sign_cmd %{__gpg} gpg --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
+          EOF
+
+          # Sign the RPM
+          echo "Signing RPM: ${{ env.RPM_FILENAME }}"
+          rpm --addsign "${{ env.RPM_FILENAME }}"
+
+          # Verify the signature
+          echo "Verifying RPM signature:"
+          rpm --checksig "${{ env.RPM_FILENAME }}"
+
       - name: Upload ${{ inputs.artifactId }} rpm package
         if: ${{ inputs.dry_run == false }}
         continue-on-error: true
         run: |
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-          ./.github/sign_artifact.sh "${{ env.RPM_FILENAME }}"
+
+          # Verify RPM is signed before uploading
+          echo "Verifying RPM signature before upload:"
+          rpm --checksig "${{ env.RPM_FILENAME }}" || echo "Warning: RPM signature verification failed"
+
           mkdir -p createrepo_folder
           cd createrepo_folder
           git clone https://github.com/rpm-software-management/createrepo_c
@@ -370,11 +450,12 @@ jobs:
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com/yum/noarch/{} $PWD/yum/noarch
           mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
-          if [ -f "${{ env.RPM_FILENAME }}.asc" ]; then
-            mv "${{ env.RPM_FILENAME }}.asc" $PWD/yum/noarch/
-          fi
           /opt/createrepo -dp $PWD/yum/noarch
-          ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+
+          # Sign the repository metadata
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
+          gpg --batch --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --detach-sign --armor -u "$GPG_KEY_ID" $PWD/yum/noarch/repodata/repomd.xml
+
           aws s3 sync $PWD/yum s3://repo.liquibase.com/yum
 
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
@@ -384,7 +465,11 @@ jobs:
           # Use the RPM filename from the previous step
           echo "Using RPM file: ${{ env.RPM_FILENAME }}"
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
-          ./.github/sign_artifact.sh "${{ env.RPM_FILENAME }}"
+
+          # Verify RPM is signed before uploading
+          echo "Verifying RPM signature before upload:"
+          rpm --checksig "${{ env.RPM_FILENAME }}" || echo "Warning: RPM signature verification failed"
+
           mkdir -p createrepo_folder
           cd createrepo_folder
           git clone https://github.com/rpm-software-management/createrepo_c
@@ -411,11 +496,12 @@ jobs:
           mkdir -p $PWD/yum/noarch
           aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | xargs -I {} aws s3 cp s3://repo.liquibase.com.dry.run/yum/noarch/{} $PWD/yum/noarch
           mv "${{ env.RPM_FILENAME }}" $PWD/yum/noarch/
-          if [ -f "${{ env.RPM_FILENAME }}.asc" ]; then
-            mv "${{ env.RPM_FILENAME }}.asc" $PWD/yum/noarch/
-          fi
           /opt/createrepo -dp $PWD/yum/noarch
-          ./.github/sign_artifact.sh $PWD/yum/noarch/repodata/repomd.xml
+
+          # Sign the repository metadata
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
+          gpg --batch --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --detach-sign --armor -u "$GPG_KEY_ID" $PWD/yum/noarch/repodata/repomd.xml
+
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
 
       - name: Check for existing Homebrew formula PR for ${{ inputs.distribution }}

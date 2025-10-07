@@ -320,13 +320,27 @@ jobs:
           cat ~/.rpmmacros
           echo "================================"
 
-          # Sign the RPM
-          echo "Signing RPM: ${{ env.RPM_FILENAME }}"
-          rpm --addsign "${{ env.RPM_FILENAME }}"
+          # Debug: Test GPG signing manually
+          echo "Testing GPG signing capability:"
+          echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign || echo "GPG test sign failed"
 
-          # Verify the signature
+          # Sign the RPM with verbose output
+          echo "Signing RPM: ${{ env.RPM_FILENAME }}"
+          rpm --addsign "${{ env.RPM_FILENAME }}" 2>&1 | tee /tmp/rpm-sign-output.txt
+
+          # Check if signing actually worked
+          if grep -q "error" /tmp/rpm-sign-output.txt; then
+            echo "ERROR: RPM signing encountered errors"
+            cat /tmp/rpm-sign-output.txt
+          fi
+
+          # Verify the signature with verbose output
           echo "Verifying RPM signature:"
-          rpm --checksig "${{ env.RPM_FILENAME }}"
+          rpm --checksig -v "${{ env.RPM_FILENAME }}"
+
+          # Also check with query
+          echo "Checking RPM signature with query:"
+          rpm -qip "${{ env.RPM_FILENAME }}" | grep -i signature || echo "No signature found"
 
       - name: Invalidate CloudFront cache
         if: ${{ inputs.dry_run == false }}
@@ -417,13 +431,27 @@ jobs:
           cat ~/.rpmmacros
           echo "================================"
 
-          # Sign the RPM
-          echo "Signing RPM: ${{ env.RPM_FILENAME }}"
-          rpm --addsign "${{ env.RPM_FILENAME }}"
+          # Debug: Test GPG signing manually
+          echo "Testing GPG signing capability:"
+          echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign || echo "GPG test sign failed"
 
-          # Verify the signature
+          # Sign the RPM with verbose output
+          echo "Signing RPM: ${{ env.RPM_FILENAME }}"
+          rpm --addsign "${{ env.RPM_FILENAME }}" 2>&1 | tee /tmp/rpm-sign-output.txt
+
+          # Check if signing actually worked
+          if grep -q "error" /tmp/rpm-sign-output.txt; then
+            echo "ERROR: RPM signing encountered errors"
+            cat /tmp/rpm-sign-output.txt
+          fi
+
+          # Verify the signature with verbose output
           echo "Verifying RPM signature:"
-          rpm --checksig "${{ env.RPM_FILENAME }}"
+          rpm --checksig -v "${{ env.RPM_FILENAME }}"
+
+          # Also check with query
+          echo "Checking RPM signature with query:"
+          rpm -qip "${{ env.RPM_FILENAME }}" | grep -i signature || echo "No signature found"
 
       - name: Upload ${{ inputs.artifactId }} rpm package
         if: ${{ inputs.dry_run == false }}

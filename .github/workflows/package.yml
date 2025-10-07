@@ -126,6 +126,8 @@ jobs:
           permission-actions: write
 
       - uses: actions/checkout@v4
+        with:
+          ref: rpm-update
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -240,28 +242,6 @@ jobs:
         with:
           gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
-
-      - name: Upload ${{ inputs.artifactId }} deb package
-        if: ${{ inputs.dry_run == false }}
-        continue-on-error: true
-        run: |
-          # Debug: List available GPG keys
-          echo "Available GPG keys:"
-          gpg --list-secret-keys --keyid-format LONG
-
-          # Get the actual key ID from the imported key
-          ACTUAL_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
-          echo "Using key ID: $ACTUAL_KEY_ID"
-
-          # Create temporary passphrase file securely (not logged)
-          TEMP_PASSPHRASE_FILE=$(mktemp)
-          echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
-          chmod 600 "$TEMP_PASSPHRASE_FILE"
-
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
-
-          # Securely clean up passphrase file
-          rm -f "$TEMP_PASSPHRASE_FILE"
 
       - name: Import GPG key for dry-run deb signing
         if: ${{ inputs.dry_run == true }}

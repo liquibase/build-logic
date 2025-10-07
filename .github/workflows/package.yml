@@ -495,27 +495,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
-        if: ${{ inputs.distribution != 'liquibase-secure' && inputs.dry_run == false }}
+        if: ${{ inputs.distribution == 'liquibase' && inputs.dry_run == false }}
         continue-on-error: true
         env:
           SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
           SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
           VERSION: ${{ inputs.version }}
-          WEB_URL: ${{ inputs.distribution == 'liquibase-secure' && 'https://package.liquibase.com/downloads/secure/sdkman/' || 'https://package.liquibase.com/downloads/oss/sdkman/' }}
-          S3_BUCKET: ${{ inputs.distribution == 'liquibase-secure' && 's3://repo.liquibase.com/sdkman/secure/' || 's3://repo.liquibase.com/sdkman/oss/' }}
+          WEB_URL: https://package.liquibase.com/downloads/oss/sdkman/
+          S3_BUCKET: s3://repo.liquibase.com/sdkman/oss/
         run: |
           set -e  # Exit on any error
 
-          # Download the appropriate zip file based on distribution
-          if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
-            wget -q -O liquibase-secure-$VERSION.zip ${{ inputs.download_base_url }}/$VERSION/liquibase-secure-$VERSION.zip
-            ZIP_FILENAME="liquibase-secure-$VERSION.zip"
-            SDKMAN_CANDIDATE="liquibase-secure"
-          else
-            wget -q -O liquibase-$VERSION.zip ${{ inputs.download_base_url }}/v$VERSION/liquibase-$VERSION.zip
-            ZIP_FILENAME="liquibase-$VERSION.zip"
-            SDKMAN_CANDIDATE="liquibase"
-          fi
+          # Download the zip file for liquibase (community edition only)
+          wget -q -O liquibase-$VERSION.zip ${{ inputs.download_base_url }}/v$VERSION/liquibase-$VERSION.zip
+          ZIP_FILENAME="liquibase-$VERSION.zip"
+          SDKMAN_CANDIDATE="liquibase"
           mkdir -p liquibase-$VERSION/bin/internal
           unzip $ZIP_FILENAME -d liquibase-$VERSION
           rm -rf $ZIP_FILENAME
@@ -578,7 +572,7 @@ jobs:
           echo "Announced $ZIP_FILENAME to SDKMAN"
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
-        if: ${{ inputs.distribution != 'liquibase-secure' && inputs.dry_run == true }}
+        if: ${{ inputs.distribution == 'liquibase' && inputs.dry_run == true }}
         continue-on-error: true
         env:
           SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}

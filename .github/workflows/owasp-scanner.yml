@@ -4,23 +4,23 @@ on:
   workflow_call:
     inputs:
       repository:
-        description: 'Repository to scan'
+        description: "Repository to scan"
         required: false
         type: string
-        default: 'liquibase'
+        default: "liquibase"
       branch:
-        description: 'Branch to scan'
+        description: "Branch to scan"
         required: true
         type: string
   workflow_dispatch:
     inputs:
       repository:
-        description: 'Repository to scan'
+        description: "Repository to scan"
         required: false
         type: string
-        default: 'liquibase'
+        default: "liquibase"
       branch:
-        description: 'Branch to scan'
+        description: "Branch to scan"
         required: true
         type: string
 
@@ -68,9 +68,9 @@ jobs:
       - name: Set up Java for publishing to GitHub Repository
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
 
       - name: maven-settings-xml-action
         uses: whelk-io/maven-settings-xml-action@v22
@@ -121,22 +121,43 @@ jobs:
           # Build using pom-pro-distribution.xml which includes all dependencies
           mvn -B -f pom-pro-distribution.xml clean install -DskipTests -P '!oss,!obfuscate,!run-proguard'
 
+      - name: Set versions for liquibase-pro dist
+        if: inputs.repository == 'liquibase-pro'
+        run: |
+          cd ${{ inputs.repository }}/dist
+          # Set versions to make the project fully resolvable
+          mvn versions:set -DnewVersion=1.0.0-SNAPSHOT -DgenerateBackupPoms=false
+
       - name: Build project (non-pro repositories)
         if: inputs.repository != 'liquibase-pro'
         run: |
           cd ${{ inputs.repository }}
           mvn clean install -DskipTests
 
-      - name: Run the scanner
+      - name: Run the scanner (liquibase-pro)
+        if: inputs.repository == 'liquibase-pro'
+        id: run_owasp_pro
+        run: |
+          cd ${{ inputs.repository }}/dist
+          mvn org.owasp:dependency-check-maven:aggregate -DnvdApiKey=${{ env.NVD_API_KEY }} -DfailOnError=true
+
+      - name: Run the scanner (non-pro repositories)
+        if: inputs.repository != 'liquibase-pro'
         id: run_owasp
         run: |
           cd ${{ inputs.repository }}
           mvn org.owasp:dependency-check-maven:aggregate -DnvdApiKey=${{ env.NVD_API_KEY }} -DfailOnError=true
-    
-      - name: Upload OWASP Dependency-Check results
-        if: always()
+
+      - name: Upload OWASP Dependency-Check results (liquibase-pro)
+        if: always() && inputs.repository == 'liquibase-pro'
         uses: actions/upload-artifact@v4
         with:
-            name: owasp-dependency-check
-            path: ${{ inputs.repository }}/target/dependency-check-report.html
-  
+          name: owasp-dependency-check
+          path: ${{ inputs.repository }}/dist/target/dependency-check-report.html
+
+      - name: Upload OWASP Dependency-Check results (non-pro repositories)
+        if: always() && inputs.repository != 'liquibase-pro'
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dependency-check
+          path: ${{ inputs.repository }}/target/dependency-check-report.html

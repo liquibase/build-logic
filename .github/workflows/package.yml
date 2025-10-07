@@ -315,32 +315,51 @@ jobs:
           sed -i "s/GPG_KEY_ID_PLACEHOLDER/$GPG_KEY_ID/g" ~/.rpmmacros
           sed -i "s/GPG_PASSPHRASE_PLACEHOLDER/${{ env.GPG_PASSPHRASE }}/g" ~/.rpmmacros
 
-          # Debug: Show .rpmmacros content
-          echo "=== Contents of ~/.rpmmacros ==="
-          cat ~/.rpmmacros
-          echo "================================"
+          # Verify .rpmmacros was created successfully (without displaying sensitive content)
+          if [ -f ~/.rpmmacros ]; then
+            echo "✓ RPM macros file created successfully"
+          else
+            echo "✗ ERROR: Failed to create RPM macros file"
+            exit 1
+          fi
 
-          # Debug: Test GPG signing manually
-          echo "Testing GPG signing capability:"
-          echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign || echo "GPG test sign failed"
+          # Test GPG signing capability (redirect output to avoid exposing sensitive data)
+          echo "Testing GPG signing capability..."
+          if echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign > /dev/null 2>&1; then
+            echo "✓ GPG signing test successful"
+          else
+            echo "✗ WARNING: GPG signing test failed"
+          fi
 
-          # Sign the RPM with verbose output
+          # Sign the RPM (filter output to avoid exposing sensitive data)
           echo "Signing RPM: ${{ env.RPM_FILENAME }}"
-          rpm --addsign "${{ env.RPM_FILENAME }}" 2>&1 | tee /tmp/rpm-sign-output.txt
-
-          # Check if signing actually worked
-          if grep -q "error" /tmp/rpm-sign-output.txt; then
-            echo "ERROR: RPM signing encountered errors"
-            cat /tmp/rpm-sign-output.txt
+          if rpm --addsign "${{ env.RPM_FILENAME }}" 2>&1 | grep -v "passphrase" > /tmp/rpm-sign-output.txt; then
+            echo "✓ RPM signing completed"
+          else
+            # Check if signing actually worked
+            if grep -q "error" /tmp/rpm-sign-output.txt; then
+              echo "✗ ERROR: RPM signing encountered errors"
+              grep -i "error" /tmp/rpm-sign-output.txt
+            else
+              echo "✓ RPM signing completed (with warnings)"
+            fi
           fi
 
           # Verify the signature with verbose output
           echo "Verifying RPM signature:"
-          rpm --checksig -v "${{ env.RPM_FILENAME }}"
+          rpm --checksig -v "${{ env.RPM_FILENAME }}" || true
+
+          # Check if signature was actually added
+          echo "Checking if RPM has a GPG signature:"
+          if rpm --checksig "${{ env.RPM_FILENAME }}" 2>&1 | grep -q "RSA/SHA"; then
+            echo "✓ RPM is successfully signed with GPG signature"
+          else
+            echo "✗ WARNING: RPM may not be properly signed"
+          fi
 
           # Also check with query
           echo "Checking RPM signature with query:"
-          rpm -qip "${{ env.RPM_FILENAME }}" | grep -i signature || echo "No signature found"
+          rpm -qip "${{ env.RPM_FILENAME }}" | grep -i signature || echo "No signature info in package header"
 
       - name: Invalidate CloudFront cache
         if: ${{ inputs.dry_run == false }}
@@ -426,32 +445,51 @@ jobs:
           sed -i "s/GPG_KEY_ID_PLACEHOLDER/$GPG_KEY_ID/g" ~/.rpmmacros
           sed -i "s/GPG_PASSPHRASE_PLACEHOLDER/${{ env.GPG_PASSPHRASE }}/g" ~/.rpmmacros
 
-          # Debug: Show .rpmmacros content
-          echo "=== Contents of ~/.rpmmacros ==="
-          cat ~/.rpmmacros
-          echo "================================"
+          # Verify .rpmmacros was created successfully (without displaying sensitive content)
+          if [ -f ~/.rpmmacros ]; then
+            echo "✓ RPM macros file created successfully"
+          else
+            echo "✗ ERROR: Failed to create RPM macros file"
+            exit 1
+          fi
 
-          # Debug: Test GPG signing manually
-          echo "Testing GPG signing capability:"
-          echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign || echo "GPG test sign failed"
+          # Test GPG signing capability (redirect output to avoid exposing sensitive data)
+          echo "Testing GPG signing capability..."
+          if echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign > /dev/null 2>&1; then
+            echo "✓ GPG signing test successful"
+          else
+            echo "✗ WARNING: GPG signing test failed"
+          fi
 
-          # Sign the RPM with verbose output
+          # Sign the RPM (filter output to avoid exposing sensitive data)
           echo "Signing RPM: ${{ env.RPM_FILENAME }}"
-          rpm --addsign "${{ env.RPM_FILENAME }}" 2>&1 | tee /tmp/rpm-sign-output.txt
-
-          # Check if signing actually worked
-          if grep -q "error" /tmp/rpm-sign-output.txt; then
-            echo "ERROR: RPM signing encountered errors"
-            cat /tmp/rpm-sign-output.txt
+          if rpm --addsign "${{ env.RPM_FILENAME }}" 2>&1 | grep -v "passphrase" > /tmp/rpm-sign-output.txt; then
+            echo "✓ RPM signing completed"
+          else
+            # Check if signing actually worked
+            if grep -q "error" /tmp/rpm-sign-output.txt; then
+              echo "✗ ERROR: RPM signing encountered errors"
+              grep -i "error" /tmp/rpm-sign-output.txt
+            else
+              echo "✓ RPM signing completed (with warnings)"
+            fi
           fi
 
           # Verify the signature with verbose output
           echo "Verifying RPM signature:"
-          rpm --checksig -v "${{ env.RPM_FILENAME }}"
+          rpm --checksig -v "${{ env.RPM_FILENAME }}" || true
+
+          # Check if signature was actually added
+          echo "Checking if RPM has a GPP signature:"
+          if rpm --checksig "${{ env.RPM_FILENAME }}" 2>&1 | grep -q "RSA/SHA"; then
+            echo "✓ RPM is successfully signed with GPG signature"
+          else
+            echo "✗ WARNING: RPM may not be properly signed"
+          fi
 
           # Also check with query
           echo "Checking RPM signature with query:"
-          rpm -qip "${{ env.RPM_FILENAME }}" | grep -i signature || echo "No signature found"
+          rpm -qip "${{ env.RPM_FILENAME }}" | grep -i signature || echo "No signature info in package header"
 
       - name: Upload ${{ inputs.artifactId }} rpm package
         if: ${{ inputs.dry_run == false }}

@@ -293,7 +293,6 @@ jobs:
           echo "Using GPG key ID: $GPG_KEY_ID"
 
           # Create RPM macros file for signing
-          mkdir -p ~/.rpmmacros
           cat > ~/.rpmmacros << EOF
           %_signature gpg
           %_gpg_name $GPG_KEY_ID
@@ -373,7 +372,6 @@ jobs:
           echo "Using GPG key ID: $GPG_KEY_ID"
 
           # Create RPM macros file for signing
-          mkdir -p ~/.rpmmacros
           cat > ~/.rpmmacros << EOF
           %_signature gpg
           %_gpg_name $GPG_KEY_ID
@@ -483,5 +481,3 @@ jobs:
           gpg --batch --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --detach-sign --armor -u "$GPG_KEY_ID" $PWD/yum/noarch/repodata/repomd.xml
 
           aws s3 sync $PWD/yum s3://repo.liquibase.com.dry.run/yum
-
-     

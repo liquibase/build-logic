@@ -295,6 +295,9 @@ jobs:
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using GPG key ID: $GPG_KEY_ID"
 
+          # Set GPG environment to avoid TTY warnings
+          export GPG_TTY=$(tty)
+          
           # Create RPM macros file for signing
           cat > ~/.rpmmacros << EOF
           %_signature gpg
@@ -302,7 +305,7 @@ jobs:
           %__gpg /usr/bin/gpg
           %_gpg_path ~/.gnupg
           %_gpgbin /usr/bin/gpg
-          %__gpg_sign_cmd %{__gpg} gpg --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
+          %__gpg_sign_cmd %{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
           EOF
 
           # Sign the RPM
@@ -377,6 +380,9 @@ jobs:
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using GPG key ID: $GPG_KEY_ID"
 
+          # Set GPG environment to avoid TTY warnings
+          export GPG_TTY=$(tty)
+          
           # Create RPM macros file for signing
           cat > ~/.rpmmacros << EOF
           %_signature gpg
@@ -384,7 +390,7 @@ jobs:
           %__gpg /usr/bin/gpg
           %_gpg_path ~/.gnupg
           %_gpgbin /usr/bin/gpg
-          %__gpg_sign_cmd %{__gpg} gpg --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
+          %__gpg_sign_cmd %{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
           EOF
 
           # Sign the RPM

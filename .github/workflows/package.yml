@@ -288,6 +288,9 @@ jobs:
           # Install rpm-sign package
           sudo apt-get install -y rpm
 
+          # Fix ownership of RPM file (alien creates it as root)
+          sudo chown $(whoami):$(whoami) "${{ env.RPM_FILENAME }}"
+
           # Get the GPG key ID
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           echo "Using GPG key ID: $GPG_KEY_ID"
@@ -366,6 +369,9 @@ jobs:
         run: |
           # Install rpm-sign package
           sudo apt-get install -y rpm
+
+          # Fix ownership of RPM file (alien creates it as root)
+          sudo chown $(whoami):$(whoami) "${{ env.RPM_FILENAME }}"
 
           # Get the GPG key ID
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')

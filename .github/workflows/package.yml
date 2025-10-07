@@ -126,8 +126,6 @@ jobs:
           permission-actions: write
 
       - uses: actions/checkout@v4
-        with:
-          ref: rpm-update
 
       - name: Set up Java
         uses: actions/setup-java@v4

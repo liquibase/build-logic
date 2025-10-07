@@ -118,11 +118,7 @@ jobs:
         if: inputs.repository == 'liquibase-pro'
         run: |
           cd ${{ inputs.repository }}
-          # First build the pro module which contains liquibase-commercial
-          mvn -B -f pro/pom.xml clean install -DskipTests
-          # Then build the core module
-          mvn -B -f core/pom.xml clean install -DskipTests
-          # Finally build using pom-pro-distribution.xml which includes all dependencies
+          # Build using pom-pro-distribution.xml which includes all dependencies
           mvn -B -f pom-pro-distribution.xml clean install -DskipTests -P '!oss,!obfuscate,!run-proguard'
 
       - name: Set versions for liquibase-pro dist

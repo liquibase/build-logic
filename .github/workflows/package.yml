@@ -305,13 +305,13 @@ jobs:
           
           # Create RPM macros file for signing (no indentation)
           cat > ~/.rpmmacros << 'MACROS_EOF'
-          %_signature gpg
-          %_gpg_name GPG_KEY_ID_PLACEHOLDER
-          %__gpg /usr/bin/gpg
-          %_gpg_path ~/.gnupg
-          %_gpgbin /usr/bin/gpg
-          %__gpg_sign_cmd %{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase "GPG_PASSPHRASE_PLACEHOLDER" --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
-          MACROS_EOF
+%_signature gpg
+%_gpg_name GPG_KEY_ID_PLACEHOLDER
+%__gpg /usr/bin/gpg
+%_gpg_path ~/.gnupg
+%_gpgbin /usr/bin/gpg
+%__gpg_sign_cmd %{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase "GPG_PASSPHRASE_PLACEHOLDER" --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
+MACROS_EOF
 
           # Replace placeholders in .rpmmacros
           sed -i "s/GPG_KEY_ID_PLACEHOLDER/$GPG_KEY_ID/g" ~/.rpmmacros
@@ -404,13 +404,13 @@ jobs:
           
           # Create RPM macros file for signing (no indentation)
           cat > ~/.rpmmacros << 'MACROS_EOF'
-          %_signature gpg
-          %_gpg_name GPG_KEY_ID_PLACEHOLDER
-          %__gpg /usr/bin/gpg
-          %_gpg_path ~/.gnupg
-          %_gpgbin /usr/bin/gpg
-          %__gpg_sign_cmd %{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase "GPG_PASSPHRASE_PLACEHOLDER" --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
-          MACROS_EOF
+%_signature gpg
+%_gpg_name GPG_KEY_ID_PLACEHOLDER
+%__gpg /usr/bin/gpg
+%_gpg_path ~/.gnupg
+%_gpgbin /usr/bin/gpg
+%__gpg_sign_cmd %{__gpg} --batch --no-verbose --no-armor --pinentry-mode loopback --passphrase "GPG_PASSPHRASE_PLACEHOLDER" --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
+MACROS_EOF
 
           # Replace placeholders in .rpmmacros
           sed -i "s/GPG_KEY_ID_PLACEHOLDER/$GPG_KEY_ID/g" ~/.rpmmacros

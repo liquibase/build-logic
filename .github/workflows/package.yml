@@ -683,7 +683,7 @@ jobs:
 
           echo "✓ RPM repository updated successfully"
 
-      - name: Check for existing Homebrew formula PR for ${{ inputs.distribution }}
+      - name: Check for existing Homebrew cask PR for ${{ inputs.distribution }}
         if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') }}
         continue-on-error: true
         id: check-brew-pr
@@ -694,8 +694,8 @@ jobs:
           # Define the PR title
           pr_title="${{ inputs.distribution }} ${{ inputs.version }}"
 
-          # Search for open pull requests with the specified title in the Homebrew/homebrew-core repo
-          pr_title=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
+          # Search for open pull requests with the specified title in the Homebrew/homebrew-cask repo
+          pr_title=$(gh pr list --repo Homebrew/homebrew-cask --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
           echo "pr_title: $pr_title"
           # Set the environment variable based on whether the PR exists
           if [ -z "$pr_title" ]; then
@@ -710,22 +710,17 @@ jobs:
           # Echo it immediately to see the value in logs
           echo "PR_EXISTS is set to $PR_EXISTS"
 
-      - name: Update Homebrew formula for ${{ inputs.distribution }}
+      - name: Update Homebrew cask for ${{ inputs.distribution }}
         if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         continue-on-error: true
-        uses: mislav/bump-homebrew-formula-action@v3
+        uses: macauley/action-homebrew-bump-cask@v1
         with:
-          formula-name: ${{ inputs.distribution }}
-          formula-path: Formula/l/${{ inputs.distribution }}.rb
-          homebrew-tap: Homebrew/homebrew-core
-          tag-name: ${{ inputs.version }}
-          download-url: ${{ inputs.distribution == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/v{1}/{2}-{1}.tar.gz', inputs.download_base_url, inputs.version, inputs.artifactId) }}
-          commit-message: |
-            {{formulaName}} {{version}}
-
-            Created by https://github.com/mislav/bump-homebrew-formula-action
-        env:
-          COMMITTER_TOKEN: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
+          token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
+          tap: Homebrew/homebrew-cask
+          cask: ${{ inputs.distribution }}
+          tag: ${{ inputs.version }}
+          livecheck: false
+          dryrun: false
 
       # This step captures the PR details after it has been created
       # and stores the PR number and URL in GitHub outputs for later use.
@@ -749,7 +744,7 @@ jobs:
                 }
               }
             }
-          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
+          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-cask liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
 
           if [ ! -z "$PR_DATA" ]; then
             echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT

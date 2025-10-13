@@ -85,7 +85,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Set up JDK for Build
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: 21
           distribution: 'temurin'
@@ -299,7 +299,7 @@ jobs:
           fi
 
       - name: Set up JDK for Sonar
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: 21
           distribution: 'temurin'

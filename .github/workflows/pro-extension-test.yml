@@ -396,7 +396,7 @@ jobs:
               }
             ]
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ matrix.os }}-${{needs.build.outputs.artifact_version}}-artifacts
           path: ./target
@@ -507,19 +507,19 @@ jobs:
           echo "Artifact Version: ${ARTIFACT_VERSION}"
 
       - name: Download Ubuntu Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-macos-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/macos
 
       - name: Download Windows Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/windows

@@ -83,7 +83,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `fossa_ai.yml`                          | Scans code for AI-generated content and runs FOSSA license compliance                                                   |
 | `generate-upload-fossa-report.yml`      | Generates and uploads license reports to FOSSA                                                                          |
 | `lth-docker.yml`                        | Runs Liquibase Test Harness on Docker-based databases                                                                   |
-|| `extension-automated-release.yml`       | Unified workflow for OSS and commercial extension releases with automatic publishing to Maven Central |
+| `extension-automated-release.yml`       | Unified workflow for OSS and commercial extension releases with automatic publishing to Maven Central |
 | `os-extension-test.yml`                 | Unit tests across build matrix on previously built artifact                                                             |
 | `owasp-scanner.yml`                     | Runs vulnerability scans using OWASP dependency checker                                                                 |
 | `package.yml`                           | Creates and distributes Linux packages (deb, rpm) and updates platform-specific repositories                            |

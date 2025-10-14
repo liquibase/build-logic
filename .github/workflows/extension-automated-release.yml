@@ -58,20 +58,22 @@ jobs:
           repositories: ${{ matrix.repository }}
 
       - name: Security
+        env:
+          REPOSITORY: ${{ matrix.repository }}
         run: |
           security_fail=false
-          echo "INFO: Checking repository: ${{ matrix.repository }}"
-          security_url="https://api.github.com/repos/liquibase/${{ matrix.repository }}/dependabot/alerts?state=open"
+          echo "INFO: Checking repository: $REPOSITORY"
+          security_url="https://api.github.com/repos/liquibase/$REPOSITORY/dependabot/alerts?state=open"
           response=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" $security_url | jq length)
           echo "INFO: Open Alerts: $response"
           if [[ $response == "0" ]]; then
-            echo "INFO: Security vulnerabilities for ${{ matrix.repository }} are addressed."
+            echo "INFO: Security vulnerabilities for $REPOSITORY are addressed."
           else
-            echo "ERROR: Security vulnerabilities for ${{ matrix.repository }} are not addressed."
+            echo "ERROR: Security vulnerabilities for $REPOSITORY are not addressed."
             security_fail=true
           fi
           if [[ $security_fail == true ]]; then
-            echo "ERROR: Security vulnerabilities are not addressed for ${{ matrix.repository }}"
+            echo "ERROR: Security vulnerabilities are not addressed for $REPOSITORY"
             exit 1
           fi
 

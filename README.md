@@ -67,9 +67,9 @@ Please review the below table of reusable workflows and their descriptions:
 
 | Workflow                                | Description                                                                                                             |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-|| `build-artifact.yml`                    | Runs maven build and saves artifacts                                                                                    |
-|| `build-extension-jar.yml`               | Builds and deploys extension JARs to GitHub Package Manager                                                             |
-|| `cleanup-individual-artifacts.yml`      | Cleans up individual OS-specific artifacts across multiple operating systems                                            |
+| `build-artifact.yml`                    | Runs maven build and saves artifacts                                                                                    |
+| `build-extension-jar.yml`               | Builds and deploys extension JARs to GitHub Package Manager                                                             |
+| `cleanup-individual-artifacts.yml`      | Cleans up individual OS-specific artifacts across multiple operating systems                                            |
 | `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                                                                 |
 | `dependabot-automerge.yml` | Automatically merges Dependabot PRs for minor and patch updates                                                                      |
 | `fossa_ai.yml`                          | Runs FOSSA Scan for AI Generated Code                                                                                   |

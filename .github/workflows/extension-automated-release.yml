@@ -354,15 +354,16 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           TOKEN: ${{ steps.get-token.outputs.token }}
+          REPOSITORY: ${{ matrix.repository }}
         run: |
-          echo "INFO: Checking repository: ${{ matrix.repository }}"
+          echo "INFO: Checking repository: $REPOSITORY"
           
           # Get the latest published release for this version
-          RELEASE_DATA=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $TOKEN" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/tags/v$VERSION")
+          RELEASE_DATA=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $TOKEN" "https://api.github.com/repos/liquibase/$REPOSITORY/releases/tags/v$VERSION")
           
           # Check if release exists and is published
           if echo "$RELEASE_DATA" | jq -e '.draft == false' > /dev/null; then
-            echo "INFO: Found published release v$VERSION for ${{ matrix.repository }}"
+            echo "INFO: Found published release v$VERSION for $REPOSITORY"
             
             # Create working directory
             mkdir -p artifacts

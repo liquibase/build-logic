@@ -351,15 +351,17 @@ jobs:
 
       - name: Check for published release and download artifacts
         id: download-artifacts
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           echo "INFO: Checking repository: ${{ matrix.repository }}"
           
           # Get the latest published release for this version
-          RELEASE_DATA=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/tags/v${{ inputs.version }}")
+          RELEASE_DATA=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/tags/v$VERSION")
           
           # Check if release exists and is published
           if echo "$RELEASE_DATA" | jq -e '.draft == false' > /dev/null; then
-            echo "INFO: Found published release v${{ inputs.version }} for ${{ matrix.repository }}"
+            echo "INFO: Found published release v$VERSION for ${{ matrix.repository }}"
             
             # Create working directory
             mkdir -p artifacts
@@ -391,13 +393,13 @@ jobs:
               echo "ARTIFACT_ID=$ARTIFACT_ID" >> $GITHUB_OUTPUT
               echo "has_artifacts=true" >> $GITHUB_OUTPUT
               
-              echo "INFO: Found artifacts for $GROUP_ID:$ARTIFACT_ID:${{ inputs.version }}"
+              echo "INFO: Found artifacts for $GROUP_ID:$ARTIFACT_ID:$VERSION"
             else
               echo "WARNING: No POM file found"
               echo "has_artifacts=false" >> $GITHUB_OUTPUT
             fi
           else
-            echo "WARNING: No published release found for v${{ inputs.version }}"
+            echo "WARNING: No published release found for v$VERSION"
             echo "has_artifacts=false" >> $GITHUB_OUTPUT
           fi
 

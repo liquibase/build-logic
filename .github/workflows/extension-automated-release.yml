@@ -124,10 +124,11 @@ jobs:
       - name: Run dependabot on extension
         env:
           LOCAL_GITHUB_ACCESS_TOKEN: ${{ steps.get-token.outputs.token }}
+          REPOSITORY: ${{ matrix.repository }}
         run: |
-          echo "INFO: Running Dependabot on repository: ${{ matrix.repository }}"
-          dependabot update maven "liquibase/${{ matrix.repository }}"
-          echo "INFO: Dependabot update completed for ${{ matrix.repository }}"
+          echo "INFO: Running Dependabot on repository: $REPOSITORY"
+          dependabot update maven "liquibase/$REPOSITORY"
+          echo "INFO: Dependabot update completed for $REPOSITORY"
 
   update-pom:
     needs: check-security-vulnerabilities

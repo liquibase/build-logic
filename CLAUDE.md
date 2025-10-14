@@ -20,7 +20,7 @@ This is the Liquibase build-logic repository containing reusable GitHub Actions 
 2. **pro-extension-test.yml** - Tests Pro extensions with license key support
 3. **extension-release-prepare.yml** - Prepares release artifacts
 4. **extension-release-published.yml** - Publishes to Maven Central
-5. **os-extension-automated-release.yml** - Automated release via Sonatype Central Portal API
+5. **extension-automated-release.yml** - Automated release via Sonatype Central Portal API
 
 #### Package Management
 - **package.yml** - Creates Linux packages (deb/rpm)

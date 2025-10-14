@@ -67,10 +67,9 @@ Please review the below table of reusable workflows and their descriptions:
 
 | Workflow                                | Description                                                                                                             |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `build-artifact.yml`                    | Runs maven build and saves artifacts                                                                                    |
-| `build-extension-jar.yml`               | Builds and deploys extension JARs to GitHub Package Manager                                                             |
-| `cleanup-individual-artifacts.yml`      | Cleans up individual OS-specific artifacts across multiple operating systems                                            |
-| `codeql.yml`                            | Runs CodeQL scanning                                                                                                    |
+|| `build-artifact.yml`                    | Runs maven build and saves artifacts                                                                                    |
+|| `build-extension-jar.yml`               | Builds and deploys extension JARs to GitHub Package Manager                                                             |
+|| `cleanup-individual-artifacts.yml`      | Cleans up individual OS-specific artifacts across multiple operating systems                                            |
 | `create-release.yml`                    | Runs Release Drafter to auto create draft release notes                                                                 |
 | `dependabot-automerge.yml` | Automatically merges Dependabot PRs for minor and patch updates                                                                      |
 | `fossa_ai.yml`                          | Runs FOSSA Scan for AI Generated Code                                                                                   |
@@ -84,7 +83,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `fossa_ai.yml`                          | Scans code for AI-generated content and runs FOSSA license compliance                                                   |
 | `generate-upload-fossa-report.yml`      | Generates and uploads license reports to FOSSA                                                                          |
 | `lth-docker.yml`                        | Runs Liquibase Test Harness on Docker-based databases                                                                   |
-| `os-extension-automated-release.yml`    | Publishes draft releases and automatically publishes extensions to Maven Central via Sonatype Central Portal API. Details [here](./doc/os-extension-automated-release.md) |
+|| `extension-automated-release.yml`       | Unified workflow for OSS and commercial extension releases with automatic publishing to Maven Central |
 | `os-extension-test.yml`                 | Unit tests across build matrix on previously built artifact                                                             |
 | `owasp-scanner.yml`                     | Runs vulnerability scans using OWASP dependency checker                                                                 |
 | `package.yml`                           | Creates and distributes Linux packages (deb, rpm) and updates platform-specific repositories                            |
@@ -636,3 +635,218 @@ Our approach to selecting tokens follows these principles:
 5. **Separate tokens** for different types of operations (deployment vs. reading)
 
 This strategy helps us maintain security while ensuring our CI/CD workflows operate smoothly with appropriate permissions.
+
+## Unified Extension Automated Release (OSS & Commercial)
+
+The `extension-automated-release.yml` workflow is a unified release automation for both OSS and commercial/secure Liquibase extensions. It automatically publishes extensions to Maven Central.
+
+**Supports:**
+- **OSS Extensions:** BigQuery, Cache, Cassandra, CosmosDB, DB2i, FileChangelog, NoChangeLock, HanaDB, MaxDB, Modify Column, MSSQL, Oracle, PostgreSQL, Redshift, SQLFire, Teradata, Vertica, YugabyteDB, Hibernate, Parent POM
+- **Commercial Extensions:** BigQuery, Databricks, MongoDB, Azure, AWS
+
+### Triggering the Workflow
+
+The workflow is called from orchestrator workflows in different repositories:
+
+**For OSS Extensions** (liquibase repository):
+```yml
+name: Release Extensions
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Liquibase Version'
+        required: true
+
+jobs:
+  automated-os-extensions-release:
+    uses: liquibase/build-logic/.github/workflows/extension-automated-release.yml@main
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+      # Uses default OSS extension list
+```
+
+**For Commercial/Secure Extensions** (liquibase-pro repository):
+```yml
+name: Release Secure Extensions
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Liquibase Secure Version (e.g., 5.0.0, 5.0.1)'
+        required: true
+
+jobs:
+  automated-secure-extensions-release:
+    uses: liquibase/build-logic/.github/workflows/extension-automated-release.yml@main
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+      repositories: '["liquibase-commercial-bigquery","liquibase-commercial-databricks","liquibase-commercial-mongodb","liquibase-azure-extension","liquibase-aws-extension"]'
+```
+
+**To manually trigger a release:**
+
+**For OSS Extensions:**
+1. Navigate to the `liquibase` repository on GitHub
+2. Go to **Actions** → **Release Extensions**
+3. Click **Run workflow**
+4. Enter the version number (e.g., `4.26.0`)
+5. Click **Run workflow** to start
+
+**For Commercial Extensions:**
+1. Navigate to the `liquibase-pro` repository on GitHub
+2. Go to **Actions** → **Release Secure Extensions**
+3. Click **Run workflow**
+4. Enter the version number (e.g., `4.26.0`)
+5. Click **Run workflow** to start
+
+### Workflow Inputs
+
+- **version** (required): Version to release in semantic versioning format (e.g., `4.26.0`, `4.26.1`)
+- **repositories** (optional): JSON array of repository names to release
+  - Default: `["liquibase-bigquery", "liquibase-databricks", "liquibase-mongodb", "liquibase-azure", "liquibase-aws"]`
+  - Can be customized to release specific extensions only
+
+### Workflow Jobs
+
+The workflow executes the following jobs in sequence:
+
+#### 1. **check-security-vulnerabilities**
+- Runs in parallel across all specified extension repositories
+- Checks for open Dependabot security alerts using GitHub API
+- Fails if any open security vulnerabilities are found
+- Uses matrix strategy with `fail-fast: false` to check all repositories
+
+**Log Messages:**
+- INFO: "Checking repository: {repository}"
+- INFO: "Security vulnerabilities for {repository} are addressed."
+- ERROR: "Security vulnerabilities for {repository} are not addressed."
+
+#### 2. **run-extensions-dependabot**
+- Depends on: `check-security-vulnerabilities`
+- Installs and runs Dependabot CLI on each extension repository
+- Updates Maven dependencies automatically
+- Runs in parallel across all repositories
+
+#### 3. **update-pom**
+- Depends on: `check-security-vulnerabilities`
+- Updates extension versions to next SNAPSHOT
+- Updates `liquibase.version` property in pom.xml
+- Commits and pushes changes if modified
+- Configures Maven settings for both `liquibase` and `liquibase-pro` repositories
+
+**Important:** Maven settings include access to both OSS and Pro packages for commercial extension dependencies.
+
+#### 4. **release-draft-releases**
+- Depends on: `update-pom`
+- Waits 180 seconds for artifacts to be available
+- Finds draft releases containing the specified version
+- Publishes draft releases (sets `draft: false`)
+- Tracks published releases
+
+#### 5. **publish-to-central-portal**
+- Depends on: `release-draft-releases`
+- Waits 120 seconds for releases to be fully available
+- Downloads artifacts from published GitHub releases (jar, pom, asc, md5, sha1)
+- Creates Maven repository layout bundles
+- Uploads to Sonatype Central Portal with **AUTOMATIC** publishing
+- Publishes to Maven Central (same as OSS extensions)
+
+**Artifact Types Downloaded:**
+- `.jar` - Extension JAR file
+- `.pom` - Maven POM file
+- `.asc` - GPG signatures (code signing)
+- `.md5` and `.sha1` - Checksums
+
+### Requirements
+
+#### Repository Structure
+
+Each commercial extension repository must:
+
+1. Have a LICENSE file (LICENSE, LICENSE.md, or LICENSE.txt) in the root
+2. Include FSL license headers in Java source files
+3. Follow Maven project structure with pom.xml
+4. Have draft releases ready with signed artifacts
+
+#### Secrets Required
+
+The following secrets must be available in AWS Secrets Manager (`/vault/liquibase`):
+
+- `LIQUIBASE_GITHUB_APP_ID` - GitHub App ID for repository access
+- `LIQUIBASE_GITHUB_APP_PRIVATE_KEY` - GitHub App private key
+- `LIQUIBOT_PAT_GPM_ACCESS` - GitHub PAT for Maven Package access
+- `SONATYPE_USERNAME` - Sonatype Central Portal username
+- `SONATYPE_TOKEN` - Sonatype Central Portal token
+
+#### Permissions
+
+The workflow requires:
+- `contents: write` - For releasing and updating repositories
+- `security-events: read` - For checking Dependabot alerts
+- `packages: write` - For Maven package operations
+- `id-token: write` - For OIDC authentication with AWS
+
+### Troubleshooting
+
+#### Common Issues
+
+**Issue: Security vulnerabilities not addressed**
+- **Cause**: Open Dependabot alerts in repository
+- **Solution**: Review and fix Dependabot alerts before releasing
+- **Check**: GitHub repository → Security → Dependabot alerts
+
+**Issue: No artifacts found in release**
+- **Cause**: Draft release doesn't contain artifacts for the specified version
+- **Solution**: Ensure draft release is created with proper version tag
+- **Check**: GitHub repository → Releases → Draft releases
+
+**Issue: Maven Central upload failed**
+- **Cause**: Invalid credentials or artifact bundle structure
+- **Solution**: Verify SONATYPE_USERNAME and SONATYPE_TOKEN in vault
+- **Check**: Sonatype Central Portal deployment logs
+
+**Issue: POM update failed**
+- **Cause**: Maven settings not configured or missing dependencies
+- **Solution**: Verify both liquibase and liquibase-pro repository access
+- **Check**: Ensure LIQUIBOT_PAT_GPM_ACCESS is valid
+
+### Release Process Flow
+
+```mermaid
+graph TB
+    A[Manual Trigger from liquibase or liquibase-pro] --> B[Check Security Vulnerabilities]
+    B --> C{All Extensions Clean?}
+    C -->|No| D[Fail Workflow]
+    C -->|Yes| E[Run Dependabot]
+    E --> F[Update POMs]
+    F --> G[Release Draft Releases]
+    G --> H[Wait for Artifacts]
+    H --> I[Download Artifacts]
+    I --> J[Create Maven Bundles]
+    J --> K[Upload to Central Portal]
+    K --> L[Publish to Maven Central]
+    L --> M[Archive Results]
+    
+    style A fill:#e1f5ff
+    style L fill:#e8f5e9
+```
+
+### Success Criteria
+
+A successful release completes when:
+
+1. ✅ All security vulnerabilities addressed across all extensions
+2. ✅ POM versions updated and committed
+3. ✅ Draft releases published to GitHub
+4. ✅ Artifacts uploaded to Maven Central via Sonatype Central Portal
+5. ✅ Deployment IDs logged for tracking
+
+### Monitoring
+
+- **GitHub Actions**: View workflow runs in `liquibase` (OSS) or `liquibase-pro` (commercial) repositories
+- **Maven Central**: Track deployment status at https://central.sonatype.com/publishing/deployments
+- **Artifacts**: Published extensions artifact uploaded with deployment IDs
+- **Logs**: All jobs log INFO/WARNING/ERROR messages for easy debugging

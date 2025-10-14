@@ -690,7 +690,7 @@ jobs:
         id: check-brew-pr
         run: |
           # Authenticate GitHub CLI
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
           # Define the PR title
           pr_title="${{ inputs.distribution }} ${{ inputs.version }}"
@@ -767,7 +767,7 @@ jobs:
         id: check-brew-pr
         run: |
           # Authenticate GitHub CLI
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
           # Define the PR title
           pr_title="${{ inputs.distribution }} ${{ inputs.version }}"

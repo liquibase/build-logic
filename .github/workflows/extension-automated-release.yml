@@ -1,4 +1,4 @@
-name: Automated OS Extension Release
+name: Automated Extension Release
 
 on:
   workflow_call:
@@ -58,20 +58,22 @@ jobs:
           repositories: ${{ matrix.repository }}
 
       - name: Security
+        env:
+          REPOSITORY: ${{ matrix.repository }}
         run: |
           security_fail=false
-          echo "Checking repository: ${{ matrix.repository }}"
-          security_url="https://api.github.com/repos/liquibase/${{ matrix.repository }}/dependabot/alerts?state=open"
+          echo "INFO: Checking repository: $REPOSITORY"
+          security_url="https://api.github.com/repos/liquibase/$REPOSITORY/dependabot/alerts?state=open"
           response=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" $security_url | jq length)
-          echo "Open Alerts: $response"
+          echo "INFO: Open Alerts: $response"
           if [[ $response == "0" ]]; then
-            echo "Security vulnerabilities for ${{ matrix.repository }} are addressed."
+            echo "INFO: Security vulnerabilities for $REPOSITORY are addressed."
           else
-            echo "Security vulnerabilities for ${{ matrix.repository }} are not addressed."
+            echo "ERROR: Security vulnerabilities for $REPOSITORY are not addressed."
             security_fail=true
           fi
           if [[ $security_fail == true ]]; then
-            echo "Security vulnerabilities are not addressed for ${{ matrix.repository }}"
+            echo "ERROR: Security vulnerabilities are not addressed for $REPOSITORY"
             exit 1
           fi
 
@@ -110,19 +112,23 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
+          echo "INFO: Installing Dependabot CLI"
           gh release download --repo dependabot/cli -p "*linux-amd64.tar.gz"
           tar xzvf *.tar.gz >/dev/null 2>&1
           chmod +x dependabot
           sudo mv dependabot /usr/local/bin
           dependabot --version
+          echo "INFO: Dependabot CLI installed successfully"
 
       # https://github.com/dependabot/cli?tab=readme-ov-file#dependabot-update
       - name: Run dependabot on extension
         env:
           LOCAL_GITHUB_ACCESS_TOKEN: ${{ steps.get-token.outputs.token }}
+          REPOSITORY: ${{ matrix.repository }}
         run: |
-          echo "Running Dependabot on repository: ${{ matrix.repository }}"
-          dependabot update maven "liquibase/${{ matrix.repository }}"
+          echo "INFO: Running Dependabot on repository: $REPOSITORY"
+          dependabot update maven "liquibase/$REPOSITORY"
+          echo "INFO: Dependabot update completed for $REPOSITORY"
 
   update-pom:
     needs: check-security-vulnerabilities
@@ -213,19 +219,24 @@ jobs:
 
       - name: Update extension version to next SNAPSHOT
         if: ${{ matrix.repository != 'liquibase-parent-pom' }}
-        run: mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
+        run: |
+          echo "INFO: Updating extension version to ${{ inputs.version }}-SNAPSHOT"
+          mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
+          echo "INFO: Extension version updated"
 
       - name: Update pom.xml
         run: |
+          echo "INFO: Updating liquibase.version in pom.xml to ${{ inputs.version }}"
           sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
           git add pom.xml
           # Check if there are changes before committing
           if git diff-index --quiet HEAD --; then
-            echo "No changes to commit."
+            echo "INFO: No changes to commit."
           else
             git commit -m "Update liquibase.version to ${{ inputs.version }}"
             git remote set-url origin https://x-access-token:${{ steps.get-token.outputs.token }}@github.com/liquibase/${{ matrix.repository }}.git
             git push
+            echo "INFO: Changes committed and pushed successfully"
           fi
 
   release-draft-releases:
@@ -266,37 +277,35 @@ jobs:
           
       - name: Check for Artifact in Draft Releases
         run: |
+          echo "INFO: Waiting for artifacts to be available..."
           sleep 180
           published_drafts_file=published_drafts.txt
           found=false
-          echo "Checking repository: ${{ matrix.repository }}"
+          echo "INFO: Checking repository: ${{ matrix.repository }}"
           assets=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases" | jq -r '.[] | select(.draft == true)' | jq -r '.assets[]')
-          echo "Assets: $assets"
+          echo "INFO: Assets: $assets"
           # check if assests are empty
           if [ -z "$assets" ]; then
-            echo "No assets found"
+            echo "WARNING: No assets found"
           else
             if echo "$assets" | jq -e '.name | contains("${{ inputs.version }}")' > /dev/null; then
               found=true
-              echo "Found an asset containing '${{ inputs.version }}'"
+              echo "INFO: Found an asset containing '${{ inputs.version }}'"
             else
-              echo "No asset containing '${{ inputs.version }}' found"
+              echo "WARNING: No asset containing '${{ inputs.version }}' found"
             fi
             if [ "$found" = true ] ; then
               # Get the draft release ID
               RELEASE_ID=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases" | jq -r '[.[] | select(.draft == true)] | sort_by(.created_at) | last | .id')
-              echo "Newest Draft release ID: $RELEASE_ID"
+              echo "INFO: Newest Draft release ID: $RELEASE_ID"
               RELEASE_TITLE="v${{ inputs.version }}"
-              # Update the release title
-              # echo "Updating release title to $RELEASE_TITLE... for ${{ matrix.repository }}"
-              # curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" -d '{"name": "'"$RELEASE_TITLE"'"}' "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
               # Publish the draft release as the latest release
-              echo "Publishing the draft release as the latest release to https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
+              echo "INFO: Publishing the draft release as the latest release to https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
               curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" -d '{"draft": false}' "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/$RELEASE_ID"
-              echo "Draft release published as the latest release for ${{ matrix.repository }}"
+              echo "INFO: Draft release published as the latest release for ${{ matrix.repository }}"
               echo "${{ matrix.repository }}: v${{ inputs.version }}" >> $published_drafts_file
             else
-              echo "No artifact containing '${{ inputs.version }}' found in the last draft release."
+              echo "WARNING: No artifact containing '${{ inputs.version }}' found in the last draft release."
             fi
           fi
 
@@ -336,19 +345,25 @@ jobs:
           repositories: ${{ matrix.repository }}
 
       - name: Wait for GitHub releases to be available
-        run: sleep 120
+        run: |
+          echo "INFO: Waiting for GitHub releases to be available..."
+          sleep 120
 
       - name: Check for published release and download artifacts
         id: download-artifacts
+        env:
+          VERSION: ${{ inputs.version }}
+          TOKEN: ${{ steps.get-token.outputs.token }}
+          REPOSITORY: ${{ matrix.repository }}
         run: |
-          echo "Checking repository: ${{ matrix.repository }}"
+          echo "INFO: Checking repository: $REPOSITORY"
           
           # Get the latest published release for this version
-          RELEASE_DATA=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" "https://api.github.com/repos/liquibase/${{ matrix.repository }}/releases/tags/v${{ inputs.version }}")
+          RELEASE_DATA=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $TOKEN" "https://api.github.com/repos/liquibase/$REPOSITORY/releases/tags/v$VERSION")
           
           # Check if release exists and is published
           if echo "$RELEASE_DATA" | jq -e '.draft == false' > /dev/null; then
-            echo "Found published release v${{ inputs.version }} for ${{ matrix.repository }}"
+            echo "INFO: Found published release v$VERSION for $REPOSITORY"
             
             # Create working directory
             mkdir -p artifacts
@@ -358,15 +373,15 @@ jobs:
             ASSETS=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | test("\\.(jar|pom|asc|md5|sha1)$")) | .browser_download_url')
             
             if [ -z "$ASSETS" ]; then
-              echo "No artifacts found in release"
+              echo "WARNING: No artifacts found in release"
               echo "has_artifacts=false" >> $GITHUB_OUTPUT
               exit 0
             fi
             
-            echo "Downloading artifacts..."
+            echo "INFO: Downloading artifacts..."
             for asset_url in $ASSETS; do
-              echo "Downloading: $asset_url"
-              curl -L -H "Authorization: Bearer ${{ steps.get-token.outputs.token }}" -o "$(basename "$asset_url")" "$asset_url"
+              echo "INFO: Downloading: $asset_url"
+              curl -L -H "Authorization: Bearer $TOKEN" -o "$(basename "$asset_url")" "$asset_url"
             done
             
             # Get artifact info from pom file
@@ -380,13 +395,13 @@ jobs:
               echo "ARTIFACT_ID=$ARTIFACT_ID" >> $GITHUB_OUTPUT
               echo "has_artifacts=true" >> $GITHUB_OUTPUT
               
-              echo "Found artifacts for $GROUP_ID:$ARTIFACT_ID:${{ inputs.version }}"
+              echo "INFO: Found artifacts for $GROUP_ID:$ARTIFACT_ID:$VERSION"
             else
-              echo "No POM file found"
+              echo "WARNING: No POM file found"
               echo "has_artifacts=false" >> $GITHUB_OUTPUT
             fi
           else
-            echo "No published release found for v${{ inputs.version }}"
+            echo "WARNING: No published release found for v$VERSION"
             echo "has_artifacts=false" >> $GITHUB_OUTPUT
           fi
 
@@ -398,6 +413,8 @@ jobs:
           GROUP_ID="${{ steps.download-artifacts.outputs.GROUP_ID }}"
           ARTIFACT_ID="${{ steps.download-artifacts.outputs.ARTIFACT_ID }}"
           VERSION="${{ inputs.version }}"
+          
+          echo "INFO: Creating Maven bundle for ${ARTIFACT_ID}-${VERSION}"
           
           # Create Maven repository layout structure for the bundle
           GROUP_PATH=$(echo "$GROUP_ID" | tr '.' '/')
@@ -411,11 +428,13 @@ jobs:
           zip -r ../central-bundle.zip .
           cd ..
           
+          echo "INFO: Maven bundle created successfully"
+          
           # Create base64 encoded credentials for Bearer auth
           AUTH_HEADER=$(printf "%s:%s" "${{ env.SONATYPE_USERNAME }}" "${{ env.SONATYPE_TOKEN }}" | base64 -w 0)
           
           # Upload bundle to Central Portal with AUTOMATIC publishing
-          echo "Uploading bundle to Central Portal for ${ARTIFACT_ID}-${VERSION}..."
+          echo "INFO: Uploading bundle to Sonatype Central Portal for ${ARTIFACT_ID}-${VERSION}..."
           UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST \
             -H "Authorization: Bearer ${AUTH_HEADER}" \
@@ -426,18 +445,18 @@ jobs:
           HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
           DEPLOYMENT_ID=$(echo "$UPLOAD_RESPONSE" | head -n1)
           
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Deployment ID: $DEPLOYMENT_ID"
+          echo "INFO: HTTP Status: $HTTP_CODE"
+          echo "INFO: Deployment ID: $DEPLOYMENT_ID"
           
           if [ "$HTTP_CODE" != "201" ]; then
-            echo "Upload failed with HTTP status $HTTP_CODE"
-            echo "Response: $DEPLOYMENT_ID"
+            echo "ERROR: Upload failed with HTTP status $HTTP_CODE"
+            echo "ERROR: Response: $DEPLOYMENT_ID"
             exit 1
           fi
           
-          echo "Bundle uploaded successfully to Central Portal"
-          echo "Deployment ID: $DEPLOYMENT_ID"
-          echo "Automatic publishing initiated for ${ARTIFACT_ID}-${VERSION}"
+          echo "INFO: Bundle uploaded successfully to Central Portal"
+          echo "INFO: Deployment ID: $DEPLOYMENT_ID"
+          echo "INFO: Automatic publishing initiated for ${ARTIFACT_ID}-${VERSION}"
           
           # Track successful upload
           echo "${{ matrix.repository }}: ${ARTIFACT_ID}-${VERSION} (${DEPLOYMENT_ID})" >> ../published_extensions.txt

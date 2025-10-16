@@ -106,7 +106,6 @@ jobs:
           app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
           private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ${{ matrix.repository }}
           
       - name: Install Dependabot CLI
         env:
@@ -123,7 +122,7 @@ jobs:
       # https://github.com/dependabot/cli?tab=readme-ov-file#dependabot-update
       - name: Run dependabot on extension
         env:
-          LOCAL_GITHUB_ACCESS_TOKEN: ${{ env.LIQUIBOT_PAT_GPM_ACCESS  }}
+          LOCAL_GITHUB_ACCESS_TOKEN: ${{ steps.get-token.outputs.token }}
           REPOSITORY: ${{ matrix.repository }}
         run: |
           echo "INFO: Running Dependabot on repository: $REPOSITORY"

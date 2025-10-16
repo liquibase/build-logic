@@ -126,8 +126,30 @@ jobs:
           REPOSITORY: ${{ matrix.repository }}
         run: |
           echo "INFO: Running Dependabot on repository: $REPOSITORY"
-          dependabot update maven "liquibase/$REPOSITORY"
-          echo "INFO: Dependabot update completed for $REPOSITORY"
+
+          set +e
+          output=$(dependabot update maven "liquibase/$REPOSITORY" 2>&1)
+          exit_code=$?
+          set -e
+
+          echo "$output"
+
+          if [ $exit_code -ne 0 ]; then
+            # Check for BigQuery-only failure
+            if echo "$output" | grep -qE "(com\.simba\.googlebigquery\.jdbc:GoogleBigQueryJDBC42.*private_source_authentication_failure|GoogleBigQueryJDBC42.*private_source_authentication_failure)"; then
+              echo "WARNING: Known issue - GoogleBigQueryJDBC42 authentication failed"
+              echo "INFO: This dependency will be skipped. Please update manually if needed."
+              echo "INFO: Continuing with other dependencies for $REPOSITORY"
+              # Exit successfully to continue the workflow
+              exit 0
+            fi
+
+            # Other error - fail the step
+            echo "ERROR: Dependabot failed with unexpected error for $REPOSITORY"
+            exit $exit_code
+          fi
+
+          echo "INFO: Dependabot update completed successfully for $REPOSITORY"
 
   update-pom:
     needs: check-security-vulnerabilities

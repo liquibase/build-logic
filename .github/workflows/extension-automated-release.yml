@@ -135,13 +135,19 @@ jobs:
           echo "$output"
 
           if [ $exit_code -ne 0 ]; then
-            # Check for BigQuery-only failure
-            if echo "$output" | grep -qE "(com\.simba\.googlebigquery\.jdbc:GoogleBigQueryJDBC42.*private_source_authentication_failure|GoogleBigQueryJDBC42.*private_source_authentication_failure)"; then
-              echo "WARNING: Known issue - GoogleBigQueryJDBC42 authentication failed"
-              echo "INFO: This dependency will be skipped. Please update manually if needed."
-              echo "INFO: Continuing with other dependencies for $REPOSITORY"
-              # Exit successfully to continue the workflow
-              exit 0
+            # Check if there were any successful updates
+            if echo "$output" | grep -q "Changes to Dependabot Pull Requests"; then
+              echo "INFO: Some dependencies were successfully updated"
+
+              # Check if only known problematic dependencies failed
+              if echo "$output" | grep -qE "(com\.simba\.googlebigquery\.jdbc:GoogleBigQueryJDBC42|com\.liquibase:liquibase-extension-testing).*private_source_authentication_failure"; then
+                echo "WARNING: Known authentication issues with private dependencies:"
+                echo "$output" | grep -A 5 "Dependencies failed to update" || true
+                echo "INFO: These dependencies will be skipped. Please update manually if needed."
+                echo "INFO: Continuing with other successfully updated dependencies for $REPOSITORY"
+                # Exit successfully to continue the workflow
+                exit 0
+              fi
             fi
 
             # Other error - fail the step

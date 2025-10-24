@@ -70,7 +70,7 @@ jobs:
               
       - name: Check for open Homebrew PR
         id: check-homebrew-pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           GITHUB_APP_TOKEN: ${{ steps.get-token.outputs.token }}
         with:

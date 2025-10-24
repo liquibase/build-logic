@@ -6,7 +6,7 @@ on:
       java:
         description: "Java version to test"
         required: false
-        default: "[17, 21]"
+        default: "[17, 21, 25]"
         type: string
       javaBuildVersion:
         description: "Java version to build the project"

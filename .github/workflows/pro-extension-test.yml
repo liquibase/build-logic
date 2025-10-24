@@ -6,7 +6,7 @@ on:
       java:
         description: "Java version to test"
         required: false
-        default: "[17, 21]"
+        default: "[17, 21, 25]"
         type: string
       os:
         description: "Operating system to build/test on"

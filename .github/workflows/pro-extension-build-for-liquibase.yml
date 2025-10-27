@@ -278,19 +278,19 @@ jobs:
           token: ${{ steps.get-token.outputs.token }}
 
       - name: Download Ubuntu Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{needs.build.outputs.artifact_id}}-ubuntu-latest-${{ inputs.version }}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{needs.build.outputs.artifact_id}}-macos-latest-${{ inputs.version }}-artifacts
           path: /tmp/macos
 
       - name: Download Windows Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{needs.build.outputs.artifact_id}}-windows-latest-${{ inputs.version }}-artifacts
           path: /tmp/windows

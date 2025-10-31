@@ -102,7 +102,7 @@ jobs:
 
       - name: Download release files
         id: download-release-files
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: release-files
 

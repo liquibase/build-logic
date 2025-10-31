@@ -270,7 +270,7 @@ jobs:
           echo "Using GitHub latest version: $LATEST_OSS_VERSION"
 
       - name: Configure AWS credentials for S3 access
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1

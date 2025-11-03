@@ -62,7 +62,7 @@ on:
       javaBuildVersion:
         description: "Java version to build the project"
         required: false
-        default: "17"
+        default: "21"
         type: string
 
 jobs:
@@ -80,7 +80,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
@@ -94,7 +94,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Set up JDK ${{ inputs.javaBuildVersion }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
@@ -228,19 +228,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download Ubuntu Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{needs.build-multi-architecture.outputs.artifact_id}}-ubuntu-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{needs.build-multi-architecture.outputs.artifact_id}}-macos-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/macos
 
       - name: Download Windows Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{needs.build-multi-architecture.outputs.artifact_id}}-windows-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/windows
@@ -299,7 +299,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
@@ -313,7 +313,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Set up JDK ${{ inputs.javaBuildVersion }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
@@ -456,7 +456,7 @@ jobs:
 
       - name: Download multiarchitecture release artifacts
         if: inputs.combineJars
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: multiplatform-artifacts
           path: ${{ inputs.artifactPath }}/target

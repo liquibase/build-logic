@@ -424,7 +424,6 @@ jobs:
           ${{ inputs.extraCommand }}
 
       - name: Get Release Version from POM
-        if: ${{ inputs.dry_run == false }}
         id: get-release-version-attach
         shell: bash
         run: |

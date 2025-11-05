@@ -102,7 +102,7 @@ jobs:
       HOMEBREW_PR_URL: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
     steps:
       - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
@@ -128,7 +128,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: "21"
           distribution: "temurin"
@@ -197,7 +197,7 @@ jobs:
           passphrase: ${{ env.GPG_PASSPHRASE }}
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1
@@ -762,15 +762,23 @@ jobs:
 
       ## HomeBrew CASKS: Versions >= 5.x use Homebrew Casks
       - name: Check for existing Homebrew cask PR for ${{ inputs.distribution }}
-        if: ${{ inputs.distribution != 'liquibase-secure' && !startsWith(inputs.version, '4.') }}
+        if: ${{ !startsWith(inputs.version, '4.') }}
         continue-on-error: true
-        id: check-brew-pr
+        id: check-brew-cask-pr
         run: |
           # Authenticate GitHub CLI
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
+          # Determine the cask name based on distribution
+          if [ "${{ inputs.distribution }}" = "liquibase" ]; then
+            CASK_NAME="liquibase-community"
+          else
+            CASK_NAME="${{ inputs.distribution }}"
+          fi
+          echo "CASK_NAME=$CASK_NAME" >> $GITHUB_OUTPUT
+
           # Define the PR title
-          pr_title="${{ inputs.distribution }} ${{ inputs.version }}"
+          pr_title="$CASK_NAME ${{ inputs.version }}"
 
           # Search for open pull requests with the specified title in the Homebrew/homebrew-cask repo
           pr_title=$(gh pr list --repo Homebrew/homebrew-cask --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
@@ -789,13 +797,13 @@ jobs:
           echo "PR_EXISTS is set to $PR_EXISTS"
 
       - name: Update Homebrew cask for ${{ inputs.distribution }}
-        if: ${{ inputs.distribution != 'liquibase-secure' && !startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        if: ${{ !startsWith(inputs.version, '4.') && steps.check-brew-cask-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         continue-on-error: true
         uses: macauley/action-homebrew-bump-cask@v1
         with:
           token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
           tap: Homebrew/homebrew-cask
-          cask: ${{ inputs.distribution }}
+          cask: ${{ steps.check-brew-cask-pr.outputs.CASK_NAME }}
           tag: ${{ inputs.version }}
           livecheck: false
           dryrun: false
@@ -803,13 +811,16 @@ jobs:
       # This step captures the PR details after it has been created
       # and stores the PR number and URL in GitHub outputs for later use.
       # This is useful for tracking the PR status and creating a tracking issue.
-      - name: Capture Homebrew PR Details
+      - name: Capture Homebrew Cask PR Details
         continue-on-error: true
-        if: ${{ inputs.distribution != 'liquibase-secure' && !startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
-        id: capture-pr
+        if: ${{ !startsWith(inputs.version, '4.') && steps.check-brew-cask-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+        id: capture-cask-pr
         run: |
           # Wait briefly for PR to be created
           sleep 30
+
+          # Get the cask name
+          CASK_NAME="${{ steps.check-brew-cask-pr.outputs.CASK_NAME }}"
 
           # Search for the PR
           PR_DATA=$(gh api graphql -f query='
@@ -822,7 +833,7 @@ jobs:
                 }
               }
             }
-          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-cask liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
+          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-cask $CASK_NAME ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
 
           if [ ! -z "$PR_DATA" ]; then
             echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
@@ -938,7 +949,7 @@ jobs:
     if: ${{ inputs.distribution != 'liquibase-secure' && inputs.dry_run == false }}
     steps:
       - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1

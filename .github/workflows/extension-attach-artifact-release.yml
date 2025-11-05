@@ -512,7 +512,8 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         run: |
           gpg -K
-          version=${{ inputs.dry_run_version }}
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Signing artifacts for version: $version"
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar

@@ -1,4 +1,4 @@
-# Attach Artifact to Release
+name: Attach Artifact to Release
 
 # Add permissions for the default GITHUB_TOKEN
 permissions:
@@ -436,7 +436,7 @@ jobs:
           # Use GitHub's default branch from repository settings
           DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
           echo "Using default branch: $DEFAULT_BRANCH"
-          LAST_COMMIT_HASH=$(git rev-parse origin/$DEFAULT_BRANCH)
+          LAST_COMMIT_HASH=$(git rev-parse origin/$DEFAULT_BRANCH || git rev-parse HEAD)
           mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$LAST_COMMIT_HASH
 
       - name: Download multiarchitecture release artifacts

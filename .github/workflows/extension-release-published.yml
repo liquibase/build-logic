@@ -318,14 +318,15 @@ jobs:
 
       - name: Publish to Maven Central
         working-directory: ${{ inputs.artifactPath }}
-        env:
-          MAVEN_USERNAME: ${{ env.REPO_LIQUIBASE_NET_USER }}
-          MAVEN_PASSWORD: ${{ env.REPO_LIQUIBASE_NET_PASSWORD }}
         run: |
-          version=${{ inputs.dry_run_version }}         
+          version=${{ inputs.dry_run_version }}
+          echo "Deploying version: $version"
+          echo "Repository: https://repo.liquibase.net/repository/dry-run-sonatype-nexus-staging/"
           mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
                       -Durl=https://repo.liquibase.net/repository/dry-run-sonatype-nexus-staging/ \
                       -DrepositoryId=dry-run-sonatype-nexus-staging \
+                      -Dusername="${REPO_LIQUIBASE_NET_USER}" \
+                      -Dpassword="${REPO_LIQUIBASE_NET_PASSWORD}" \
                       -DpomFile=${{ env.artifact_id }}-${version}.pom \
                       -DgeneratePom=false \
                       -Dfile=${{ env.artifact_id }}-${version}.jar \

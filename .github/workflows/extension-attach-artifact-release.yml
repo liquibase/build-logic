@@ -416,34 +416,26 @@ jobs:
         if: ${{ env.ARTIFACT_FOUND == '0' && inputs.dry_run == false }}
         id: build-release-artifacts
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' \
+          -DscmServerId=liquibase
           git reset HEAD~ --hard
-          # Determine the default branch (master or main)
-          if git rev-parse --verify origin/master >/dev/null 2>&1; then
-            DEFAULT_BRANCH="master"
-          elif git rev-parse --verify origin/main >/dev/null 2>&1; then
-            DEFAULT_BRANCH="main"
-          else
-            echo "Neither master nor main branch found. Exiting."
-            exit 1
-          fi
-          LAST_COMMIT_HASH=$(git rev-parse origin/$DEFAULT_BRANCH)
+          # Use GitHub's default branch from repository settings
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          echo "Using default branch: $DEFAULT_BRANCH"
+          LAST_COMMIT_HASH=$(git rev-parse origin/$DEFAULT_BRANCH || git rev-parse HEAD)
           mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$LAST_COMMIT_HASH
 
       - name: Build release artifacts (dry-run)
         if: ${{ inputs.dry_run == true }}
         id: build-release-artifacts-dry-run
         run: |
-          mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
-          # Determine the default branch (master or main)
-          if git rev-parse --verify origin/master >/dev/null 2>&1; then
-            DEFAULT_BRANCH="master"
-          elif git rev-parse --verify origin/main >/dev/null 2>&1; then
-            DEFAULT_BRANCH="main"
-          else
-            echo "Neither master nor main branch found. Exiting."
-            exit 1
-          fi
+          mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' \
+          -DscmServerId=liquibase
+          # Use GitHub's default branch from repository settings
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          echo "Using default branch: $DEFAULT_BRANCH"
           LAST_COMMIT_HASH=$(git rev-parse origin/$DEFAULT_BRANCH)
           mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$LAST_COMMIT_HASH
 

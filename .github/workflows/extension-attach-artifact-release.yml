@@ -425,6 +425,15 @@ jobs:
           echo "Using default branch: $DEFAULT_BRANCH"
           mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$DEFAULT_BRANCH
 
+          # Generate source and javadoc jars
+          mvn source:jar javadoc:jar -Dmaven.javadoc.skip=false
+
+          # Copy POM to target directory with versioned name
+          ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          cp pom.xml target/${ARTIFACT_ID}-${VERSION}.pom
+          echo "Generated artifacts for ${ARTIFACT_ID}-${VERSION}"
+
       - name: Build release artifacts (dry-run)
         if: ${{ inputs.dry_run == true }}
         id: build-release-artifacts-dry-run
@@ -436,6 +445,15 @@ jobs:
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           echo "Using current branch: $CURRENT_BRANCH"
           mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$CURRENT_BRANCH
+
+          # Generate source and javadoc jars
+          mvn source:jar javadoc:jar -Dmaven.javadoc.skip=false
+
+          # Copy POM to target directory with versioned name
+          ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          cp pom.xml target/${ARTIFACT_ID}-${VERSION}.pom
+          echo "Generated artifacts for ${ARTIFACT_ID}-${VERSION}"
 
       - name: Download multiarchitecture release artifacts
         if: inputs.combineJars

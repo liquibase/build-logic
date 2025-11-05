@@ -276,7 +276,7 @@ jobs:
                   "enabled": "true"
                 },
                 "snapshots": {
-                  "enabled": "false"
+                  "enabled": "true"
                 }
               }
             ]

@@ -316,12 +316,24 @@ jobs:
           fileName: "${{ env.artifact_id }}-*"
           out-file-path: ${{ inputs.artifactPath }}
 
-      - name: Publish to Maven Central
+      - name: Publish to Maven Central (dry_run)
         working-directory: ${{ inputs.artifactPath }}
         run: |
           version=${{ inputs.dry_run_version }}
           echo "Deploying version: $version"
           echo "Repository: https://repo.liquibase.net/repository/dry-run-sonatype-nexus-staging/"
+
+          # Debug: Check if credentials are set
+          if [ -z "$REPO_LIQUIBASE_NET_USER" ]; then
+            echo "ERROR: REPO_LIQUIBASE_NET_USER is not set!"
+            exit 1
+          fi
+          if [ -z "$REPO_LIQUIBASE_NET_PASSWORD" ]; then
+            echo "ERROR: REPO_LIQUIBASE_NET_PASSWORD is not set!"
+            exit 1
+          fi
+          echo "Credentials are set (user length: ${#REPO_LIQUIBASE_NET_USER}, pass length: ${#REPO_LIQUIBASE_NET_PASSWORD})"
+
           mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
                       -Durl=https://repo.liquibase.net/repository/dry-run-sonatype-nexus-staging/ \
                       -DrepositoryId=dry-run-sonatype-nexus-staging \

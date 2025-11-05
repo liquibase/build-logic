@@ -1,4 +1,4 @@
-name: Attach Artifact to Release
+# Attach Artifact to Release
 
 # Add permissions for the default GITHUB_TOKEN
 permissions:
@@ -163,34 +163,11 @@ jobs:
         run: |
           ${{ inputs.extraLinuxCommand }}
 
-      - name: Get Release Version from POM
-        id: get-release-version
-        shell: bash
-        run: |
-          RELEASE_VERSION=$(grep -m2 '<version>' pom.xml | tail -n 1 | awk -F'[><]' '{print $3}' | sed 's/-SNAPSHOT//')
-          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-          echo "Release version extracted from pom.xml: $RELEASE_VERSION"
-
-      - name: Determine Release Version for Dry Run
-        if: ${{ inputs.dry_run == true }}
-        id: determine-dry-run-version
-        shell: bash
-        run: |
-          # Use dry_run_version input if provided, otherwise use version from POM
-          if [ -n "${{ inputs.dry_run_version }}" ]; then
-            DRY_RUN_VERSION="${{ inputs.dry_run_version }}"
-            echo "Using provided dry_run_version: $DRY_RUN_VERSION"
-          else
-            DRY_RUN_VERSION="${{ steps.get-release-version.outputs.RELEASE_VERSION }}"
-            echo "Using version from pom.xml: $DRY_RUN_VERSION"
-          fi
-          echo "DRY_RUN_VERSION=$DRY_RUN_VERSION" >> $GITHUB_OUTPUT
-
       - name: Build and Package
         if: ${{ inputs.dry_run == false }}
         shell: bash
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ steps.get-release-version.outputs.RELEASE_VERSION }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
           git reset HEAD~ --hard
           mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }} -P '${{ inputs.mavenProfiles }}'
 
@@ -198,8 +175,7 @@ jobs:
         if: ${{ inputs.dry_run == true }}
         shell: bash
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ steps.determine-dry-run-version.outputs.DRY_RUN_VERSION }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
-          git reset HEAD~ --hard
+          mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
           mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }} -P '${{ inputs.mavenProfiles }}'
 
       - name: Get Artifact ID
@@ -216,25 +192,14 @@ jobs:
           echo "artifact_id=$artifact_id" >> $GITHUB_OUTPUT
 
       - name: Get Artifact Version
-        if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
         shell: bash
         run: |
-          artifact_version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout)
-          echo "artifact_version=$artifact_version" >> $GITHUB_OUTPUT
-
-      - name: Get Artifact Version
-        if: ${{ inputs.dry_run == true }}
-        working-directory: ${{ inputs.artifactPath }}
-        id: get-artifact-version-dry-run
-        shell: bash
-        run: |
-          # Use dry_run_version input if provided, otherwise use version from POM
-          if [ -n "${{ inputs.dry_run_version }}" ]; then
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
             artifact_version="${{ inputs.dry_run_version }}"
           else
-            artifact_version="${{ steps.get-release-version.outputs.RELEASE_VERSION }}"
+            artifact_version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout)
           fi
           echo "artifact_version=$artifact_version" >> $GITHUB_OUTPUT
 
@@ -423,21 +388,13 @@ jobs:
         run: |
           ${{ inputs.extraCommand }}
 
-      - name: Get Release Version from POM
-        id: get-release-version-attach
-        shell: bash
-        run: |
-          RELEASE_VERSION=$(grep -m2 '<version>' pom.xml | tail -n 1 | awk -F'[><]' '{print $3}' | sed 's/-SNAPSHOT//')
-          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-          echo "Release version extracted from pom.xml: $RELEASE_VERSION"
-
       - name: Check and download artifacts from GPM
         if: ${{ inputs.dry_run == false }}
         id: check-download-artifacts
         env:
           ARTIFACT_NAME: ${{ github.event.repository.name }}
         run: |
-          RELEASE_VERSION=${{ steps.get-release-version-attach.outputs.RELEASE_VERSION }}
+          RELEASE_VERSION=$(grep -m2 '<version>' pom.xml | tail -n 1 | awk -F'[><]' '{print $3}' | sed 's/-SNAPSHOT//')
           echo "RELEASE_VERSION=$RELEASE_VERSION"
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dtransitive=false || echo "Failed to download artifact"
           mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dpackaging=pom -Dtransitive=false || echo "Failed to download pom artifact"
@@ -459,7 +416,7 @@ jobs:
         if: ${{ env.ARTIFACT_FOUND == '0' && inputs.dry_run == false }}
         id: build-release-artifacts
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ steps.get-release-version-attach.outputs.RELEASE_VERSION }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
           git reset HEAD~ --hard
           # Determine the default branch (master or main)
           if git rev-parse --verify origin/master >/dev/null 2>&1; then
@@ -473,27 +430,11 @@ jobs:
           LAST_COMMIT_HASH=$(git rev-parse origin/$DEFAULT_BRANCH)
           mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$LAST_COMMIT_HASH
 
-      - name: Determine Dry Run Version for Attach Release
-        if: ${{ inputs.dry_run == true }}
-        id: determine-dry-run-version-attach
-        shell: bash
-        run: |
-          # Use dry_run_version input if provided, otherwise use version from POM
-          if [ -n "${{ inputs.dry_run_version }}" ]; then
-            DRY_RUN_VERSION="${{ inputs.dry_run_version }}"
-            echo "Using provided dry_run_version: $DRY_RUN_VERSION"
-          else
-            DRY_RUN_VERSION="${{ steps.get-release-version-attach.outputs.RELEASE_VERSION }}"
-            echo "Using version from pom.xml: $DRY_RUN_VERSION"
-          fi
-          echo "DRY_RUN_VERSION=$DRY_RUN_VERSION" >> $GITHUB_OUTPUT
-
       - name: Build release artifacts (dry-run)
         if: ${{ inputs.dry_run == true }}
         id: build-release-artifacts-dry-run
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ steps.determine-dry-run-version-attach.outputs.DRY_RUN_VERSION }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
-          git reset HEAD~ --hard
+          mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' -DscmServerId=liquibase
           # Determine the default branch (master or main)
           if git rev-parse --verify origin/master >/dev/null 2>&1; then
             DEFAULT_BRANCH="master"
@@ -520,7 +461,6 @@ jobs:
           LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
           echo "Latest Draft Release ID: $LATEST_DRAFT_RELEASE"
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
-          
 
       - name: List artifacts in release
         if: ${{ env.RELEASE_ID != '' && env.RELEASE_ID != null && inputs.dry_run == false }}
@@ -542,7 +482,6 @@ jobs:
             curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/assets/$value"
             echo "Deleted artifact ID: $value"
           done
-  
       - name: Convert escaped newlines and set GPG key
         run: |
           GPG_KEY_CONTENT="$(printf '%b' "${{ env.GPG_SECRET }}")"
@@ -583,7 +522,7 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         run: |
           gpg -K
-          version=${{ steps.determine-dry-run-version-attach.outputs.DRY_RUN_VERSION }}
+          version=${{ inputs.dry_run_version }}
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
@@ -614,9 +553,9 @@ jobs:
         if: ${{ inputs.dry_run == true }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.determine-dry-run-version-attach.outputs.DRY_RUN_VERSION }}
+          tag_name: v${{ inputs.dry_run_version }}
           fail_on_unmatched_files: true
-          body: Dry Run ${{ steps.determine-dry-run-version-attach.outputs.DRY_RUN_VERSION }}
+          body: Dry Run ${{ inputs.dry_run_version }}
           generate_release_notes: true
           draft: true
           files: ./target/*

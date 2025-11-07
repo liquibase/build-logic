@@ -75,4 +75,4 @@ jobs:
 
             Use the repository's CLAUDE.md for style conventions if available.
 
-          claude_args: '--max-turns 2 --allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"'
+          claude_args: '--max-turns 2 --allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*)"'

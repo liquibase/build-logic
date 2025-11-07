@@ -40,17 +40,38 @@ jobs:
           anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR: #${{ github.event.pull_request.number }}
 
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            SCOPE: Review ONLY changed files and modified lines (use `gh pr diff`)
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            SKIP these entirely:
+            - Auto-generated files (package-lock.json, yarn.lock, go.sum, Gemfile.lock, *.generated.*, *_pb.go)
+            - Binary files or large data files
+            - Unchanged code
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+            REVIEW FOR (critical/important issues only):
+            1. Critical bugs or security vulnerabilities
+            2. Logic errors that break functionality
+            3. Missing test coverage for critical code paths
 
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+            SKIP if not found:
+            - Do NOT mention performance unless there's an actual problem
+            - Do NOT mention security unless there's an actual vulnerability
+            - Do NOT comment on style/formatting unless egregious
+
+            OUTPUT FORMAT:
+            - Use inline comments (gh pr comment) for specific code issues
+            - Use ONE summary comment for overall feedback
+            - Maximum 5 bullet points total
+            - Each bullet point: 1 sentence maximum
+            - If no significant issues: "LGTM - no significant issues found"
+
+            FORBIDDEN:
+            - Do not analyze unchanged files or code
+            - Do not provide verbose explanations or tutorials
+            - Do not mention categories where no issues exist
+            - Do not create multiple top-level comments
+
+            Use the repository's CLAUDE.md for style conventions if available.
+
+          claude_args: '--max-turns 2 --allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"'

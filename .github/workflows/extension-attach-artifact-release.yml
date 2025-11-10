@@ -437,25 +437,7 @@ jobs:
       - name: Build release artifacts (dry-run)
         if: ${{ inputs.dry_run == true }}
         id: build-release-artifacts-dry-run
-        working-directory: ${{ inputs.artifactPath }}
         run: |
-          # Detect if this is a multi-module project and find the actual module
-          CURRENT_ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
-          echo "Current artifactId: $CURRENT_ARTIFACT_ID"
-
-          # Check if this is a parent/aggregator POM (ends with build-pom or has modules)
-          if [[ "$CURRENT_ARTIFACT_ID" == *"build-pom"* ]] || mvn help:evaluate -Dexpression=project.modules -q -DforceStdout | grep -q "module"; then
-            echo "Detected parent POM, looking for module..."
-            # Find the module directory (first subdirectory with a pom.xml that's not a build-pom)
-            MODULE_DIR=$(find . -maxdepth 1 -type d ! -name "." ! -name ".." ! -name "target" ! -name ".*" | head -1 | sed 's|^./||')
-            if [ -n "$MODULE_DIR" ]; then
-              echo "Found module directory: $MODULE_DIR"
-              cd "$MODULE_DIR"
-              MODULE_ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
-              echo "Module artifactId: $MODULE_ARTIFACT_ID"
-            fi
-          fi
-
           mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' \
           -DscmServerId=liquibase
@@ -575,36 +557,10 @@ jobs:
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target
 
-      - name: Detect module path for dry-run
-        id: detect-module-dry-run
+      - name: Set artifact path
+        id: set-artifact-path
         if: ${{ inputs.dry_run == true }}
-        working-directory: ${{ inputs.artifactPath }}
-        run: |
-          # Detect if this is a multi-module project and find the actual module
-          CURRENT_ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
-          echo "Current artifactId: $CURRENT_ARTIFACT_ID"
-
-          MODULE_PATH="${{ inputs.artifactPath }}"
-
-          # Check if this is a parent/aggregator POM (ends with build-pom or has modules)
-          if [[ "$CURRENT_ARTIFACT_ID" == *"build-pom"* ]] || mvn help:evaluate -Dexpression=project.modules -q -DforceStdout | grep -q "module"; then
-            echo "Detected parent POM, looking for module..."
-            # Find the module directory (first subdirectory with a pom.xml that's not a build-pom)
-            MODULE_DIR=$(find . -maxdepth 1 -type d ! -name "." ! -name ".." ! -name "target" ! -name ".*" | head -1 | sed 's|^./||')
-            if [ -n "$MODULE_DIR" ]; then
-              echo "Found module directory: $MODULE_DIR"
-              if [ "${{ inputs.artifactPath }}" = "." ]; then
-                MODULE_PATH="$MODULE_DIR"
-              else
-                MODULE_PATH="${{ inputs.artifactPath }}/$MODULE_DIR"
-              fi
-              echo "Module path: $MODULE_PATH"
-            fi
-          fi
-
-          echo "module_path=$MODULE_PATH" >> $GITHUB_OUTPUT
-          echo "Artifacts will be attached from: $MODULE_PATH/target"
-          ls -la "$MODULE_PATH/target" 2>/dev/null || echo "Target directory not found"
+        run: echo "ARTIFACT_PATH=${{ inputs.artifactPath || '.' }}" >> $GITHUB_OUTPUT
 
       - name: Attach Files to Draft Release (dry-run)
         id: attach-files-dry-run
@@ -616,7 +572,7 @@ jobs:
           body: Dry Run ${{ inputs.dry_run_version }}
           generate_release_notes: true
           draft: true
-          files: ${{ steps.detect-module-dry-run.outputs.module_path }}/target/*
+          files: ${{ steps.set-artifact-path.outputs.ARTIFACT_PATH }}/target/*
 
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'

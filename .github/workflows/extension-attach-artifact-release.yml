@@ -576,7 +576,7 @@ jobs:
           body: Dry Run ${{ inputs.dry_run_version }}
           generate_release_notes: true
           draft: true
-          files: ${{ inputs.artifactPath }}/target/*
+          files: ./target/*
 
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'

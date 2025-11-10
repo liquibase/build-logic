@@ -316,6 +316,20 @@ jobs:
           fileName: "${{ env.artifact_id }}-*"
           out-file-path: ${{ inputs.artifactPath }}
 
+      - name: Rename SNAPSHOTS to dry_run version
+        working-directory: ${{ inputs.artifactPath }}
+        run: |
+          for file in ${{ env.artifact_id }}-*-SNAPSHOT*; do
+            if [ -f "$file" ]; then
+              # Remove -SNAPSHOT- and -SNAPSHOT from filenames
+              new_file=$(echo "$file" | sed "s/-SNAPSHOT-/-/g" | sed "s/-SNAPSHOT//g")
+              if [ "$file" != "$new_file" ]; then
+                echo "Renaming: $file -> $new_file"
+                mv "$file" "$new_file"
+              fi
+            fi
+          done
+
       - name: Publish to Maven Central
         working-directory: ${{ inputs.artifactPath }}
         env:
@@ -334,7 +348,7 @@ jobs:
                       -Dfiles=${{ env.artifact_id }}-${version}.jar.asc,${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
                       -Dtypes=jar.asc,jar.asc,jar.asc,pom.asc \
                       -Dclassifiers=,sources,javadoc,
-                      
+
   deploy_xsd:
     if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true && inputs.dry_run == false
     name: Upload xsds

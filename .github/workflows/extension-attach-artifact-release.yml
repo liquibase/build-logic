@@ -436,24 +436,67 @@ jobs:
 
       - name: Build release artifacts (dry-run)
         if: ${{ inputs.dry_run == true }}
+        working-directory: ${{ inputs.artifactPath }}
         id: build-release-artifacts-dry-run
         run: |
+          # Build all modules from root
           mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' \
           -DscmServerId=liquibase
+
           # Use current branch name for dry runs
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           echo "Using current branch: $CURRENT_BRANCH"
           mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$CURRENT_BRANCH
 
-          # Generate source and javadoc jars
-          mvn source:jar javadoc:jar -Dmaven.javadoc.skip=false
+          # Detect if this is a multi-module project
+          ROOT_ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "Root artifactId: $ROOT_ARTIFACT_ID"
 
-          # Copy POM to target directory with versioned name
-          ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          cp pom.xml target/${ARTIFACT_ID}-${VERSION}.pom
-          echo "Generated artifacts for ${ARTIFACT_ID}-${VERSION}"
+          # Use the dry_run_version input
+          VERSION="${{ inputs.dry_run_version }}"
+          echo "Using dry-run version: $VERSION"
+
+          # Check if this is a parent/aggregator POM (contains build-pom or has modules)
+          if [[ "$ROOT_ARTIFACT_ID" == *"build-pom"* ]] || mvn help:evaluate -Dexpression=project.modules -q -DforceStdout | grep -q "module"; then
+            echo "Detected multi-module project with parent POM"
+
+            # Extract base name by removing -build-pom suffix
+            BASE_NAME=$(echo "$ROOT_ARTIFACT_ID" | sed 's/-build-pom$//')
+            echo "Base name: $BASE_NAME"
+
+            # Look for module directory with the base name
+            if [ -d "$BASE_NAME" ]; then
+              MODULE_DIR="$BASE_NAME"
+              echo "Found extension module directory: $MODULE_DIR"
+
+              # Navigate into the module and generate source/javadoc jars there
+              cd "$MODULE_DIR"
+              mvn source:jar javadoc:jar -Dmaven.javadoc.skip=false
+
+              # Get artifact ID from the actual extension module
+              ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+              echo "Extension module artifactId: $ARTIFACT_ID"
+              echo "Extension module version: $VERSION"
+
+              # Copy the module's POM to its target directory
+              cp pom.xml target/${ARTIFACT_ID}-${VERSION}.pom
+              echo "Generated artifacts for ${ARTIFACT_ID}-${VERSION} in module ${MODULE_DIR}"
+            else
+              echo "WARNING: Module directory $BASE_NAME not found, falling back to root"
+              mvn source:jar javadoc:jar -Dmaven.javadoc.skip=false
+              ARTIFACT_ID=$ROOT_ARTIFACT_ID
+              cp pom.xml target/${ARTIFACT_ID}-${VERSION}.pom
+              echo "Generated artifacts for ${ARTIFACT_ID}-${VERSION}"
+            fi
+          else
+            # Single module project
+            echo "Single module project"
+            mvn source:jar javadoc:jar -Dmaven.javadoc.skip=false
+            ARTIFACT_ID=$ROOT_ARTIFACT_ID
+            cp pom.xml target/${ARTIFACT_ID}-${VERSION}.pom
+            echo "Generated artifacts for ${ARTIFACT_ID}-${VERSION}"
+          fi
 
       - name: Download multiarchitecture release artifacts
         if: inputs.combineJars
@@ -490,7 +533,8 @@ jobs:
             curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/assets/$value"
             echo "Deleted artifact ID: $value"
           done
-      - name: Convert escaped newlines and set GPG key
+      
+          - name: Convert escaped newlines and set GPG key
         run: |
           GPG_KEY_CONTENT="$(printf '%b' "${{ env.GPG_SECRET }}")"
           {
@@ -530,12 +574,50 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         run: |
           gpg -K
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Signing artifacts for version: $version"
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-sources.jar
+
+          # Detect if this is a multi-module project
+          ROOT_ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "Root artifactId: $ROOT_ARTIFACT_ID"
+
+          # Use the dry_run_version input
+          VERSION="${{ inputs.dry_run_version }}"
+          echo "Using dry-run version: $VERSION"
+
+          # Check if this is a parent/aggregator POM (contains build-pom or has modules)
+          if [[ "$ROOT_ARTIFACT_ID" == *"build-pom"* ]] || mvn help:evaluate -Dexpression=project.modules -q -DforceStdout | grep -q "module"; then
+            echo "Detected multi-module project"
+
+            # Extract base name by removing -build-pom suffix
+            BASE_NAME=$(echo "$ROOT_ARTIFACT_ID" | sed 's/-build-pom$//')
+            echo "Base name: $BASE_NAME"
+
+            # Look for module directory
+            if [ -d "$BASE_NAME" ]; then
+              cd "$BASE_NAME"
+              ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+              echo "Signing artifacts for module: $ARTIFACT_ID version: $VERSION"
+
+              # Sign artifacts in module directory
+              ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/$BASE_NAME/target/$ARTIFACT_ID-${VERSION}.jar
+              ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/$BASE_NAME/target/$ARTIFACT_ID-${VERSION}.pom
+              ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/$BASE_NAME/target/$ARTIFACT_ID-${VERSION}-javadoc.jar
+              ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/$BASE_NAME/target/$ARTIFACT_ID-${VERSION}-sources.jar
+            else
+              echo "Module directory not found, signing from root"
+              ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${VERSION}.jar
+              ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${VERSION}.pom
+              ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${VERSION}-javadoc.jar
+              ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${VERSION}-sources.jar
+            fi
+          else
+            # Single module project
+            echo "Single module project"
+            echo "Signing artifacts for version: $VERSION"
+            ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${VERSION}.jar
+            ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${VERSION}.pom
+            ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${VERSION}-javadoc.jar
+            ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${VERSION}-sources.jar
+          fi
 
       - name: Set draft release title
         if: ${{ inputs.dry_run == false }}
@@ -557,10 +639,52 @@ jobs:
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target
 
-      - name: Set artifact path
-        id: set-artifact-path
+      - name: Detect module path for artifact attachment
+        id: detect-module-path
         if: ${{ inputs.dry_run == true }}
-        run: echo "ARTIFACT_PATH=${{ inputs.artifactPath || '.' }}" >> $GITHUB_OUTPUT
+        working-directory: ${{ inputs.artifactPath }}
+        run: |
+          # Detect if this is a multi-module project
+          ROOT_ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "Root artifactId: $ROOT_ARTIFACT_ID"
+
+          ARTIFACT_PATH="${{ inputs.artifactPath }}"
+          if [ -z "$ARTIFACT_PATH" ] || [ "$ARTIFACT_PATH" = "." ]; then
+            ARTIFACT_PATH="."
+          fi
+
+          # Check if this is a parent/aggregator POM (contains build-pom or has modules)
+          if [[ "$ROOT_ARTIFACT_ID" == *"build-pom"* ]] || mvn help:evaluate -Dexpression=project.modules -q -DforceStdout | grep -q "module"; then
+            echo "Detected multi-module project"
+
+            # Extract base name by removing -build-pom suffix
+            BASE_NAME=$(echo "$ROOT_ARTIFACT_ID" | sed 's/-build-pom$//')
+            echo "Base name: $BASE_NAME"
+
+            # Look for module directory with the base name
+            if [ -d "$BASE_NAME" ]; then
+              if [ "$ARTIFACT_PATH" = "." ]; then
+                FULL_PATH="$BASE_NAME"
+              else
+                FULL_PATH="$ARTIFACT_PATH/$BASE_NAME"
+              fi
+              echo "Found module at: $FULL_PATH"
+              echo "ARTIFACT_PATH=$FULL_PATH" >> $GITHUB_OUTPUT
+
+              # List artifacts for debugging
+              echo "Artifacts in module target directory:"
+              ls -la "$FULL_PATH/target" 2>/dev/null || echo "Target directory not found"
+            else
+              echo "Module directory not found, using root path: $ARTIFACT_PATH"
+              echo "ARTIFACT_PATH=$ARTIFACT_PATH" >> $GITHUB_OUTPUT
+              ls -la "$ARTIFACT_PATH/target" 2>/dev/null || echo "Target directory not found"
+            fi
+          else
+            # Single module project
+            echo "Single module project, using path: $ARTIFACT_PATH"
+            echo "ARTIFACT_PATH=$ARTIFACT_PATH" >> $GITHUB_OUTPUT
+            ls -la "$ARTIFACT_PATH/target" 2>/dev/null || echo "Target directory not found"
+          fi
 
       - name: Attach Files to Draft Release (dry-run)
         id: attach-files-dry-run
@@ -572,7 +696,7 @@ jobs:
           body: Dry Run ${{ inputs.dry_run_version }}
           generate_release_notes: true
           draft: true
-          files: ${{ steps.set-artifact-path.outputs.ARTIFACT_PATH }}/target/*
+          files: ${{ steps.detect-module-path.outputs.ARTIFACT_PATH }}/target/*
 
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'

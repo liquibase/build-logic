@@ -331,9 +331,10 @@ jobs:
           done
 
           # Find and update all pom files in current directory
+          ls -l *.pom
           pom_file="${{ env.artifact_id }}-${{ inputs.dry_run_version }}.pom"
           echo "Updating $pom_file - removing -SNAPSHOT from version tags"
-          sed -i '' 's/<version>\(.*\)-SNAPSHOT<\/version>/<version>\1<\/version>/g' "$pom_file"
+          sed -i '' 's/<version>\(.*\)-SNAPSHOT<\/version>/<version>\1<\/version>/g' $pom_file
           echo "✓ Updated $pom_file"
 
       - name: Publish to Maven Central

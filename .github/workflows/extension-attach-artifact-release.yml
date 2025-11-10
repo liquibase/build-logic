@@ -576,7 +576,15 @@ jobs:
           body: Dry Run ${{ inputs.dry_run_version }}
           generate_release_notes: true
           draft: true
-          files: ./target/*
+          files: |
+            ${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${{ inputs.dry_run_version }}.jar
+            ${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${{ inputs.dry_run_version }}.jar.asc
+            ${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${{ inputs.dry_run_version }}.pom
+            ${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${{ inputs.dry_run_version }}.pom.asc
+            ${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${{ inputs.dry_run_version }}-javadoc.jar
+            ${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${{ inputs.dry_run_version }}-javadoc.jar.asc
+            ${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${{ inputs.dry_run_version }}-sources.jar
+            ${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${{ inputs.dry_run_version }}-sources.jar.asc
 
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'

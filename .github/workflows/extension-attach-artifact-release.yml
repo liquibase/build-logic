@@ -534,7 +534,7 @@ jobs:
             echo "Deleted artifact ID: $value"
           done
       
-          - name: Convert escaped newlines and set GPG key
+      - name: Convert escaped newlines and set GPG key
         run: |
           GPG_KEY_CONTENT="$(printf '%b' "${{ env.GPG_SECRET }}")"
           {

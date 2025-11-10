@@ -437,6 +437,7 @@ jobs:
       - name: Build release artifacts (dry-run)
         if: ${{ inputs.dry_run == true }}
         id: build-release-artifacts-dry-run
+        working-directory: ${{ inputs.artifactPath }}
         run: |
           mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' \
@@ -557,29 +558,6 @@ jobs:
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target
 
-      # - name: Get version for dry-run release
-      #   if: ${{ inputs.dry_run == true }}
-      #   id: get-dry-run-version
-      #   working-directory: ${{ inputs.artifactPath }}
-      #   run: |
-      #     VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-      #     echo "version=$VERSION" >> $GITHUB_OUTPUT
-      #     echo "Dry run version: $VERSION"
-
-      - name: Prepare artifacts for dry-run release
-        id: prepare-artifacts-dry-run
-        if: ${{ inputs.dry_run == true }}
-        working-directory: ${{ inputs.artifactPath }}
-        run: |
-          # Get the artifact ID from the current module (not parent POM)
-          ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
-          echo "Detected artifact_id: $ARTIFACT_ID"
-          echo "artifact_id_dry_run=$ARTIFACT_ID" >> $GITHUB_OUTPUT
-
-          # List the files that will be attached
-          echo "Files to attach from $(pwd)/target:"
-          ls -la target/${ARTIFACT_ID}-${{ inputs.dry_run_version }}* 2>/dev/null || echo "No artifacts found matching ${ARTIFACT_ID}-${{ inputs.dry_run_version }}*"
-
       - name: Attach Files to Draft Release (dry-run)
         id: attach-files-dry-run
         if: ${{ inputs.dry_run == true }}
@@ -590,15 +568,7 @@ jobs:
           body: Dry Run ${{ inputs.dry_run_version }}
           generate_release_notes: true
           draft: true
-          files: |
-            ${{ inputs.artifactPath }}/target/${{ steps.prepare-artifacts-dry-run.outputs.artifact_id_dry_run }}-${{ inputs.dry_run_version }}.jar
-            ${{ inputs.artifactPath }}/target/${{ steps.prepare-artifacts-dry-run.outputs.artifact_id_dry_run }}-${{ inputs.dry_run_version }}.jar.asc
-            ${{ inputs.artifactPath }}/target/${{ steps.prepare-artifacts-dry-run.outputs.artifact_id_dry_run }}-${{ inputs.dry_run_version }}.pom
-            ${{ inputs.artifactPath }}/target/${{ steps.prepare-artifacts-dry-run.outputs.artifact_id_dry_run }}-${{ inputs.dry_run_version }}.pom.asc
-            ${{ inputs.artifactPath }}/target/${{ steps.prepare-artifacts-dry-run.outputs.artifact_id_dry_run }}-${{ inputs.dry_run_version }}-javadoc.jar
-            ${{ inputs.artifactPath }}/target/${{ steps.prepare-artifacts-dry-run.outputs.artifact_id_dry_run }}-${{ inputs.dry_run_version }}-javadoc.jar.asc
-            ${{ inputs.artifactPath }}/target/${{ steps.prepare-artifacts-dry-run.outputs.artifact_id_dry_run }}-${{ inputs.dry_run_version }}-sources.jar
-            ${{ inputs.artifactPath }}/target/${{ steps.prepare-artifacts-dry-run.outputs.artifact_id_dry_run }}-${{ inputs.dry_run_version }}-sources.jar.asc
+          files: ./target/*
 
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'

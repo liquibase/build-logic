@@ -437,8 +437,8 @@ jobs:
       - name: Set pom version to dry_run version
         if: ${{ inputs.dry_run == true }}
         run: |
-          mvn versions:set -DnewVersion=${{ inputs.dry_run_version }} -DgenerateBackupPoms=false
-                
+          mvn versions:set -DnewVersion=${{ inputs.dry_run_version }}-SNAPSHOT -DgenerateBackupPoms=false
+
       - name: Build release artifacts (dry-run)
         if: ${{ inputs.dry_run == true }}
         id: build-release-artifacts-dry-run

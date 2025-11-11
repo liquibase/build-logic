@@ -8,6 +8,9 @@ permissions:
   pull-requests: write
   issues: read
   id-token: write
+  actions: read
+  checks: read
+  statuses: read
 
 jobs:
   claude-review:

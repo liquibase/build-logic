@@ -9,6 +9,8 @@ permissions:
   issues: write
   id-token: write
   actions: read # Required for Claude to read CI results on PRs
+  checks: read
+  statuses: read
 
 jobs:
   claude:

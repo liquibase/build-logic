@@ -41,40 +41,11 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
-          prompt: |
-            REPO: ${{ github.repository }}
-            PR: #${{ github.event.pull_request.number }}
-
-            SCOPE: Review ONLY changed files and modified lines (use `gh pr diff`)
-
-            SKIP these entirely:
-            - Auto-generated files (package-lock.json, yarn.lock, go.sum, Gemfile.lock, *.generated.*, *_pb.go)
-            - Binary files or large data files
-            - Unchanged code
-
-            REVIEW FOR (critical/important issues only):
-            1. Critical bugs or security vulnerabilities
-            2. Logic errors that break functionality
-            3. Missing test coverage for critical code paths
-
-            SKIP if not found:
-            - Do NOT mention performance unless there's an actual problem
-            - Do NOT mention security unless there's an actual vulnerability
-            - Do NOT comment on style/formatting unless egregious
-
-            OUTPUT FORMAT:
-            - Use inline comments (gh pr comment) for specific code issues
-            - Use ONE summary comment for overall feedback
-            - Maximum 5 bullet points total
-            - Each bullet point: 1 sentence maximum
-            - If no significant issues: "LGTM - no significant issues found"
-
-            FORBIDDEN:
-            - Do not analyze unchanged files or code
-            - Do not provide verbose explanations or tutorials
-            - Do not mention categories where no issues exist
-            - Do not create multiple top-level comments
-
-            Use the repository's CLAUDE.md for style conventions if available.
-
-          claude_args: '--max-turns 2 --allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*)"'
+          claude_args: |
+            --max-turns 8
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Read,Edit,Replace,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
+            --model claude-sonnet-4-20250514
+          additional_permissions: |
+            actions: read
+            checks: read
+            statuses: read

@@ -8,9 +8,6 @@ permissions:
   pull-requests: write
   issues: read
   id-token: write
-  actions: read
-  checks: read
-  statuses: read
 
 jobs:
   claude-review:
@@ -57,7 +54,7 @@ jobs:
             1. Critical bugs or security vulnerabilities
             2. Logic errors that break functionality
             3. Missing test coverage for critical code paths
-            4. Build or test failures (check CI status with mcp__github_ci__get_ci_status)
+            4. Build or test issues suggested by the code changes or PR discussion
 
             SKIP if not found:
             - Do NOT mention performance unless there's an actual problem
@@ -81,9 +78,5 @@ jobs:
 
           claude_args: |
             --max-turns 5
-            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
-            --model claude-sonnet-4-20250514
-          additional_permissions: |
-            actions: read
-            checks: read
-            statuses: read
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,mcp__github_inline_comment__create_inline_comment"
+            --model claude-sonnet-4-5-20250929

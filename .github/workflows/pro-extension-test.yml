@@ -239,7 +239,7 @@ jobs:
           LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
         run: |
           if [ -n "${{ inputs.extraMavenArgs }}" ]; then
-            mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
+            mvn -B dependency:go-offline clean package -DskipTests=true "${{ inputs.extraMavenArgs }}"
           else
             mvn -B dependency:go-offline clean package -DskipTests=true
           fi

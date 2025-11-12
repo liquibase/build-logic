@@ -8,10 +8,19 @@ permissions:
   pull-requests: write
   issues: write
   id-token: write
+  # Required for CI integration tools (mcp__github_ci__*)
+  # These allow Claude to check workflow runs, job statuses, and test results
+  # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/solutions.md#ci-integration
+  actions: read
+  checks: read
+  statuses: read
 
 jobs:
   claude:
     runs-on: ubuntu-latest
+    # Prevent excessive API costs from runaway conversations
+    # 15 minutes should be sufficient for most interactive tasks
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -38,7 +47,30 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+          # Enable CI tools by granting actions:read permission to Claude
+          # This activates mcp__github_ci__* tools for checking workflow runs and test results
+          # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#additional_permissions
+          additional_permissions: |
+            actions: read
+          # Shows "Claude is working..." progress comments (similar to v0.x behavior)
+          # Helps users understand Claude is processing their request
+          # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#track_progress
+          track_progress: true
           claude_args: |
+            # Allow up to 8 conversation turns for interactive @claude mentions
+            # Typical flow: Read request → Analyze code → Ask questions → Implement changes → Verify → Respond
+            # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#max-turns
             --max-turns 8
-            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Read,Edit,Replace,mcp__github_inline_comment__create_inline_comment"
+
+            # Explicit tool allowlist for security and cost control
+            # - gh pr comment/diff/view: PR interaction
+            # - gh issue view: Context from linked issues
+            # - Read/Edit/Replace: File operations for implementing fixes
+            # - mcp__github_inline_comment__create_inline_comment: Code-specific feedback
+            # - mcp__github_ci__*: Check CI status and test failures
+            # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/tools.md
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Read,Edit,Replace,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
+
+            # Use latest Sonnet 4.5 model for best performance
+            # Note: Verify this model ID is correct (PR description mentioned claude-sonnet-4-20250514)
             --model claude-sonnet-4-5-20250929

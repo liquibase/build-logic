@@ -8,6 +8,9 @@ permissions:
   pull-requests: write
   issues: read
   id-token: write
+  # Required for CI integration tools (mcp__github_ci__*)
+  # These allow Claude to check workflow runs, job statuses, and test results
+  # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/solutions.md#ci-integration
   actions: read
   checks: read
   statuses: read
@@ -15,6 +18,9 @@ permissions:
 jobs:
   claude-review:
     runs-on: ubuntu-latest
+    # Prevent excessive API costs from runaway reviews
+    # 10 minutes should be sufficient for automated PR reviews
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
@@ -41,6 +47,14 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+          # Enable CI tools by granting actions:read permission to Claude
+          # This activates mcp__github_ci__* tools for checking workflow runs and test results
+          # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#additional_permissions
+
+          # Shows "Claude is working..." progress comments (similar to v0.x behavior)
+          # Helps users understand Claude is processing their request
+          # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#track_progress
+          track_progress: true
           prompt: |
             REPO: ${{ github.repository }}
             PR: #${{ github.event.pull_request.number }}
@@ -56,6 +70,7 @@ jobs:
             1. Critical bugs or security vulnerabilities
             2. Logic errors that break functionality
             3. Missing test coverage for critical code paths
+            4. Build or test issues suggested by the code changes or PR discussion
 
             SKIP if not found:
             - Do NOT mention performance unless there's an actual problem
@@ -63,8 +78,8 @@ jobs:
             - Do NOT comment on style/formatting unless egregious
 
             OUTPUT FORMAT:
-            - Use inline comments (gh pr comment) for specific code issues
-            - Use ONE summary comment for overall feedback
+            - Use mcp__github_inline_comment__create_inline_comment for code-specific issues
+            - Use gh pr comment for overall summary
             - Maximum 5 bullet points total
             - Each bullet point: 1 sentence maximum
             - If no significant issues: "LGTM - no significant issues found"
@@ -77,4 +92,20 @@ jobs:
 
             Use the repository's CLAUDE.md for style conventions if available.
 
-          claude_args: '--max-turns 2 --allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*)"'
+          claude_args: |
+            # Allow up to 5 conversation turns for automated PR reviews
+            # Typical flow: Read PR → Analyze diff → Check CI (if needed) → Formulate review → Post comments
+            # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#max-turns
+            --max-turns 5
+
+            # Explicit tool allowlist for security and cost control
+            # - gh pr comment/diff/view: PR interaction and analysis
+            # - Read: Read repository files for context
+            # - mcp__github_inline_comment__create_inline_comment: Code-specific feedback
+            # - mcp__github_ci__*: Check CI status and correlate test failures with code changes
+            # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/tools.md
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
+
+            # Use latest Sonnet 4.5 model for best performance
+            # Note: Verify this model ID is correct (PR description mentioned claude-sonnet-4-20250514)
+            --model claude-sonnet-4-5-20250929

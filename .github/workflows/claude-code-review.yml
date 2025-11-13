@@ -50,8 +50,7 @@ jobs:
           # Enable CI tools by granting actions:read permission to Claude
           # This activates mcp__github_ci__* tools for checking workflow runs and test results
           # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#additional_permissions
-          additional_permissions: |
-            actions: read
+
           # Shows "Claude is working..." progress comments (similar to v0.x behavior)
           # Helps users understand Claude is processing their request
           # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#track_progress

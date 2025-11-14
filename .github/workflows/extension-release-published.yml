@@ -379,9 +379,10 @@ jobs:
         env:
           MAVEN_USERNAME: ${{ env.REPO_LIQUIBASE_NET_USER }}
           MAVEN_PASSWORD: ${{ env.REPO_LIQUIBASE_NET_PASSWORD }}
+          DRY_RUN_VERSION: ${{ inputs.dry_run_version }}
         run: |
-          # Validate and sanitize dry_run_version input (Maven-style: letters, digits, dots, hyphens, underscores)
-          raw_version="${{ inputs.dry_run_version }}"
+          # Validate and sanitize DRY_RUN_VERSION input (Maven-style: letters, digits, dots, hyphens, underscores)
+          raw_version="$DRY_RUN_VERSION"
           if [[ ! "$raw_version" =~ ^[a-zA-Z0-9._-]+$ ]]; then
             echo "ERROR: Invalid dry_run_version format: '$raw_version'"
             echo "Version must contain only letters, digits, dots, hyphens, and underscores"

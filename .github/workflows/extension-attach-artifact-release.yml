@@ -200,9 +200,11 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-version
         shell: bash
+        env:
+          DRY_RUN_VERSION: ${{ inputs.dry_run_version }}
         run: |
           if [ "${{ inputs.dry_run }}" == "true" ]; then
-            artifact_version="${{ inputs.dry_run_version }}"
+            artifact_version="$DRY_RUN_VERSION"
           else
             artifact_version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout)
           fi

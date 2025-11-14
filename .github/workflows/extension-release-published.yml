@@ -330,6 +330,16 @@ jobs:
       - name: Rename SNAPSHOTS to dry_run version
         working-directory: ${{ inputs.artifactPath }}
         run: |
+          # Validate and sanitize dry_run_version input (Maven-style: letters, digits, dots, hyphens, underscores)
+          raw_version="${{ inputs.dry_run_version }}"
+          if [[ ! "$raw_version" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            echo "ERROR: Invalid dry_run_version format: '$raw_version'"
+            echo "Version must contain only letters, digits, dots, hyphens, and underscores"
+            exit 1
+          fi
+          version="$raw_version"
+          echo "Validated version: $version"
+
           # Rename all SNAPSHOT files (supports both single and multi-module projects)
           for file in *-SNAPSHOT*; do
             if [ -f "$file" ]; then
@@ -344,13 +354,25 @@ jobs:
 
           # Find and update all pom files in current directory (supports multi-module)
           ls -l *.pom || echo "No POM files found"
-          for pom_file in *-${{ inputs.dry_run_version }}.pom; do
+
+          # Use sanitized version variable with quoted glob pattern to prevent glob expansion
+          pom_pattern="*-${version}.pom"
+          pom_files_found=false
+          for pom_file in $pom_pattern; do
+            # Check if glob pattern matched actual files
             if [ -f "$pom_file" ]; then
+              pom_files_found=true
               echo "Updating $pom_file - removing -SNAPSHOT from version tags"
               sed -i 's/<version>\(.*\)-SNAPSHOT<\/version>/<version>\1<\/version>/g' "$pom_file"
               echo "✓ Updated $pom_file"
             fi
           done
+
+          # Fail if no files matched the pattern
+          if [ "$pom_files_found" = false ]; then
+            echo "ERROR: No POM files matching pattern '$pom_pattern' were found"
+            exit 1
+          fi
 
       - name: Publish to Maven Central
         working-directory: ${{ inputs.artifactPath }}
@@ -358,30 +380,50 @@ jobs:
           MAVEN_USERNAME: ${{ env.REPO_LIQUIBASE_NET_USER }}
           MAVEN_PASSWORD: ${{ env.REPO_LIQUIBASE_NET_PASSWORD }}
         run: |
-          version=${{ inputs.dry_run_version }}
+          # Validate and sanitize dry_run_version input (Maven-style: letters, digits, dots, hyphens, underscores)
+          raw_version="${{ inputs.dry_run_version }}"
+          if [[ ! "$raw_version" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            echo "ERROR: Invalid dry_run_version format: '$raw_version'"
+            echo "Version must contain only letters, digits, dots, hyphens, and underscores"
+            exit 1
+          fi
+          version="$raw_version"
+          echo "Validated version: $version"
+
+          # Use sanitized version variable with quoted glob pattern to prevent glob expansion
+          jar_pattern="*-${version}.jar"
+          jar_files_found=false
 
           # Find all JAR files (excluding sources and javadoc) and deploy each (supports multi-module)
-          for jar_file in *-${version}.jar; do
+          for jar_file in $jar_pattern; do
+            # Check if glob pattern matched actual files
             if [ -f "$jar_file" ] && [[ ! "$jar_file" =~ (sources|javadoc)\.jar$ ]]; then
+              jar_files_found=true
               # Extract artifact name (remove version and .jar)
               artifact_name="${jar_file%-${version}.jar}"
               echo "Publishing artifact: $artifact_name"
 
-              # Deploy with all associated files
+              # Deploy with all associated files (quote all variable expansions to prevent injection)
               mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
                           -Durl=https://repo.liquibase.net/repository/dry-run-sonatype-nexus-staging/ \
                           -DrepositoryId=dry-run-sonatype-nexus-staging \
-                          -DpomFile=${artifact_name}-${version}.pom \
+                          -DpomFile="${artifact_name}-${version}.pom" \
                           -DgeneratePom=false \
-                          -Dfile=${artifact_name}-${version}.jar \
-                          -Dsources=${artifact_name}-${version}-sources.jar \
-                          -Djavadoc=${artifact_name}-${version}-javadoc.jar \
-                          -Dfiles=${artifact_name}-${version}.jar.asc,${artifact_name}-${version}-sources.jar.asc,${artifact_name}-${version}-javadoc.jar.asc,${artifact_name}-${version}.pom.asc \
+                          -Dfile="${artifact_name}-${version}.jar" \
+                          -Dsources="${artifact_name}-${version}-sources.jar" \
+                          -Djavadoc="${artifact_name}-${version}-javadoc.jar" \
+                          -Dfiles="${artifact_name}-${version}.jar.asc,${artifact_name}-${version}-sources.jar.asc,${artifact_name}-${version}-javadoc.jar.asc,${artifact_name}-${version}.pom.asc" \
                           -Dtypes=jar.asc,jar.asc,jar.asc,pom.asc \
                           -Dclassifiers=,sources,javadoc,
               echo "✓ Published $artifact_name"
             fi
           done
+
+          # Fail if no JAR files matched the pattern
+          if [ "$jar_files_found" = false ]; then
+            echo "ERROR: No JAR files matching pattern '$jar_pattern' were found"
+            exit 1
+          fi
 
   deploy_xsd:
     if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true && inputs.dry_run == false

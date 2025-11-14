@@ -118,6 +118,7 @@ jobs:
 
       - name: Download unit tests report
         uses: actions/download-artifact@v6
+        continue-on-error: true
         with:
           name: test-reports-jdk-${{ inputs.javaBuildVersion }}-ubuntu-latest
 

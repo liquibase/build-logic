@@ -156,7 +156,7 @@ jobs:
         uses: robinraju/release-downloader@v1.12
         with:
           tag: "${{ github.event.release.tag_name }}"
-          fileName: "${{ env.artifact_id }}-*"
+          fileName: "*"
           out-file-path: ${{ inputs.artifactPath }}
 
       - name: Publish to Maven Central
@@ -168,16 +168,27 @@ jobs:
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           groupId=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
 
-          # Create Maven repository layout structure for the bundle
           # Convert groupId dots to directory separators
           groupPath=$(echo "$groupId" | tr '.' '/')
-          mkdir -p "bundle/${groupPath}/${{ env.artifact_id }}/${version}"
 
-          # Copy all artifacts and their signatures/checksums to proper Maven repository layout
-          # Skip files containing "-full" in their names
-          for file in ${{ env.artifact_id }}-${version}*; do
-            if [[ ! "$file" == *"-full"* ]]; then
-              cp "$file" "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
+          # Process all JAR files (supports multi-module projects)
+          for jar_file in *-${version}.jar; do
+            if [ -f "$jar_file" ] && [[ ! "$jar_file" =~ (sources|javadoc)\.jar$ ]]; then
+              # Extract artifact name (remove version and .jar)
+              artifact_name="${jar_file%-${version}.jar}"
+              echo "Processing artifact: $artifact_name"
+
+              # Create Maven repository layout structure for this artifact
+              mkdir -p "bundle/${groupPath}/${artifact_name}/${version}"
+
+              # Copy all files for this artifact (jar, pom, sources, javadoc, signatures, checksums)
+              # Skip files containing "-full" in their names
+              for file in ${artifact_name}-${version}*; do
+                if [[ ! "$file" == *"-full"* ]] && [ -f "$file" ]; then
+                  cp "$file" "bundle/${groupPath}/${artifact_name}/${version}/"
+                  echo "  Copied: $file"
+                fi
+              done
             fi
           done
 
@@ -313,13 +324,14 @@ jobs:
         uses: robinraju/release-downloader@v1.12
         with:
           releaseId: "${{ inputs.dry_run_release_id }}"
-          fileName: "${{ env.artifact_id }}-*"
+          fileName: "*"
           out-file-path: ${{ inputs.artifactPath }}
 
       - name: Rename SNAPSHOTS to dry_run version
         working-directory: ${{ inputs.artifactPath }}
         run: |
-          for file in ${{ env.artifact_id }}-*-SNAPSHOT*; do
+          # Rename all SNAPSHOT files (supports both single and multi-module projects)
+          for file in *-SNAPSHOT*; do
             if [ -f "$file" ]; then
               # Remove -SNAPSHOT- and -SNAPSHOT from filenames
               new_file=$(echo "$file" | sed "s/-SNAPSHOT-/-/g" | sed "s/-SNAPSHOT//g")
@@ -330,12 +342,15 @@ jobs:
             fi
           done
 
-          # Find and update all pom files in current directory
-          ls -l *.pom
-          pom_file="${{ env.artifact_id }}-${{ inputs.dry_run_version }}.pom"
-          echo "Updating $pom_file - removing -SNAPSHOT from version tags"
-          sed -i 's/<version>\(.*\)-SNAPSHOT<\/version>/<version>\1<\/version>/g' $pom_file
-          echo "✓ Updated $pom_file"
+          # Find and update all pom files in current directory (supports multi-module)
+          ls -l *.pom || echo "No POM files found"
+          for pom_file in *-${{ inputs.dry_run_version }}.pom; do
+            if [ -f "$pom_file" ]; then
+              echo "Updating $pom_file - removing -SNAPSHOT from version tags"
+              sed -i 's/<version>\(.*\)-SNAPSHOT<\/version>/<version>\1<\/version>/g' "$pom_file"
+              echo "✓ Updated $pom_file"
+            fi
+          done
 
       - name: Publish to Maven Central
         working-directory: ${{ inputs.artifactPath }}
@@ -343,18 +358,30 @@ jobs:
           MAVEN_USERNAME: ${{ env.REPO_LIQUIBASE_NET_USER }}
           MAVEN_PASSWORD: ${{ env.REPO_LIQUIBASE_NET_PASSWORD }}
         run: |
-          version=${{ inputs.dry_run_version }}         
-          mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
-                      -Durl=https://repo.liquibase.net/repository/dry-run-sonatype-nexus-staging/ \
-                      -DrepositoryId=dry-run-sonatype-nexus-staging \
-                      -DpomFile=${{ env.artifact_id }}-${version}.pom \
-                      -DgeneratePom=false \
-                      -Dfile=${{ env.artifact_id }}-${version}.jar \
-                      -Dsources=${{ env.artifact_id }}-${version}-sources.jar \
-                      -Djavadoc=${{ env.artifact_id }}-${version}-javadoc.jar \
-                      -Dfiles=${{ env.artifact_id }}-${version}.jar.asc,${{ env.artifact_id }}-${version}-sources.jar.asc,${{ env.artifact_id }}-${version}-javadoc.jar.asc,${{ env.artifact_id }}-${version}.pom.asc \
-                      -Dtypes=jar.asc,jar.asc,jar.asc,pom.asc \
-                      -Dclassifiers=,sources,javadoc,
+          version=${{ inputs.dry_run_version }}
+
+          # Find all JAR files (excluding sources and javadoc) and deploy each (supports multi-module)
+          for jar_file in *-${version}.jar; do
+            if [ -f "$jar_file" ] && [[ ! "$jar_file" =~ (sources|javadoc)\.jar$ ]]; then
+              # Extract artifact name (remove version and .jar)
+              artifact_name="${jar_file%-${version}.jar}"
+              echo "Publishing artifact: $artifact_name"
+
+              # Deploy with all associated files
+              mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.0.0-M1:deploy-file \
+                          -Durl=https://repo.liquibase.net/repository/dry-run-sonatype-nexus-staging/ \
+                          -DrepositoryId=dry-run-sonatype-nexus-staging \
+                          -DpomFile=${artifact_name}-${version}.pom \
+                          -DgeneratePom=false \
+                          -Dfile=${artifact_name}-${version}.jar \
+                          -Dsources=${artifact_name}-${version}-sources.jar \
+                          -Djavadoc=${artifact_name}-${version}-javadoc.jar \
+                          -Dfiles=${artifact_name}-${version}.jar.asc,${artifact_name}-${version}-sources.jar.asc,${artifact_name}-${version}-javadoc.jar.asc,${artifact_name}-${version}.pom.asc \
+                          -Dtypes=jar.asc,jar.asc,jar.asc,pom.asc \
+                          -Dclassifiers=,sources,javadoc,
+              echo "✓ Published $artifact_name"
+            fi
+          done
 
   deploy_xsd:
     if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true && inputs.dry_run == false

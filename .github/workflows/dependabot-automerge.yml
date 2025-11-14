@@ -20,8 +20,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    # Conditional statement to run the job only when the event was triggered by 'dependabot[bot]'
-    if: ${{ github.actor == 'dependabot[bot]' }}
+    # Conditional statement to run the job only when the PR is from 'dependabot[bot]'
+    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
 
     steps:
       - name: Dependabot metadata

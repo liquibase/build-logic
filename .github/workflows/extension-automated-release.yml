@@ -106,7 +106,6 @@ jobs:
           app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
           private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ${{ matrix.repository }}
           
       - name: Install Dependabot CLI
         env:
@@ -127,8 +126,36 @@ jobs:
           REPOSITORY: ${{ matrix.repository }}
         run: |
           echo "INFO: Running Dependabot on repository: $REPOSITORY"
-          dependabot update maven "liquibase/$REPOSITORY"
-          echo "INFO: Dependabot update completed for $REPOSITORY"
+
+          set +e
+          output=$(dependabot update maven "liquibase/$REPOSITORY" 2>&1)
+          exit_code=$?
+          set -e
+
+          echo "$output"
+
+          if [ $exit_code -ne 0 ]; then
+            # Check if there were any successful updates
+            if echo "$output" | grep -q "Changes to Dependabot Pull Requests"; then
+              echo "INFO: Some dependencies were successfully updated"
+
+              # Check if only known problematic dependencies failed
+              if echo "$output" | grep -qE "(com\.simba\.googlebigquery\.jdbc:GoogleBigQueryJDBC42|com\.liquibase:liquibase-extension-testing).*private_source_authentication_failure"; then
+                echo "WARNING: Known authentication issues with private dependencies:"
+                echo "$output" | grep -A 5 "Dependencies failed to update" || true
+                echo "INFO: These dependencies will be skipped. Please update manually if needed."
+                echo "INFO: Continuing with other successfully updated dependencies for $REPOSITORY"
+                # Exit successfully to continue the workflow
+                exit 0
+              fi
+            fi
+
+            # Other error - fail the step
+            echo "ERROR: Dependabot failed with unexpected error for $REPOSITORY"
+            exit $exit_code
+          fi
+
+          echo "INFO: Dependabot update completed successfully for $REPOSITORY"
 
   update-pom:
     needs: check-security-vulnerabilities

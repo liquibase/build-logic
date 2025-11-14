@@ -437,7 +437,7 @@ jobs:
       - name: Set pom version to dry_run version
         if: ${{ inputs.dry_run == true }}
         run: |
-          mvn versions:set -DnewVersion=${{ inputs.dry_run_version }}-SNAPSHOT -DgenerateBackupPoms=false
+          mvn versions:set -DnewVersion=${{ inputs.dry_run_version }}-SNAPSHOT -DgenerateBackupPoms=false -DprocessAllModules=true
 
       - name: Build release artifacts (dry-run)
         if: ${{ inputs.dry_run == true }}
@@ -567,6 +567,15 @@ jobs:
         if: ${{ inputs.dry_run == true }}
         run: echo "ARTIFACT_PATH=${{ inputs.artifactPath || '.' }}" >> $GITHUB_OUTPUT
 
+      - name: Collect artifacts for release (dry-run)
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          mkdir -p /tmp/release-artifacts
+          # Find and copy all artifacts from target directories (supports multi-module)
+          find ${{ steps.set-artifact-path.outputs.ARTIFACT_PATH }} -type f \( -name "*.jar" -o -name "*.pom" -o -name "*.asc" \) -path "*/target/*" ! -name "original-*" -exec cp {} /tmp/release-artifacts/ \;
+          echo "Collected artifacts:"
+          ls -lh /tmp/release-artifacts/
+
       - name: Attach Files to Draft Release (dry-run)
         id: attach-files-dry-run
         if: ${{ inputs.dry_run == true }}
@@ -577,7 +586,7 @@ jobs:
           body: Dry Run ${{ inputs.dry_run_version }}
           generate_release_notes: true
           draft: true
-          files: ${{ steps.set-artifact-path.outputs.ARTIFACT_PATH }}/target/*
+          files: /tmp/release-artifacts/*
 
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'

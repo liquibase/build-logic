@@ -23,7 +23,7 @@ jobs:
       HOMEBREW_BRANCH: ${{ steps.check-placeholder-branch.outputs.HOMEBREW_BRANCH }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: liquibase/liquibase
           
@@ -63,7 +63,7 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: liquibase/liquibase
           token: ${{ steps.get-token.outputs.token }}
@@ -116,7 +116,7 @@ jobs:
       branch_exists: ${{ steps.check-placeholder-branch.outputs.branch_exists }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: liquibase/liquibase
 
@@ -159,7 +159,7 @@ jobs:
           echo "Latest SDKMAN version: $SDKMAN_OSS_VERSION"
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: liquibase/liquibase
 
@@ -259,7 +259,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Get Latest GitHub Version
         id: oss-latest-version

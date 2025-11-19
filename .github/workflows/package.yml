@@ -1038,7 +1038,7 @@ jobs:
     with:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
-      dry_run_release_id: ${{ inputs.dry_run_release_id }}
+      dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
 
   upload_secure_ansible_role:
     if: ${{ inputs.distribution == 'liquibase-secure' }}
@@ -1047,4 +1047,4 @@ jobs:
     with:
       version: ${{ inputs.version }}
       dry_run: ${{ inputs.dry_run }}
-      dry_run_release_id: ${{ inputs.dry_run_release_id }}
+      dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}

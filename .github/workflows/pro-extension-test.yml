@@ -509,10 +509,12 @@ jobs:
       - name: Parse Ubuntu OS name from inputs
         id: parse-os
         shell: bash
+        env:
+          OS_INPUT: ${{ inputs.os }}
         run: |
           # Extract Ubuntu runner name (could be ubuntu-latest or blacksmith-2vcpu-ubuntu-2404)
           # Blacksmith only supports Ubuntu/Linux, so macOS and Windows are always *-latest
-          UBUNTU_OS=$(echo '${{ inputs.os }}' | jq -r '.[] | select(contains("ubuntu"))' | head -n1)
+          UBUNTU_OS=$(echo "${OS_INPUT}" | jq -r '.[] | select(contains("ubuntu"))' | head -n1)
           echo "ubuntu_os=${UBUNTU_OS}" >> $GITHUB_OUTPUT
           echo "Parsed Ubuntu OS: ${UBUNTU_OS}"
 

@@ -283,7 +283,7 @@ jobs:
           path: ${{ github.event_path }}
 
       - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
-        if: matrix.os == 'ubuntu-latest'
+        if: contains(matrix.os, 'ubuntu')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
@@ -506,10 +506,22 @@ jobs:
           echo "Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
           echo "Artifact Version: ${ARTIFACT_VERSION}"
 
+      - name: Parse Ubuntu OS name from inputs
+        id: parse-os
+        shell: bash
+        env:
+          OS_INPUT: ${{ inputs.os }}
+        run: |
+          # Extract Ubuntu runner name (could be ubuntu-latest or blacksmith-2vcpu-ubuntu-2404)
+          # Blacksmith only supports Ubuntu/Linux, so macOS and Windows are always *-latest
+          UBUNTU_OS=$(echo "${OS_INPUT}" | jq -r '.[] | select(contains("ubuntu"))' | head -n1)
+          echo "ubuntu_os=${UBUNTU_OS}" >> $GITHUB_OUTPUT
+          echo "Parsed Ubuntu OS: ${UBUNTU_OS}"
+
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v6
         with:
-          name: ${{ env.PROJECT_ARTIFACT_NAME }}-ubuntu-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.parse-os.outputs.ubuntu_os }}-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts

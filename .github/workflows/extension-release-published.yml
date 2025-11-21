@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: maven-release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -229,7 +229,7 @@ jobs:
     if: ${{ inputs.dry_run == true }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -432,7 +432,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Download xsd files
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Relative path under $GITHUB_WORKSPACE to place the repository
           path: ${{ github.event.repository.name }}

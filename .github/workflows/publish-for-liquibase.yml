@@ -77,7 +77,7 @@ jobs:
           permission-packages: write
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.repository }}
           token: ${{ steps.get-token.outputs.token }}

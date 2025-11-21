@@ -77,7 +77,7 @@ jobs:
     concurrency:
       group: attach-artifact-${{ github.ref }}-${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -226,7 +226,7 @@ jobs:
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v6
@@ -297,7 +297,7 @@ jobs:
       - run: sleep 30
         if: ${{ inputs.dry_run == false }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5

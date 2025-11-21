@@ -587,7 +587,7 @@ jobs:
 
           # Verify the copied file is still signed
           echo "Verifying copied RPM signature:"
-          rpm --checksig "yum/noarch/${{ env.RPM_FILENAME }}"
+          sudo rpm --checksig "yum/noarch/${{ env.RPM_FILENAME }}"
 
           # Generate repository metadata with the signed RPM
           echo "Generating repository metadata..."
@@ -680,7 +680,7 @@ jobs:
 
           # Verify the copied file is still signed
           echo "Verifying copied RPM signature:"
-          rpm --checksig "yum/noarch/${{ env.RPM_FILENAME }}"
+          sudo rpm --checksig "yum/noarch/${{ env.RPM_FILENAME }}"
 
           # Generate repository metadata with the signed RPM
           echo "Generating repository metadata..."

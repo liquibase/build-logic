@@ -774,89 +774,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      ## HomeBrew CASKS: Versions >= 5.x use Homebrew Casks
-      - name: Check for existing Homebrew cask PR for ${{ inputs.distribution }}
-        if: ${{ !startsWith(inputs.version, '4.') }}
-        continue-on-error: true
-        id: check-brew-cask-pr
-        run: |
-          # Authenticate GitHub CLI
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
-
-          # Determine the cask name based on distribution
-          if [ "${{ inputs.distribution }}" = "liquibase" ]; then
-            CASK_NAME="liquibase-community"
-          else
-            CASK_NAME="${{ inputs.distribution }}"
-          fi
-          echo "CASK_NAME=$CASK_NAME" >> $GITHUB_OUTPUT
-
-          # Define the PR title
-          pr_title="$CASK_NAME ${{ inputs.version }}"
-
-          # Search for open pull requests with the specified title in the Homebrew/homebrew-cask repo
-          pr_title=$(gh pr list --repo Homebrew/homebrew-cask --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
-          echo "pr_title: $pr_title"
-          # Set the environment variable based on whether the PR exists
-          if [ -z "$pr_title" ]; then
-            PR_EXISTS=false
-          else
-            PR_EXISTS=true
-          fi
-
-          # Store it in GitHub output for later steps
-          echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_OUTPUT
-
-          # Echo it immediately to see the value in logs
-          echo "PR_EXISTS is set to $PR_EXISTS"
-
-      - name: Update Homebrew cask for ${{ inputs.distribution }}
-        if: ${{ !startsWith(inputs.version, '4.') && steps.check-brew-cask-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
-        continue-on-error: true
-        uses: macauley/action-homebrew-bump-cask@v1
-        with:
-          token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
-          tap: Homebrew/homebrew-cask
-          cask: ${{ steps.check-brew-cask-pr.outputs.CASK_NAME }}
-          tag: ${{ inputs.version }}
-          livecheck: false
-          dryrun: false
-
-      # This step captures the PR details after it has been created
-      # and stores the PR number and URL in GitHub outputs for later use.
-      # This is useful for tracking the PR status and creating a tracking issue.
-      - name: Capture Homebrew Cask PR Details
-        continue-on-error: true
-        if: ${{ !startsWith(inputs.version, '4.') && steps.check-brew-cask-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
-        id: capture-cask-pr
-        run: |
-          # Wait briefly for PR to be created
-          sleep 30
-
-          # Get the cask name
-          CASK_NAME="${{ steps.check-brew-cask-pr.outputs.CASK_NAME }}"
-
-          # Search for the PR
-          PR_DATA=$(gh api graphql -f query='
-          query($search_query: String!) {
-            search(query: $search_query, type: ISSUE, first: 1) {
-              nodes {
-                ... on PullRequest {
-                  url,
-                  number
-                }
-              }
-            }
-          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-cask $CASK_NAME ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
-
-          if [ ! -z "$PR_DATA" ]; then
-            echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
-            echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
-            echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.distribution == 'liquibase' && inputs.dry_run == false }}
         continue-on-error: true
@@ -954,13 +871,118 @@ jobs:
           aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
           echo "Uploaded liquibase-$VERSION.zip to s3"
 
+  # Homebrew cask updates for versions >= 5.x
+  # This job runs on macOS because the macauley/action-homebrew-bump-cask action requires brew to be installed
+  update_homebrew_cask:
+    name: Update Homebrew Cask
+    runs-on: macos-latest
+    if: ${{ !startsWith(inputs.version, '4.') && inputs.dry_run == false }}
+    outputs:
+      HOMEBREW_PR_NUMBER: ${{ steps.capture-cask-pr.outputs.HOMEBREW_PR_NUMBER }}
+      HOMEBREW_PR_URL: ${{ steps.capture-cask-pr.outputs.HOMEBREW_PR_URL }}
+    steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Check for existing Homebrew cask PR for ${{ inputs.distribution }}
+        continue-on-error: true
+        id: check-brew-cask-pr
+        run: |
+          # Authenticate GitHub CLI
+          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+
+          # Determine the cask name based on distribution
+          if [ "${{ inputs.distribution }}" = "liquibase" ]; then
+            CASK_NAME="liquibase-community"
+          else
+            CASK_NAME="${{ inputs.distribution }}"
+          fi
+          echo "CASK_NAME=$CASK_NAME" >> $GITHUB_OUTPUT
+
+          # Define the PR title
+          pr_title="$CASK_NAME ${{ inputs.version }}"
+
+          # Search for open pull requests with the specified title in the Homebrew/homebrew-cask repo
+          pr_title=$(gh pr list --repo Homebrew/homebrew-cask --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
+          echo "pr_title: $pr_title"
+          # Set the environment variable based on whether the PR exists
+          if [ -z "$pr_title" ]; then
+            PR_EXISTS=false
+          else
+            PR_EXISTS=true
+          fi
+
+          # Store it in GitHub output for later steps
+          echo "PR_EXISTS=$PR_EXISTS" >> $GITHUB_OUTPUT
+
+          # Echo it immediately to see the value in logs
+          echo "PR_EXISTS is set to $PR_EXISTS"
+
+      - name: Update Homebrew cask for ${{ inputs.distribution }}
+        if: ${{ steps.check-brew-cask-pr.outputs.PR_EXISTS == 'false' }}
+        continue-on-error: true
+        uses: macauley/action-homebrew-bump-cask@v1
+        with:
+          token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
+          tap: Homebrew/homebrew-cask
+          cask: ${{ steps.check-brew-cask-pr.outputs.CASK_NAME }}
+          tag: ${{ inputs.version }}
+          livecheck: false
+          dryrun: false
+
+      # This step captures the PR details after it has been created
+      # and stores the PR number and URL in GitHub outputs for later use.
+      # This is useful for tracking the PR status and creating a tracking issue.
+      - name: Capture Homebrew Cask PR Details
+        continue-on-error: true
+        if: ${{ steps.check-brew-cask-pr.outputs.PR_EXISTS == 'false' }}
+        id: capture-cask-pr
+        run: |
+          # Wait briefly for PR to be created
+          sleep 30
+
+          # Get the cask name
+          CASK_NAME="${{ steps.check-brew-cask-pr.outputs.CASK_NAME }}"
+
+          # Search for the PR
+          PR_DATA=$(gh api graphql -f query='
+          query($search_query: String!) {
+            search(query: $search_query, type: ISSUE, first: 1) {
+              nodes {
+                ... on PullRequest {
+                  url,
+                  number
+                }
+              }
+            }
+          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-cask $CASK_NAME ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
+
+          if [ ! -z "$PR_DATA" ]; then
+            echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
+            echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
+            echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # create a placeholder branch to check if tracking branch exists for this version
   # Branch is created when package is submitted to Homebrew and SDKMAN
   # Branch is deleted when package becomes available on Homebrew and SDKMAN
   create-placeholder-branch:
     runs-on: ubuntu-latest
-    needs: upload_packages
-    if: ${{ inputs.distribution != 'liquibase-secure' && inputs.dry_run == false }}
+    needs: [upload_packages, update_homebrew_cask]
+    if: ${{ always() && inputs.distribution != 'liquibase-secure' && inputs.dry_run == false }}
     steps:
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -1013,15 +1035,32 @@ jobs:
           fi
 
           # Create Homebrew tracking branch if it doesn't exist and PR number is available
-          # Only create for 4.x versions due to Homebrew licensing restrictions
+          # For 4.x versions: Homebrew Formulas (from upload_packages job)
           if [[ "${{ inputs.version }}" =~ ^4\. ]] && [[ -n "${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}; then
             git checkout -b ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
-            echo "This is a placeholder branch for oss homebrew package v.${{ inputs.version }}. If this branch is open, it means the homebrew package is not yet approved" > README.md
+            echo "This is a placeholder branch for oss homebrew formula v.${{ inputs.version }}. If this branch is open, it means the homebrew formula is not yet approved" > README.md
             git add README.md
-            git commit -m "Create placeholder branch for Homebrew package v.${{ inputs.version }}"
+            git commit -m "Create placeholder branch for Homebrew formula v.${{ inputs.version }}"
             git push origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+            echo "Created Homebrew formula tracking branch for PR #${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}"
+          elif [[ ! "${{ inputs.version }}" =~ ^4\. ]]; then
+            echo "Homebrew formula tracking branch skipped (only 4.x versions use formulas)"
           else
-            echo "Homebrew tracking branch skipped (only 4.x versions supported) or already exists or PR number not available"
+            echo "Homebrew formula tracking branch already exists or PR number not available"
+          fi
+
+          # For 5.x+ versions: Homebrew Casks (from update_homebrew_cask job)
+          if [[ ! "${{ inputs.version }}" =~ ^4\. ]] && [[ -n "${{ needs.update_homebrew_cask.outputs.HOMEBREW_PR_NUMBER }}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-cask-check-${{ needs.update_homebrew_cask.outputs.HOMEBREW_PR_NUMBER }}; then
+            git checkout -b ci-oss-homebrew-cask-check-${{ needs.update_homebrew_cask.outputs.HOMEBREW_PR_NUMBER }}
+            echo "This is a placeholder branch for oss homebrew cask v.${{ inputs.version }}. If this branch is open, it means the homebrew cask is not yet approved" > README.md
+            git add README.md
+            git commit -m "Create placeholder branch for Homebrew cask v.${{ inputs.version }}"
+            git push origin ci-oss-homebrew-cask-check-${{ needs.update_homebrew_cask.outputs.HOMEBREW_PR_NUMBER }}
+            echo "Created Homebrew cask tracking branch for PR #${{ needs.update_homebrew_cask.outputs.HOMEBREW_PR_NUMBER }}"
+          elif [[ "${{ inputs.version }}" =~ ^4\. ]]; then
+            echo "Homebrew cask tracking branch skipped (4.x versions use formulas)"
+          else
+            echo "Homebrew cask tracking branch already exists or PR number not available"
           fi
 
   upload_windows_package:

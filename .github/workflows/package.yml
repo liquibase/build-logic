@@ -500,7 +500,7 @@ jobs:
           rpm --checksig -v "${{ env.RPM_FILENAME }}" || true
 
           # Check if signature was actually added
-          echo "Checking if RPM has a GPP signature:"
+          echo "Checking if RPM has a GPG signature:"
           if rpm --checksig "${{ env.RPM_FILENAME }}" 2>&1 | grep -q "RSA/SHA"; then
             echo "✓ RPM is successfully signed with GPG signature"
           else
@@ -577,6 +577,13 @@ jobs:
           # Copy the signed RPM to the repository directory
           echo "Copying signed RPM to repository..."
           cp "$SIGNED_RPM_PATH" yum/noarch/
+
+          # Import GPG public key into RPM database for verification
+          echo "Importing GPG public key for signature verification..."
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
+          gpg --export -a "$GPG_KEY_ID" > /tmp/gpg-pubkey-verify.asc
+          sudo rpm --import /tmp/gpg-pubkey-verify.asc
+          rm /tmp/gpg-pubkey-verify.asc
 
           # Verify the copied file is still signed
           echo "Verifying copied RPM signature:"
@@ -663,6 +670,13 @@ jobs:
           # Copy the signed RPM to the repository directory
           echo "Copying signed RPM to repository..."
           cp "$SIGNED_RPM_PATH" yum/noarch/
+
+          # Import GPG public key into RPM database for verification
+          echo "Importing GPG public key for signature verification..."
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
+          gpg --export -a "$GPG_KEY_ID" > /tmp/gpg-pubkey-verify.asc
+          sudo rpm --import /tmp/gpg-pubkey-verify.asc
+          rm /tmp/gpg-pubkey-verify.asc
 
           # Verify the copied file is still signed
           echo "Verifying copied RPM signature:"

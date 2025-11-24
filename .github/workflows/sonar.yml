@@ -51,11 +51,15 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
 
-      - name: Build Maven project
+      - name: Build and analyze with Maven
         if: steps.check-maven.outputs.is_maven == 'true'
-        run: mvn clean compile test-compile
+        run: mvn clean verify sonar:sonar
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: SonarQube Scan
+      - name: SonarQube Scan (non-Maven projects)
+        if: steps.check-maven.outputs.is_maven == 'false'
         uses: SonarSource/sonarqube-scan-action@v6.0.0
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}

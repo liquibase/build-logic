@@ -53,7 +53,18 @@ jobs:
 
       - name: Build and analyze with Maven
         if: steps.check-maven.outputs.is_maven == 'true'
-        run: mvn clean verify sonar:sonar -Dsonar.host.url=https://sonarcloud.io
+        run: |
+          # Extract sonar properties from sonar-project.properties if it exists
+          if [ -f "sonar-project.properties" ]; then
+            SONAR_PROJECT_KEY=$(grep -E "^sonar.projectKey=" sonar-project.properties | cut -d'=' -f2)
+            SONAR_ORGANIZATION=$(grep -E "^sonar.organization=" sonar-project.properties | cut -d'=' -f2)
+            mvn clean verify sonar:sonar \
+              -Dsonar.host.url=https://sonarcloud.io \
+              -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+              -Dsonar.organization=${SONAR_ORGANIZATION}
+          else
+            mvn clean verify sonar:sonar -Dsonar.host.url=https://sonarcloud.io
+          fi
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -51,6 +51,49 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
 
+      - name: Configure Maven settings for GitHub Packages
+        if: steps.check-maven.outputs.is_maven == 'true'
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
+              }
+            ]
+
       - name: Build and analyze with Maven
         if: steps.check-maven.outputs.is_maven == 'true'
         run: |

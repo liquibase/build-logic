@@ -1,6 +1,12 @@
 name: SonarQube Scan
 on:
   workflow_call:
+    inputs:
+      java-version:
+        description: 'Java version to use for Maven projects'
+        required: false
+        type: string
+        default: '17'
 
 jobs:
   sonarqube:
@@ -13,6 +19,23 @@ jobs:
         with:
           # Disabling shallow clones is recommended for improving the relevancy of reporting
           fetch-depth: 0
+
+      - name: Check for Maven project
+        id: check-maven
+        run: |
+          if [ -f "pom.xml" ]; then
+            echo "is_maven=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_maven=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up JDK
+        if: steps.check-maven.outputs.is_maven == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: 'temurin'
+          cache: maven
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -27,6 +50,11 @@ jobs:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
+
+      - name: Build Maven project
+        if: steps.check-maven.outputs.is_maven == 'true'
+        run: mvn clean compile test-compile
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6.0.0
         env:

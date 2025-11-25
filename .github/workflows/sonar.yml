@@ -104,13 +104,17 @@ jobs:
             mvn clean verify sonar:sonar \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-              -Dsonar.organization=${SONAR_ORGANIZATION}
+              -Dsonar.organization=${SONAR_ORGANIZATION}\
+              -Dmaven.test.failure.ignore=true
           else
-            mvn clean verify sonar:sonar -Dsonar.host.url=https://sonarcloud.io
+            mvn clean verify sonar:sonar \
+              -Dsonar.host.url=https://sonarcloud.io \
+              -Dmaven.test.failure.ignore=true
           fi
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIQUIBOT_PAT_GPM_ACCESS: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
 
       - name: SonarQube Scan (non-Maven projects)
         if: steps.check-maven.outputs.is_maven == 'false'

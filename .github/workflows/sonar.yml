@@ -7,6 +7,10 @@ on:
         required: false
         type: string
         default: '17'
+    secrets:
+      LIQUIBASE_VAULT_OIDC_ROLE_ARN:
+        description: 'AWS OIDC role ARN for accessing vault secrets'
+        required: true
 
 jobs:
   sonarqube:

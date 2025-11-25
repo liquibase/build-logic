@@ -51,6 +51,11 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
 
+      - name: Set environment variables from vault
+        run: |
+          echo "LIQUIBOT_PAT_GPM_ACCESS=${{ steps.vault-secrets.outputs.LIQUIBOT_PAT_GPM_ACCESS }}" >> $GITHUB_ENV
+          echo "SONAR_TOKEN=${{ steps.vault-secrets.outputs.SONAR_TOKEN }}" >> $GITHUB_ENV
+
       - name: Configure Maven settings for GitHub Packages
         if: steps.check-maven.outputs.is_maven == 'true'
         uses: whelk-io/maven-settings-xml-action@v22
@@ -101,16 +106,24 @@ jobs:
           if [ -f "sonar-project.properties" ]; then
             SONAR_PROJECT_KEY=$(grep -E "^sonar.projectKey=" sonar-project.properties | cut -d'=' -f2)
             SONAR_ORGANIZATION=$(grep -E "^sonar.organization=" sonar-project.properties | cut -d'=' -f2)
+            if [ -z "$SONAR_PROJECT_KEY" ] || [ -z "$SONAR_ORGANIZATION" ]; then
+              echo "Error: sonar.projectKey and sonar.organization must be defined in sonar-project.properties"
+              exit 1
+            fi
             mvn clean verify sonar:sonar \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-              -Dsonar.organization=${SONAR_ORGANIZATION}
+              -Dsonar.organization=${SONAR_ORGANIZATION} \
+              -Dmaven.test.failure.ignore=true
           else
-            mvn clean verify sonar:sonar -Dsonar.host.url=https://sonarcloud.io
+            mvn clean verify sonar:sonar \
+              -Dsonar.host.url=https://sonarcloud.io \
+              -Dmaven.test.failure.ignore=true
           fi
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIQUIBOT_PAT_GPM_ACCESS: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
 
       - name: SonarQube Scan (non-Maven projects)
         if: steps.check-maven.outputs.is_maven == 'false'

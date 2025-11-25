@@ -7,10 +7,6 @@ on:
         required: false
         type: string
         default: '17'
-    secrets:
-      LIQUIBASE_VAULT_OIDC_ROLE_ARN:
-        description: 'AWS OIDC role ARN for accessing vault secrets'
-        required: true
 
 jobs:
   sonarqube:
@@ -113,7 +109,7 @@ jobs:
             mvn clean verify sonar:sonar \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-              -Dsonar.organization=${SONAR_ORGANIZATION}\
+              -Dsonar.organization=${SONAR_ORGANIZATION} \
               -Dmaven.test.failure.ignore=true
           else
             mvn clean verify sonar:sonar \

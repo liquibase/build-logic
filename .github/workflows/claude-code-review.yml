@@ -55,6 +55,9 @@ jobs:
           # Helps users understand Claude is processing their request
           # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#track_progress
           track_progress: true
+          # Allow bot-initiated PRs to be reviewed without failing
+          # This prevents workflow failures for dependabot, renovate, and other automation
+          allowed_bots: '*'
           prompt: |
             REPO: ${{ github.repository }}
             PR: #${{ github.event.pull_request.number }}

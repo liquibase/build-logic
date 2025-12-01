@@ -101,6 +101,10 @@ jobs:
           if [ -f "sonar-project.properties" ]; then
             SONAR_PROJECT_KEY=$(grep -E "^sonar.projectKey=" sonar-project.properties | cut -d'=' -f2)
             SONAR_ORGANIZATION=$(grep -E "^sonar.organization=" sonar-project.properties | cut -d'=' -f2)
+            if [ -z "$SONAR_PROJECT_KEY" ] || [ -z "$SONAR_ORGANIZATION" ]; then
+              echo "Error: sonar.projectKey and sonar.organization must be defined in sonar-project.properties"
+              exit 1
+            fi
             mvn clean verify sonar:sonar \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
@@ -115,6 +119,7 @@ jobs:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LIQUIBOT_PAT_GPM_ACCESS: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
 
       - name: SonarQube Scan (non-Maven projects)
         if: steps.check-maven.outputs.is_maven == 'false'
@@ -122,3 +127,4 @@ jobs:
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}

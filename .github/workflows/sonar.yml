@@ -1,6 +1,12 @@
 name: SonarQube Scan
 on:
   workflow_call:
+    inputs:
+      java-version:
+        description: 'Java version to use for Maven projects'
+        required: false
+        type: string
+        default: '17'
 
 jobs:
   sonarqube:
@@ -13,6 +19,23 @@ jobs:
         with:
           # Disabling shallow clones is recommended for improving the relevancy of reporting
           fetch-depth: 0
+
+      - name: Check for Maven project
+        id: check-maven
+        run: |
+          if [ -f "pom.xml" ]; then
+            echo "is_maven=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_maven=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up JDK
+        if: steps.check-maven.outputs.is_maven == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: 'temurin'
+          cache: maven
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -27,8 +50,81 @@ jobs:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
-      - name: SonarQube Scan
+
+      - name: Configure Maven settings for GitHub Packages
+        if: steps.check-maven.outputs.is_maven == 'true'
+        uses: whelk-io/maven-settings-xml-action@v22
+        with:
+          repositories: |
+            [
+              {
+                "id": "liquibase",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              },
+              {
+                "id": "liquibase-pro",
+                "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
+                "releases": {
+                  "enabled": "true"
+                },
+                "snapshots": {
+                  "enabled": "true",
+                  "updatePolicy": "always"
+                }
+              }
+            ]
+          servers: |
+            [
+              {
+                "id": "liquibase-pro",
+                "username": "liquibot",
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
+              },
+              {
+                "id": "liquibase",
+                "username": "liquibot",
+                "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
+              }
+            ]
+
+      - name: Build and analyze with Maven
+        if: steps.check-maven.outputs.is_maven == 'true'
+        run: |
+          # Extract sonar properties from sonar-project.properties if it exists
+          if [ -f "sonar-project.properties" ]; then
+            SONAR_PROJECT_KEY=$(grep -E "^sonar.projectKey=" sonar-project.properties | cut -d'=' -f2)
+            SONAR_ORGANIZATION=$(grep -E "^sonar.organization=" sonar-project.properties | cut -d'=' -f2)
+            if [ -z "$SONAR_PROJECT_KEY" ] || [ -z "$SONAR_ORGANIZATION" ]; then
+              echo "Error: sonar.projectKey and sonar.organization must be defined in sonar-project.properties"
+              exit 1
+            fi
+            mvn clean verify sonar:sonar \
+              -Dsonar.host.url=https://sonarcloud.io \
+              -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+              -Dsonar.organization=${SONAR_ORGANIZATION} \
+              -Dmaven.test.failure.ignore=true
+          else
+            mvn clean verify sonar:sonar \
+              -Dsonar.host.url=https://sonarcloud.io \
+              -Dmaven.test.failure.ignore=true
+          fi
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIQUIBOT_PAT_GPM_ACCESS: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+
+      - name: SonarQube Scan (non-Maven projects)
+        if: steps.check-maven.outputs.is_maven == 'false'
         uses: SonarSource/sonarqube-scan-action@v6.0.0
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}

@@ -35,6 +35,11 @@ on:
         required: false
         default: "21"
         type: string
+      codeqlConfigFile:
+        description: "Path to CodeQL configuration file (e.g., .github/codeql/codeql-config.yml) for customizing queries and exclusions"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   actions: read
@@ -100,6 +105,7 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ steps.set-build-mode.outputs.buildMode }}
+        config-file: ${{ inputs.codeqlConfigFile || '' }}
         # If you wish to specify custom queries, you can do so here or in a config file.
         # By default, queries listed here will override any specified in a config file.
         # Prefix the list here with "+" to use these queries and those in the config file.

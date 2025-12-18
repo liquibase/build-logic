@@ -8,7 +8,7 @@
 #     cp build-logic/.trivyignore .trivyignore
 #
 # Maintained by: DevOps Team
-# Repository: https://github.com/Datical/build-logic
+# Repository: https://github.com/liquibase/build-logic
 
 # ==============================================================================
 # CVE-2025-59250 - Microsoft SQL Server JDBC Driver

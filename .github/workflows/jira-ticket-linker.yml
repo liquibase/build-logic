@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   add-jira-ticket-link:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
       - name: Check and add ticket link
         uses: actions/github-script@v8

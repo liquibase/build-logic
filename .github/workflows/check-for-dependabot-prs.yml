@@ -9,7 +9,7 @@ env:
 jobs:
   check_for_prs:
     name: Check for open Dependabot PRs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
       - name: Skip check if PR creator is dependabot
         if: github.event.pull_request.user.login == 'dependabot[bot]'

@@ -36,6 +36,11 @@ on:
         required: false
         type: boolean
         default: false
+      snowflake_ext:
+        description: "Deploy or destroy the snowflake Extension infrastructure"
+        required: false
+        type: boolean
+        default: false
       aws_postgresql:
         description: "Deploy or destroy the aws_postgresql infrastructure"
         required: false
@@ -194,7 +199,8 @@ jobs:
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }}
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_oss ${{ inputs.snowflake_oss }}
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_pro ${{ inputs.snowflake_pro }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_th ${{ inputs.snowflake_th }} 
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_th ${{ inputs.snowflake_th }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_ext ${{ inputs.snowflake_ext }}
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql ${{ inputs.aws_postgresql }}
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle ${{ inputs.aws_oracle }}
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mariadb ${{ inputs.aws_mariadb }}

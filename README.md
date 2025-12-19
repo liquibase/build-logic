@@ -96,7 +96,111 @@ Please review the below table of reusable workflows and their descriptions:
 | `sonar-pull-request.yml`                | Code Coverage Scan for PRs. Requires branch name parameter                                                              |
 | `sonar-test-scan.yml`                   | Code Coverage Scan for unit and integration tests                                                                       |
 | `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                                          |
+| `reusable-vulnerability-scan.yml`       | Deep vulnerability scanning for Docker images and tarballs (nested JARs + Python packages)                              |
 | various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets                                   |
+
+## Vulnerability Scanning
+
+The `reusable-vulnerability-scan.yml` workflow provides deep vulnerability scanning for Docker images and tarballs. It extracts nested JARs (Spring Boot BOOT-INF/lib) and Python packages (GraalVM) that standard scanners miss.
+
+### Usage
+
+**Docker Image Scanning:**
+```yaml
+jobs:
+  vulnerability-scan:
+    uses: liquibase/build-logic/.github/workflows/reusable-vulnerability-scan.yml@main
+    with:
+      mode: docker
+      source: "liquibase/liquibase-secure:latest"
+      image_name: "liquibase-secure"
+      image_tag: "latest"
+      fail_on_vulnerabilities: true
+      upload_sarif: true
+```
+
+**Tarball Scanning:**
+```yaml
+jobs:
+  vulnerability-scan:
+    uses: liquibase/build-logic/.github/workflows/reusable-vulnerability-scan.yml@main
+    with:
+      mode: tarball
+      source: "distribution-artifact"  # artifact name from upload-artifact
+      version: "5.0.0"
+      scan_scope: "python-only"
+      fail_on_vulnerabilities: true
+```
+
+### Inputs
+
+| Input | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `mode` | string | yes | - | `docker` or `tarball` |
+| `source` | string | yes | - | Docker image ref OR artifact name |
+| `image_name` | string | no | `''` | Image name for reporting (docker mode) |
+| `image_tag` | string | no | `''` | Image tag for reporting (docker mode) |
+| `version` | string | no | `''` | Version for reporting (tarball mode) |
+| `scan_scope` | string | no | `full` | `full` or `python-only` |
+| `fail_on_vulnerabilities` | boolean | no | `true` | Fail on HIGH/CRITICAL |
+| `upload_sarif` | boolean | no | `false` | Upload to GitHub Security tab |
+| `sarif_category` | string | no | `vulnerability-scan` | SARIF category |
+| `generate_sbom` | boolean | no | `true` | Generate SBOM (docker only) |
+| `build_logic_ref` | string | no | `master` | build-logic branch/tag |
+
+### Outputs
+
+| Output | Description |
+|--------|-------------|
+| `total_vulnerabilities` | Total HIGH/CRITICAL count |
+| `surface_vulnerabilities` | Surface scan count (docker only) |
+| `deep_vulnerabilities` | Deep scan count |
+| `grype_vulnerabilities` | Grype scan count (docker only) |
+| `scan_status` | `pass` or `fail` |
+
+### Suppressing False Positives
+
+The `.trivyignore` file at the root of build-logic contains documented false positive suppressions. Consuming workflows should copy this file:
+
+```yaml
+- name: Checkout build-logic
+  uses: actions/checkout@v4
+  with:
+    repository: liquibase/build-logic
+    ref: master
+    path: build-logic
+
+- name: Setup Trivy ignore file
+  run: cp build-logic/.trivyignore .trivyignore
+```
+
+### Scripts
+
+Scripts in `scripts/vulnerability-scanning/` can be used directly:
+
+| Script | Description |
+|--------|-------------|
+| `extract-nested-deps.sh` | Extract nested JARs and Python packages |
+| `analyze-scan-results.sh` | Combine Trivy/Grype results |
+| `convert-scan-results.sh` | Convert JSON to SARIF |
+| `create-enhanced-report.sh` | Generate detailed markdown report |
+| `append-github-summary.sh` | Append to GitHub Actions summary |
+| `save-grype-results.sh` | Normalize Grype output filenames |
+
+**Direct script usage:**
+```bash
+# Docker mode - extract nested deps
+build-logic/scripts/vulnerability-scanning/extract-nested-deps.sh \
+  --mode=docker \
+  --source="my-image:tag" \
+  --scope=full
+
+# Tarball mode - extract Python only
+build-logic/scripts/vulnerability-scanning/extract-nested-deps.sh \
+  --mode=tarball \
+  --source="./path/to/tarball.tar.gz" \
+  --scope=python-only
+```
 
 ## Requirements
 

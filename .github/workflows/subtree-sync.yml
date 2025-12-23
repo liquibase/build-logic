@@ -83,20 +83,27 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Add remote for subtree
+        env:
+          REMOTE_NAME: ${{ inputs.remote_name }}
+          REMOTE_URL: ${{ inputs.remote_url }}
         run: |
-          git remote add ${{ inputs.remote_name }} ${{ inputs.remote_url }} || true
-          git fetch ${{ inputs.remote_name }}
+          git remote add "${REMOTE_NAME}" "${REMOTE_URL}" || true
+          git fetch "${REMOTE_NAME}"
 
       - name: Pull updates from subtree
         id: pull_subtree
+        env:
+          REMOTE_NAME: ${{ inputs.remote_name }}
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
+          SUBTREE_PREFIX: ${{ inputs.subtree_prefix }}
         run: |
           # Store the current commit count
           BEFORE_PULL_COUNT=$(git rev-list --count HEAD)
-          
+
           # Attempt subtree pull
           set +e
-          COMMIT_MESSAGE="Merging latest ${{ inputs.remote_name }} from ${{ inputs.source_branch }} into subtree"
-          git subtree pull --prefix ${{ inputs.subtree_prefix }} ${{ inputs.remote_name }} ${{ inputs.source_branch }} -m "$COMMIT_MESSAGE"
+          COMMIT_MESSAGE="Merging latest ${REMOTE_NAME} from ${SOURCE_BRANCH} into subtree"
+          git subtree pull --prefix "${SUBTREE_PREFIX}" "${REMOTE_NAME}" "${SOURCE_BRANCH}" -m "$COMMIT_MESSAGE"
           PULL_EXIT_CODE=$?
           set -e
           

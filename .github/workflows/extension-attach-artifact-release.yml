@@ -155,23 +155,28 @@ jobs:
 
       - name: Run extra command
         if: inputs.extraCommand != ''
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${{ inputs.extraCommand }}
+          ${EXTRA_COMMAND}
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != ''
+        env:
+          EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         run: |
-          ${{ inputs.extraLinuxCommand }}
+          ${EXTRA_LINUX_COMMAND}
 
       - name: Build and Package
         if: ${{ inputs.dry_run == false }}
         shell: bash
         env:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P "$MAVEN_PROFILES" -DscmServerId=liquibase
           git reset HEAD~ --hard
-          mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }} -P "$MAVEN_PROFILES"
+          mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS} -P "$MAVEN_PROFILES"
 
       - name: Build and Package (dry-run)
         if: ${{ inputs.dry_run == true }}
@@ -179,18 +184,21 @@ jobs:
         env:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
           DRY_RUN_VERSION: ${{ inputs.dry_run_version }}
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: |
           mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$DRY_RUN_VERSION -DpushChanges=false -P "$MAVEN_PROFILES" -DscmServerId=liquibase
-          mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }} -P "$MAVEN_PROFILES"
+          mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS} -P "$MAVEN_PROFILES"
 
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
         shell: bash
+        env:
+          ARTIFACT_ID_INPUT: ${{ inputs.artifactId }}
         run: |
           # If artifactId is provided as input, use it; otherwise, evaluate from pom.xml
-          if [ -n "${{ inputs.artifactId }}" ]; then
-            artifact_id="${{ inputs.artifactId }}"
+          if [ -n "${ARTIFACT_ID_INPUT}" ]; then
+            artifact_id="${ARTIFACT_ID_INPUT}"
           else
             artifact_id=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
           fi
@@ -381,10 +389,12 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id
         shell: bash
+        env:
+          ARTIFACT_ID_INPUT: ${{ inputs.artifactId }}
         run: |
           # If artifactId is provided as input, use it; otherwise, evaluate from pom.xml
-          if [ -n "${{ inputs.artifactId }}" ]; then
-            artifact_id="${{ inputs.artifactId }}"
+          if [ -n "${ARTIFACT_ID_INPUT}" ]; then
+            artifact_id="${ARTIFACT_ID_INPUT}"
           else
             artifact_id=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
           fi
@@ -392,8 +402,10 @@ jobs:
 
       - name: Run extra command
         if: inputs.extraCommand
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${{ inputs.extraCommand }}
+          ${EXTRA_COMMAND}
 
       - name: Check and download artifacts from GPM
         if: ${{ inputs.dry_run == false }}

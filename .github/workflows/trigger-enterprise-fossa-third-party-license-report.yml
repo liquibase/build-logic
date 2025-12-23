@@ -183,7 +183,9 @@ jobs:
 
       - name: Upload merged CSV to S3
         if: always()
-        run: aws s3 cp enterprise_report.csv s3://liquibaseorg-origin/enterprise_fossa_report/${{ inputs.version_number_for_3p_fossa_report_generation }}/enterprise_report_${{ inputs.version_number_for_3p_fossa_report_generation }}.csv
+        env:
+          VERSION_NUMBER: ${{ inputs.version_number_for_3p_fossa_report_generation }}
+        run: aws s3 cp enterprise_report.csv "s3://liquibaseorg-origin/enterprise_fossa_report/${VERSION_NUMBER}/enterprise_report_${VERSION_NUMBER}.csv"
 
 
   trigger-datical-service:

@@ -246,21 +246,25 @@ jobs:
 
       - name: Update extension version to next SNAPSHOT
         if: ${{ matrix.repository != 'liquibase-parent-pom' }}
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          echo "INFO: Updating extension version to ${{ inputs.version }}-SNAPSHOT"
-          mvn versions:set -DnewVersion=${{ inputs.version }}-SNAPSHOT
+          echo "INFO: Updating extension version to ${VERSION}-SNAPSHOT"
+          mvn versions:set -DnewVersion="${VERSION}-SNAPSHOT"
           echo "INFO: Extension version updated"
 
       - name: Update pom.xml
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          echo "INFO: Updating liquibase.version in pom.xml to ${{ inputs.version }}"
-          sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${{ inputs.version }}<\/liquibase.version>/" pom.xml
+          echo "INFO: Updating liquibase.version in pom.xml to ${VERSION}"
+          sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${VERSION}<\/liquibase.version>/" pom.xml
           git add pom.xml
           # Check if there are changes before committing
           if git diff-index --quiet HEAD --; then
             echo "INFO: No changes to commit."
           else
-            git commit -m "Update liquibase.version to ${{ inputs.version }}"
+            git commit -m "Update liquibase.version to ${VERSION}"
             git remote set-url origin https://x-access-token:${{ steps.get-token.outputs.token }}@github.com/liquibase/${{ matrix.repository }}.git
             git push
             echo "INFO: Changes committed and pushed successfully"

@@ -88,8 +88,10 @@ jobs:
     # If a buildCommand is provided, it sets the build mode to "manual"; otherwise, it sets it to "autobuild".
     - name: set build mode
       id: set-build-mode
+      env:
+        BUILD_COMMAND: ${{ inputs.buildCommand }}
       run: |
-        if [[ -n "${{ inputs.buildCommand }}" ]]
+        if [[ -n "${BUILD_COMMAND}" ]]
         then
           echo "Build command is provided. Setting buildMode to manual"
           buildMode='manual'
@@ -123,8 +125,10 @@ jobs:
         
     - name: Run extra command
       if: inputs.extraCommand != ''
+      env:
+        EXTRA_COMMAND: ${{ inputs.extraCommand }}
       run: |
-        ${{ inputs.extraCommand }}
+        ${EXTRA_COMMAND}
 
     - name: Set up Maven
       if: matrix.language == 'java'
@@ -180,8 +184,10 @@ jobs:
 
     - name: Build
       if: steps.set-build-mode.outputs.buildMode  == 'manual'
+      env:
+        BUILD_COMMAND: ${{ inputs.buildCommand }}
       run: |
-        ${{ inputs.buildCommand }}
+        ${BUILD_COMMAND}
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3

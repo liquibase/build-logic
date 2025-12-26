@@ -173,8 +173,9 @@ jobs:
         env:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+          LIQUIBASE_VERSION: ${{ inputs.liquibaseVersion }}
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P "$MAVEN_PROFILES" -DscmServerId=liquibase
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$LIQUIBASE_VERSION -DpushChanges=false -P "$MAVEN_PROFILES" -DscmServerId=liquibase
           git reset HEAD~ --hard
           mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS} -P "$MAVEN_PROFILES"
 

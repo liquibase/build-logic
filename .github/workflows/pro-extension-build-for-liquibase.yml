@@ -175,42 +175,50 @@ jobs:
 
       - name: Run extra command
         if: inputs.extraCommand != ''
+        shell: bash
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${{ inputs.extraCommand }}
+          ${EXTRA_COMMAND}
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
         shell: bash
+        env:
+          EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         run: |
-          ${{ inputs.extraLinuxCommand }}
+          ${EXTRA_LINUX_COMMAND}
 
       - name: Run extra Windows Command
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
         shell: powershell
+        env:
+          EXTRA_WINDOWS_COMMAND: ${{ inputs.extraWindowsCommand }}
         run: |
-          ${{ inputs.extraWindowsCommand }}
+          ${env:EXTRA_WINDOWS_COMMAND}
 
       - name: Set Artifact Versions
         shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
+          mvn versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false
 
       - name: Set Artifact Versions
         working-directory: ${{ inputs.artifactPath }}
         shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          mvn versions:set -DnewVersion='${{ inputs.version }}' -DgenerateBackupPoms=false
+          mvn versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false
 
       - name: Build and Package
         shell: bash
         env:
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: |
-          if [ -n "${{ inputs.extraMavenArgs }}" ]; then
-            mvn -B dependency:go-offline clean package -DskipTests=true ${{ inputs.extraMavenArgs }}
-          else
-            mvn -B dependency:go-offline clean package -DskipTests=true
-          fi
+          mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS}
 
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}

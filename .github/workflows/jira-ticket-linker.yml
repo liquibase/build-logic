@@ -18,12 +18,14 @@ jobs:
     steps:
       - name: Check and add ticket link
         uses: actions/github-script@v8
+        env:
+          TICKET_PREFIX: ${{ inputs.ticket_prefix }}
         with:
           script: |
             const { pull_request } = context.payload;
 
             // Get inputs from the workflow
-            const ticketPrefix = '${{ inputs.ticket_prefix }}';
+            const ticketPrefix = process.env.TICKET_PREFIX;
             const atlassianBaseUrl = 'https://datical.atlassian.net/browse';
 
             // Extract ticket number from PR title, branch name, or body

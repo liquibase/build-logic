@@ -920,6 +920,7 @@ jobs:
         id: create-placeholder-branch
         env:
           VERSION: ${{ inputs.version }}
+          HOMEBREW_PR_NUMBER: ${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
         run: |
           git fetch origin
 
@@ -936,12 +937,12 @@ jobs:
 
           # Create Homebrew tracking branch if it doesn't exist and PR number is available
           # Only create for 4.x versions due to Homebrew licensing restrictions
-          if [[ "${VERSION}" =~ ^4\. ]] && [[ -n "${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}; then
-            git checkout -b ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+          if [[ "${VERSION}" =~ ^4\. ]] && [[ -n "${HOMEBREW_PR_NUMBER}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${HOMEBREW_PR_NUMBER}; then
+            git checkout -b ci-oss-homebrew-package-check-${HOMEBREW_PR_NUMBER}
             echo "This is a placeholder branch for oss homebrew package v.${VERSION}. If this branch is open, it means the homebrew package is not yet approved" > README.md
             git add README.md
             git commit -m "Create placeholder branch for Homebrew package v.${VERSION}"
-            git push origin ci-oss-homebrew-package-check-${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+            git push origin ci-oss-homebrew-package-check-${HOMEBREW_PR_NUMBER}
           else
             echo "Homebrew tracking branch skipped (only 4.x versions supported) or already exists or PR number not available"
           fi

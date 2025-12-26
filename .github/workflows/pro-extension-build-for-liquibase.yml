@@ -217,11 +217,7 @@ jobs:
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: |
-          if [ -n "${EXTRA_MAVEN_ARGS}" ]; then
-            mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS}
-          else
-            mvn -B dependency:go-offline clean package -DskipTests=true
-          fi
+          mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS}
 
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}

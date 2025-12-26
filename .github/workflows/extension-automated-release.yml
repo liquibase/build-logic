@@ -256,6 +256,8 @@ jobs:
       - name: Update pom.xml
         env:
           VERSION: ${{ inputs.version }}
+          GITHUB_TOKEN: ${{ steps.get-token.outputs.token }}
+          REPOSITORY: ${{ matrix.repository }}
         run: |
           echo "INFO: Updating liquibase.version in pom.xml to ${VERSION}"
           sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${VERSION}<\/liquibase.version>/" pom.xml
@@ -265,7 +267,7 @@ jobs:
             echo "INFO: No changes to commit."
           else
             git commit -m "Update liquibase.version to ${VERSION}"
-            git remote set-url origin https://x-access-token:${{ steps.get-token.outputs.token }}@github.com/liquibase/${{ matrix.repository }}.git
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/liquibase/${REPOSITORY}.git
             git push
             echo "INFO: Changes committed and pushed successfully"
           fi

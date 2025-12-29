@@ -64,6 +64,16 @@ on:
         required: false
         default: "21"
         type: string
+      liquibaseVersion:
+        description: "Liquibase version for release preparation"
+        required: false
+        default: ""
+        type: string
+      extraLinuxCommand:
+        description: "Specify it if you want to run an extra Linux-specific command before attaching the artifact"
+        required: false
+        default: ""
+        type: string
 
 jobs:
   build-multi-architecture:

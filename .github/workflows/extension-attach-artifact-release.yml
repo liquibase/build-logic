@@ -28,7 +28,7 @@ on:
       os:
         description: "Operating system to build/test on"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]'
         type: string
       extraMavenArgs:
         description: "Specify it if you want to run an extra maven argument"
@@ -243,7 +243,7 @@ jobs:
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v6
         with:
-          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-windows-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-blacksmith-2vcpu-windows-2025-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/windows
 
       - name: Create multiplatform jar

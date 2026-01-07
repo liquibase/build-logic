@@ -11,7 +11,7 @@ on:
       os:
         description: "Operating system to build/test on"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]'
         type: string
       extraCommand:
         description: "Specify it if you want to run an extra command before attaching the artifact. This runs on both Linux and Windows runners."
@@ -292,7 +292,7 @@ jobs:
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v6
         with:
-          name: ${{needs.build.outputs.artifact_id}}-windows-latest-${{ inputs.version }}-artifacts
+          name: ${{needs.build.outputs.artifact_id}}-blacksmith-2vcpu-windows-2025-${{ inputs.version }}-artifacts
           path: /tmp/windows
 
       - name: Create multiplatform jar

@@ -11,12 +11,12 @@ on:
       os:
         description: "Operating system to build/test on"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]'
         type: string
       os-test:
         description: "Operating system to test on"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]'
         type: string
       nightly:
         description: "Specifies nightly builds against liquibase master-SNAPSHOT"
@@ -298,7 +298,7 @@ jobs:
       fail-fast: false
       matrix:
         java: ${{fromJson(inputs.java || '[17, 21]')}}
-        os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "windows-latest"]')}}
+        os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build
@@ -533,7 +533,7 @@ jobs:
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v6
         with:
-          name: ${{ env.PROJECT_ARTIFACT_NAME }}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-blacksmith-2vcpu-windows-2025-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/windows
 
       - name: Create multiplatform jar

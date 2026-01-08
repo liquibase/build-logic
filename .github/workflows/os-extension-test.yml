@@ -16,7 +16,7 @@ on:
       os:
         description: "Operating system to test"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]'
         type: string
       nightly:
         description: "Specifies nightly builds against liquibase master-SNAPSHOT"
@@ -183,7 +183,7 @@ jobs:
       fail-fast: false
       matrix:
         java: ${{fromJson(inputs.java || '[17, 21]')}}
-        os: ${{fromJson(inputs.os || '["ubuntu-latest", "windows-latest"]')}}
+        os: ${{fromJson(inputs.os || '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build

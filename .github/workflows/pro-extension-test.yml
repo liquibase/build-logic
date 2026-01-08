@@ -11,12 +11,12 @@ on:
       os:
         description: "Operating system to build/test on"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]'
         type: string
       os-test:
         description: "Operating system to test on"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]'
         type: string
       nightly:
         description: "Specifies nightly builds against liquibase master-SNAPSHOT"
@@ -298,7 +298,7 @@ jobs:
       fail-fast: false
       matrix:
         java: ${{fromJson(inputs.java || '[17, 21]')}}
-        os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "windows-latest"]')}}
+        os: ${{fromJson(inputs.os-test || '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]')}}
     name: Test Java ${{ matrix.java }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build
@@ -506,17 +506,20 @@ jobs:
           echo "Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
           echo "Artifact Version: ${ARTIFACT_VERSION}"
 
-      - name: Parse Ubuntu OS name from inputs
+      - name: Parse OS names from inputs
         id: parse-os
         shell: bash
         env:
           OS_INPUT: ${{ inputs.os }}
         run: |
           # Extract Ubuntu runner name (could be ubuntu-latest or blacksmith-2vcpu-ubuntu-2404)
-          # Blacksmith only supports Ubuntu/Linux, so macOS and Windows are always *-latest
           UBUNTU_OS=$(echo "${OS_INPUT}" | jq -r '.[] | select(contains("ubuntu"))' | head -n1)
           echo "ubuntu_os=${UBUNTU_OS}" >> $GITHUB_OUTPUT
           echo "Parsed Ubuntu OS: ${UBUNTU_OS}"
+          # Extract Windows runner name (could be windows-latest or blacksmith-2vcpu-windows-2025)
+          WINDOWS_OS=$(echo "${OS_INPUT}" | jq -r '.[] | select(contains("windows"))' | head -n1)
+          echo "windows_os=${WINDOWS_OS}" >> $GITHUB_OUTPUT
+          echo "Parsed Windows OS: ${WINDOWS_OS}"
 
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v6
@@ -533,7 +536,7 @@ jobs:
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v6
         with:
-          name: ${{ env.PROJECT_ARTIFACT_NAME }}-windows-latest-${{needs.build.outputs.artifact_version}}-artifacts
+          name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.parse-os.outputs.windows_os }}-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/windows
 
       - name: Create multiplatform jar

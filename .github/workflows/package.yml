@@ -746,7 +746,7 @@ jobs:
           formula-name: ${{ inputs.distribution }}
           formula-path: Formula/l/${{ inputs.distribution }}.rb
           homebrew-tap: Homebrew/homebrew-core
-          tag-name: ${{ inputs.tag || inputs.version }}
+          tag-name: ${{ inputs.tag || format('v{0}', inputs.version) }}
           download-url: ${{ inputs.distribution == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/{1}/{2}-{3}.tar.gz', inputs.download_base_url, inputs.tag || format('v{0}', inputs.version), inputs.artifactId, inputs.version) }}
           commit-message: |
             {{formulaName}} {{version}}

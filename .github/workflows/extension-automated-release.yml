@@ -190,7 +190,7 @@ jobs:
           repositories: ${{ matrix.repository }}
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: "liquibase/${{ matrix.repository }}"
           token: ${{ steps.get-token.outputs.token }}

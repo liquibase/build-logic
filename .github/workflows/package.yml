@@ -231,13 +231,16 @@ jobs:
 
       - name: Download ${{ inputs.artifactId }} dry-run Release
         if: ${{ inputs.dry_run == true }}
-        uses: robinraju/release-downloader@v1.12
-        with:
-          repository: "liquibase/liquibase"
-          releaseId: "${{ inputs.dry_run_release_id }}"
-          fileName: "*"
-          out-file-path: ".github/target/"
-          token: "${{ steps.get-token.outputs.token }}"
+        run: |
+          mkdir -p $PWD/.github/target
+          # Download tar.gz from dry-run release URL
+          curl -L -H "Accept: application/octet-stream" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz \
+            "${{ inputs.dry_run_tar_gz_url }}"
+          # Download zip from dry-run release URL
+          curl -L -H "Accept: application/octet-stream" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.zip \
+            "${{ inputs.dry_run_zip_url }}"
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |

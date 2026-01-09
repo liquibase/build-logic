@@ -235,15 +235,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p $PWD/.github/target
-          # Use gh CLI which handles GitHub auth and redirects correctly
+          # Download all release assets to target directory
           gh release download "${{ inputs.tag }}" \
             --repo liquibase/liquibase \
-            --pattern "*.tar.gz" \
-            --output "$PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz"
-          gh release download "${{ inputs.tag }}" \
-            --repo liquibase/liquibase \
-            --pattern "*.zip" \
-            --output "$PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.zip"
+            --pattern "*" \
+            --dir "$PWD/.github/target"
+
+          # Find and rename the main tar.gz (exclude additional files)
+          MAIN_TAR=$(ls $PWD/.github/target/liquibase-*.tar.gz 2>/dev/null | grep -v additional | head -1)
+          if [ -n "$MAIN_TAR" ]; then
+            mv "$MAIN_TAR" "$PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz"
+          fi
+
+          # Find and rename the main zip (exclude additional files)
+          MAIN_ZIP=$(ls $PWD/.github/target/liquibase-*.zip 2>/dev/null | grep -v additional | head -1)
+          if [ -n "$MAIN_ZIP" ]; then
+            mv "$MAIN_ZIP" "$PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.zip"
+          fi
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |

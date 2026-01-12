@@ -28,7 +28,7 @@ on:
       os:
         description: "Operating system to build/test on"
         required: false
-        default: '["ubuntu-latest", "windows-latest"]'
+        default: '["ubuntu-latest", "blacksmith-2vcpu-windows-2025"]'
         type: string
       extraMavenArgs:
         description: "Specify it if you want to run an extra maven argument"
@@ -228,10 +228,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Parse OS names from inputs
+        id: parse-os
+        shell: bash
+        env:
+          OS_INPUT: ${{ inputs.os }}
+        run: |
+          # Extract Ubuntu runner name (could be ubuntu-latest or blacksmith-2vcpu-ubuntu-2404)
+          UBUNTU_OS=$(echo "${OS_INPUT}" | jq -r '.[] | select(contains("ubuntu"))' | head -n1)
+          echo "ubuntu_os=${UBUNTU_OS}" >> $GITHUB_OUTPUT
+          echo "Parsed Ubuntu OS: ${UBUNTU_OS}"
+          # Extract Windows runner name (could be windows-latest or blacksmith-2vcpu-windows-2025)
+          WINDOWS_OS=$(echo "${OS_INPUT}" | jq -r '.[] | select(contains("windows"))' | head -n1)
+          echo "windows_os=${WINDOWS_OS}" >> $GITHUB_OUTPUT
+          echo "Parsed Windows OS: ${WINDOWS_OS}"
+
       - name: Download Ubuntu Artifacts
         uses: actions/download-artifact@v6
         with:
-          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-ubuntu-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-${{ steps.parse-os.outputs.ubuntu_os }}-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
@@ -243,7 +258,7 @@ jobs:
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v6
         with:
-          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-windows-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-${{ steps.parse-os.outputs.windows_os }}-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/windows
 
       - name: Create multiplatform jar

@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       check_snippets:
-        description: "Run FOSSA Snippets Detection"
+        description: "Enable FOSSA Snippet Scanning (adds --snippet-scan to analyze)"
         required: false
         default: false
         type: boolean
@@ -58,39 +58,12 @@ jobs:
         run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
 
-      - name: Run FOSSA Snippets Detection
-        if: ${{ inputs.check_snippets }}
-        id: snippets
-        env:
-          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
-        run: |
-          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
-          fossa snippets analyze -o snippets 2>&1 | tee snippets.out
-          FILE="snippets.out"
-          if [ -f "$FILE" ]; then
-              if grep -q "0 matches" "$FILE"; then
-                  echo "The file '$FILE' contains '0 matches'."
-              else
-                  echo "The file '$FILE' does not contain '0 matches'."
-                  exit 1
-              fi
-          else
-              echo "Error: The file '$FILE' does not exist."
-          fi
-
-      - name: Generate Snippet Dependencies
-        if: ${{ inputs.check_snippets }}
-        env:
-          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
-        run: |
-          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/commit.md
-          fossa snippets commit --analyze-output snippets --overwrite-fossa-deps --format yml
-
       - name: Run FOSSA Analyze with AI Generated Code Detection
         id: analyze-ai
         if: ${{ inputs.check_ai_generated_code }}
         env:
           FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
           mkdir patch
@@ -99,24 +72,29 @@ jobs:
           git diff --name-only HEAD~1 HEAD | xargs zip patch.zip
           unzip patch.zip -d patch/
           # Analyze the changes using FOSSA and redirect output to analyze.out
-          fossa analyze -p ${{ github.event.repository.name }} patch -o 2>&1 | tee analyze.out
+          fossa analyze -p "$REPO_NAME" patch -o 2>&1 | tee analyze.out
 
       - name: Run FOSSA Analyze
         id: analyze
         env:
           FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+          SNIPPET_FLAG: ${{ inputs.check_snippets && '--snippet-scan' || '' }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
           # Run the full analyze on the current branch to be checked by the test command
-          fossa analyze -p ${{ github.event.repository.name }} -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze_no_ai.out
+          # --snippet-scan is added when check_snippets is enabled (replaces deprecated 'fossa snippets' command)
+          fossa analyze -p "$REPO_NAME" -b "$BRANCH_NAME" $SNIPPET_FLAG 2>&1 | tee analyze_no_ai.out
 
       - name: Run FOSSA Test
         id: test
         env:
           FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
-          fossa test -p ${{ github.event.repository.name }} 2>&1 | tee test.out
+          fossa test -p "$REPO_NAME" 2>&1 | tee test.out
           FILE="test.out"
           if [ -f "$FILE" ]; then
               if grep -q "Test passed" "$FILE"; then
@@ -159,9 +137,10 @@ jobs:
         if: ${{ inputs.generate_fossa_3p_license_report }}
         env:
           FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-          fossa report -p ${{ github.event.repository.name }} attribution --format html 2>&1 | tee fossa-3party-license-report.html
+          fossa report -p "$REPO_NAME" attribution --format html 2>&1 | tee fossa-3party-license-report.html
 
       - name: Archive FOSSA 3Party License Report
         if: ${{ inputs.generate_fossa_3p_license_report }}

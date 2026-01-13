@@ -63,6 +63,7 @@ jobs:
         if: ${{ inputs.check_ai_generated_code }}
         env:
           FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
           mkdir patch
@@ -71,25 +72,29 @@ jobs:
           git diff --name-only HEAD~1 HEAD | xargs zip patch.zip
           unzip patch.zip -d patch/
           # Analyze the changes using FOSSA and redirect output to analyze.out
-          fossa analyze -p ${{ github.event.repository.name }} patch -o 2>&1 | tee analyze.out
+          fossa analyze -p "$REPO_NAME" patch -o 2>&1 | tee analyze.out
 
       - name: Run FOSSA Analyze
         id: analyze
         env:
           FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+          SNIPPET_FLAG: ${{ inputs.check_snippets && '--snippet-scan' || '' }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
           # Run the full analyze on the current branch to be checked by the test command
           # --snippet-scan is added when check_snippets is enabled (replaces deprecated 'fossa snippets' command)
-          fossa analyze -p ${{ github.event.repository.name }} -b ${{ github.head_ref || github.ref_name }} ${{ inputs.check_snippets && '--snippet-scan' || '' }} 2>&1 | tee analyze_no_ai.out
+          fossa analyze -p "$REPO_NAME" -b "$BRANCH_NAME" $SNIPPET_FLAG 2>&1 | tee analyze_no_ai.out
 
       - name: Run FOSSA Test
         id: test
         env:
           FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
-          fossa test -p ${{ github.event.repository.name }} 2>&1 | tee test.out
+          fossa test -p "$REPO_NAME" 2>&1 | tee test.out
           FILE="test.out"
           if [ -f "$FILE" ]; then
               if grep -q "Test passed" "$FILE"; then
@@ -132,9 +137,10 @@ jobs:
         if: ${{ inputs.generate_fossa_3p_license_report }}
         env:
           FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/report.md
-          fossa report -p ${{ github.event.repository.name }} attribution --format html 2>&1 | tee fossa-3party-license-report.html
+          fossa report -p "$REPO_NAME" attribution --format html 2>&1 | tee fossa-3party-license-report.html
 
       - name: Archive FOSSA 3Party License Report
         if: ${{ inputs.generate_fossa_3p_license_report }}

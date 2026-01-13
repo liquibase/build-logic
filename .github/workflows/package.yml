@@ -13,6 +13,10 @@ on:
       version:
         description: "Value from the version field in pom.xml. i.e 4.23.0"
         type: string
+      tag:
+        description: "Release tag (e.g., v4.23.0). Used for downloading release assets."
+        required: false
+        type: string
       dry_run:
         description: "Flag to indicate if the workflow is triggered to create a dry-run release"
         required: false
@@ -53,6 +57,10 @@ on:
         type: string
       version:
         description: "Value from the version field in pom.xml. i.e 4.23.0"
+        type: string
+      tag:
+        description: "Release tag (e.g., v4.23.0). Used for downloading release assets."
+        required: false
         type: string
       dry_run:
         description: "Flag to indicate if the workflow is triggered to create a dry-run release"
@@ -206,25 +214,46 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         run: |
           mkdir -p $PWD/.github/target
+          # Use tag if provided, otherwise construct from version
+          RELEASE_TAG="${{ inputs.tag }}"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="v${{ inputs.version }}"
+          fi
           if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
-            # Download from S3 for liquibase-secure
+            # Download from S3 for liquibase-secure (uses version, not tag)
             wget -q -O $PWD/.github/target/liquibase-secure-${{ inputs.version }}.tar.gz \
               ${{ inputs.download_base_url }}/${{ inputs.version }}/liquibase-secure-${{ inputs.version }}.tar.gz
           else
             # Download from GitHub for liquibase (community)
             wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz \
-              ${{ inputs.download_base_url }}/v${{ inputs.version }}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+              ${{ inputs.download_base_url }}/${RELEASE_TAG}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
           fi
 
       - name: Download ${{ inputs.artifactId }} dry-run Release
         if: ${{ inputs.dry_run == true }}
-        uses: robinraju/release-downloader@v1.12
-        with:
-          repository: "liquibase/liquibase"
-          releaseId: "${{ inputs.dry_run_release_id }}"
-          fileName: "*"
-          out-file-path: ".github/target/"
-          token: "${{ steps.get-token.outputs.token }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p $PWD/.github/target
+          # Download all release assets to target directory
+          gh release download "${{ inputs.tag }}" \
+            --repo liquibase/liquibase \
+            --pattern "*" \
+            --dir "$PWD/.github/target"
+
+          # Find and rename the main tar.gz (exclude additional files)
+          MAIN_TAR=$(ls $PWD/.github/target/liquibase-*.tar.gz 2>/dev/null | grep -v additional | head -1)
+          DEST_TAR="$PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz"
+          if [ -n "$MAIN_TAR" ] && [ "$MAIN_TAR" != "$DEST_TAR" ]; then
+            mv "$MAIN_TAR" "$DEST_TAR"
+          fi
+
+          # Find and rename the main zip (exclude additional files)
+          MAIN_ZIP=$(ls $PWD/.github/target/liquibase-*.zip 2>/dev/null | grep -v additional | head -1)
+          DEST_ZIP="$PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.zip"
+          if [ -n "$MAIN_ZIP" ] && [ "$MAIN_ZIP" != "$DEST_ZIP" ]; then
+            mv "$MAIN_ZIP" "$DEST_ZIP"
+          fi
 
       - name: Build ${{ inputs.artifactId }} deb package
         run: |
@@ -733,8 +762,8 @@ jobs:
           formula-name: ${{ inputs.distribution }}
           formula-path: Formula/l/${{ inputs.distribution }}.rb
           homebrew-tap: Homebrew/homebrew-core
-          tag-name: ${{ inputs.version }}
-          download-url: ${{ inputs.distribution == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/v{1}/{2}-{1}.tar.gz', inputs.download_base_url, inputs.version, inputs.artifactId) }}
+          tag-name: ${{ inputs.tag || format('v{0}', inputs.version) }}
+          download-url: ${{ inputs.distribution == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/{1}/{2}-{3}.tar.gz', inputs.download_base_url, inputs.tag || format('v{0}', inputs.version), inputs.artifactId, inputs.version) }}
           commit-message: |
             {{formulaName}} {{version}}
 
@@ -784,13 +813,14 @@ jobs:
           SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
           SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
           VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ inputs.tag || format('v{0}', inputs.version) }}
           WEB_URL: https://package.liquibase.com/downloads/oss/sdkman/
           S3_BUCKET: s3://repo.liquibase.com/sdkman/oss/
         run: |
           set -e  # Exit on any error
 
           # Download the zip file for liquibase (community edition only)
-          wget -q -O liquibase-$VERSION.zip ${{ inputs.download_base_url }}/v$VERSION/liquibase-$VERSION.zip
+          wget -q -O liquibase-$VERSION.zip ${{ inputs.download_base_url }}/$RELEASE_TAG/liquibase-$VERSION.zip
           ZIP_FILENAME="liquibase-$VERSION.zip"
           SDKMAN_CANDIDATE="liquibase"
           mkdir -p liquibase-$VERSION/bin/internal
@@ -843,7 +873,7 @@ jobs:
           -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
           -H "Content-Type: application/json" \
           -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/v'"$VERSION"'"}' \
+          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/'"$RELEASE_TAG"'"}' \
           https://vendors.sdkman.io/announce/struct)
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')

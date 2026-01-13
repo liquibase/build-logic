@@ -25,7 +25,7 @@ jobs:
     permissions:
       contents: read        # For code checkout
       pull-requests: write  # For adding/removing PR labels
-      actions: write        # For uploading artifacts
+      actions: read         # For artifact-uploads that happen in the same workflow, dont need actions: write
       id-token: write       # For AWS credentials
 
     steps:

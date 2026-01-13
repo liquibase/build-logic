@@ -133,7 +133,7 @@ jobs:
           permission-contents: write
           permission-actions: write
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -936,7 +936,7 @@ jobs:
           repositories: liquibase
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: liquibase/liquibase
           token: ${{ steps.get-token.outputs.token }}

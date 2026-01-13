@@ -129,7 +129,7 @@ jobs:
           permission-contents: read
 
       - name: Checkout liquibase-infrastructure
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: master
           repository: liquibase/liquibase-infrastructure

@@ -87,10 +87,12 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
       - name: Checkout Dependencies
+        env:
+          EXTENSION: ${{ inputs.extension }}
         run: |
           git config --global credential.helper store
           echo "https://$GIT_USERNAME:$GIT_PASSWORD@github.com" > ~/.git-credentials
-          git clone https://github.com/liquibase/${{ inputs.extension }}.git ${{ inputs.extension }}
+          git clone "https://github.com/liquibase/${EXTENSION}.git" "${EXTENSION}"
 
       - name: Convert escaped newlines and set GPG key
         run: |
@@ -188,13 +190,14 @@ jobs:
 
       - name: Build and deploy Extension to GPM
         env:
+          EXTENSION: ${{ inputs.extension }}
           GPG_PASSWORD: ${{ env.GPG_PASSPHRASE }}
           APP_TOKEN: ${{ steps.get-token.outputs.token }}
           ACTIONS_RUNNER_DEBUG: true
           ACTIONS_STEP_DEBUG: true
           GITHUB_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
-          cd ${{ inputs.extension }}
+          cd "${EXTENSION}"
           EXTENSION_VERSION="master-SNAPSHOT"
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
@@ -208,11 +211,11 @@ jobs:
 
           # Deploy with explicit token authentication
           mvn deploy:deploy-file \
-              -Dfile=./target/${{ inputs.extension }}-$EXTENSION_VERSION.jar \
-              -Dsources=./target/${{ inputs.extension }}-$EXTENSION_VERSION-sources.jar \
-              -Djavadoc=./target/${{ inputs.extension }}-$EXTENSION_VERSION-javadoc.jar \
+              -Dfile=./target/${EXTENSION}-$EXTENSION_VERSION.jar \
+              -Dsources=./target/${EXTENSION}-$EXTENSION_VERSION-sources.jar \
+              -Djavadoc=./target/${EXTENSION}-$EXTENSION_VERSION-javadoc.jar \
               -DrepositoryId=extension-repo \
-              -Durl=https://maven.pkg.github.com/liquibase/${{ inputs.extension }} \
+              -Durl=https://maven.pkg.github.com/liquibase/${EXTENSION} \
               -DpomFile=pom.xml \
               -Dgithub.token=${{ steps.get-token.outputs.token }} \
               -Dserver.username=liquibot \

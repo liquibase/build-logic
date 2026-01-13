@@ -133,8 +133,11 @@ jobs:
 
       - name: Run extra command
         if: inputs.extraCommand != ''
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
+        shell: bash
         run: |
-          ${{ inputs.extraCommand }}
+          ${EXTRA_COMMAND}
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
@@ -275,24 +278,35 @@ jobs:
 
       - name: Run extra command
         if: inputs.extraCommand != ''
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
+        shell: bash
         run: |
-          ${{ inputs.extraCommand }}
+          ${EXTRA_COMMAND}
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}
-        run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }}
+        env:
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS}
 
       - name: Run Tests
         if: ${{ inputs.nightly }}
-        run: mvn -B test -P 'coverage' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
+        env:
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Run Integration Tests
         if: ${{ !inputs.nightly && inputs.runIntegrationTests }}
-        run: mvn -B integration-test -P 'coverage' ${{ inputs.extraMavenArgs }}
+        env:
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS}
 
       - name: Run Integration Tests
         if: ${{ inputs.nightly && inputs.runIntegrationTests }}
-        run: mvn -B integration-test -P 'coverage' ${{ inputs.extraMavenArgs }} "-Dliquibase.version=master-SNAPSHOT"
+        env:
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       check_snippets:
-        description: "Run FOSSA Snippets Detection"
+        description: "Enable FOSSA Snippet Scanning (adds --snippet-scan to analyze)"
         required: false
         default: false
         type: boolean
@@ -58,34 +58,6 @@ jobs:
         run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
 
-      - name: Run FOSSA Snippets Detection
-        if: ${{ inputs.check_snippets }}
-        id: snippets
-        env:
-          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
-        run: |
-          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/analyze.md
-          fossa snippets analyze -o snippets 2>&1 | tee snippets.out
-          FILE="snippets.out"
-          if [ -f "$FILE" ]; then
-              if grep -q "0 matches" "$FILE"; then
-                  echo "The file '$FILE' contains '0 matches'."
-              else
-                  echo "The file '$FILE' does not contain '0 matches'."
-                  exit 1
-              fi
-          else
-              echo "Error: The file '$FILE' does not exist."
-          fi
-
-      - name: Generate Snippet Dependencies
-        if: ${{ inputs.check_snippets }}
-        env:
-          FOSSA_API_KEY: ${{ env.FOSSA_API_KEY }}
-        run: |
-          # https://github.com/fossas/fossa-cli/blob/master/docs/references/subcommands/snippets/commit.md
-          fossa snippets commit --analyze-output snippets --overwrite-fossa-deps --format yml
-
       - name: Run FOSSA Analyze with AI Generated Code Detection
         id: analyze-ai
         if: ${{ inputs.check_ai_generated_code }}
@@ -108,7 +80,8 @@ jobs:
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
           # Run the full analyze on the current branch to be checked by the test command
-          fossa analyze -p ${{ github.event.repository.name }} -b ${{ github.head_ref || github.ref_name }} 2>&1 | tee analyze_no_ai.out
+          # --snippet-scan is added when check_snippets is enabled (replaces deprecated 'fossa snippets' command)
+          fossa analyze -p ${{ github.event.repository.name }} -b ${{ github.head_ref || github.ref_name }} ${{ inputs.check_snippets && '--snippet-scan' || '' }} 2>&1 | tee analyze_no_ai.out
 
       - name: Run FOSSA Test
         id: test

@@ -27,11 +27,11 @@ fi
 
 case $KEY in
     TAG)
-        HTML_URL=$(echo $RELEASE | jq -r ".html_url")
+        HTML_URL=$(echo "$RELEASE" | jq -r ".html_url")
         echo "$HTML_URL" | rev | cut -d "/" -f1 | rev
         ;;
     UPLOAD_URL)
-        UPLOAD_URL=$(echo $RELEASE | jq -r '.upload_url')
+        UPLOAD_URL=$(echo "$RELEASE" | jq -r '.upload_url')
         echo "${UPLOAD_URL//{?name,label\}}"
         ;;
 esac

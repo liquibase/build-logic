@@ -87,7 +87,7 @@ jobs:
     concurrency:
       group: attach-artifact-${{ github.ref }}-${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -104,20 +104,20 @@ jobs:
           parse-json-secrets: true
 
       - name: Set up JDK ${{ inputs.javaBuildVersion }}
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
         with:
           java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
           cache: "maven"
 
       - name: Set up Maven
-        uses: stCarolas/setup-maven@v5
+        uses: stCarolas/setup-maven@d6af6abeda15e98926a57b5aa970a96bb37f97d1 # v5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
+        uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
         with:
           repositories: |
             [
@@ -222,9 +222,10 @@ jobs:
         id: get-artifact-version
         shell: bash
         env:
+          DRY_RUN: ${{ inputs.dry_run }}
           DRY_RUN_VERSION: ${{ inputs.dry_run_version }}
         run: |
-          if [ "${{ inputs.dry_run }}" == "true" ]; then
+          if [ "$DRY_RUN" == "true" ]; then
             artifact_version="$DRY_RUN_VERSION"
           else
             artifact_version=$(mvn help:evaluate "-Dexpression=project.version" -q -DforceStdout)
@@ -232,7 +233,7 @@ jobs:
           echo "artifact_version=$artifact_version" >> $GITHUB_OUTPUT
 
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
@@ -247,22 +248,22 @@ jobs:
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Download Ubuntu Artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: ${{needs.build-multi-architecture.outputs.artifact_id}}-ubuntu-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/ubuntu
 
       - name: Download macOS Artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: ${{needs.build-multi-architecture.outputs.artifact_id}}-macos-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/macos
 
       - name: Download Windows Artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: ${{needs.build-multi-architecture.outputs.artifact_id}}-windows-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/windows
@@ -290,7 +291,7 @@ jobs:
           cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom /tmp/combined/
 
       - name: Upload multiplatform artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: multiplatform-artifacts
           path: |
@@ -318,7 +319,7 @@ jobs:
       - run: sleep 30
         if: ${{ inputs.dry_run == false }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -335,7 +336,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Set up JDK ${{ inputs.javaBuildVersion }}
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
         with:
           java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
@@ -343,7 +344,7 @@ jobs:
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
+        uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
         with:
           repositories: |
             [
@@ -428,34 +429,37 @@ jobs:
         run: |
           RELEASE_VERSION=$(grep -m2 '<version>' pom.xml | tail -n 1 | awk -F'[><]' '{print $3}' | sed 's/-SNAPSHOT//')
           echo "RELEASE_VERSION=$RELEASE_VERSION"
-          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dtransitive=false || echo "Failed to download artifact"
-          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dpackaging=pom -Dtransitive=false || echo "Failed to download pom artifact"
-          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=sources -Dtransitive=false || echo "Failed to download sources artifact"
-          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=${{ env.ARTIFACT_NAME }} -Dversion=$RELEASE_VERSION -Dclassifier=javadoc -Dtransitive=false || echo "Failed to download javadoc artifact"
-          rm -rf ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/*.lastUpdated
-          ARTIFACT_FOUND=$(ls -1 ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/ 2>/dev/null | wc -l)
+          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=$ARTIFACT_NAME -Dversion=$RELEASE_VERSION -Dtransitive=false || echo "Failed to download artifact"
+          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=$ARTIFACT_NAME -Dversion=$RELEASE_VERSION -Dpackaging=pom -Dtransitive=false || echo "Failed to download pom artifact"
+          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=$ARTIFACT_NAME -Dversion=$RELEASE_VERSION -Dclassifier=sources -Dtransitive=false || echo "Failed to download sources artifact"
+          mvn dependency:get -DgroupId=org.liquibase.ext -DartifactId=$ARTIFACT_NAME -Dversion=$RELEASE_VERSION -Dclassifier=javadoc -Dtransitive=false || echo "Failed to download javadoc artifact"
+          rm -rf ~/.m2/repository/org/liquibase/ext/$ARTIFACT_NAME/$RELEASE_VERSION/*.lastUpdated
+          ARTIFACT_FOUND=$(ls -1 ~/.m2/repository/org/liquibase/ext/$ARTIFACT_NAME/$RELEASE_VERSION/ 2>/dev/null | wc -l)
           echo "ARTIFACT_FOUND=$ARTIFACT_FOUND" >> $GITHUB_ENV
           if [ $ARTIFACT_FOUND -eq 0 ]; then
             echo "No artifact found"
           else
             echo "Artifact found"
             rm -rf ./target && mkdir -p ./target
-            mv ~/.m2/repository/org/liquibase/ext/${{ env.ARTIFACT_NAME }}/$RELEASE_VERSION/* ./target
+            mv ~/.m2/repository/org/liquibase/ext/$ARTIFACT_NAME/$RELEASE_VERSION/* ./target
             sed -i 's/-SNAPSHOT//g' pom.xml
           fi
 
       - name: Build release artifacts
         if: ${{ env.ARTIFACT_FOUND == '0' && inputs.dry_run == false }}
         id: build-release-artifacts
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.liquibaseVersion }}
+          MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
-          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' \
+          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$RELEASE_VERSION -DpushChanges=false -P "$MAVEN_PROFILES" \
           -DscmServerId=liquibase
           git reset HEAD~ --hard
           # Use GitHub's default branch from repository settings
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
           echo "Using default branch: $DEFAULT_BRANCH"
-          mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$DEFAULT_BRANCH
+          mvn clean install -DskipTests -P "$MAVEN_PROFILES" -DbuildNumber=$DEFAULT_BRANCH
 
           # Generate source and javadoc jars
           mvn source:jar javadoc:jar -Dmaven.javadoc.skip=false
@@ -477,14 +481,16 @@ jobs:
         if: ${{ inputs.dry_run == true }}
         id: build-release-artifacts-dry-run
         env:
+          DRY_RUN_VERSION: ${{ inputs.dry_run_version }}
+          MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
           CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
-          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.dry_run_version }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' \
+          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$DRY_RUN_VERSION -DpushChanges=false -P "$MAVEN_PROFILES" \
           -DscmServerId=liquibase
           # Use current branch name for dry runs
           echo "Using current branch: $CURRENT_BRANCH"
-          mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$CURRENT_BRANCH
+          mvn clean install -DskipTests -P "$MAVEN_PROFILES" -DbuildNumber=$CURRENT_BRANCH
 
           # Generate source and javadoc jars
           mvn source:jar javadoc:jar -Dmaven.javadoc.skip=false
@@ -497,7 +503,7 @@ jobs:
 
       - name: Download multiarchitecture release artifacts
         if: inputs.combineJars
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: multiplatform-artifacts
           path: ${{ inputs.artifactPath }}/target
@@ -505,34 +511,42 @@ jobs:
       - name: Get latest draft release ID
         if: ${{ inputs.dry_run == false }}
         id: get-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
+          LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
           echo "Latest Draft Release ID: $LATEST_DRAFT_RELEASE"
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
 
       - name: List artifacts in release
         if: ${{ env.RELEASE_ID != '' && env.RELEASE_ID != null && inputs.dry_run == false }}
         id: list-artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          RELEASE_ID="${{ env.RELEASE_ID }}"
-          ARTIFACTS=$(curl -X GET -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | jq -r '.[].id')
+          ARTIFACTS=$(curl -X GET -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets" | jq -r '.[].id')
           echo "Artifacts to delete: $ARTIFACTS"
           ARTIFACTS_CLEANED=$(echo "$ARTIFACTS" | tr -s '[:space:]' ',' | sed 's/,$//')
           echo "ARTIFACTS_TO_DELETE=$ARTIFACTS_CLEANED" >> $GITHUB_ENV
 
       - name: Delete artifacts
         if: ${{ env.ARTIFACTS_TO_DELETE != null && inputs.dry_run == false }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          RELEASE_ID="${{ env.RELEASE_ID }}"
-          ARTIFACTS_TO_DELETE="${{ env.ARTIFACTS_TO_DELETE }}"
           IFS=',' read -ra values <<< "$ARTIFACTS_TO_DELETE"
           for value in "${values[@]}"; do
-            curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/assets/$value"
+            curl -X DELETE -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$value"
             echo "Deleted artifact ID: $value"
           done
       - name: Convert escaped newlines and set GPG key
+        env:
+          GPG_SECRET_VAR: ${{ env.GPG_SECRET }}
         run: |
-          GPG_KEY_CONTENT="$(printf '%b' "${{ env.GPG_SECRET }}")"
+          GPG_KEY_CONTENT="$(printf '%b' "$GPG_SECRET_VAR")"
           {
             echo "GPG_KEY_CONTENT<<GPG_EOF"
             echo "$GPG_KEY_CONTENT"
@@ -546,7 +560,7 @@ jobs:
 
       - name: Import GPG key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
         with:
           gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
@@ -557,50 +571,62 @@ jobs:
       - name: Sign Files for Draft Release
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
+        env:
+          ARTIFACT_PATH: ${{ inputs.artifactPath }}
         run: |
           gpg -K
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-sources.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-javadoc.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-sources.jar
 
       - name: Sign Files for Draft Release (dry-run)
         if: ${{ inputs.dry_run == true }}
         working-directory: ${{ inputs.artifactPath }}
+        env:
+          ARTIFACT_PATH: ${{ inputs.artifactPath }}
         run: |
           gpg -K
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "Signing artifacts for version: $version"
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
-          ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-sources.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-javadoc.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-sources.jar
 
       - name: Set draft release title
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: set-release-title
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           RELEASE_TITLE="v$version"
           echo "Updating release title to $RELEASE_TITLE"
-          curl -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'", "tag_name": "'"v$version"'"}' "https://api.github.com/repos/${{ github.repository }}/releases/${{ env.RELEASE_ID }}"
+          curl -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $GITHUB_TOKEN" -d '{"name": "'"$RELEASE_TITLE"'", "tag_name": "'"v$version"'"}' "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"
 
       - name: Attach Files to Draft Release
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: upload-release-asset
-        run: ${{ env.REPO_ROOT }}/.github/upload_asset.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
+          ASSET_NAME_PREFIX_VAR: ${{ env.artifact_id }}
           ASSET_DIR: ./target
+        run: |
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          export ASSET_NAME_PREFIX="${ASSET_NAME_PREFIX_VAR}-"
+          $REPO_ROOT/.github/upload_asset.sh $version
 
       - name: Set artifact path
         id: set-artifact-path
         if: ${{ inputs.dry_run == true }}
-        run: echo "ARTIFACT_PATH=${{ inputs.artifactPath || '.' }}" >> $GITHUB_OUTPUT
+        env:
+          INPUT_ARTIFACT_PATH: ${{ inputs.artifactPath || '.' }}
+        run: echo "ARTIFACT_PATH=$INPUT_ARTIFACT_PATH" >> $GITHUB_OUTPUT
 
       - name: Collect artifacts for release (dry-run)
         if: ${{ inputs.dry_run == true }}
@@ -614,7 +640,7 @@ jobs:
       - name: Attach Files to Draft Release (dry-run)
         id: attach-files-dry-run
         if: ${{ inputs.dry_run == true }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           tag_name: v${{ inputs.dry_run_version }}
           fail_on_unmatched_files: true

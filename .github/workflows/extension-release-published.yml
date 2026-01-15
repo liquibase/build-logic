@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: maven-release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -79,7 +79,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Set up Java for publishing to Maven Central Repository
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
         with:
           java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
@@ -87,7 +87,7 @@ jobs:
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
+        uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
         with:
           repositories: |
             [
@@ -143,8 +143,10 @@ jobs:
         working-directory: ${{ inputs.artifactPath }}
         id: build-release-artifacts
         continue-on-error: true
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.liquibaseVersion }}
         run: |
-          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$RELEASE_VERSION -DpushChanges=false
           git reset HEAD~ --hard
 
       - name: Get Artifact ID
@@ -153,7 +155,7 @@ jobs:
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
       - name: Download Release Artifacts
-        uses: robinraju/release-downloader@v1.12
+        uses: robinraju/release-downloader@daf26c55d821e836577a15f77d86ddc078948b05 # v1.12
         with:
           tag: "${{ github.event.release.tag_name }}"
           fileName: "*"
@@ -229,7 +231,7 @@ jobs:
     if: ${{ inputs.dry_run == true }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -246,7 +248,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Set up Java for publishing to Maven Central Repository
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
         with:
           java-version: ${{ inputs.javaBuildVersion }}
           distribution: "temurin"
@@ -254,7 +256,7 @@ jobs:
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
+        uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
         with:
           repositories: |
             [
@@ -321,7 +323,7 @@ jobs:
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
       - name: Download Release Artifacts
-        uses: robinraju/release-downloader@v1.12
+        uses: robinraju/release-downloader@daf26c55d821e836577a15f77d86ddc078948b05 # v1.12
         with:
           releaseId: "${{ inputs.dry_run_release_id }}"
           fileName: "*"
@@ -432,7 +434,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Download xsd files
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # Relative path under $GITHUB_WORKSPACE to place the repository
           path: ${{ github.event.repository.name }}
@@ -461,25 +463,31 @@ jobs:
       - name: Upload to s3
         working-directory: ${{ inputs.artifactPath }}
         # aws s3 sync syncs directories and S3 prefixes.
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          NAMESPACE: ${{ inputs.nameSpace }}
         run: |
-          aws s3 sync ${{ github.event.repository.name }}/src/main/resources/www.liquibase.org/xml/ns/${{ inputs.nameSpace }}/ s3://liquibaseorg-origin/xml/ns/${{ inputs.nameSpace }}/ --content-type application/octet-stream --only-show-errors
+          aws s3 sync "${REPO_NAME}/src/main/resources/www.liquibase.org/xml/ns/${NAMESPACE}/" "s3://liquibaseorg-origin/xml/ns/${NAMESPACE}/" --content-type application/octet-stream --only-show-errors
 
       - name: Index.htm file upload
         working-directory: ${{ inputs.artifactPath }}
         # List all xsd and htm files in repository. Copy index.htm to temporary folder
         # Add links for all xsd files to index.htm file (except liquibase-${{ inputs.nameSpace }}-latest.xsd and index.htm)
         # Sync index.htm with the s3
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          NAMESPACE: ${{ inputs.nameSpace }}
         run: |
-          search_dir=${{ github.event.repository.name }}/src/main/resources/www.liquibase.org/xml/ns/${{ inputs.nameSpace }}
-          filenames=`ls -1 $search_dir`
+          search_dir="${REPO_NAME}/src/main/resources/www.liquibase.org/xml/ns/${NAMESPACE}"
+          filenames=`ls -1 "$search_dir"`
           mkdir index-file
-          cp $search_dir/index.htm index-file/
+          cp "$search_dir/index.htm" index-file/
           for entry in $filenames
           do
-            if [[ "$entry" != "${{ github.event.repository.name }}-latest.xsd" ]] && [[ "$entry" != "index.htm" ]] ;then
-              sed -ie "s/<\/ul>/  <li><a href=\"\/xml\/ns\/${{ inputs.nameSpace }}\/${entry}\">${entry}<\/a><\/li>\n<\/ul>/" index-file/index.htm
+            if [[ "$entry" != "${REPO_NAME}-latest.xsd" ]] && [[ "$entry" != "index.htm" ]] ;then
+              sed -ie "s/<\/ul>/  <li><a href=\"\/xml\/ns\/${NAMESPACE}\/${entry}\">${entry}<\/a><\/li>\n<\/ul>/" index-file/index.htm
             fi
           done
 
-          aws s3 sync index-file s3://liquibaseorg-origin/xml/ns/${{ inputs.nameSpace }}/ --only-show-errors
+          aws s3 sync index-file "s3://liquibaseorg-origin/xml/ns/${NAMESPACE}/" --only-show-errors
           

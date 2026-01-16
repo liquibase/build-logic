@@ -136,8 +136,11 @@ jobs:
       - name: Run extra command
         working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
+        shell: bash
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${{ inputs.extraCommand }}
+          ${EXTRA_COMMAND}
 
       - name: Build release artifacts
         working-directory: ${{ inputs.artifactPath }}

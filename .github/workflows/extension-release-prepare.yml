@@ -106,6 +106,7 @@ jobs:
         if: inputs.extraCommand != ''
         env:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
+        shell: bash
         run: |
           ${EXTRA_COMMAND}
 

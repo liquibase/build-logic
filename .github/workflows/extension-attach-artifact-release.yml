@@ -416,6 +416,7 @@ jobs:
 
       - name: Run extra command
         if: inputs.extraCommand
+        shell: bash
         env:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |

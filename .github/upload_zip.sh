@@ -35,7 +35,7 @@ upload_asset() {
       -H "Authorization: token $GITHUB_TOKEN" \
       -H "Content-Length: $size"\
       -H "Content-Type: $content_type" \
-      --data-binary @$file "$UPLOAD_URL?name=$(basename $file)"
+      --data-binary @"$file" "$UPLOAD_URL?name=$(basename "$file")"
 }
 
 EXTENSION=".zip"
@@ -44,11 +44,11 @@ FILE=$ASSET_DIR/$ASSET_NAME_PREFIX$VERSION$EXTENSION
 if [[ ! -f "$FILE" && "$FILE" != *".zip" ]]; then
     echo "$FILE does not exist."
 fi
-SIZE=$(wc -c $FILE | awk '{print $1}')
+SIZE=$(wc -c "$FILE" | awk '{print $1}')
 if [[ $SIZE -eq 0 ]]; then
     echo "$FILE is empty."
 fi
-MIME=$(file -b --mime-type $FILE)
+MIME=$(file -b --mime-type "$FILE")
 upload_asset $FILE $SIZE $MIME
 
 

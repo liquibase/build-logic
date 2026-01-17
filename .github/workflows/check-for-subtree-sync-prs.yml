@@ -6,6 +6,9 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+permissions:
+  pull-requests: read
+
 jobs:
   check_for_prs:
     name: Check for open subtree sync PRs

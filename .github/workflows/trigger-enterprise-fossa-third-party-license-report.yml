@@ -53,7 +53,7 @@ jobs:
           fi
 
       - name: Dispatch an action and get the run ID
-        uses: codex-/return-dispatch@v1
+        uses: codex-/return-dispatch@2dd36d60e4c18c35e6c8d3a1a3c4b31ecf8ee9bd # v1
         id: return_dispatch
         continue-on-error: true
         with:
@@ -89,7 +89,7 @@ jobs:
         shell: bash
 
       - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
-        uses: Codex-/await-remote-run@v1
+        uses: Codex-/await-remote-run@1fd400f3e2033480390bd521e6626b24365c9c20 # v1
         with:
           token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
           run_id: ${{ steps.return_dispatch.outputs.run_id }}
@@ -117,7 +117,7 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: liquibase/build-logic
           ref: main
@@ -176,7 +176,7 @@ jobs:
 
 
       - name: Upload CSV to Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: enterprise_report
           path: ./enterprise_report.csv
@@ -192,7 +192,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v5
@@ -209,7 +209,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Dispatch an action for datical-service
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
         with:
           token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
           repository: Datical/datical-service

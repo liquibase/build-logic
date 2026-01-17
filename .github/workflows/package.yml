@@ -125,7 +125,7 @@ jobs:
 
       - name: Get GitHub App token
         id: get-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2
         with:
           app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
           private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
@@ -133,17 +133,17 @@ jobs:
           permission-contents: write
           permission-actions: write
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
         with:
           java-version: "21"
           distribution: "temurin"
           cache: "maven"
 
       - name: Set up Maven
-        uses: stCarolas/setup-maven@v5
+        uses: stCarolas/setup-maven@d6af6abeda15e98926a57b5aa970a96bb37f97d1 # v5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
@@ -153,15 +153,18 @@ jobs:
           ruby-version: 3.1.4
 
       - name: Get Reusable Files
+        env:
+          DISTRIBUTION: ${{ inputs.distribution }}
+          ARTIFACT_ID: ${{ inputs.artifactId }}
         run: |
           # Under the src folder is where specific packages files live. The GitHub action inputs will modify the universal package-deb-pom.xml to tell the process which assets to use during the packaging step
           # Determine the correct source directory and package name based on distribution
-          if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
+          if [ "$DISTRIBUTION" = "liquibase-secure" ]; then
             SRC_DIR="liquibase-secure"
             PACKAGE_NAME="liquibase-secure"
           else
-            SRC_DIR="${{ inputs.artifactId }}"
-            PACKAGE_NAME="${{ inputs.artifactId }}"
+            SRC_DIR="$ARTIFACT_ID"
+            PACKAGE_NAME="$ARTIFACT_ID"
           fi
 
           # Export for use in later steps
@@ -175,7 +178,7 @@ jobs:
           curl -o $PWD/.github/src/$PACKAGE_NAME/main/archive/$PACKAGE_NAME-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/main/archive/${SRC_DIR}-env.sh
 
           # Download appropriate pom.xml based on distribution
-          if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
+          if [ "$DISTRIBUTION" = "liquibase-secure" ]; then
             curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom-secure.xml
           else
             curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
@@ -199,7 +202,7 @@ jobs:
 
       - name: Import GPG key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
         with:
           gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
@@ -212,52 +215,64 @@ jobs:
 
       - name: Download ${{ inputs.artifactId }} Release
         if: ${{ inputs.dry_run == false }}
+        env:
+          TAG: ${{ inputs.tag }}
+          VERSION: ${{ inputs.version }}
+          DISTRIBUTION: ${{ inputs.distribution }}
+          ARTIFACT_ID: ${{ inputs.artifactId }}
+          DOWNLOAD_BASE_URL: ${{ inputs.download_base_url }}
         run: |
           mkdir -p $PWD/.github/target
           # Use tag if provided, otherwise construct from version
-          RELEASE_TAG="${{ inputs.tag }}"
+          RELEASE_TAG="$TAG"
           if [ -z "$RELEASE_TAG" ]; then
-            RELEASE_TAG="v${{ inputs.version }}"
+            RELEASE_TAG="v$VERSION"
           fi
-          if [ "${{ inputs.distribution }}" = "liquibase-secure" ]; then
+          if [ "$DISTRIBUTION" = "liquibase-secure" ]; then
             # Download from S3 for liquibase-secure (uses version, not tag)
-            wget -q -O $PWD/.github/target/liquibase-secure-${{ inputs.version }}.tar.gz \
-              ${{ inputs.download_base_url }}/${{ inputs.version }}/liquibase-secure-${{ inputs.version }}.tar.gz
+            wget -q -O $PWD/.github/target/liquibase-secure-$VERSION.tar.gz \
+              $DOWNLOAD_BASE_URL/$VERSION/liquibase-secure-$VERSION.tar.gz
           else
             # Download from GitHub for liquibase (community)
-            wget -q -O $PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz \
-              ${{ inputs.download_base_url }}/${RELEASE_TAG}/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz
+            wget -q -O $PWD/.github/target/$ARTIFACT_ID-$VERSION.tar.gz \
+              $DOWNLOAD_BASE_URL/${RELEASE_TAG}/$ARTIFACT_ID-$VERSION.tar.gz
           fi
 
       - name: Download ${{ inputs.artifactId }} dry-run Release
         if: ${{ inputs.dry_run == true }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          ARTIFACT_ID: ${{ inputs.artifactId }}
+          VERSION: ${{ inputs.version }}
         run: |
           mkdir -p $PWD/.github/target
           # Download all release assets to target directory
-          gh release download "${{ inputs.tag }}" \
+          gh release download "$TAG" \
             --repo liquibase/liquibase \
             --pattern "*" \
             --dir "$PWD/.github/target"
 
           # Find and rename the main tar.gz (exclude additional files)
           MAIN_TAR=$(ls $PWD/.github/target/liquibase-*.tar.gz 2>/dev/null | grep -v additional | head -1)
-          DEST_TAR="$PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.tar.gz"
+          DEST_TAR="$PWD/.github/target/$ARTIFACT_ID-$VERSION.tar.gz"
           if [ -n "$MAIN_TAR" ] && [ "$MAIN_TAR" != "$DEST_TAR" ]; then
             mv "$MAIN_TAR" "$DEST_TAR"
           fi
 
           # Find and rename the main zip (exclude additional files)
           MAIN_ZIP=$(ls $PWD/.github/target/liquibase-*.zip 2>/dev/null | grep -v additional | head -1)
-          DEST_ZIP="$PWD/.github/target/${{ inputs.artifactId }}-${{ inputs.version }}.zip"
+          DEST_ZIP="$PWD/.github/target/$ARTIFACT_ID-$VERSION.zip"
           if [ -n "$MAIN_ZIP" ] && [ "$MAIN_ZIP" != "$DEST_ZIP" ]; then
             mv "$MAIN_ZIP" "$DEST_ZIP"
           fi
 
       - name: Build ${{ inputs.artifactId }} deb package
+        env:
+          GROUP_ID: ${{ inputs.groupId }}
+          REVISION: ${{ inputs.version }}
         run: |
-          mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId=${{ inputs.groupId }} -DartifactId=${{ env.PACKAGE_NAME }} -Drevision=${{ inputs.version }} -DskipTests
+          mvn package -f $PWD/.github/package-deb-pom.xml -DgroupId="$GROUP_ID" -DartifactId="$PACKAGE_NAME" -Drevision="$REVISION" -DskipTests
 
       - name: Install deb-s3 gem
         run: gem install deb-s3
@@ -265,7 +280,7 @@ jobs:
       - name: Import GPG key for deb signing
         if: ${{ inputs.dry_run == false }}
         id: import_gpg_deb
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
         with:
           gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
@@ -273,6 +288,9 @@ jobs:
       - name: Upload ${{ inputs.artifactId }} deb package
         if: ${{ inputs.dry_run == false }}
         continue-on-error: true
+        env:
+          VERSION: ${{ inputs.version }}
+          GPG_PASS: ${{ env.GPG_PASSPHRASE }}
         run: |
           # Debug: List available GPG keys
           echo "Available GPG keys:"
@@ -284,10 +302,10 @@ jobs:
 
           # Create temporary passphrase file securely (not logged)
           TEMP_PASSPHRASE_FILE=$(mktemp)
-          echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
+          echo "$GPG_PASS" > "$TEMP_PASSPHRASE_FILE"
           chmod 600 "$TEMP_PASSPHRASE_FILE"
 
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/$PACKAGE_NAME-$VERSION.deb
 
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
@@ -295,7 +313,7 @@ jobs:
       - name: Import GPG key for dry-run deb signing
         if: ${{ inputs.dry_run == true }}
         id: import_gpg_deb_dryrun
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
         with:
           gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
@@ -303,6 +321,10 @@ jobs:
       - name: Upload ${{ inputs.artifactId }} dry-run deb package
         if: ${{ inputs.dry_run == true }}
         continue-on-error: true
+        env:
+          VERSION: ${{ inputs.version }}
+          PACKAGE_NAME: ${{ env.PACKAGE_NAME }}
+          GPG_PASS: ${{ env.GPG_PASSPHRASE }}
         run: |
           # Debug: List available GPG keys
           echo "Available GPG keys:"
@@ -314,10 +336,10 @@ jobs:
 
           # Create temporary passphrase file securely (not logged)
           TEMP_PASSPHRASE_FILE=$(mktemp)
-          echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
+          echo "$GPG_PASS" > "$TEMP_PASSPHRASE_FILE"
           chmod 600 "$TEMP_PASSPHRASE_FILE"
 
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
+          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/$PACKAGE_NAME-$VERSION.deb
 
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
@@ -325,7 +347,7 @@ jobs:
       - name: Import GPG key for dry-run RPM signing
         if: ${{ inputs.dry_run == true }}
         id: import_gpg_rpm_dryrun
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
         with:
           gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
@@ -333,12 +355,15 @@ jobs:
       - name: Sign dry-run RPM package
         if: ${{ inputs.dry_run == true }}
         continue-on-error: true
+        env:
+          RPM_FILENAME: ${{ env.RPM_FILENAME }}
+          GPG_PASS: ${{ env.GPG_PASSPHRASE }}
         run: |
           # Install rpm-sign package
           sudo apt-get install -y rpm
 
           # Fix ownership of RPM file (alien creates it as root)
-          sudo chown $(whoami):$(whoami) "${{ env.RPM_FILENAME }}"
+          sudo chown $(whoami):$(whoami) "$RPM_FILENAME"
 
           # Get the GPG key ID
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
@@ -362,7 +387,7 @@ jobs:
 
           # Replace placeholders in .rpmmacros
           sed -i "s/GPG_KEY_ID_PLACEHOLDER/$GPG_KEY_ID/g" ~/.rpmmacros
-          sed -i "s/GPG_PASSPHRASE_PLACEHOLDER/${{ env.GPG_PASSPHRASE }}/g" ~/.rpmmacros
+          sed -i "s/GPG_PASSPHRASE_PLACEHOLDER/$GPG_PASS/g" ~/.rpmmacros
 
           # Verify .rpmmacros was created successfully (without displaying sensitive content)
           if [ -f ~/.rpmmacros ]; then
@@ -374,15 +399,15 @@ jobs:
 
           # Test GPG signing capability (redirect output to avoid exposing sensitive data)
           echo "Testing GPG signing capability..."
-          if echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign > /dev/null 2>&1; then
+          if echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "$GPG_PASS" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign > /dev/null 2>&1; then
             echo "✓ GPG signing test successful"
           else
             echo "✗ WARNING: GPG signing test failed"
           fi
 
           # Sign the RPM (filter output to avoid exposing sensitive data)
-          echo "Signing RPM: ${{ env.RPM_FILENAME }}"
-          if rpm --addsign "${{ env.RPM_FILENAME }}" 2>&1 | grep -v "passphrase" > /tmp/rpm-sign-output.txt; then
+          echo "Signing RPM: $RPM_FILENAME"
+          if rpm --addsign "$RPM_FILENAME" 2>&1 | grep -v "passphrase" > /tmp/rpm-sign-output.txt; then
             echo "✓ RPM signing completed"
           else
             # Check if signing actually worked
@@ -396,11 +421,11 @@ jobs:
 
           # Verify the signature with verbose output
           echo "Verifying RPM signature:"
-          rpm --checksig -v "${{ env.RPM_FILENAME }}" || true
+          rpm --checksig -v "$RPM_FILENAME" || true
 
           # Check if signature was actually added
           echo "Checking if RPM has a GPG signature:"
-          if rpm --checksig "${{ env.RPM_FILENAME }}" 2>&1 | grep -q "RSA/SHA"; then
+          if rpm --checksig "$RPM_FILENAME" 2>&1 | grep -q "RSA/SHA"; then
             echo "✓ RPM is successfully signed with GPG signature"
           else
             echo "✗ WARNING: RPM may not be properly signed"
@@ -408,7 +433,7 @@ jobs:
 
           # Also check with query
           echo "Checking RPM signature with query:"
-          rpm -qip "${{ env.RPM_FILENAME }}" | grep -i signature || echo "No signature info in package header"
+          rpm -qip "$RPM_FILENAME" | grep -i signature || echo "No signature info in package header"
 
       - name: Invalidate CloudFront cache
         if: ${{ inputs.dry_run == false }}
@@ -431,16 +456,19 @@ jobs:
 
       - name: Convert deb to rpm
         continue-on-error: true
+        env:
+          PACKAGE_NAME: ${{ env.PACKAGE_NAME }}
+          VERSION: ${{ inputs.version }}
         run: |
           sudo apt-get update
           sudo apt-get install -y alien
-          sudo alien --to-rpm --keep-version $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
+          sudo alien --to-rpm --keep-version $PWD/.github/target/$PACKAGE_NAME-$VERSION.deb
           # Find the actual generated RPM file (alien may change naming)
           RPM_FILE=$(ls -1 *.rpm 2>/dev/null | head -1)
           if [ -n "$RPM_FILE" ]; then
             echo "Generated RPM: $RPM_FILE"
             # For liquibase-secure, ensure the RPM has the correct name format
-            EXPECTED_RPM="${{ env.PACKAGE_NAME }}-${{ inputs.version }}-1.noarch.rpm"
+            EXPECTED_RPM="$PACKAGE_NAME-$VERSION-1.noarch.rpm"
             if [ "$RPM_FILE" != "$EXPECTED_RPM" ]; then
               echo "Renaming $RPM_FILE to $EXPECTED_RPM"
               mv "$RPM_FILE" "$EXPECTED_RPM"
@@ -455,7 +483,7 @@ jobs:
       - name: Import GPG key for RPM signing
         if: ${{ inputs.dry_run == false }}
         id: import_gpg_rpm
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
         with:
           gpg_private_key: ${{ env.GPG_KEY_CONTENT }}
           passphrase: ${{ env.GPG_PASSPHRASE }}
@@ -463,12 +491,15 @@ jobs:
       - name: Sign RPM package
         if: ${{ inputs.dry_run == false }}
         continue-on-error: true
+        env:
+          RPM_FILENAME: ${{ env.RPM_FILENAME }}
+          GPG_PASS: ${{ env.GPG_PASSPHRASE }}
         run: |
           # Install rpm-sign package
           sudo apt-get install -y rpm
 
           # Fix ownership of RPM file (alien creates it as root)
-          sudo chown $(whoami):$(whoami) "${{ env.RPM_FILENAME }}"
+          sudo chown $(whoami):$(whoami) "$RPM_FILENAME"
 
           # Get the GPG key ID
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
@@ -492,7 +523,7 @@ jobs:
 
           # Replace placeholders in .rpmmacros
           sed -i "s/GPG_KEY_ID_PLACEHOLDER/$GPG_KEY_ID/g" ~/.rpmmacros
-          sed -i "s/GPG_PASSPHRASE_PLACEHOLDER/${{ env.GPG_PASSPHRASE }}/g" ~/.rpmmacros
+          sed -i "s/GPG_PASSPHRASE_PLACEHOLDER/$GPG_PASS/g" ~/.rpmmacros
 
           # Verify .rpmmacros was created successfully (without displaying sensitive content)
           if [ -f ~/.rpmmacros ]; then
@@ -504,15 +535,15 @@ jobs:
 
           # Test GPG signing capability (redirect output to avoid exposing sensitive data)
           echo "Testing GPG signing capability..."
-          if echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "${{ env.GPG_PASSPHRASE }}" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign > /dev/null 2>&1; then
+          if echo "test" | gpg --batch --no-verbose --armor --pinentry-mode loopback --passphrase "$GPG_PASS" --no-secmem-warning -u "$GPG_KEY_ID" --clearsign > /dev/null 2>&1; then
             echo "✓ GPG signing test successful"
           else
             echo "✗ WARNING: GPG signing test failed"
           fi
 
           # Sign the RPM (filter output to avoid exposing sensitive data)
-          echo "Signing RPM: ${{ env.RPM_FILENAME }}"
-          if rpm --addsign "${{ env.RPM_FILENAME }}" 2>&1 | grep -v "passphrase" > /tmp/rpm-sign-output.txt; then
+          echo "Signing RPM: $RPM_FILENAME"
+          if rpm --addsign "$RPM_FILENAME" 2>&1 | grep -v "passphrase" > /tmp/rpm-sign-output.txt; then
             echo "✓ RPM signing completed"
           else
             # Check if signing actually worked
@@ -526,11 +557,11 @@ jobs:
 
           # Verify the signature with verbose output
           echo "Verifying RPM signature:"
-          rpm --checksig -v "${{ env.RPM_FILENAME }}" || true
+          rpm --checksig -v "$RPM_FILENAME" || true
 
           # Check if signature was actually added
           echo "Checking if RPM has a GPG signature:"
-          if rpm --checksig "${{ env.RPM_FILENAME }}" 2>&1 | grep -q "RSA/SHA"; then
+          if rpm --checksig "$RPM_FILENAME" 2>&1 | grep -q "RSA/SHA"; then
             echo "✓ RPM is successfully signed with GPG signature"
           else
             echo "✗ WARNING: RPM may not be properly signed"
@@ -538,16 +569,19 @@ jobs:
 
           # Also check with query
           echo "Checking RPM signature with query:"
-          rpm -qip "${{ env.RPM_FILENAME }}" | grep -i signature || echo "No signature info in package header"
+          rpm -qip "$RPM_FILENAME" | grep -i signature || echo "No signature info in package header"
 
       - name: Upload ${{ inputs.artifactId }} rpm package
         if: ${{ inputs.dry_run == false }}
         continue-on-error: true
+        env:
+          RPM_FILENAME: ${{ env.RPM_FILENAME }}
+          GPG_PASS: ${{ env.GPG_PASSPHRASE }}
         run: |
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
 
           # Get absolute path to the signed RPM file
-          SIGNED_RPM_PATH="$(pwd)/${{ env.RPM_FILENAME }}"
+          SIGNED_RPM_PATH="$(pwd)/$RPM_FILENAME"
           echo "Signed RPM location: $SIGNED_RPM_PATH"
 
           # Verify the signed RPM exists and is actually signed
@@ -598,7 +632,7 @@ jobs:
           echo "Downloading existing RPMs from S3..."
           aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | while read rpm; do
             # Skip if it's the same version we're uploading
-            if [[ "$rpm" != "${{ env.RPM_FILENAME }}" ]]; then
+            if [[ "$rpm" != "$RPM_FILENAME" ]]; then
               aws s3 cp "s3://repo.liquibase.com/yum/noarch/$rpm" yum/noarch/
             fi
           done
@@ -616,7 +650,7 @@ jobs:
 
           # Verify the copied file is still signed
           echo "Verifying copied RPM signature:"
-          sudo rpm --checksig "yum/noarch/${{ env.RPM_FILENAME }}"
+          sudo rpm --checksig "yum/noarch/$RPM_FILENAME"
 
           # Generate repository metadata with the signed RPM
           echo "Generating repository metadata..."
@@ -625,7 +659,7 @@ jobs:
           # Sign the repository metadata
           echo "Signing repository metadata..."
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
-          gpg --batch --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
+          gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASS" --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
 
           # Upload to S3
           echo "Uploading repository to S3..."
@@ -636,11 +670,14 @@ jobs:
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
         if: ${{ inputs.dry_run == true }}
         continue-on-error: true
+        env:
+          RPM_FILENAME: ${{ env.RPM_FILENAME }}
+          GPG_PASS: ${{ env.GPG_PASSPHRASE }}
         run: |
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
 
           # Get absolute path to the signed RPM file
-          SIGNED_RPM_PATH="$(pwd)/${{ env.RPM_FILENAME }}"
+          SIGNED_RPM_PATH="$(pwd)/$RPM_FILENAME"
           echo "Signed RPM location: $SIGNED_RPM_PATH"
 
           # Verify the signed RPM exists and is actually signed
@@ -691,7 +728,7 @@ jobs:
           echo "Downloading existing RPMs from S3..."
           aws s3 ls s3://repo.liquibase.com.dry.run/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | while read rpm; do
             # Skip if it's the same version we're uploading
-            if [[ "$rpm" != "${{ env.RPM_FILENAME }}" ]]; then
+            if [[ "$rpm" != "$RPM_FILENAME" ]]; then
               aws s3 cp "s3://repo.liquibase.com.dry.run/yum/noarch/$rpm" yum/noarch/
             fi
           done
@@ -709,7 +746,7 @@ jobs:
 
           # Verify the copied file is still signed
           echo "Verifying copied RPM signature:"
-          sudo rpm --checksig "yum/noarch/${{ env.RPM_FILENAME }}"
+          sudo rpm --checksig "yum/noarch/$RPM_FILENAME"
 
           # Generate repository metadata with the signed RPM
           echo "Generating repository metadata..."
@@ -718,7 +755,7 @@ jobs:
           # Sign the repository metadata
           echo "Signing repository metadata..."
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
-          gpg --batch --pinentry-mode loopback --passphrase '${{ env.GPG_PASSPHRASE }}' --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
+          gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASS" --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
 
           # Upload to S3
           echo "Uploading repository to S3..."
@@ -731,12 +768,16 @@ jobs:
         if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') }}
         continue-on-error: true
         id: check-brew-pr
+        env:
+          DISTRIBUTION: ${{ inputs.distribution }}
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Authenticate GitHub CLI
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+          gh auth login --with-token <<< "$GH_TOKEN"
 
           # Define the PR title
-          pr_title="${{ inputs.distribution }} ${{ inputs.version }}"
+          pr_title="$DISTRIBUTION $VERSION"
 
           # Search for open pull requests with the specified title in the Homebrew/homebrew-core repo
           pr_title=$(gh pr list --repo Homebrew/homebrew-core --state open --search "$pr_title" --json title --jq ".[] | select(.title == \"$pr_title\") | .title" )
@@ -757,7 +798,7 @@ jobs:
       - name: Update Homebrew formula for ${{ inputs.distribution }}
         if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         continue-on-error: true
-        uses: mislav/bump-homebrew-formula-action@v3
+        uses: mislav/bump-homebrew-formula-action@581d1a926c3b95b39a0048a3934a3489290408d2 # v3
         with:
           formula-name: ${{ inputs.distribution }}
           formula-path: Formula/l/${{ inputs.distribution }}.rb
@@ -778,6 +819,9 @@ jobs:
         continue-on-error: true
         if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
         id: capture-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
         run: |
           # Wait briefly for PR to be created
           sleep 30
@@ -793,15 +837,13 @@ jobs:
                 }
               }
             }
-          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
+          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase $VERSION in:title" --jq '.data.search.nodes[0]')
 
           if [ ! -z "$PR_DATA" ]; then
             echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
             echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
             echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       ## HomeBrew CASKS: Versions >= 5.x use Homebrew Casks
       ## Moved to separate update_homebrew_cask job that runs on macOS
@@ -814,13 +856,14 @@ jobs:
           SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
           VERSION: ${{ inputs.version }}
           RELEASE_TAG: ${{ inputs.tag || format('v{0}', inputs.version) }}
+          DOWNLOAD_BASE_URL: ${{ inputs.download_base_url }}
           WEB_URL: https://package.liquibase.com/downloads/oss/sdkman/
           S3_BUCKET: s3://repo.liquibase.com/sdkman/oss/
         run: |
           set -e  # Exit on any error
 
           # Download the zip file for liquibase (community edition only)
-          wget -q -O liquibase-$VERSION.zip ${{ inputs.download_base_url }}/$RELEASE_TAG/liquibase-$VERSION.zip
+          wget -q -O liquibase-$VERSION.zip $DOWNLOAD_BASE_URL/$RELEASE_TAG/liquibase-$VERSION.zip
           ZIP_FILENAME="liquibase-$VERSION.zip"
           SDKMAN_CANDIDATE="liquibase"
           mkdir -p liquibase-$VERSION/bin/internal
@@ -928,7 +971,7 @@ jobs:
 
       - name: Get GitHub App token
         id: get-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2
         with:
           app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
           private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
@@ -936,7 +979,7 @@ jobs:
           repositories: liquibase
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: liquibase/liquibase
           token: ${{ steps.get-token.outputs.token }}

@@ -71,13 +71,44 @@ jobs:
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
+      - name: Find and download test results artifact
+        id: find-artifact
+        shell: bash
+        run: |
+          # Try to find test reports from any available platform
+          # Test reports may come from linux, windows, or macos depending on what was tested
+          ARTIFACT_FOUND=false
+
+          for platform in linux windows macos; do
+            ARTIFACT_NAME="test-reports-jdk-21-${platform}"
+            echo "Checking for artifact: $ARTIFACT_NAME"
+
+            # Use GitHub API to search for artifacts in recent workflow runs
+            RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?name=$ARTIFACT_NAME" \
+              | jq -r ".artifacts[0] | select(.name==\"$ARTIFACT_NAME\") | .id" 2>/dev/null)
+
+            if [ -n "$RESPONSE" ]; then
+              echo "Found artifact: $ARTIFACT_NAME (ID: $RESPONSE)"
+              ARTIFACT_FOUND=true
+              echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+              break
+            fi
+          done
+
+          if [ "$ARTIFACT_FOUND" = false ]; then
+            echo "No test reports found for any platform"
+            echo "artifact_name=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Download Test Results Artifact
         id: download-artifact
+        if: ${{ steps.find-artifact.outputs.artifact_name != '' }}
         uses: dawidd6/action-download-artifact@v7
         with:
           github_token: ${{secrets.GITHUB_TOKEN}}
           workflow: test.yml
-          name: test-reports-jdk-21-ubuntu-latest
+          name: ${{ steps.find-artifact.outputs.artifact_name }}
           repo: ${{ github.repository }}
           if_no_artifact_found: warn
           workflow_conclusion: ""

@@ -496,7 +496,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
+          name: test-reports-jdk-${{ matrix.java }}-${{ steps.normalize-os.outputs.platform }}
           path: |
             **/target/surefire-reports
             **/target/site/jacoco/jacoco.xml

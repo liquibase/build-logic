@@ -335,7 +335,7 @@ jobs:
 
           # Only attempt to merge fileslist.txt if the directory exists
           if [ -d "/tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}/org.graalvm.python.vfs" ]; then
-            rm /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}/org.graalvm.python.vfs/fileslist.txt
+            rm -f /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}/org.graalvm.python.vfs/fileslist.txt
             touch /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}/org.graalvm.python.vfs/fileslist.txt
             [ -f "/tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt" ] && cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt >> /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}/org.graalvm.python.vfs/fileslist.txt
             [ -f "/tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt" ] && cat /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt >> /tmp/combined/${{needs.build.outputs.artifact_id}}-${{ inputs.version }}/org.graalvm.python.vfs/fileslist.txt

@@ -116,8 +116,8 @@ jobs:
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
-      - name: Find and download unit tests report
-        id: download-test-reports
+      - name: Find test reports artifact
+        id: find-test-reports
         shell: bash
         run: |
           # Try to download test reports from any available platform and Java version
@@ -157,11 +157,11 @@ jobs:
           fi
 
       - name: Download unit tests report
-        if: ${{ steps.download-test-reports.outputs.artifact_name != '' }}
+        if: ${{ steps.find-test-reports.outputs.artifact_name != '' }}
         uses: actions/download-artifact@v6
         continue-on-error: true
         with:
-          name: ${{ steps.download-test-reports.outputs.artifact_name }}
+          name: ${{ steps.find-test-reports.outputs.artifact_name }}
 
       - name: Sonar Scan
         working-directory: ${{ inputs.artifactPath }}

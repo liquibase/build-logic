@@ -290,18 +290,21 @@ jobs:
         with:
           name: ${{needs.build.outputs.artifact_id}}-ubuntu-latest-${{ inputs.version }}-artifacts
           path: /tmp/ubuntu
+        continue-on-error: true
 
       - name: Download macOS Artifacts
         uses: actions/download-artifact@v6
         with:
           name: ${{needs.build.outputs.artifact_id}}-macos-latest-${{ inputs.version }}-artifacts
           path: /tmp/macos
+        continue-on-error: true
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v6
         with:
           name: ${{needs.build.outputs.artifact_id}}-windows-latest-${{ inputs.version }}-artifacts
           path: /tmp/windows
+        continue-on-error: true
 
       - name: Create multiplatform jar
         run: |

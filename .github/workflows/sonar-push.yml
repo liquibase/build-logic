@@ -71,13 +71,80 @@ jobs:
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
+      - name: Find and download test results artifact
+        id: find-artifact
+        shell: bash
+        run: |
+          # Try to find test reports from any available platform and Java version
+          # Test reports may come from linux, windows, or macos depending on what was tested
+          # Java version may vary (17, 21, 25, etc.) depending on the test matrix
+          ARTIFACT_FOUND=false
+
+          # First, find the most recent successful test.yml run for this commit
+          echo "Looking for test.yml workflow run for commit ${{ github.sha }}"
+          RUNS_API_URL="https://api.github.com/repos/${{ github.repository }}/actions/workflows/test.yml/runs?head_sha=${{ github.sha }}&status=success&per_page=1"
+          RUNS_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "$RUNS_API_URL" 2>&1)
+
+          # Validate workflow runs API response is valid JSON
+          if ! echo "$RUNS_RESPONSE" | jq empty 2>/dev/null; then
+            echo "ERROR: Workflow runs API response is not valid JSON"
+            echo "Response: $RUNS_RESPONSE" | head -c 500
+            echo ""
+            echo "artifact_name=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Extract the run ID from the most recent successful run
+          RUN_ID=$(echo "$RUNS_RESPONSE" | jq -r ".workflow_runs[0]?.id" 2>/dev/null)
+
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "No successful test.yml workflow run found for commit ${{ github.sha }}"
+            echo "artifact_name=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Found test.yml run ID: $RUN_ID"
+
+          # Now search for test reports in artifacts from this specific run
+          for platform in linux windows macos; do
+            echo "Searching for test reports on platform: $platform"
+
+            # Use GitHub API to search for artifacts in this specific run
+            API_URL="https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts?per_page=100"
+            API_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "$API_URL" 2>&1)
+
+            # Validate API response is valid JSON
+            if ! echo "$API_RESPONSE" | jq empty 2>/dev/null; then
+              echo "ERROR: API response is not valid JSON for platform $platform"
+              echo "Response: $API_RESPONSE" | head -c 500
+              echo ""
+              continue
+            fi
+
+            # Find any test-reports artifact for this platform (any Java version)
+            ARTIFACT_NAME=$(echo "$API_RESPONSE" | jq -r ".artifacts[]? | select(.name | startswith(\"test-reports-jdk-\") and endswith(\"-$platform\")) | .name" 2>/dev/null | head -1)
+
+            if [ -n "$ARTIFACT_NAME" ]; then
+              echo "Found artifact: $ARTIFACT_NAME"
+              ARTIFACT_FOUND=true
+              echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+              break
+            fi
+          done
+
+          if [ "$ARTIFACT_FOUND" = false ]; then
+            echo "No test reports found for any platform"
+            echo "artifact_name=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Download Test Results Artifact
         id: download-artifact
+        if: ${{ steps.find-artifact.outputs.artifact_name != '' }}
         uses: dawidd6/action-download-artifact@v7
         with:
           github_token: ${{secrets.GITHUB_TOKEN}}
           workflow: test.yml
-          name: test-reports-jdk-21-ubuntu-latest
+          name: ${{ steps.find-artifact.outputs.artifact_name }}
           repo: ${{ github.repository }}
           if_no_artifact_found: warn
           workflow_conclusion: ""

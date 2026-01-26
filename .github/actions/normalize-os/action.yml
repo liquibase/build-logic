@@ -1,0 +1,21 @@
+name: 'Normalize OS Platform Name'
+description: 'Normalizes runner.os to lowercase platform name for consistent artifact naming'
+outputs:
+  platform:
+    description: 'Normalized platform name (linux, windows, or macos)'
+    value: ${{ steps.normalize.outputs.platform }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Normalize OS platform name
+      id: normalize
+      shell: bash
+      run: |
+        # Use runner.os which is automatically normalized by GitHub to: Linux, Windows, macOS
+        # Handles both traditional runners (ubuntu-latest, windows-latest, macos-latest)
+        # and Blacksmith runners (blacksmith-2vcpu-windows-2025, etc.)
+        # Convert to lowercase to ensure consistent artifact naming (linux, windows, macos)
+        # This prevents case sensitivity issues and matches expected naming patterns
+        platform=$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
+        echo "platform=$platform" >> $GITHUB_OUTPUT
+        echo "Normalized runner OS '${{ runner.os }}' to platform '$platform'"

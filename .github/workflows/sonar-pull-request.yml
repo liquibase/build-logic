@@ -116,11 +116,52 @@ jobs:
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
+      - name: Find test reports artifact
+        id: find-test-reports
+        shell: bash
+        run: |
+          # Try to download test reports from any available platform and Java version
+          # Test reports may come from linux, windows, or macos depending on what was tested
+          # Java version may vary (17, 21, 25, etc.) depending on the test matrix
+          ARTIFACT_FOUND=false
+
+          for platform in linux windows macos; do
+            echo "Searching for test reports on platform: $platform"
+
+            # Use GitHub API to get all artifacts in current run
+            API_URL="https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100"
+            API_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "$API_URL" 2>&1)
+
+            # Validate API response is valid JSON
+            if ! echo "$API_RESPONSE" | jq empty 2>/dev/null; then
+              echo "ERROR: API response is not valid JSON for platform $platform"
+              echo "Response: $API_RESPONSE" | head -c 500
+              echo ""
+              continue
+            fi
+
+            # Find any test-reports artifact for this platform (any Java version)
+            ARTIFACT_NAME=$(echo "$API_RESPONSE" | jq -r ".artifacts[]? | select(.name | startswith(\"test-reports-jdk-\") and endswith(\"-$platform\")) | .name" 2>/dev/null | head -1)
+
+            if [ -n "$ARTIFACT_NAME" ]; then
+              echo "Found artifact: $ARTIFACT_NAME"
+              ARTIFACT_FOUND=true
+              echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+              break
+            fi
+          done
+
+          if [ "$ARTIFACT_FOUND" = false ]; then
+            echo "No test reports found for any platform"
+            echo "artifact_name=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Download unit tests report
+        if: ${{ steps.find-test-reports.outputs.artifact_name != '' }}
         uses: actions/download-artifact@v6
         continue-on-error: true
         with:
-          name: test-reports-jdk-${{ inputs.javaBuildVersion }}-ubuntu-latest
+          name: ${{ steps.find-test-reports.outputs.artifact_name }}
 
       - name: Sonar Scan
         working-directory: ${{ inputs.artifactPath }}

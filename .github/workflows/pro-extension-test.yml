@@ -96,7 +96,7 @@ jobs:
     steps:
       - name: Normalize OS platform name
         id: normalize-os
-        uses: liquibase/build-logic/.github/actions/normalize-os@DAT-21734
+        uses: liquibase/build-logic/.github/actions/normalize-os@main
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5

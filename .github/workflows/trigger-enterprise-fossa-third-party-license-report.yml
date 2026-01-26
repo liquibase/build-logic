@@ -209,7 +209,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Dispatch an action for datical-service
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
           repository: Datical/datical-service

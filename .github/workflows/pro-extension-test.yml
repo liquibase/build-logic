@@ -402,7 +402,7 @@ jobs:
 
       - name: Normalize OS platform name
         id: normalize-os
-        uses: liquibase/build-logic/.github/actions/normalize-os@DAT-21734
+        uses: liquibase/build-logic/.github/actions/normalize-os@main
 
       - uses: actions/download-artifact@v6
         with:
@@ -685,7 +685,7 @@ jobs:
   sonar-pr:
     if: ${{ !inputs.nightly }}
     needs: [unit-test]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@DAT-21734
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

@@ -308,13 +308,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          MAVEN_ARGS_INPUT: ${{ inputs.mavenArgs }}
+          SONAR_BRANCH_NAME: ${{ inputs.thisBranchName }}
+          SONAR_SCM_REVISION: ${{ inputs.thisSha }}
         run: |
+          read -r -a MAVEN_ARGS <<< "$MAVEN_ARGS_INPUT"
           mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
-          ${{ inputs.mavenArgs }} \
-          -Dsonar.scm.revision=${{ inputs.thisSha }} \
-          -Dsonar.token=$SONAR_TOKEN \
+          "${MAVEN_ARGS[@]}" \
+          -Dsonar.scm.revision="$SONAR_SCM_REVISION" \
+          -Dsonar.token="$SONAR_TOKEN" \
           -Dsonar.java.coveragePlugin=jacoco \
-          -Dsonar.branch.name=${{ inputs.thisBranchName }} \
+          -Dsonar.branch.name="$SONAR_BRANCH_NAME" \
           -Dsonar.qualitygate.wait=true \
           -Dsonar.organization=${{ github.repository_owner }} \
           -Dsonar.host.url='https://sonarcloud.io' \
@@ -327,15 +331,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          MAVEN_ARGS_INPUT: ${{ inputs.mavenArgs }}
+          SONAR_SCM_REVISION: ${{ inputs.thisSha }}
+          PR_KEY: ${{ inputs.pullRequestNumber }}
+          PR_BRANCH: ${{ inputs.pullRequestBranchName }}
+          PR_BASE_BRANCH: ${{ inputs.pullRequestBaseBranchName }}
         run: |
+          read -r -a MAVEN_ARGS <<< "$MAVEN_ARGS_INPUT"
           mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
-          ${{ inputs.mavenArgs }} \
-          -Dsonar.scm.revision=${{ inputs.thisSha }} \
-          -Dsonar.token=$SONAR_TOKEN \
+          "${MAVEN_ARGS[@]}" \
+          -Dsonar.scm.revision="$SONAR_SCM_REVISION" \
+          -Dsonar.token="$SONAR_TOKEN" \
           -Dsonar.java.coveragePlugin=jacoco \
-          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber }} \
-          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName }} \
-          -Dsonar.pullrequest.base=${{ inputs.pullRequestBaseBranchName }} \
+          -Dsonar.pullrequest.key="$PR_KEY" \
+          -Dsonar.pullrequest.branch="$PR_BRANCH" \
+          -Dsonar.pullrequest.base="$PR_BASE_BRANCH" \
           -Dsonar.pullrequest.provider=GitHub \
           -Dsonar.pullrequest.github.repository="${{ github.repository }}" \
           -Dsonar.pullrequest.github.endpoint='https://api.github.com/' \

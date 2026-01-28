@@ -7,10 +7,6 @@ on:
         description: 'The name of the branch to be scanned'
         type: string
         required: true
-      liquibaseBranchName:
-        description: 'The name of the liquibase branch to be scanned'
-        type: string
-        required: true
       thisSha:
         description: 'The sha of the branch to be scanned'
         type: string
@@ -233,7 +229,7 @@ jobs:
       - name: Generate classes
         if: always()
         run: |
-          mvn -B clean install -DskipTests -P 'sonar,!run-proguard' "-Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT"
+          mvn -B clean install -DskipTests -P 'sonar,!run-proguard'
 
       - name: Merge integration and unit tests reports
         if: always()
@@ -313,12 +309,12 @@ jobs:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
         run: |
-          mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
-          ${{ inputs.mavenArgs  }} \
+          mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
+          ${{ inputs.mavenArgs }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.token=$SONAR_TOKEN \
           -Dsonar.java.coveragePlugin=jacoco \
-          -Dsonar.branch.name=${{ inputs.thisBranchName}} \
+          -Dsonar.branch.name=${{ inputs.thisBranchName }} \
           -Dsonar.qualitygate.wait=true \
           -Dsonar.organization=${{ github.repository_owner }} \
           -Dsonar.host.url='https://sonarcloud.io' \
@@ -332,13 +328,13 @@ jobs:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
         run: |
-          mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests -Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT \
-          ${{ inputs.mavenArgs  }} \
+          mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
+          ${{ inputs.mavenArgs }} \
           -Dsonar.scm.revision=${{ inputs.thisSha }} \
           -Dsonar.token=$SONAR_TOKEN \
           -Dsonar.java.coveragePlugin=jacoco \
-          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber}} \
-          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName}} \
+          -Dsonar.pullrequest.key=${{ inputs.pullRequestNumber }} \
+          -Dsonar.pullrequest.branch=${{ inputs.pullRequestBranchName }} \
           -Dsonar.pullrequest.base=${{ inputs.pullRequestBaseBranchName }} \
           -Dsonar.pullrequest.provider=GitHub \
           -Dsonar.pullrequest.github.repository="${{ github.repository }}" \

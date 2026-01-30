@@ -290,8 +290,8 @@ jobs:
             java -jar jacococli.jar report merged.exec --classfiles ./classes --sourcefiles src --html site
           else
             echo "Tested classes module name: ${{ env.testedClassesModuleName }}"
-            java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --xml jacoco.xml
-            java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/ --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --html site
+            java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/classes --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --xml jacoco.xml
+            java -jar jacococli.jar report merged.exec --classfiles ../${{ env.testedClassesModuleName }}/target/classes --sourcefiles ../${{ env.testedClassesModuleName }}/src/ --html site
           fi
 
       - name: Set up JDK for Sonar

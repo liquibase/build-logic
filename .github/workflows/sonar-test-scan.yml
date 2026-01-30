@@ -308,13 +308,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
-          MAVEN_ARGS_INPUT: ${{ inputs.mavenArgs }}
           SONAR_BRANCH_NAME: ${{ inputs.thisBranchName }}
           SONAR_SCM_REVISION: ${{ inputs.thisSha }}
+          MAVEN_ARGS: ${{ inputs.mavenArgs }}
         run: |
-          read -r -a MAVEN_ARGS <<< "$MAVEN_ARGS_INPUT"
           mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
-          "${MAVEN_ARGS[@]}" \
+          $MAVEN_ARGS \
           -Dsonar.scm.revision="$SONAR_SCM_REVISION" \
           -Dsonar.token="$SONAR_TOKEN" \
           -Dsonar.java.coveragePlugin=jacoco \
@@ -331,15 +330,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
-          MAVEN_ARGS_INPUT: ${{ inputs.mavenArgs }}
           SONAR_SCM_REVISION: ${{ inputs.thisSha }}
           PR_KEY: ${{ inputs.pullRequestNumber }}
           PR_BRANCH: ${{ inputs.pullRequestBranchName }}
           PR_BASE_BRANCH: ${{ inputs.pullRequestBaseBranchName }}
+          MAVEN_ARGS: ${{ inputs.mavenArgs }}
         run: |
-          read -r -a MAVEN_ARGS <<< "$MAVEN_ARGS_INPUT"
           mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
-          "${MAVEN_ARGS[@]}" \
+          $MAVEN_ARGS \
           -Dsonar.scm.revision="$SONAR_SCM_REVISION" \
           -Dsonar.token="$SONAR_TOKEN" \
           -Dsonar.java.coveragePlugin=jacoco \

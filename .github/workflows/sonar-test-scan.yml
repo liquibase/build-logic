@@ -302,19 +302,21 @@ jobs:
           cache: 'maven'
           overwrite-settings: false
 
+      # Note: inputs.mavenArgs uses direct interpolation because it's a workflow input
+      # (controlled by the calling workflow), not untrusted external data. The array
+      # splitting approach breaks quoted arguments in the default value. Other values
+      # like branch names use env vars since they may come from PR metadata.
       - name: Sonar Branch Scan
         if: always() && !github.event.pull_request
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
-          MAVEN_ARGS_INPUT: ${{ inputs.mavenArgs }}
           SONAR_BRANCH_NAME: ${{ inputs.thisBranchName }}
           SONAR_SCM_REVISION: ${{ inputs.thisSha }}
         run: |
-          read -r -a MAVEN_ARGS <<< "$MAVEN_ARGS_INPUT"
           mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
-          "${MAVEN_ARGS[@]}" \
+          ${{ inputs.mavenArgs }} \
           -Dsonar.scm.revision="$SONAR_SCM_REVISION" \
           -Dsonar.token="$SONAR_TOKEN" \
           -Dsonar.java.coveragePlugin=jacoco \
@@ -331,15 +333,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
-          MAVEN_ARGS_INPUT: ${{ inputs.mavenArgs }}
           SONAR_SCM_REVISION: ${{ inputs.thisSha }}
           PR_KEY: ${{ inputs.pullRequestNumber }}
           PR_BRANCH: ${{ inputs.pullRequestBranchName }}
           PR_BASE_BRANCH: ${{ inputs.pullRequestBaseBranchName }}
         run: |
-          read -r -a MAVEN_ARGS <<< "$MAVEN_ARGS_INPUT"
           mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
-          "${MAVEN_ARGS[@]}" \
+          ${{ inputs.mavenArgs }} \
           -Dsonar.scm.revision="$SONAR_SCM_REVISION" \
           -Dsonar.token="$SONAR_TOKEN" \
           -Dsonar.java.coveragePlugin=jacoco \

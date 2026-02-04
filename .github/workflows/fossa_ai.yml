@@ -72,7 +72,7 @@ jobs:
           CHANGED_FILES=$(git diff --name-only --diff-filter=d HEAD~1 HEAD)
           if [ -n "$CHANGED_FILES" ]; then
             # Export the full content of changed files to 'patch.zip'
-            echo "$CHANGED_FILES" | xargs zip patch.zip
+            printf '%s\n' "$CHANGED_FILES" | zip patch.zip -@
             unzip patch.zip -d patch/
             # Analyze the changes using FOSSA and redirect output to analyze.out
             fossa analyze -p "$REPO_NAME" patch -o 2>&1 | tee analyze.out

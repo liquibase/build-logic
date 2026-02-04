@@ -68,11 +68,18 @@ jobs:
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/analyze
           mkdir patch
           cp $PWD/.github/.fossa.yml patch/.fossa.yml
-          # Export the full content of changed files to 'patch.zip'
-          git diff --name-only HEAD~1 HEAD | xargs zip patch.zip
-          unzip patch.zip -d patch/
-          # Analyze the changes using FOSSA and redirect output to analyze.out
-          fossa analyze -p "$REPO_NAME" patch -o 2>&1 | tee analyze.out
+          # Get changed files excluding deleted ones (--diff-filter=d excludes deleted files)
+          CHANGED_FILES=$(git diff --name-only --diff-filter=d HEAD~1 HEAD)
+          if [ -n "$CHANGED_FILES" ]; then
+            # Export the full content of changed files to 'patch.zip'
+            echo "$CHANGED_FILES" | xargs zip patch.zip
+            unzip patch.zip -d patch/
+            # Analyze the changes using FOSSA and redirect output to analyze.out
+            fossa analyze -p "$REPO_NAME" patch -o 2>&1 | tee analyze.out
+          else
+            echo "No files to analyze (all changes are deletions or no changes found)"
+            echo "Skipping AI code detection - no analyzable files" > analyze.out
+          fi
 
       - name: Run FOSSA Analyze
         id: analyze

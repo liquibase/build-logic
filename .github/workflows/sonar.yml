@@ -1,58 +1,46 @@
-name: SonarQube Scan
+name: SonarCloud Analysis
+
 on:
   workflow_call:
     inputs:
       java-version:
-        description: 'Java version to use for Maven projects'
-        required: false
+        description: "Java version for build"
         type: string
-        default: '17'
+        default: "21"
 
 jobs:
-  sonarqube:
+  sonar:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
-          # Disabling shallow clones is recommended for improving the relevancy of reporting
           fetch-depth: 0
 
-      - name: Check for Maven project
-        id: check-maven
-        run: |
-          if [ -f "pom.xml" ]; then
-            echo "is_maven=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_maven=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Set up JDK
-        if: steps.check-maven.outputs.is_maven == 'true'
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ inputs.java-version }}
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Configure AWS credentials for vault access
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
-        id: vault-secrets
         uses: aws-actions/aws-secretsmanager-get-secrets@v2
         with:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
 
-      - name: Configure Maven settings for GitHub Packages
-        if: steps.check-maven.outputs.is_maven == 'true'
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: temurin
+          cache: maven
+
+      - name: Configure Maven settings
         uses: whelk-io/maven-settings-xml-action@v22
         with:
           repositories: |
@@ -60,24 +48,14 @@ jobs:
               {
                 "id": "liquibase",
                 "url": "https://maven.pkg.github.com/liquibase/liquibase",
-                "releases": {
-                  "enabled": "true"
-                },
-                "snapshots": {
-                  "enabled": "true",
-                  "updatePolicy": "always"
-                }
+                "releases": { "enabled": "true" },
+                "snapshots": { "enabled": "true", "updatePolicy": "always" }
               },
               {
                 "id": "liquibase-pro",
                 "url": "https://maven.pkg.github.com/liquibase/liquibase-pro",
-                "releases": {
-                  "enabled": "true"
-                },
-                "snapshots": {
-                  "enabled": "true",
-                  "updatePolicy": "always"
-                }
+                "releases": { "enabled": "true" },
+                "snapshots": { "enabled": "true", "updatePolicy": "always" }
               }
             ]
           servers: |
@@ -94,37 +72,16 @@ jobs:
               }
             ]
 
-      - name: Build and analyze with Maven
-        if: steps.check-maven.outputs.is_maven == 'true'
-        run: |
-          # Extract sonar properties from sonar-project.properties if it exists
-          if [ -f "sonar-project.properties" ]; then
-            SONAR_PROJECT_KEY=$(grep -E "^sonar.projectKey=" sonar-project.properties | cut -d'=' -f2)
-            SONAR_ORGANIZATION=$(grep -E "^sonar.organization=" sonar-project.properties | cut -d'=' -f2)
-            if [ -z "$SONAR_PROJECT_KEY" ] || [ -z "$SONAR_ORGANIZATION" ]; then
-              echo "Error: sonar.projectKey and sonar.organization must be defined in sonar-project.properties"
-              exit 1
-            fi
-            mvn clean verify sonar:sonar \
-              -Dsonar.host.url=https://sonarcloud.io \
-              -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-              -Dsonar.organization=${SONAR_ORGANIZATION} \
-              -Dmaven.test.failure.ignore=true
-          else
-            mvn clean verify sonar:sonar \
-              -Dsonar.host.url=https://sonarcloud.io \
-              -Dmaven.test.failure.ignore=true
-          fi
-        env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LIQUIBOT_PAT_GPM_ACCESS: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
-          LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
 
-      - name: SonarQube Scan (non-Maven projects)
-        if: steps.check-maven.outputs.is_maven == 'false'
-        uses: SonarSource/sonarqube-scan-action@v6.0.0
+      - name: Build, test, and analyze
         env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dmaven.test.failure.ignore=true

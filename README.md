@@ -94,8 +94,8 @@ Please review the below table of reusable workflows and their descriptions:
 | `publish-for-liquibase.yml`             | Publishes extensions for Liquibase consumption                                                                          |
 | `slack-notification.yml`                | Sends notifications to Slack when tests fail                                                                            |
 | `sonar-pull-request.yml`                | Code Coverage Scan for PRs. Requires branch name parameter                                                              |
-| `sonar-test-scan.yml`                   | Code Coverage Scan for unit and integration tests                                                                       |
 | `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                                          |
+| `sonar-coverage-merge.yml`              | Merges unit/integration test coverage (JaCoCo) and runs Sonar scan for liquibase/liquibase-pro                          |
 | `reusable-vulnerability-scan.yml`       | Deep vulnerability scanning for Docker images and tarballs (nested JARs + Python packages)                              |
 | various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets                                   |
 
@@ -354,14 +354,9 @@ This automation ensures that version bumps are consistently applied across all e
 
 ## Liquibase test (unit & integration tests) + Sonar
 
-The `sonar-test-scan.yml` reusable workflow has been designed to execute unit and integration tests and deliver the Jacoco agregated report to Sonar.
-Jacoco requires all generated reports to fulfill its merge goal. Running integration tests on separate runners complicates the aggregation of reports. This is why an optimized workflow has been created to launch all tests and generate a comprehensive aggregated report for Sonar. It utilizes [mvnd](https://github.com/apache/maven-mvnd) instead of `mvn`` to speed up the build and test process and it also creates one thread per core.
+The `sonar-coverage-merge.yml` reusable workflow merges unit and integration test JaCoCo coverage reports and delivers the aggregated report to SonarCloud. It downloads pre-generated coverage artifacts (`liquibase-jacoco-test-results` for unit tests, `liquibase-integration-jacoco-test-results-*` for integration tests), merges them using the JaCoCo CLI, and runs the Sonar scan.
 
-`sonar-test-scan.yml` can be run in parallel to the rest of the workflow steps since it builds the application by itself. With this, we managed not to interfere with the total final build time.
-
-Here you can see an example for `liquibase-pro` executing all unit&integration for `-Dliquibase.sdk.testSystem.test=hub,h2,hsqldb,mssql,oracle`:
-
-![](./doc/img/sonar-test.png)
+This workflow supports both PR and branch scans, and is used by `liquibase` and `liquibase-pro`.
 
 ### Configuration
 

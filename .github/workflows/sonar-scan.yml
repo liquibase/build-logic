@@ -193,7 +193,16 @@ jobs:
                       -Dsonar.pullrequest.branch=$PR_HEAD_REF \
                       -Dsonar.pullrequest.base=$PR_BASE_REF"
           fi
+
+          SONAR_PROPS=""
+          if [ -f "sonar-project.properties" ]; then
+            SONAR_PROJECT_KEY=$(grep -E "^sonar.projectKey=" sonar-project.properties | cut -d'=' -f2)
+            SONAR_ORG=$(grep -E "^sonar.organization=" sonar-project.properties | cut -d'=' -f2)
+            [ -n "$SONAR_PROJECT_KEY" ] && SONAR_PROPS="$SONAR_PROPS -Dsonar.projectKey=$SONAR_PROJECT_KEY"
+            [ -n "$SONAR_ORG" ] && SONAR_PROPS="$SONAR_PROPS -Dsonar.organization=$SONAR_ORG"
+          fi
+
           mvn -B -Daws.region="us-east-1" -Dsonar.token=$SONAR_TOKEN \
-              $PR_FLAGS \
+              $PR_FLAGS $SONAR_PROPS \
               -Dsonar.scm.revision=$SCM_REVISION \
               package -DskipTests sonar:sonar

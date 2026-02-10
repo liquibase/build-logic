@@ -97,14 +97,7 @@ jobs:
     steps:
       - name: Normalize OS platform name
         id: normalize-os
-        shell: bash
-        run: |
-          # Use runner.os which is automatically normalized by GitHub
-          # Handles both traditional runners (ubuntu-latest, windows-latest, macos-latest)
-          # and Blacksmith runners (blacksmith-2vcpu-windows-2025, etc.)
-          platform=$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
-          echo "platform=$platform" >> $GITHUB_OUTPUT
-          echo "Normalized runner OS '${{ runner.os }}' to platform '$platform'"
+        uses: liquibase/build-logic/.github/actions/normalize-os@main
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -410,11 +403,7 @@ jobs:
 
       - name: Normalize OS platform name
         id: normalize-os
-        shell: bash
-        run: |
-          # Use runner.os which is automatically normalized by GitHub
-          platform=$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
-          echo "platform=$platform" >> $GITHUB_OUTPUT
+        uses: liquibase/build-logic/.github/actions/normalize-os@main
 
       - uses: actions/download-artifact@v6
         with:
@@ -551,23 +540,70 @@ jobs:
         run: |
           rm -rf /tmp/combined/linux /tmp/combined/windows /tmp/combined/macos
           mkdir -p /tmp/combined/linux /tmp/combined/windows /tmp/combined/macos
-          unzip -d /tmp/combined/linux /tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/windows /tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
-          unzip -d /tmp/combined/macos /tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+
+          # Unzip platform jars if they exist
+          if [ -f "/tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar" ]; then
+            unzip -d /tmp/combined/linux /tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          else
+            echo "WARNING: Linux artifact not found at /tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar"
+          fi
+
+          if [ -f "/tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar" ]; then
+            unzip -d /tmp/combined/windows /tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          else
+            echo "WARNING: Windows artifact not found at /tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar"
+          fi
+
+          if [ -f "/tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar" ]; then
+            unzip -d /tmp/combined/macos /tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
+          else
+            echo "WARNING: macOS artifact not found at /tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar"
+          fi
+
           rm -r -f /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}
           mkdir /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}
-          cp -a /tmp/combined/linux/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
-          cp -a /tmp/combined/windows/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
-          cp -a /tmp/combined/macos/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
-          rm /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          cat /tmp/combined/linux/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          cp -a /tmp/combined/linux/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/ 2>/dev/null || true
+          cp -a /tmp/combined/windows/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/ 2>/dev/null || true
+          cp -a /tmp/combined/macos/* /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/ 2>/dev/null || true
+
+          # Only attempt to merge fileslist.txt if the directory exists
+          if [ -d "/tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs" ]; then
+            rm /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+            touch /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+            [ -f "/tmp/combined/linux/org.graalvm.python.vfs/fileslist.txt" ] && cat /tmp/combined/linux/org.graalvm.python.vfs/fileslist.txt >> /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+            [ -f "/tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt" ] && cat /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt >> /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+            [ -f "/tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt" ] && cat /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt >> /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          fi
+
           rm -f /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar
           cd /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}/
           zip -r ../${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.jar *
           cd ..
-          cp /tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
-          cp /tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
-          cp /tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
+
+          # Copy supplementary files if they exist (prefer from linux, but fallback to others)
+          if [ -f "/tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar" ]; then
+            cp /tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
+          elif [ -f "/tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar" ]; then
+            cp /tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
+          elif [ -f "/tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar" ]; then
+            cp /tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar /tmp/combined/
+          fi
+
+          if [ -f "/tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar" ]; then
+            cp /tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
+          elif [ -f "/tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar" ]; then
+            cp /tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
+          elif [ -f "/tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar" ]; then
+            cp /tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar /tmp/combined/
+          fi
+
+          if [ -f "/tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom" ]; then
+            cp /tmp/linux/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
+          elif [ -f "/tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom" ]; then
+            cp /tmp/windows/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
+          elif [ -f "/tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom" ]; then
+            cp /tmp/macos/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom /tmp/combined/
+          fi
 
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@v4

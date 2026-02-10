@@ -14,7 +14,7 @@ on:
       mavenArgs:
         description: "Extra Maven arguments for sonar scan"
         type: string
-        default: "-Dsonar.coverage.exclusions='**/test/**/*.*, **/pom.xml'"
+        default: "-Dsonar.coverage.exclusions=**/test/**/*.*,**/pom.xml"
 
 jobs:
   sonar:

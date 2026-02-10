@@ -102,10 +102,12 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
 
       - name: Build classes for Sonar
+        env:
+          LIQUIBASE_BRANCH: ${{ inputs.liquibaseBranchName }}
         run: |
           VERSION_FLAG=""
-          if [ -n "${{ inputs.liquibaseBranchName }}" ]; then
-            VERSION_FLAG="-Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT"
+          if [ -n "$LIQUIBASE_BRANCH" ]; then
+            VERSION_FLAG="-Dliquibase.version=${LIQUIBASE_BRANCH}-SNAPSHOT"
           fi
           mvn -B clean install -DskipTests -P 'sonar,!run-proguard' $VERSION_FLAG
 
@@ -129,8 +131,9 @@ jobs:
 
           echo "Found $i coverage files"
 
-          # Download JaCoCo CLI
+          # Download JaCoCo CLI and verify checksum
           wget -q https://github.com/jacoco/jacoco/releases/download/v0.8.12/jacoco-0.8.12.zip
+          echo "35cf2a2b8937659ecbc8d0d3902dfa7f55b7ed2250e82424036a3e1d12462cd7  jacoco-0.8.12.zip" | sha256sum -c -
           unzip -qq jacoco-0.8.12.zip -d jacoco-cli
 
           # Merge all exec files
@@ -155,30 +158,39 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          SCM_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          MAVEN_ARGS: ${{ inputs.mavenArgs }}
+          LIQUIBASE_BRANCH: ${{ inputs.liquibaseBranchName }}
         run: |
           SONAR_ARGS=""
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            SONAR_ARGS="-Dsonar.pullrequest.key=${{ github.event.pull_request.number }}"
-            SONAR_ARGS="$SONAR_ARGS -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }}"
-            SONAR_ARGS="$SONAR_ARGS -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }}"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            SONAR_ARGS="-Dsonar.pullrequest.key=$PR_NUMBER"
+            SONAR_ARGS="$SONAR_ARGS -Dsonar.pullrequest.branch=$PR_HEAD_REF"
+            SONAR_ARGS="$SONAR_ARGS -Dsonar.pullrequest.base=$PR_BASE_REF"
           else
-            SONAR_ARGS="-Dsonar.branch.name=${{ github.ref_name }}"
+            SONAR_ARGS="-Dsonar.branch.name=$REF_NAME"
           fi
 
           VERSION_FLAG=""
-          if [ -n "${{ inputs.liquibaseBranchName }}" ]; then
-            VERSION_FLAG="-Dliquibase.version=${{ inputs.liquibaseBranchName }}-SNAPSHOT"
+          if [ -n "$LIQUIBASE_BRANCH" ]; then
+            VERSION_FLAG="-Dliquibase.version=${LIQUIBASE_BRANCH}-SNAPSHOT"
           fi
 
           mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
             $VERSION_FLAG \
-            ${{ inputs.mavenArgs }} \
-            -Dsonar.scm.revision=${{ github.event.pull_request.head.sha || github.sha }} \
+            $MAVEN_ARGS \
+            -Dsonar.scm.revision=$SCM_REVISION \
             -Dsonar.token=$SONAR_TOKEN \
             -Dsonar.java.coveragePlugin=jacoco \
             $SONAR_ARGS \
             -Dsonar.qualitygate.wait=true \
-            -Dsonar.organization=${{ github.repository_owner }} \
+            -Dsonar.organization=$REPO_OWNER \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.scm.provider=git \
             -Daws.region=us-east-1

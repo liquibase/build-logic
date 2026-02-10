@@ -287,7 +287,7 @@ jobs:
           echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
           chmod 600 "$TEMP_PASSPHRASE_FILE"
 
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
+          #deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
 
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
@@ -317,7 +317,7 @@ jobs:
           echo "${{ env.GPG_PASSPHRASE }}" > "$TEMP_PASSPHRASE_FILE"
           chmod 600 "$TEMP_PASSPHRASE_FILE"
 
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
+          #deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com.dry.run --visibility=nil $PWD/.github/target/${{ env.PACKAGE_NAME }}-${{ inputs.version }}.deb
 
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
@@ -629,7 +629,7 @@ jobs:
 
           # Upload to S3
           echo "Uploading repository to S3..."
-          aws s3 sync yum s3://repo.liquibase.com/yum --delete
+          #aws s3 sync yum s3://repo.liquibase.com/yum --delete
 
           echo "✓ RPM repository updated successfully"
 
@@ -722,7 +722,7 @@ jobs:
 
           # Upload to S3
           echo "Uploading repository to S3..."
-          aws s3 sync yum s3://repo.liquibase.com.dry.run/yum --delete
+          #aws s3 sync yum s3://repo.liquibase.com.dry.run/yum --delete
 
           echo "✓ RPM repository updated successfully"
 
@@ -754,57 +754,57 @@ jobs:
           # Echo it immediately to see the value in logs
           echo "PR_EXISTS is set to $PR_EXISTS"
 
-      - name: Update Homebrew formula for ${{ inputs.distribution }}
-        if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
-        continue-on-error: true
-        uses: mislav/bump-homebrew-formula-action@v3
-        with:
-          formula-name: ${{ inputs.distribution }}
-          formula-path: Formula/l/${{ inputs.distribution }}.rb
-          homebrew-tap: Homebrew/homebrew-core
-          tag-name: ${{ inputs.tag || format('v{0}', inputs.version) }}
-          download-url: ${{ inputs.distribution == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/{1}/{2}-{3}.tar.gz', inputs.download_base_url, inputs.tag || format('v{0}', inputs.version), inputs.artifactId, inputs.version) }}
-          commit-message: |
-            {{formulaName}} {{version}}
+      # - name: Update Homebrew formula for ${{ inputs.distribution }}
+      #   if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+      #   continue-on-error: true
+      #   uses: mislav/bump-homebrew-formula-action@v3
+      #   with:
+      #     formula-name: ${{ inputs.distribution }}
+      #     formula-path: Formula/l/${{ inputs.distribution }}.rb
+      #     homebrew-tap: Homebrew/homebrew-core
+      #     tag-name: ${{ inputs.tag || format('v{0}', inputs.version) }}
+      #     download-url: ${{ inputs.distribution == 'liquibase-secure' && format('{0}/{1}/liquibase-secure-{1}.tar.gz', inputs.download_base_url, inputs.version) || format('{0}/{1}/{2}-{3}.tar.gz', inputs.download_base_url, inputs.tag || format('v{0}', inputs.version), inputs.artifactId, inputs.version) }}
+      #     commit-message: |
+      #       {{formulaName}} {{version}}
 
-            Created by https://github.com/mislav/bump-homebrew-formula-action
-        env:
-          COMMITTER_TOKEN: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
+      #       Created by https://github.com/mislav/bump-homebrew-formula-action
+      #   env:
+      #     COMMITTER_TOKEN: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
 
       # This step captures the PR details after it has been created
       # and stores the PR number and URL in GitHub outputs for later use.
       # This is useful for tracking the PR status and creating a tracking issue.
-      - name: Capture Homebrew PR Details
-        continue-on-error: true
-        if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
-        id: capture-pr
-        run: |
-          # Wait briefly for PR to be created
-          sleep 30
+      # - name: Capture Homebrew PR Details
+      #   continue-on-error: true
+      #   if: ${{ inputs.distribution != 'liquibase-secure' && startsWith(inputs.version, '4.') && steps.check-brew-pr.outputs.PR_EXISTS == 'false' && inputs.dry_run == false }}
+      #   id: capture-pr
+      #   run: |
+      #     # Wait briefly for PR to be created
+      #     sleep 30
 
-          # Search for the PR
-          PR_DATA=$(gh api graphql -f query='
-          query($search_query: String!) {
-            search(query: $search_query, type: ISSUE, first: 1) {
-              nodes {
-                ... on PullRequest {
-                  url,
-                  number
-                }
-              }
-            }
-          }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
+      #     # Search for the PR
+      #     PR_DATA=$(gh api graphql -f query='
+      #     query($search_query: String!) {
+      #       search(query: $search_query, type: ISSUE, first: 1) {
+      #         nodes {
+      #           ... on PullRequest {
+      #             url,
+      #             number
+      #           }
+      #         }
+      #       }
+      #     }' -f search_query="is:pr is:open repo:Homebrew/homebrew-core liquibase ${{ inputs.version }} in:title" --jq '.data.search.nodes[0]')
 
-          if [ ! -z "$PR_DATA" ]; then
-            echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
-            echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
-            echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     if [ ! -z "$PR_DATA" ]; then
+      #       echo "HOMEBREW_PR_URL=$(echo "$PR_DATA" | jq -r '.url')" >> $GITHUB_OUTPUT
+      #       echo "HOMEBREW_PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')" >> $GITHUB_OUTPUT
+      #       echo "Found Homebrew PR #$(echo "$PR_DATA" | jq -r '.url')"
+      #     fi
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      ## HomeBrew CASKS: Versions >= 5.x use Homebrew Casks
-      ## Moved to separate update_homebrew_cask job that runs on macOS
+      # ## HomeBrew CASKS: Versions >= 5.x use Homebrew Casks
+      # ## Moved to separate update_homebrew_cask job that runs on macOS
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.distribution == 'liquibase' && inputs.dry_run == false }}
@@ -833,55 +833,55 @@ jobs:
           aws s3 cp $ZIP_FILENAME $S3_BUCKET
           echo "Uploaded $ZIP_FILENAME to s3"
 
-          # Send the release to SDKMAN
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "'"$WEB_URL$ZIP_FILENAME"'"}' \
-          https://vendors.sdkman.io/release)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "SDKMAN release response: $RESPONSE_BODY"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            echo "ERROR: Failed to release to SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
-            exit 1
-          fi
+          # # Send the release to SDKMAN
+          # RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+          # -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+          # -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+          # -H "Content-Type: application/json" \
+          # -H "Accept: application/json" \
+          # -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "'"$WEB_URL$ZIP_FILENAME"'"}' \
+          # https://vendors.sdkman.io/release)
+          # HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          # RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+          # echo "SDKMAN release response: $RESPONSE_BODY"
+          # if [ "$HTTP_CODE" -ge 400 ]; then
+          #   echo "ERROR: Failed to release to SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
+          #   exit 1
+          # fi
           echo "Sent $ZIP_FILENAME to SDKMAN"
 
-          # Set the default version for SDKMAN
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'"}' \
-          https://vendors.sdkman.io/default)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "SDKMAN default response: $RESPONSE_BODY"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            echo "ERROR: Failed to set default version in SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
-            exit 1
-          fi
-          echo "Set $ZIP_FILENAME as default version for SDKMAN"
+          # # Set the default version for SDKMAN
+          # RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+          # -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+          # -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+          # -H "Content-Type: application/json" \
+          # -H "Accept: application/json" \
+          # -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'"}' \
+          # https://vendors.sdkman.io/default)
+          # HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          # RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+          # echo "SDKMAN default response: $RESPONSE_BODY"
+          # if [ "$HTTP_CODE" -ge 400 ]; then
+          #   echo "ERROR: Failed to set default version in SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
+          #   exit 1
+          # fi
+          # echo "Set $ZIP_FILENAME as default version for SDKMAN"
 
-          # Announce the release to SDKMAN
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/'"$RELEASE_TAG"'"}' \
-          https://vendors.sdkman.io/announce/struct)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "SDKMAN announce response: $RESPONSE_BODY"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            echo "ERROR: Failed to announce to SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
-            exit 1
-          fi
+          # # Announce the release to SDKMAN
+          # RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+          # -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+          # -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+          # -H "Content-Type: application/json" \
+          # -H "Accept: application/json" \
+          # -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/'"$RELEASE_TAG"'"}' \
+          # https://vendors.sdkman.io/announce/struct)
+          # HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          # RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+          # echo "SDKMAN announce response: $RESPONSE_BODY"
+          # if [ "$HTTP_CODE" -ge 400 ]; then
+          #   echo "ERROR: Failed to announce to SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
+          #   exit 1
+          # fi
           echo "Announced $ZIP_FILENAME to SDKMAN"
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
@@ -901,7 +901,7 @@ jobs:
           mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
           zip -r liquibase-$VERSION.zip ./liquibase-$VERSION
           # Upload the release to S3
-          aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
+          #aws s3 cp liquibase-$VERSION.zip $S3_BUCKET
           echo "Uploaded liquibase-$VERSION.zip to s3"
 
   # create a placeholder branch to check if tracking branch exists for this version
@@ -946,45 +946,45 @@ jobs:
           git config --local user.email "64099989+liquibot@users.noreply.github.com"
           git config --local user.name "liquibot"
 
-      - name: Create placeholder branches for SDKMAN and Homebrew
-        id: create-placeholder-branch
-        env:
-          VERSION: ${{ inputs.version }}
-          HOMEBREW_PR_NUMBER: ${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
-        run: |
-          git fetch origin
+      # - name: Create placeholder branches for SDKMAN and Homebrew
+      #   id: create-placeholder-branch
+      #   env:
+      #     VERSION: ${{ inputs.version }}
+      #     HOMEBREW_PR_NUMBER: ${{ needs.upload_packages.outputs.HOMEBREW_PR_NUMBER }}
+      #   run: |
+      #     git fetch origin
 
-          # Create SDKMAN tracking branch if it doesn't exist
-          if ! git ls-remote --exit-code --heads origin ci-oss-sdkman-package-check; then
-            git checkout -b ci-oss-sdkman-package-check
-            echo "This is a placeholder branch for oss sdkman package v.${VERSION}. If this branch is open, it means the sdkman package is not yet approved" > README.md
-            git add README.md
-            git commit -m "Create placeholder branch for SDKMAN package v.${VERSION}"
-            git push origin ci-oss-sdkman-package-check
-          else
-            echo "SDKMAN tracking branch already exists, skipping creation"
-          fi
+      #     # Create SDKMAN tracking branch if it doesn't exist
+      #     if ! git ls-remote --exit-code --heads origin ci-oss-sdkman-package-check; then
+      #       git checkout -b ci-oss-sdkman-package-check
+      #       echo "This is a placeholder branch for oss sdkman package v.${VERSION}. If this branch is open, it means the sdkman package is not yet approved" > README.md
+      #       git add README.md
+      #       git commit -m "Create placeholder branch for SDKMAN package v.${VERSION}"
+      #       git push origin ci-oss-sdkman-package-check
+      #     else
+      #       echo "SDKMAN tracking branch already exists, skipping creation"
+      #     fi
 
-          # Create Homebrew tracking branch if it doesn't exist and PR number is available
-          # Only create for 4.x versions due to Homebrew licensing restrictions
-          if [[ "${VERSION}" =~ ^4\. ]] && [[ -n "${HOMEBREW_PR_NUMBER}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${HOMEBREW_PR_NUMBER}; then
-            git checkout -b ci-oss-homebrew-package-check-${HOMEBREW_PR_NUMBER}
-            echo "This is a placeholder branch for oss homebrew package v.${VERSION}. If this branch is open, it means the homebrew package is not yet approved" > README.md
-            git add README.md
-            git commit -m "Create placeholder branch for Homebrew package v.${VERSION}"
-            git push origin ci-oss-homebrew-package-check-${HOMEBREW_PR_NUMBER}
-          else
-            echo "Homebrew tracking branch skipped (only 4.x versions supported) or already exists or PR number not available"
-          fi
+      #     # Create Homebrew tracking branch if it doesn't exist and PR number is available
+      #     # Only create for 4.x versions due to Homebrew licensing restrictions
+      #     if [[ "${VERSION}" =~ ^4\. ]] && [[ -n "${HOMEBREW_PR_NUMBER}" ]] && ! git ls-remote --exit-code --heads origin ci-oss-homebrew-package-check-${HOMEBREW_PR_NUMBER}; then
+      #       git checkout -b ci-oss-homebrew-package-check-${HOMEBREW_PR_NUMBER}
+      #       echo "This is a placeholder branch for oss homebrew package v.${VERSION}. If this branch is open, it means the homebrew package is not yet approved" > README.md
+      #       git add README.md
+      #       git commit -m "Create placeholder branch for Homebrew package v.${VERSION}"
+      #       git push origin ci-oss-homebrew-package-check-${HOMEBREW_PR_NUMBER}
+      #     else
+      #       echo "Homebrew tracking branch skipped (only 4.x versions supported) or already exists or PR number not available"
+      #     fi
 
-  upload_windows_package:
-    if: ${{ inputs.distribution == 'liquibase' }}
-    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-      dry_run: ${{ inputs.dry_run }}
-      dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
+  # upload_windows_package:
+  #   if: ${{ inputs.distribution == 'liquibase' }}
+  #   uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
+  #   secrets: inherit
+  #   with:
+  #     version: ${{ inputs.version }}
+  #     dry_run: ${{ inputs.dry_run }}
+  #     dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   # Chocolatey does not accept commercial/proprietary software in their community repository
   # This job is commented out as liquibase-secure cannot be distributed via Chocolatey
@@ -998,20 +998,20 @@ jobs:
   #    dry_run: ${{ inputs.dry_run }}
   #    dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
-  upload_ansible_role:
-    if: ${{ inputs.distribution == 'liquibase' }}
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-      dry_run: ${{ inputs.dry_run }}
-      dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
+  # upload_ansible_role:
+  #   if: ${{ inputs.distribution == 'liquibase' }}
+  #   uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
+  #   secrets: inherit
+  #   with:
+  #     version: ${{ inputs.version }}
+  #     dry_run: ${{ inputs.dry_run }}
+  #     dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
 
-  upload_secure_ansible_role:
-    if: ${{ inputs.distribution == 'liquibase-secure' }}
-    uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@main
-    secrets: inherit
-    with:
-      version: ${{ inputs.version }}
-      dry_run: ${{ inputs.dry_run }}
-      dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
+  # upload_secure_ansible_role:
+  #   if: ${{ inputs.distribution == 'liquibase-secure' }}
+  #   uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@main
+  #   secrets: inherit
+  #   with:
+  #     version: ${{ inputs.version }}
+  #     dry_run: ${{ inputs.dry_run }}
+  #     dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}

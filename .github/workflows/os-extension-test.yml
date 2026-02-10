@@ -321,11 +321,18 @@ jobs:
           SLACK_FOOTER: "${{ github.repository }}"
           SLACK_LINK_NAMES: true
 
+      - name: Normalize OS platform name
+        id: normalize-os
+        shell: bash
+        run: |
+          platform=$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
+          echo "platform=$platform" >> $GITHUB_OUTPUT
+
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports-jdk-${{ matrix.java }}-${{ matrix.os }}
+          name: test-reports-jdk-${{ matrix.java }}-${{ steps.normalize-os.outputs.platform }}
           path: |
             **/target/surefire-reports
             **/target/failsafe-reports
@@ -334,7 +341,7 @@ jobs:
   sonar-pr:
     if: ${{ !inputs.skipSonar && !inputs.nightly }}
     needs: [unit-test]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
+    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@DAT-21845
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

@@ -118,20 +118,25 @@ jobs:
       - name: Find test reports artifact
         id: find-test-reports
         shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ARTIFACT_FOUND=false
 
           # PR context: search within current run; Push context: search across all artifacts
-          if [ -n "${{ github.event.pull_request.number }}" ]; then
-            API_URL="https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100"
+          if [ -n "$PR_NUMBER" ]; then
+            API_URL="https://api.github.com/repos/$GH_REPOSITORY/actions/runs/$GH_RUN_ID/artifacts?per_page=100"
           else
-            API_URL="https://api.github.com/repos/${{ github.repository }}/actions/artifacts?per_page=100"
+            API_URL="https://api.github.com/repos/$GH_REPOSITORY/actions/artifacts?per_page=100"
           fi
 
           for platform in linux windows macos; do
             echo "Searching for test reports on platform: $platform"
 
-            API_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "$API_URL" 2>&1)
+            API_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" "$API_URL" 2>&1)
 
             if ! echo "$API_RESPONSE" | jq empty 2>/dev/null; then
               echo "ERROR: API response is not valid JSON for platform $platform"

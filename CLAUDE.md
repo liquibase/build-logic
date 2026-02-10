@@ -27,6 +27,7 @@ This is the Liquibase build-logic repository containing reusable GitHub Actions 
 - **verify-package-availability.yml** - Verifies package availability in Homebrew, SDKMAN, and repo.liquibase.com
 
 #### Quality & Security
+- **sonar-scan.yml** - Sonar code coverage scan for PRs and pushes (auto-detects context)
 - **sonar-coverage-merge.yml** - Merges unit/integration test coverage and runs Sonar scan (liquibase/liquibase-pro)
 - **codeql.yml** - Security scanning
 - **owasp-scanner.yml** - Vulnerability scanning

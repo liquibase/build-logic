@@ -93,8 +93,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                                                   |
 | `publish-for-liquibase.yml`             | Publishes extensions for Liquibase consumption                                                                          |
 | `slack-notification.yml`                | Sends notifications to Slack when tests fail                                                                            |
-| `sonar-pull-request.yml`                | Code Coverage Scan for PRs. Requires branch name parameter                                                              |
-| `sonar-push.yml`                        | Same as PR job, but for pushes to main. Does not require branch name parameter                                          |
+| `sonar-scan.yml`                        | Sonar code coverage scan for PRs and pushes (auto-detects context)                                                      |
 | `sonar-coverage-merge.yml`              | Merges unit/integration test coverage (JaCoCo) and runs Sonar scan for liquibase/liquibase-pro                          |
 | `reusable-vulnerability-scan.yml`       | Deep vulnerability scanning for Docker images and tarballs (nested JARs + Python packages)                              |
 | various shell scripts                   | helper scripts for getting the draft release, signing artifacts, and uploading assets                                   |

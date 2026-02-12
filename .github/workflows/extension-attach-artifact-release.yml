@@ -86,8 +86,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     concurrency:
       group: attach-artifact-${{ github.ref }}-${{ matrix.os }}
+    outputs:
+      artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
+      artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
+      platform: ${{ steps.normalize-os.outputs.platform }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Normalize OS platform name
+        id: normalize-os
+        uses: liquibase/build-logic/.github/actions/normalize-os@main
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v5
@@ -235,12 +242,9 @@ jobs:
       - name: Save Artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ matrix.os }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
+          name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ steps.normalize-os.outputs.platform }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
             ${{ inputs.artifactPath }}/target/*
-    outputs:
-      artifact_id: ${{ steps.get-artifact-id.outputs.artifact_id }}
-      artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
 
   combineJars:
     needs: [build-multi-architecture]
@@ -250,45 +254,48 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Download Ubuntu Artifacts
+      - name: Download Linux Artifacts
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
-          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-ubuntu-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
-          path: /tmp/ubuntu
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-linux-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          path: /tmp/linux
+        continue-on-error: true
 
       - name: Download macOS Artifacts
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
-          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-macos-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-macos-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/macos
+        continue-on-error: true
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
-          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-windows-latest-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
+          name: ${{needs.build-multi-architecture.outputs.artifact_id}}-windows-${{needs.build-multi-architecture.outputs.artifact_version}}-artifacts
           path: /tmp/windows
+        continue-on-error: true
 
       - name: Create multiplatform jar
         run: |
-          rm -rf /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
-          mkdir -p /tmp/combined/ubuntu /tmp/combined/windows /tmp/combined/macos
-          unzip -d /tmp/combined/ubuntu /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
+          rm -rf /tmp/combined/linux /tmp/combined/windows /tmp/combined/macos
+          mkdir -p /tmp/combined/linux /tmp/combined/windows /tmp/combined/macos
+          unzip -d /tmp/combined/linux /tmp/linux/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
           unzip -d /tmp/combined/windows /tmp/windows/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
           unzip -d /tmp/combined/macos /tmp/macos/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
           rm -r -f /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}
           mkdir /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}
-          cp -a /tmp/combined/ubuntu/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
+          cp -a /tmp/combined/linux/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
           cp -a /tmp/combined/windows/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
           cp -a /tmp/combined/macos/* /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
           rm /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
-          cat /tmp/combined/ubuntu/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
+          cat /tmp/combined/linux/org.graalvm.python.vfs/fileslist.txt /tmp/combined/windows/org.graalvm.python.vfs/fileslist.txt /tmp/combined/macos/org.graalvm.python.vfs/fileslist.txt > /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/org.graalvm.python.vfs/fileslist.txt
           rm -f /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar
           cd /tmp/combined/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}/
           zip -r ../${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.jar *
           cd ..
-          cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-sources.jar /tmp/combined/
-          cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-javadoc.jar /tmp/combined/
-          cp /tmp/ubuntu/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom /tmp/combined/
+          cp /tmp/linux/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-sources.jar /tmp/combined/
+          cp /tmp/linux/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}-javadoc.jar /tmp/combined/
+          cp /tmp/linux/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom /tmp/combined/
 
       - name: Upload multiplatform artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

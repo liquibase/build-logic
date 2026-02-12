@@ -61,7 +61,7 @@ jobs:
         working-directory: ./${{ inputs.sonarRootPath }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
           ref: ${{ github.event.pull_request.head.sha || github.event.after}}
@@ -81,7 +81,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Set up JDK for Build
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
         with:
           java-version: 21
           distribution: 'temurin'
@@ -89,12 +89,12 @@ jobs:
           overwrite-settings: false
 
       - name: Set up Maven
-        uses: stCarolas/setup-maven@v5
+        uses: stCarolas/setup-maven@d6af6abeda15e98926a57b5aa970a96bb37f97d1 # v5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
       - name: Set up Maven settings.xml
-        uses: whelk-io/maven-settings-xml-action@v22
+        uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
         with:
           repositories: |
             [
@@ -136,91 +136,91 @@ jobs:
             ]
 
       - name: Download unit tests report
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: liquibase-jacoco-test-results
           path: ${{ inputs.sonarRootPath }}/unit-tests
 
       - name: Download mssql integration tests report
         if: contains(inputs.dbPlatforms, 'mssql')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
             name: liquibase-integration-jacoco-test-results-mssql
             path: ${{ inputs.sonarRootPath }}/integration-tests/mssql
 
       - name: Download mysql integration tests report
         if: contains(inputs.dbPlatforms, 'mysql')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
             name: liquibase-integration-jacoco-test-results-mysql
             path: ${{ inputs.sonarRootPath }}/integration-tests/mysql
 
       - name: Download oracle integration tests report
         if: contains(inputs.dbPlatforms, 'oracle')
-        uses: actions/download-artifact@v6     
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6     
         with:
           name: liquibase-integration-jacoco-test-results-oracle
           path: ${{ inputs.sonarRootPath }}/integration-tests/oracle
 
       - name: Download postgresql integration tests report
         if: contains(inputs.dbPlatforms, 'postgresql')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: liquibase-integration-jacoco-test-results-postgresql
           path: ${{ inputs.sonarRootPath }}/integration-tests/postgresql
 
       - name: Download h2 integration tests report
         if: contains(inputs.dbPlatforms, 'h2')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: liquibase-integration-jacoco-test-results-h2
           path: ${{ inputs.sonarRootPath }}/integration-tests/h2
 
       - name: Download hsqldb integration tests report
         if: contains(inputs.dbPlatforms, 'hsqldb')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: liquibase-integration-jacoco-test-results-hsqldb
           path: ${{ inputs.sonarRootPath }}/integration-tests/hsqldb
 
       - name: Download mariadb integration tests report
         if: contains(inputs.dbPlatforms, 'mariadb')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: liquibase-integration-jacoco-test-results-mariadb
           path: ${{ inputs.sonarRootPath }}/integration-tests/mariadb
 
       - name: Download sqlite integration tests report
         if: contains(inputs.dbPlatforms, 'sqlite')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: liquibase-integration-jacoco-test-results-sqlite
           path: ${{ inputs.sonarRootPath }}/integration-tests/sqlite
 
       - name: Download firebird integration tests report
         if: contains(inputs.dbPlatforms, 'firebird')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: liquibase-integration-jacoco-test-results-firebird
           path: ${{ inputs.sonarRootPath }}/integration-tests/firebird
 
       - name: Download snowflake integration tests report
         if: contains(inputs.dbPlatforms, 'snowflake')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: liquibase-integration-jacoco-test-results-snowflake
           path: ${{ inputs.sonarRootPath }}/integration-tests/snowflake
 
       - name: Download db2 integration tests report
         if: contains(inputs.dbPlatforms, 'db2')
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: liquibase-integration-jacoco-test-results-db2
           path: ${{ inputs.sonarRootPath }}/integration-tests/db2
 
       - name: Cache SonarCloud packages
         if: always()
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
@@ -228,8 +228,10 @@ jobs:
 
       - name: Generate classes
         if: always()
+        env:
+          LIQUIBASE_BRANCH: ${{ inputs.liquibaseBranchName }}
         run: |
-          mvn -B clean install -DskipTests -P 'sonar,!run-proguard'
+          mvn -B clean install -DskipTests -P 'sonar,!run-proguard' "-Dliquibase.version=$LIQUIBASE_BRANCH-SNAPSHOT"
 
       - name: Merge integration and unit tests reports
         if: always()
@@ -284,7 +286,7 @@ jobs:
           java -jar jacococli.jar merge *.exec --destfile merged.exec
 
 
-          if [ "${{ env.testedClassesModuleName }}" = "root" ]; then
+          if [ "$testedClassesModuleName" = "root" ]; then
             echo "Tested classes module name: root module"
             java -jar jacococli.jar report merged.exec --classfiles ./classes --sourcefiles src --xml jacoco.xml
             java -jar jacococli.jar report merged.exec --classfiles ./classes --sourcefiles src --html site
@@ -295,7 +297,7 @@ jobs:
           fi
 
       - name: Set up JDK for Sonar
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
         with:
           java-version: 21
           distribution: 'temurin'

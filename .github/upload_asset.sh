@@ -36,7 +36,7 @@ upload_asset() {
       -H "Authorization: token $GITHUB_TOKEN" \
       -H "Content-Length: $size"\
       -H "Content-Type: $content_type" \
-      --data-binary @$file "$UPLOAD_URL?name=$(basename $file)"
+      --data-binary @"$file" "$UPLOAD_URL?name=$(basename "$file")"
 }
 
 declare -a StringArray=(".jar" ".jar.asc" ".jar.md5" ".jar.sha1" \
@@ -50,11 +50,11 @@ for val in "${StringArray[@]}"; do
         echo "$FILE does not exist."
         exit 1
     fi
-    SIZE=$(wc -c $FILE | awk '{print $1}')
+    SIZE=$(wc -c "$FILE" | awk '{print $1}')
     if [[ $SIZE -eq 0 ]]; then
         echo "$FILE is empty."
         exit 1;
     fi
-    MIME=$(file -b --mime-type $FILE)
+    MIME=$(file -b --mime-type "$FILE")
     upload_asset $FILE $SIZE $MIME
 done

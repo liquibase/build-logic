@@ -428,6 +428,7 @@ jobs:
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
         env:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
+        shell: bash
         run: |
           ${EXTRA_LINUX_COMMAND}
 
@@ -435,6 +436,7 @@ jobs:
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
         env:
           EXTRA_WINDOWS_COMMAND: ${{ inputs.extraWindowsCommand }}
+        shell: bash  
         run: |
           ${env:EXTRA_WINDOWS_COMMAND}
 

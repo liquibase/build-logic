@@ -118,7 +118,7 @@ jobs:
           role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
@@ -129,7 +129,7 @@ jobs:
           aws-region: us-east-1
 
       - name: Set up JDK 21
-        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
+        uses: actions/setup-java@v5
         with:
           java-version: 21
           distribution: "temurin"
@@ -283,14 +283,14 @@ jobs:
           echo "artifact_version=${ARTIFACT_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Save Artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.normalize-os.outputs.platform }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
             ${{ inputs.artifactPath }}/target/*
 
       - name: Save Event File
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.normalize-os.outputs.platform }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
@@ -298,7 +298,7 @@ jobs:
 
       - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
         if: contains(matrix.os, 'ubuntu')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
@@ -334,7 +334,7 @@ jobs:
           role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
@@ -347,7 +347,7 @@ jobs:
           echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
 
       - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ matrix.java }}
           distribution: "temurin"
@@ -411,7 +411,7 @@ jobs:
         id: normalize-os
         uses: liquibase/build-logic/.github/actions/normalize-os@main
 
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+      - uses: actions/download-artifact@v6
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.normalize-os.outputs.platform }}-${{needs.build.outputs.artifact_version}}-artifacts
           path: ./target
@@ -498,7 +498,7 @@ jobs:
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         with:
           name: test-reports-jdk-${{ matrix.java }}-${{ steps.normalize-os.outputs.platform }}
           path: |
@@ -511,7 +511,7 @@ jobs:
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
@@ -551,21 +551,21 @@ jobs:
           echo "Parsed Windows OS: ${WINDOWS_OS}"
 
       - name: Download Linux Artifacts
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/download-artifact@v6
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-linux-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/linux
         continue-on-error: true
 
       - name: Download macOS Artifacts
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/download-artifact@v6
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-macos-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/macos
         continue-on-error: true
 
       - name: Download Windows Artifacts
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/download-artifact@v6
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-windows-${{needs.build.outputs.artifact_version}}-artifacts
           path: /tmp/windows
@@ -641,7 +641,7 @@ jobs:
           fi
 
       - name: Upload multiplatform artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         with:
           name: multiplatform-artifacts
           path: |
@@ -676,7 +676,7 @@ jobs:
           role-to-assume: ${{ env.AWS_GITHUB_OIDC_ROLE_ARN_S3_GHA }}
           aws-region: us-east-1
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 

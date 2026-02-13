@@ -77,13 +77,13 @@ jobs:
           permission-packages: write
 
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository }}
           token: ${{ steps.get-token.outputs.token }}
 
       - name: Download Multiplatform Artifacts
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/download-artifact@v6
         with:
           name: multiplatform-artifacts
           path: ./artifacts
@@ -93,7 +93,7 @@ jobs:
           ls -l ./artifacts
 
       - name: Set up JDK 21
-        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
+        uses: actions/setup-java@v5
         with:
           java-version: 21
           distribution: "temurin"

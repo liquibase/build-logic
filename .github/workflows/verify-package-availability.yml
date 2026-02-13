@@ -23,7 +23,7 @@ jobs:
       branch_exists: ${{ steps.check-placeholder-branch.outputs.branch_exists }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4
         with:
           repository: liquibase/liquibase
 
@@ -66,7 +66,7 @@ jobs:
           echo "Latest SDKMAN version: $SDKMAN_OSS_VERSION"
 
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4
         with:
           repository: liquibase/liquibase
 
@@ -133,7 +133,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4
 
       - name: Get Latest GitHub Version
         id: oss-latest-version

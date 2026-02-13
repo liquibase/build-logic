@@ -41,7 +41,7 @@ jobs:
           parse-json-secrets: true
 
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4
         with:
           ref: main
 
@@ -51,7 +51,7 @@ jobs:
           git config --local user.name "liquibot"
 
       - name: Set up JDK
-        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
+        uses: actions/setup-java@v5
         with:
           java-version: 21
           distribution: 'temurin'
@@ -102,7 +102,7 @@ jobs:
 
       - name: Download release files
         id: download-release-files
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/download-artifact@v6
         with:
           name: release-files
 

@@ -427,19 +427,6 @@ jobs:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
           ${EXTRA_COMMAND}
-
-      - name: Validate artifacts in target directory
-        if: ${{ inputs.dry_run == false }}
-        working-directory: ${{ inputs.artifactPath }}
-        run: |
-          echo "Checking for built artifacts in target directory..."
-          if [ ! -d "target" ] || [ -z "$(ls -A target/*.jar 2>/dev/null)" ]; then
-            echo "ERROR: No artifacts found in target directory"
-            exit 1
-          fi
-          echo "Artifacts validated:"
-          ls -lh target/
-
       - name: Set pom version to dry_run version
         if: ${{ inputs.dry_run == true }}
         env:

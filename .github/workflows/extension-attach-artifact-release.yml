@@ -318,7 +318,7 @@ jobs:
   attach-to-release:
     if: always()
     name: Attach Artifact to Release
-    needs: [combineJars]
+    needs: [build-multi-architecture, combineJars]
     runs-on: ubuntu-latest
     concurrency:
       group: attach-artifact-${{ github.ref }}
@@ -518,9 +518,12 @@ jobs:
       - name: Sign Files for Draft Release
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
+        env:
+          RELEASE_VERSION: ${{ needs.build-multi-architecture.outputs.artifact_version }}
         run: |
           gpg -K
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          version=${RELEASE_VERSION}
+          echo "Signing artifacts for version: $version"
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}-javadoc.jar
@@ -542,8 +545,10 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: set-release-title
+        env:
+          RELEASE_VERSION: ${{ needs.build-multi-architecture.outputs.artifact_version }}
         run: |
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          version=${RELEASE_VERSION}
           RELEASE_TITLE="v$version"
           echo "Updating release title to $RELEASE_TITLE"
           curl -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'", "tag_name": "'"v$version"'"}' "https://api.github.com/repos/${{ github.repository }}/releases/${{ env.RELEASE_ID }}"
@@ -552,7 +557,7 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: upload-release-asset
-        run: ${{ env.REPO_ROOT }}/.github/upload_asset.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        run: ${{ env.REPO_ROOT }}/.github/upload_asset.sh ${{ needs.build-multi-architecture.outputs.artifact_version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"

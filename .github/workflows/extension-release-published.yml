@@ -139,6 +139,14 @@ jobs:
         run: |
           ${{ inputs.extraCommand }}
 
+      - name: Build release artifacts
+        working-directory: ${{ inputs.artifactPath }}
+        id: build-release-artifacts
+        continue-on-error: true
+        run: |
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
+          git reset HEAD~ --hard
+
       - name: Get Artifact ID
         working-directory: ${{ inputs.artifactPath }}
         id: get-artifact-id

@@ -427,6 +427,28 @@ jobs:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
           ${EXTRA_COMMAND}
+      - name: Build release artifacts
+        if: ${{ inputs.combineJars == false && inputs.dry_run == false }}
+        id: build-release-artifacts
+        run: |
+          mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
+          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=${{ inputs.liquibaseVersion }} -DpushChanges=false -P '${{ inputs.mavenProfiles }}' \
+          -DscmServerId=liquibase
+          git reset HEAD~ --hard
+          # Use GitHub's default branch from repository settings
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          echo "Using default branch: $DEFAULT_BRANCH"
+          mvn clean install -DskipTests -P '${{ inputs.mavenProfiles }}' -DbuildNumber=$DEFAULT_BRANCH
+
+          # Generate source and javadoc jars
+          mvn source:jar javadoc:jar -Dmaven.javadoc.skip=false
+
+          # Copy POM to target directory with versioned name
+          ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          cp pom.xml target/${ARTIFACT_ID}-${VERSION}.pom
+          echo "Generated artifacts for ${ARTIFACT_ID}-${VERSION}"
+
       - name: Set pom version to dry_run version
         if: ${{ inputs.dry_run == true }}
         env:
@@ -462,6 +484,21 @@ jobs:
         with:
           name: multiplatform-artifacts
           path: ${{ inputs.artifactPath }}/target
+
+      - name: Resolve release version
+        id: resolve-version
+        working-directory: ${{ inputs.artifactPath }}
+        env:
+          BUILD_JOB_VERSION: ${{ needs.build-multi-architecture.outputs.artifact_version }}
+        run: |
+          if [ -n "$BUILD_JOB_VERSION" ]; then
+            echo "Using version from build-multi-architecture job: $BUILD_JOB_VERSION"
+            echo "RELEASE_VERSION=$BUILD_JOB_VERSION" >> $GITHUB_ENV
+          else
+            VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+            echo "Using version from pom.xml: $VERSION"
+            echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
+          fi
 
       - name: Get latest draft release ID
         if: ${{ inputs.dry_run == false }}
@@ -518,11 +555,9 @@ jobs:
       - name: Sign Files for Draft Release
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
-        env:
-          RELEASE_VERSION: ${{ needs.build-multi-architecture.outputs.artifact_version }}
         run: |
           gpg -K
-          version=${RELEASE_VERSION}
+          version=${{ env.RELEASE_VERSION }}
           echo "Signing artifacts for version: $version"
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.jar
           ${{ env.REPO_ROOT }}/.github/sign_artifact.sh ${{ env.REPO_ROOT }}/${{ inputs.artifactPath }}/target/${{ env.artifact_id }}-${version}.pom
@@ -545,10 +580,8 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: set-release-title
-        env:
-          RELEASE_VERSION: ${{ needs.build-multi-architecture.outputs.artifact_version }}
         run: |
-          version=${RELEASE_VERSION}
+          version=${{ env.RELEASE_VERSION }}
           RELEASE_TITLE="v$version"
           echo "Updating release title to $RELEASE_TITLE"
           curl -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -d '{"name": "'"$RELEASE_TITLE"'", "tag_name": "'"v$version"'"}' "https://api.github.com/repos/${{ github.repository }}/releases/${{ env.RELEASE_ID }}"
@@ -557,7 +590,7 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         working-directory: ${{ inputs.artifactPath }}
         id: upload-release-asset
-        run: ${{ env.REPO_ROOT }}/.github/upload_asset.sh ${{ needs.build-multi-architecture.outputs.artifact_version }}
+        run: ${{ env.REPO_ROOT }}/.github/upload_asset.sh ${{ env.RELEASE_VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"

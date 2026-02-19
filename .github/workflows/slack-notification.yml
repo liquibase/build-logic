@@ -27,7 +27,7 @@ jobs:
             parse-json-secrets: true
 
         - name: Notify Slack on Build Failure
-          uses: rtCamp/action-slack-notify@v2
+          uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
           env:
             SLACK_COLOR: ${{ github.event.action == 'test-failure' && 'danger' || 'good' }}
             SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.event.client_payload.server_url }}/${{ github.event.client_payload.repository }}/actions/runs/${{ github.event.client_payload.run_id }} <@U042HRTL4DT>. Triggered by repository: ${{ github.event.client_payload.repository }} and job: ${{ github.job }}"

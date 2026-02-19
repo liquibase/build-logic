@@ -23,7 +23,7 @@ jobs:
       branch_exists: ${{ steps.check-placeholder-branch.outputs.branch_exists }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: liquibase/liquibase
 
@@ -66,7 +66,7 @@ jobs:
           echo "Latest SDKMAN version: $SDKMAN_OSS_VERSION"
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: liquibase/liquibase
 
@@ -100,7 +100,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Send Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ>"
@@ -133,7 +133,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Get Latest GitHub Version
         id: oss-latest-version
@@ -204,7 +204,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Send Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ> "
@@ -238,7 +238,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Send Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ> "

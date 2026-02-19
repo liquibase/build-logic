@@ -23,7 +23,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Delete ${{ matrix.os }} Artifacts
-        uses: geekyeggo/delete-artifact@v5
+        uses: geekyeggo/delete-artifact@b54d29a59e55046d1f7fc8226cdda507e6b9cf62 # v5
         with:
           name: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.artifact_id || inputs.artifact_id }}-${{ matrix.os }}-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.artifact_version || inputs.artifact_version }}-artifacts
           failOnError: false

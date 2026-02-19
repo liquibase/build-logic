@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout code # Checkout the code from the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v5
@@ -38,7 +38,7 @@ jobs:
         run: docker compose -f src/test/resources/docker/docker-compose.yml up -d
 
       - name: Setup Temurin Java 21 # Set up Java 21 with Temurin distribution and cache the Maven packages
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5
         with:
           java-version: 21
           distribution: temurin
@@ -51,10 +51,11 @@ jobs:
         continue-on-error: false # Continue to run the action even if the previous steps fail
         env:
           LIQUIBASE_PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }} # Set the environment variable for the Liquibase Pro license key
-        run: mvn -ntp -Dtest=${{ matrix.liquibase-support-level }}ExtensionHarnessSuite test # Run the Liquibase test harness at each test level
+          TEST_LEVEL: ${{ matrix.liquibase-support-level }}
+        run: mvn -ntp -Dtest=${TEST_LEVEL}ExtensionHarnessSuite test # Run the Liquibase test harness at each test level
 
       - name: Test Reporter # Generate a test report using the Test Reporter action
-        uses: dorny/test-reporter@v1.9.1
+        uses: dorny/test-reporter@6c357194179c694acfcad2100dbf27c5b9b0d5e0 # v1.9.1
         if: always() # Run the action even if the previous steps fail
         with:
           name: Liquibase Test Harness - ${{ matrix.liquibase-support-level }} Reports # Set the name of the test report

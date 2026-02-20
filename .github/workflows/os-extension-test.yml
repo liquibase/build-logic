@@ -169,14 +169,14 @@ jobs:
           echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
 
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
             target/*
 
       - name: Save Event File
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Event File
           path: ${{ github.event_path }}
@@ -328,7 +328,7 @@ jobs:
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-reports-jdk-${{ matrix.java }}-${{ steps.normalize-os.outputs.platform }}
           path: |

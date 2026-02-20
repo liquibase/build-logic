@@ -93,6 +93,7 @@ jobs:
     outputs:
       project_artifact_name: ${{ steps.get-artifact-name.outputs.project_artifact_name }}
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
+      platform: ${{ steps.normalize-os.outputs.platform }}
     steps:
       - name: Normalize OS platform name
         id: normalize-os
@@ -685,7 +686,7 @@ jobs:
   sonar-pr:
     if: ${{ !inputs.nightly }}
     needs: [unit-test]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
+    uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

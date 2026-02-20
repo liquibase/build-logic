@@ -31,7 +31,7 @@ permissions:
 jobs:
   sonar:
     if: ${{ inputs.sonar == true }}
-    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@main
+    uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

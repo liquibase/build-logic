@@ -259,9 +259,9 @@ jobs:
           GITHUB_TOKEN: ${{ steps.get-token.outputs.token }}
           REPOSITORY: ${{ matrix.repository }}
         run: |
-          echo "INFO: Updating liquibase.version in pom.xml to ${VERSION}"
-          sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${VERSION}<\/liquibase.version>/" pom.xml
-          git add pom.xml
+          echo "INFO: Updating liquibase.version in all pom.xml files to ${VERSION}"
+          find . -name "pom.xml" -exec sed -i "s/<liquibase.version>.*<\/liquibase.version>/<liquibase.version>${VERSION}<\/liquibase.version>/" {} \;
+          git add -A '*.xml'
           # Check if there are changes before committing
           if git diff-index --quiet HEAD --; then
             echo "INFO: No changes to commit."

@@ -190,7 +190,7 @@ jobs:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         shell: bash
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
@@ -198,7 +198,7 @@ jobs:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         shell: bash
         run: |
-          ${EXTRA_LINUX_COMMAND}
+          eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Run extra Windows Command
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
@@ -206,7 +206,7 @@ jobs:
           EXTRA_WINDOWS_COMMAND: ${{ inputs.extraWindowsCommand }}
         shell: powershell
         run: |
-          ${env:EXTRA_WINDOWS_COMMAND}
+          Invoke-Expression $env:EXTRA_WINDOWS_COMMAND
 
       - name: Setup Hashicorp Vault token
         uses: hashicorp/vault-action@v3
@@ -423,7 +423,7 @@ jobs:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         shell: bash
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
@@ -431,7 +431,7 @@ jobs:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         shell: bash
         run: |
-          ${EXTRA_LINUX_COMMAND}
+          eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Run extra Windows command
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
@@ -439,7 +439,7 @@ jobs:
           EXTRA_WINDOWS_COMMAND: ${{ inputs.extraWindowsCommand }}
         shell: bash  
         run: |
-          ${env:EXTRA_WINDOWS_COMMAND}
+          Invoke-Expression $env:EXTRA_WINDOWS_COMMAND
 
       - name: Setup Hashicorp Vault token
         uses: hashicorp/vault-action@v3

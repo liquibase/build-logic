@@ -179,7 +179,7 @@ jobs:
         env:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
@@ -187,7 +187,7 @@ jobs:
         env:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         run: |
-          ${EXTRA_LINUX_COMMAND}
+          eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Run extra Windows Command
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
@@ -195,7 +195,7 @@ jobs:
         env:
           EXTRA_WINDOWS_COMMAND: ${{ inputs.extraWindowsCommand }}
         run: |
-          ${env:EXTRA_WINDOWS_COMMAND}
+          Invoke-Expression $env:EXTRA_WINDOWS_COMMAND
 
       - name: Set Artifact Versions
         shell: bash

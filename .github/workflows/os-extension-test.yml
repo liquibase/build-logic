@@ -137,7 +137,7 @@ jobs:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         shell: bash
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
@@ -282,7 +282,7 @@ jobs:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         shell: bash
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Run Tests
         if: ${{ !inputs.nightly }}

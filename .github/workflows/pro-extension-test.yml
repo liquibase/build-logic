@@ -93,6 +93,7 @@ jobs:
     outputs:
       project_artifact_name: ${{ steps.get-artifact-name.outputs.project_artifact_name }}
       artifact_version: ${{ steps.get-artifact-version.outputs.artifact_version }}
+      platform: ${{ steps.normalize-os.outputs.platform }}
     steps:
       - name: Normalize OS platform name
         id: normalize-os
@@ -136,13 +137,13 @@ jobs:
           cache: "maven"
 
       - name: Set up Maven
-        uses: stCarolas/setup-maven@v5
+        uses: stCarolas/setup-maven@d6af6abeda15e98926a57b5aa970a96bb37f97d1 # v5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
+        uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
         with:
           repositories: |
             [
@@ -185,20 +186,27 @@ jobs:
 
       - name: Run extra command
         if: inputs.extraCommand != ''
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
+        shell: bash
         run: |
-          ${{ inputs.extraCommand }}
+          eval "${EXTRA_COMMAND}"
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
+        env:
+          EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         shell: bash
         run: |
-          ${{ inputs.extraLinuxCommand }}
+          eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Run extra Windows Command
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
+        env:
+          EXTRA_WINDOWS_COMMAND: ${{ inputs.extraWindowsCommand }}
         shell: powershell
         run: |
-          ${{ inputs.extraWindowsCommand }}
+          Invoke-Expression $env:EXTRA_WINDOWS_COMMAND
 
       - name: Setup Hashicorp Vault token
         uses: hashicorp/vault-action@v3
@@ -224,7 +232,7 @@ jobs:
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
@@ -353,13 +361,13 @@ jobs:
           aws-region: us-east-1
 
       - name: Set up Maven
-        uses: stCarolas/setup-maven@v5
+        uses: stCarolas/setup-maven@d6af6abeda15e98926a57b5aa970a96bb37f97d1 # v5
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
+        uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
         with:
           repositories: |
             [
@@ -411,18 +419,27 @@ jobs:
 
       - name: Run extra command
         if: inputs.extraCommand != ''
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
+        shell: bash
         run: |
-          ${{ inputs.extraCommand }}
+          eval "${EXTRA_COMMAND}"
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
+        env:
+          EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
+        shell: bash
         run: |
-          ${{ inputs.extraLinuxCommand }}
+          eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Run extra Windows command
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
+        env:
+          EXTRA_WINDOWS_COMMAND: ${{ inputs.extraWindowsCommand }}
+        shell: bash  
         run: |
-          ${{ inputs.extraWindowsCommand }}
+          Invoke-Expression $env:EXTRA_WINDOWS_COMMAND
 
       - name: Setup Hashicorp Vault token
         uses: hashicorp/vault-action@v3
@@ -469,7 +486,7 @@ jobs:
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
@@ -513,6 +530,26 @@ jobs:
           ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
           echo "Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
           echo "Artifact Version: ${ARTIFACT_VERSION}"
+
+      - name: Parse OS names from inputs
+        id: parse-os
+        shell: bash
+        env:
+          OS_INPUT: ${{ inputs.os }}
+        run: |
+          # Extract runner names for each platform from the os input array
+          # Handles both traditional runners (*-latest) and Blacksmith runners
+          UBUNTU_OS=$(echo "${OS_INPUT}" | jq -r '.[] | select(contains("ubuntu"))' | head -n1)
+          MACOS_OS=$(echo "${OS_INPUT}" | jq -r '.[] | select(contains("macos"))' | head -n1)
+          WINDOWS_OS=$(echo "${OS_INPUT}" | jq -r '.[] | select(contains("windows") or contains("Windows"))' | head -n1)
+
+          echo "ubuntu_os=${UBUNTU_OS}" >> $GITHUB_OUTPUT
+          echo "macos_os=${MACOS_OS}" >> $GITHUB_OUTPUT
+          echo "windows_os=${WINDOWS_OS}" >> $GITHUB_OUTPUT
+
+          echo "Parsed Ubuntu OS: ${UBUNTU_OS}"
+          echo "Parsed macOS OS: ${MACOS_OS}"
+          echo "Parsed Windows OS: ${WINDOWS_OS}"
 
       - name: Download Linux Artifacts
         uses: actions/download-artifact@v6
@@ -671,7 +708,7 @@ jobs:
           echo "Cleanup Artifact Version: ${ARTIFACT_VERSION}"
 
       - name: Trigger cleanup workflow
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
         with:
           token: ${{ steps.get-token.outputs.token }}
           repository: liquibase/build-logic
@@ -685,7 +722,7 @@ jobs:
   sonar-pr:
     if: ${{ !inputs.nightly }}
     needs: [unit-test]
-    uses: liquibase/build-logic/.github/workflows/sonar-pull-request.yml@main
+    uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}

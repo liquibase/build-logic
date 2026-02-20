@@ -100,7 +100,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Send Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ>"
@@ -204,7 +204,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Send Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ> "
@@ -238,7 +238,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Send Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ> "

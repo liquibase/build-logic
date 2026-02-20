@@ -108,7 +108,7 @@ jobs:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         shell: bash
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Configure Git
         run: |

@@ -113,7 +113,7 @@ jobs:
         env:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Perform Maven Release Rollback
         working-directory: ${{ inputs.artifactPath }}

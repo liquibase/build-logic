@@ -140,7 +140,7 @@ jobs:
         env:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Build release artifacts
         working-directory: ${{ inputs.artifactPath }}

@@ -176,7 +176,7 @@ jobs:
         env:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != ''
@@ -184,7 +184,7 @@ jobs:
         env:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         run: |
-          ${EXTRA_LINUX_COMMAND}
+          eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Build and Package
         if: ${{ inputs.dry_run == false }}
@@ -427,7 +427,7 @@ jobs:
         env:
           EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${EXTRA_COMMAND}
+          eval "${EXTRA_COMMAND}"
 
       - name: Check and download artifacts from GPM
         if: ${{ inputs.dry_run == false }}

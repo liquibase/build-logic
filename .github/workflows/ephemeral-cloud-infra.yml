@@ -148,7 +148,7 @@ jobs:
           aws-region: us-east-1
 
       - name: Install spacectl
-        uses: spacelift-io/setup-spacectl@main
+        uses: spacelift-io/setup-spacectl@91feb7e564620295cd4f5bdc315a6292627f23b1 # main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}

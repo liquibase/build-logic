@@ -112,3 +112,20 @@ jobs:
             # Use latest Sonnet 4.5 model for best performance
             # Note: Verify this model ID is correct (PR description mentioned claude-sonnet-4-20250514)
             --model claude-sonnet-4-5-20250929
+
+      - name: Comment on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const prNumber =
+              context.payload.pull_request?.number ||
+              context.payload.issue?.number;
+            if (!prNumber) return;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `❌ Claude Code Review failed. [View workflow run](${runUrl})`
+            });

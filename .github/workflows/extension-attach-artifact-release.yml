@@ -316,7 +316,7 @@ jobs:
       artifact_version: ${{needs.build-multi-architecture.outputs.artifact_version}}
 
   attach-to-release:
-    if: always()
+    if: ${{ always() && !contains(needs.*.result, 'failure') }}
     name: Attach Artifact to Release
     needs: [build-multi-architecture, combineJars]
     runs-on: ubuntu-latest
@@ -663,3 +663,40 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"
           ASSET_DIR: ./target
+
+  notify-failure:
+    name: Notify Slack on Release Artifact Failure
+    needs: [build-multi-architecture, combineJars, attach-to-release]
+    if: ${{ always() && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Notify Slack on Failure
+        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
+        env:
+          SLACK_COLOR: failure
+          SLACK_MESSAGE: |
+            Workflow: extension-attach-artifact-release
+            Repository: ${{ github.repository }}
+            Version: ${{ needs.build-multi-architecture.outputs.artifact_version || inputs.dry_run_version || 'unknown' }}
+            Dry run: ${{ inputs.dry_run }}
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            <@U042HRTL4DT>
+          SLACK_TITLE: "Release artifact attachment failed for ${{ github.repository }}"
+          SLACK_USERNAME: liquibot
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_ICON_EMOJI: ":robot_face:"
+          SLACK_FOOTER: "${{ github.repository }}"
+          SLACK_LINK_NAMES: true

@@ -574,7 +574,7 @@ jobs:
           ARTIFACT_PATH: ${{ inputs.artifactPath }}
         run: |
           gpg -K
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          version=$RELEASE_VERSION
           echo "Signing artifacts for version: $version"
           $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.jar
           $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.pom
@@ -588,7 +588,7 @@ jobs:
           ARTIFACT_PATH: ${{ inputs.artifactPath }}
         run: |
           gpg -K
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          version=$RELEASE_VERSION
           echo "Signing artifacts for version: $version"
           $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.jar
           $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.pom
@@ -617,7 +617,7 @@ jobs:
           ASSET_NAME_PREFIX_VAR: ${{ env.artifact_id }}
           ASSET_DIR: ./target
         run: |
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          version=$RELEASE_VERSION
           export ASSET_NAME_PREFIX="${ASSET_NAME_PREFIX_VAR}-"
           $REPO_ROOT/.github/upload_asset.sh $version
 
@@ -658,7 +658,7 @@ jobs:
       - name: Attach Zip File to Draft Release
         if: inputs.zip == 'true'
         id: upload-release-zip
-        run: ./.github/upload_zip.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        run: ./.github/upload_zip.sh $RELEASE_VERSION
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"

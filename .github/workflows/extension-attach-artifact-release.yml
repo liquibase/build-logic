@@ -576,10 +576,10 @@ jobs:
           gpg -K
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "Signing artifacts for version: $version"
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-javadoc.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-sources.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.pom
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}-javadoc.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}-sources.jar
 
       - name: Sign Files for Draft Release (dry-run)
         if: ${{ inputs.dry_run == true }}
@@ -590,10 +590,10 @@ jobs:
           gpg -K
           version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "Signing artifacts for version: $version"
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-javadoc.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-sources.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.pom
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}-javadoc.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}-sources.jar
 
       - name: Set draft release title
         if: ${{ inputs.dry_run == false }}

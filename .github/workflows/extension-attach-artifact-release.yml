@@ -518,6 +518,14 @@ jobs:
           echo "Latest Draft Release ID: $LATEST_DRAFT_RELEASE"
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
 
+      - name: Verify draft release exists
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          if [ -z "$RELEASE_ID" ]; then
+            echo "::error::No draft release found in the repository. Please create a draft release before running this workflow."
+            exit 1
+          fi
+
       - name: List artifacts in release
         if: ${{ env.RELEASE_ID != '' && env.RELEASE_ID != null && inputs.dry_run == false }}
         id: list-artifacts

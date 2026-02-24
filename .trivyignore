@@ -16,33 +16,34 @@
 # Status: FALSE POSITIVE
 #
 # Description:
-# Trivy flags mssql-jdbc 12.10.2.jre8 as vulnerable to CVE-2025-59250, but this
-# version actually CONTAINS THE FIX for this vulnerability.
+# Trivy flags mssql-jdbc 13.2.1 as vulnerable to CVE-2025-59250, but the
+# installed JAR is actually 13.2.1.jre11 which CONTAINS THE FIX.
 #
 # Evidence:
-# - Liquibase Secure 5.0.2 upgraded mssql-jdbc from 12.10.1.jre8 to 12.10.2.jre8
-# - This upgrade explicitly addressed CVE-2025-59250 (see DAT-21214)
-# - Microsoft released mssql-jdbc 12.10.2.jre8 on October 13, 2024 as a security update
-# - The vulnerability affects versions <12.10.2.jre8
-# - Version 12.10.2.jre8 contains the fix
+# - Liquibase Secure 5.1.0 specifies mssql-jdbc 13.2.1.jre11 in pom.xml
+# - The JAR in the Docker image is the patched 13.2.1.jre11 variant
+# - Trivy reads the internal pom.properties which reports version "13.2.1"
+#   (without the jre11 classifier), causing a false version comparison
 #
 # Root Cause of False Positive:
-# Trivy's vulnerability database only lists JRE11 variants as fixed versions:
-# (10.2.4.jre11, 11.2.4.jre11, 12.2.1.jre11, 12.6.5.jre11, 12.8.2.jre11,
-#  12.10.2.jre11, 13.2.1.jre11)
-# The database doesn't recognize that the JRE8 variant (12.10.2.jre8) is also patched.
+# Microsoft's non-standard Maven versioning uses a classifier suffix (jre11)
+# instead of a standard version bump. The JAR's internal pom.properties reports
+# version 13.2.1 without the classifier. Trivy compares 13.2.1 < 13.2.1.jre11
+# and incorrectly flags it as vulnerable.
 #
 # References:
-# - Liquibase Secure 5.0.2 changelog
-# - Jira ticket: DAT-21214 "Bump mssql driver versions to address CVE-2025-59250"
-# - GitHub PR: https://github.com/liquibase/liquibase-pro/pull/2976
+# - Liquibase Secure 5.1.0 pom.xml: <mssql.version>13.2.1.jre11</mssql.version>
+# - Jira ticket: DAT-22288
+# - Trivy Discussion: https://github.com/aquasecurity/trivy/discussions/9745
+# - Grype Issue: https://github.com/anchore/grype/issues/3042
 # - Microsoft JDBC Driver release notes:
 #   https://learn.microsoft.com/en-us/sql/connect/jdbc/release-notes-for-the-jdbc-driver
 #
 # Date Added: 2025-11-20
+# Updated: 2026-02-23 (extended expiration, updated to 13.2.1.jre11 / Secure 5.1.0)
 # Added By: DevOps Team
-# Review Date: 2026-02-20 (review when Trivy database is updated)
-CVE-2025-59250 exp:2026-02-20
+# Review Date: 2026-08-20 (review when Trivy database is updated)
+CVE-2025-59250 exp:2026-08-20
 
 # ==============================================================================
 # GraalVM Python/setuptools - FALSE POSITIVES

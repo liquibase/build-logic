@@ -284,14 +284,14 @@ jobs:
           echo "artifact_version=${ARTIFACT_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.normalize-os.outputs.platform }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
             ${{ inputs.artifactPath }}/target/*
 
       - name: Save Event File
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         continue-on-error: true
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.normalize-os.outputs.platform }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
@@ -299,7 +299,7 @@ jobs:
 
       - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
         if: contains(matrix.os, 'ubuntu')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
@@ -499,7 +499,7 @@ jobs:
 
       - name: Archive Test Results - ${{ matrix.os }}
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-reports-jdk-${{ matrix.java }}-${{ steps.normalize-os.outputs.platform }}
           path: |
@@ -642,7 +642,7 @@ jobs:
           fi
 
       - name: Upload multiplatform artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: multiplatform-artifacts
           path: |

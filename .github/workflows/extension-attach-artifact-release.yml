@@ -240,7 +240,7 @@ jobs:
           echo "artifact_version=$artifact_version" >> $GITHUB_OUTPUT
 
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ steps.get-artifact-id.outputs.artifact_id }}-${{ steps.normalize-os.outputs.platform }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
@@ -298,7 +298,7 @@ jobs:
           cp /tmp/linux/${{needs.build-multi-architecture.outputs.artifact_id}}-${{needs.build-multi-architecture.outputs.artifact_version}}.pom /tmp/combined/
 
       - name: Upload multiplatform artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: multiplatform-artifacts
           path: |

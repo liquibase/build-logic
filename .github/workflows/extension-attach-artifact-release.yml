@@ -518,6 +518,14 @@ jobs:
           echo "Latest Draft Release ID: $LATEST_DRAFT_RELEASE"
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
 
+      - name: Verify draft release exists
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          if [ -z "$RELEASE_ID" ]; then
+            echo "::error::No draft release found in the repository. Please create a draft release before running this workflow."
+            exit 1
+          fi
+
       - name: List artifacts in release
         if: ${{ env.RELEASE_ID != '' && env.RELEASE_ID != null && inputs.dry_run == false }}
         id: list-artifacts
@@ -574,12 +582,12 @@ jobs:
           ARTIFACT_PATH: ${{ inputs.artifactPath }}
         run: |
           gpg -K
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          version=$RELEASE_VERSION
           echo "Signing artifacts for version: $version"
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-javadoc.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-sources.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.pom
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}-javadoc.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}-sources.jar
 
       - name: Sign Files for Draft Release (dry-run)
         if: ${{ inputs.dry_run == true }}
@@ -588,12 +596,12 @@ jobs:
           ARTIFACT_PATH: ${{ inputs.artifactPath }}
         run: |
           gpg -K
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          version=$RELEASE_VERSION
           echo "Signing artifacts for version: $version"
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-javadoc.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-sources.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}.pom
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}-javadoc.jar
+          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/${{ env.artifact_id }}-${version}-sources.jar
 
       - name: Set draft release title
         if: ${{ inputs.dry_run == false }}
@@ -617,7 +625,7 @@ jobs:
           ASSET_NAME_PREFIX_VAR: ${{ env.artifact_id }}
           ASSET_DIR: ./target
         run: |
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          version=$RELEASE_VERSION
           export ASSET_NAME_PREFIX="${ASSET_NAME_PREFIX_VAR}-"
           $REPO_ROOT/.github/upload_asset.sh $version
 
@@ -658,7 +666,7 @@ jobs:
       - name: Attach Zip File to Draft Release
         if: inputs.zip == 'true'
         id: upload-release-zip
-        run: ./.github/upload_zip.sh $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        run: ./.github/upload_zip.sh $RELEASE_VERSION
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME_PREFIX: "${{ env.artifact_id }}-"

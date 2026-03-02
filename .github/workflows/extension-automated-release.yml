@@ -502,7 +502,7 @@ jobs:
           echo "$REPOSITORY: ${ARTIFACT_ID}-${VERSION} (${DEPLOYMENT_ID})" >> ../published_extensions.txt
 
       - name: Archive published extensions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: published-extensions-${{ matrix.repository }}
           path: published_extensions.txt

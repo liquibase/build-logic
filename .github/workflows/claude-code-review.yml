@@ -17,7 +17,6 @@ permissions:
 
 jobs:
   claude-review:
-    if: ${{ !endsWith(github.actor, '[bot]') }}
     runs-on: ubuntu-latest
     # Prevent excessive API costs from runaway reviews
     # 10 minutes should be sufficient for automated PR reviews

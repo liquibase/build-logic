@@ -24,7 +24,7 @@ jobs:
     secrets: inherit
 ```
 
-**Bot PR exclusion:** Bot-authored PRs (dependabot, renovate, etc.) are automatically excluded from auto-review to avoid wasting API credits on trivial version bumps. Humans can still `@claude` on any bot PR via the `claude.yml` mention workflow if a review is needed.
+**Bot PR exclusion:** Bot-authored PRs (dependabot, renovate, etc.) are excluded from auto-review by default via the `claude-code-action` `allowed_bots` parameter (defaults to `""`, blocking all bots). To allow specific bots, set `allowed_bots` in the caller workflow. Humans can still `@claude` on any bot PR via the `claude.yml` mention workflow if a review is needed.
 
 **What it does:**
 - Reviews code changes in the PR

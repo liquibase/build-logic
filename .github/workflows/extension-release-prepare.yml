@@ -60,7 +60,7 @@ jobs:
 
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
+        uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
         with:
           repositories: |
             [
@@ -104,8 +104,11 @@ jobs:
       - name: Run extra command
         working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
+        shell: bash
         run: |
-          ${{ inputs.extraCommand }}
+          eval "${EXTRA_COMMAND}"
 
       - name: Configure Git
         run: |
@@ -132,7 +135,7 @@ jobs:
           permission-metadata: read
 
       - name: Create Pull Request for version bump
-        uses: peter-evans/create-pull-request@v7.0.8
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
         with:
           token: ${{ steps.get-token.outputs.token }}
           commit-message: "chore: update version after release"

@@ -127,18 +127,19 @@ jobs:
       if: inputs.extraCommand != ''
       env:
         EXTRA_COMMAND: ${{ inputs.extraCommand }}
+      shell: bash
       run: |
         ${EXTRA_COMMAND}
 
     - name: Set up Maven
       if: matrix.language == 'java'
-      uses: stCarolas/setup-maven@v5
+      uses: stCarolas/setup-maven@d6af6abeda15e98926a57b5aa970a96bb37f97d1 # v5
       with:
         maven-version: "3.9.5"
     # look for dependencies in maven
     - name: maven-settings-xml-action
       if: matrix.language == 'java'
-      uses: whelk-io/maven-settings-xml-action@v22
+      uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
       with:
         repositories: |
           [

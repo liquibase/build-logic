@@ -31,7 +31,7 @@ permissions:
 jobs:
   sonar:
     if: ${{ inputs.sonar == true }}
-    uses: liquibase/build-logic/.github/workflows/sonar-push.yml@main
+    uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
@@ -42,6 +42,6 @@ jobs:
     steps:
       - name: Create Release Draft
         id: create-release
-        uses: release-drafter/release-drafter@v6
+        uses: release-drafter/release-drafter@b1476f6e6eb133afa41ed8589daba6dc69b4d3f5 # v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

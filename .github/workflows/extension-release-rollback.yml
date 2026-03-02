@@ -59,7 +59,7 @@ jobs:
           
       # look for dependencies in maven
       - name: maven-settings-xml-action
-        uses: whelk-io/maven-settings-xml-action@v22
+        uses: whelk-io/maven-settings-xml-action@9dc09b23833fa9aa7f27b63db287951856f3433d # v22
         with:
           repositories: |
             [
@@ -109,8 +109,11 @@ jobs:
       - name: Run extra command
         working-directory: ${{ inputs.artifactPath }}
         if: inputs.extraCommand != ''
+        shell: bash
+        env:
+          EXTRA_COMMAND: ${{ inputs.extraCommand }}
         run: |
-          ${{ inputs.extraCommand }}
+          eval "${EXTRA_COMMAND}"
 
       - name: Perform Maven Release Rollback
         working-directory: ${{ inputs.artifactPath }}

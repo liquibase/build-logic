@@ -46,8 +46,10 @@ jobs:
 
       - name: Build release artifacts
         id: build-release-artifacts
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.liquibaseVersion }}
         run: |
-          mvn -B release:clean release:prepare -Darguments="-DscmServerId=liquibase -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=${{ github.event.inputs.liquibaseVersion }} -DpushChanges=false
+          mvn -B release:clean release:prepare -Darguments="-DscmServerId=liquibase -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=$RELEASE_VERSION -DpushChanges=false
           git reset HEAD~ --hard
 
       - name: Get Artifact ID
@@ -55,7 +57,7 @@ jobs:
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
       - name: Download Release Artifacts
-        uses: robinraju/release-downloader@v1.12
+        uses: robinraju/release-downloader@daf26c55d821e836577a15f77d86ddc078948b05 # v1.12
         with:
           tag: "${{ github.event.release.tag_name }}"
           filename: "${{ env.artifact_id }}-*"

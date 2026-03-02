@@ -44,7 +44,7 @@ jobs:
 
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@f73695ddb416e135da2e84cf04fbd47bc89beda5 # v1
         with:
           anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
           # Enable CI tools by granting actions:read permission to Claude

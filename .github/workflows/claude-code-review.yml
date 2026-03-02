@@ -44,7 +44,7 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@f73695ddb416e135da2e84cf04fbd47bc89beda5 # v1
+        uses: anthropics/claude-code-action@64c7a0ef71df67b14cb4471f4d9c8565c61042bf # v1.0.66
         with:
           anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
           # Enable CI tools by granting actions:read permission to Claude
@@ -55,9 +55,6 @@ jobs:
           # Helps users understand Claude is processing their request
           # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#track_progress
           track_progress: true
-          # Allow bot-initiated PRs to be reviewed without failing
-          # This prevents workflow failures for dependabot, renovate, and other automation          
-          allowed_bots: '*'
           prompt: |
             REPO: ${{ github.repository }}
             PR: #${{ github.event.pull_request.number }}
@@ -109,6 +106,4 @@ jobs:
             # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/tools.md
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
 
-            # Use latest Sonnet 4.5 model for best performance
-            # Note: Verify this model ID is correct (PR description mentioned claude-sonnet-4-20250514)
-            --model claude-sonnet-4-5-20250929
+            --model claude-sonnet-4-6

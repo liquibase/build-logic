@@ -1,0 +1,123 @@
+name: Claude Test Quality Review
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+  checks: read
+  statuses: read
+
+jobs:
+  claude-test-review:
+    runs-on: ubuntu-latest
+    # Prevent excessive API costs from runaway reviews
+    # 10 minutes should be sufficient for automated test reviews
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Run Claude Test Quality Review
+        id: claude-test-review
+        uses: anthropics/claude-code-action@64c7a0ef71df67b14cb4471f4d9c8565c61042bf # v1.0.66
+        with:
+          anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            You are a unit test quality reviewer. Your job is to evaluate whether new or
+            modified tests actually add value, follow best practices, and will hold up
+            over time as the codebase evolves.
+
+            REPO: ${{ github.repository }}
+            PR: #${{ github.event.pull_request.number }}
+
+            REVIEW SCOPE: Only review test files changed in this PR (use `gh pr diff`).
+            Read the source code under test for context when needed.
+
+            FLAG THESE ISSUES:
+
+            1. **Bogus/tautological tests** - Tests that pass regardless of implementation
+               (e.g., asserting on hardcoded values, `expect(true).toBe(true)`, testing
+               mocks instead of real code)
+
+            2. **Ineffective assertions** - Tests that render a component or call a function
+               but don't assert anything meaningful about the result
+
+            3. **Over-mocking** - Tests that mock so much that they're only testing the mock
+               setup, not actual behavior. If you remove the code under test and the test
+               still passes, it's over-mocked.
+
+            4. **Implementation coupling** - Tests that assert on internal state, private
+               methods, or implementation details instead of observable behavior and public API
+
+            5. **Brittle tests** - Tests that will break on harmless refactors (testing exact
+               CSS classes, hardcoded DOM structure, snapshot overuse)
+
+            6. **Missing error/edge cases** - When a test covers the happy path but ignores
+               obvious error conditions, boundary values, or null/undefined handling
+
+            7. **Async anti-patterns** - Missing await, missing act() wrappers, race
+               conditions, tests that pass due to timing rather than correctness
+
+            8. **Copy-paste duplication** - Test blocks that are nearly identical and should
+               use parameterized tests (test.each) or shared helpers
+
+            9. **Poor test naming** - Test descriptions that don't explain what behavior is
+               being verified (e.g., "it works", "test 1", "should render")
+
+            10. **Missing cleanup** - Tests that don't clean up side effects (timers,
+                subscriptions, DOM mutations) which can leak into other tests
+
+            CONVENTIONS:
+            - This repo may use Jest + React Testing Library for frontend tests
+            - Tests should focus on user behavior, not implementation
+            - Prefer `screen` queries over container queries
+            - Prefer `userEvent` over `fireEvent`
+            - Check the repository's CLAUDE.md and any testing guidelines for repo-specific patterns
+
+            OUTPUT:
+            - Use mcp__github_inline_comment__create_inline_comment for code-specific issues
+            - Each comment should explain WHY it's a problem and suggest a concrete fix
+            - Use gh pr comment for a summary only if there are systemic patterns across multiple files
+            - If no issues found: do NOT comment at all (silent pass)
+            - Maximum 10 inline comments per review to avoid overwhelming the author
+
+            FORBIDDEN:
+            - Do NOT flag style preferences or formatting
+            - Do NOT flag tests that are genuinely well-written just to have something to say
+            - Do NOT comment on non-test files
+            - Do NOT create a comment if no issues are found
+            - Focus on tests that would give false confidence or break unnecessarily
+
+          claude_args: |
+            --max-turns 5
+
+            # Tool allowlist for test review
+            # - gh pr diff/comment: PR interaction and analysis
+            # - Read: Read source files under test for context
+            # - mcp__github_inline_comment__create_inline_comment: Code-specific feedback
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr comment:*),Read,mcp__github_inline_comment__create_inline_comment"
+
+            --model claude-sonnet-4-6

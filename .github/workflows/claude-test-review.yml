@@ -122,7 +122,7 @@ jobs:
             - Focus on tests that would give false confidence or break unnecessarily
 
           claude_args: |
-            --max-turns 6
+            --max-turns 10
 
             # Tool allowlist for test review
             # - gh pr diff/comment: PR interaction and analysis

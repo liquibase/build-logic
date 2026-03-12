@@ -1,0 +1,132 @@
+name: Claude Test Quality Review
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+  checks: read
+  statuses: read
+
+jobs:
+  claude-test-review:
+    runs-on: ubuntu-latest
+    # Prevent excessive API costs from runaway reviews
+    # 10 minutes should be sufficient for automated test reviews
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Run Claude Test Quality Review
+        id: claude-test-review
+        uses: anthropics/claude-code-action@64c7a0ef71df67b14cb4471f4d9c8565c61042bf # v1.0.66
+        with:
+          anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            You are a unit test quality reviewer. Your job is to evaluate whether new or
+            modified tests actually add value, follow best practices, and will hold up
+            over time as the codebase evolves.
+
+            REPO: ${{ github.repository }}
+            PR: #${{ github.event.pull_request.number }}
+
+            REVIEW SCOPE: Only review test files changed in this PR.
+
+            TURN EFFICIENCY (minimize API costs):
+            - Turn 1: Run `gh pr diff` to get ALL changed test files at once. Identify
+              which source files you need for context from the import statements in the diff.
+            - Turn 2: Use Read to open ALL needed source files in parallel (batch multiple
+              Read calls in a single response). Do NOT read files one-at-a-time.
+            - Turn 3: Post ALL feedback. Use a single `gh pr comment` with your full review
+              rather than multiple inline comments. Group findings by file.
+            - You should complete most reviews in 3-4 turns. Only use additional turns for
+              PRs with 5+ test files that require extra reads.
+
+            FLAG THESE ISSUES:
+
+            1. **Bogus/tautological tests** - Tests that pass regardless of implementation
+               (e.g., asserting on hardcoded values, `expect(true).toBe(true)`, testing
+               mocks instead of real code)
+
+            2. **Ineffective assertions** - Tests that render a component or call a function
+               but don't assert anything meaningful about the result
+
+            3. **Over-mocking** - Tests that mock so much that they're only testing the mock
+               setup, not actual behavior. If you remove the code under test and the test
+               still passes, it's over-mocked.
+
+            4. **Implementation coupling** - Tests that assert on internal state, private
+               methods, or implementation details instead of observable behavior and public API
+
+            5. **Brittle tests** - Tests that will break on harmless refactors (testing exact
+               CSS classes, hardcoded DOM structure, snapshot overuse)
+
+            6. **Missing error/edge cases** - When a test covers the happy path but ignores
+               obvious error conditions, boundary values, or null/undefined handling
+
+            7. **Async anti-patterns** - Missing await, missing act() wrappers, race
+               conditions, tests that pass due to timing rather than correctness
+
+            8. **Copy-paste duplication** - Test blocks that are nearly identical and should
+               use parameterized tests (test.each) or shared helpers
+
+            9. **Poor test naming** - Test descriptions that don't explain what behavior is
+               being verified (e.g., "it works", "test 1", "should render")
+
+            10. **Missing cleanup** - Tests that don't clean up side effects (timers,
+                subscriptions, DOM mutations) which can leak into other tests
+
+            CONVENTIONS:
+            - This repo may use Jest + React Testing Library for frontend tests
+            - Tests should focus on user behavior, not implementation
+            - Prefer `screen` queries over container queries
+            - Prefer `userEvent` over `fireEvent`
+            - Check the repository's CLAUDE.md and any testing guidelines for repo-specific patterns
+
+            OUTPUT:
+            - Post ONE consolidated `gh pr comment` with all findings grouped by file
+            - Each finding should explain WHY it's a problem and suggest a concrete fix
+            - Use markdown headers per file (e.g., `### path/to/test.spec.ts`) with
+              line references (e.g., `L45-L60`) so authors can locate the code
+            - If no issues found: do NOT comment at all (silent pass)
+            - Maximum 10 findings per review to avoid overwhelming the author
+
+            FORBIDDEN:
+            - Do NOT flag style preferences or formatting
+            - Do NOT flag tests that are genuinely well-written just to have something to say
+            - Do NOT comment on non-test files
+            - Do NOT create a comment if no issues are found
+            - Focus on tests that would give false confidence or break unnecessarily
+
+          claude_args: |
+            --max-turns 10
+
+            # Tool allowlist for test review
+            # - gh pr diff/comment: PR interaction and analysis
+            # - Read: Read source files under test for context
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr comment:*),Read"
+
+            --model claude-sonnet-4-6

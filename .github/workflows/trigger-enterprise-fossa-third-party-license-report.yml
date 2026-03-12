@@ -176,7 +176,7 @@ jobs:
 
 
       - name: Upload CSV to Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: enterprise_report
           path: ./enterprise_report.csv

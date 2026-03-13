@@ -56,7 +56,7 @@ jobs:
             REVIEW SCOPE: Only review test files changed in this PR.
 
             TURN EFFICIENCY (minimize API costs):
-            - Turn 1: Run `git diff origin/main...HEAD -- '*.spec.*' '*.test.*'` to get ALL
+            - Turn 1: Run `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD -- '*.spec.*' '*.test.*'` to get ALL
               changed test files at once. Identify which source files you need for context
               from the import statements in the diff.
             - Turn 2: Use Read to open ALL needed source files in parallel (batch multiple

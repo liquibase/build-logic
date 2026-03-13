@@ -70,7 +70,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
   id-token: write
   packages: read
   pull-requests: write
@@ -437,7 +437,7 @@ jobs:
         if: inputs.extraWindowsCommand != '' && runner.os == 'Windows'
         env:
           EXTRA_WINDOWS_COMMAND: ${{ inputs.extraWindowsCommand }}
-        shell: bash  
+        shell: powershell  
         run: |
           Invoke-Expression $env:EXTRA_WINDOWS_COMMAND
 

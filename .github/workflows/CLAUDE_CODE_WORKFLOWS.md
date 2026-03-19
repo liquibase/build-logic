@@ -141,7 +141,7 @@ The Anthropic API key must be stored in AWS Secrets Manager at `/vault/liquibase
 
 ## Permissions
 
-Both workflows require the following permissions:
+All three workflows require the following permissions:
 - `contents: read` - Read repository code
 - `pull-requests: write` - Comment on PRs
 - `issues: write` - Comment on issues (claude.yml only)

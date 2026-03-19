@@ -8,6 +8,11 @@ on:
         required: false
         default: ''
         type: string
+      model:
+        description: 'Claude model to use for reviews (default: claude-haiku-4-5)'
+        required: false
+        default: 'claude-haiku-4-5'
+        type: string
 
 permissions:
   contents: read
@@ -113,4 +118,4 @@ jobs:
             # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/tools.md
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
 
-            --model claude-sonnet-4-6
+            --model ${{ inputs.model }}

@@ -2,6 +2,12 @@ name: Claude Test Quality Review
 
 on:
   workflow_call:
+    inputs:
+      model:
+        description: 'Claude model to use for reviews (default: claude-haiku-4-5)'
+        required: false
+        default: 'claude-haiku-4-5'
+        type: string
 
 permissions:
   contents: read
@@ -129,4 +135,4 @@ jobs:
             # - Read: Read source files under test for context
             --allowedTools "Bash(gh pr diff:*),Bash(gh pr comment:*),Read"
 
-            --model claude-sonnet-4-6
+            --model ${{ inputs.model }}

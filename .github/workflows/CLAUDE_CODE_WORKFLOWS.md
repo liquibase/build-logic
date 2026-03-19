@@ -37,6 +37,22 @@ jobs:
 
 Humans can still `@claude` on any bot PR via the `claude.yml` mention workflow if a review is needed.
 
+**Model selection:** By default this workflow uses `claude-haiku-4-5` (~75% cheaper than Sonnet) which is sufficient for structured code review tasks. High-value repositories that need deeper reasoning can opt into Sonnet:
+
+```yaml
+jobs:
+  claude-review:
+    uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@main
+    secrets: inherit
+    with:
+      model: 'claude-sonnet-4-6'
+```
+
+| Model | Input | Output | Use case |
+|---|---|---|---|
+| `claude-haiku-4-5` (default) | $0.80/MTok | $4/MTok | Standard automated reviews |
+| `claude-sonnet-4-6` | $3/MTok | $15/MTok | Complex repos needing deeper analysis |
+
 **What it does:**
 - Reviews code changes in the PR
 - Checks for code quality and best practices
@@ -76,11 +92,41 @@ jobs:
     secrets: inherit
 ```
 
+**Model selection:** Defaults to `claude-sonnet-4-6` since interactive tasks require stronger reasoning. Override with the `model` input if needed.
+
 **What it does:**
 - Responds to natural language requests in comments
 - Can read code, review changes, answer questions
 - Has access to repository context and CI/CD results
 - Can interact with GitHub API via `gh` CLI
+
+### 3. `claude-test-review.yml` - Automatic PR Test Quality Review
+
+Reviews test files changed in a PR and flags low-value or problematic tests.
+
+**Triggers:** Pull request opened or synchronized (test files only)
+
+**Usage:**
+```yaml
+# .github/workflows/claude-test-review.yml
+name: Claude Test Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  claude-test-review:
+    uses: liquibase/build-logic/.github/workflows/claude-test-review.yml@main
+    secrets: inherit
+```
+
+**Model selection:** By default uses `claude-haiku-4-5`. Override with `model` input to use Sonnet for complex test suites.
+
+**What it does:**
+- Reviews only test files changed in the PR
+- Flags bogus, tautological, or brittle tests
+- Identifies over-mocking, missing assertions, and async anti-patterns
+- Silent pass (no comment) when no issues are found
 
 ## Requirements
 
@@ -95,7 +141,7 @@ The Anthropic API key must be stored in AWS Secrets Manager at `/vault/liquibase
 
 ## Permissions
 
-Both workflows require the following permissions:
+All three workflows require the following permissions:
 - `contents: read` - Read repository code
 - `pull-requests: write` - Comment on PRs
 - `issues: write` - Comment on issues (claude.yml only)

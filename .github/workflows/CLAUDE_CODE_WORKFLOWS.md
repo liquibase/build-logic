@@ -37,7 +37,7 @@ jobs:
 
 Humans can still `@claude` on any bot PR via the `claude.yml` mention workflow if a review is needed.
 
-**Model selection:** By default this workflow uses `claude-haiku-4-5` (~75% cheaper than Sonnet) which is sufficient for structured code review tasks. High-value repositories that need deeper reasoning can opt into Sonnet:
+**Model selection:** By default this workflow uses `claude-haiku-4-5` (~75% cheaper than Sonnet) which is sufficient for structured code review tasks. The model is set via `--model` in `claude_args`. Note: `#` comment lines in `claude_args` are parsed by `shell-quote` as comment characters and will cause all subsequent flags to be silently dropped ([upstream issue #802](https://github.com/anthropics/claude-code-action/issues/802)) — avoid using `#` comments inside `claude_args`. High-value repositories that need deeper reasoning can opt into Sonnet:
 
 ```yaml
 jobs:

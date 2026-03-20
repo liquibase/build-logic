@@ -128,6 +128,5 @@ jobs:
             - Focus on tests that would give false confidence or break unnecessarily
 
           claude_args: |
-            --max-turns 10
             --allowedTools "Bash(gh pr diff:*),Bash(gh pr comment:*),Read"
             --model ${{ inputs.model }}

@@ -73,6 +73,17 @@ jobs:
 
             SCOPE: Review ONLY changed files and modified lines (use `gh pr diff`)
 
+            TURN EFFICIENCY (minimize API costs):
+            - Turn 1: Run `gh pr diff` to get ALL changed files at once. Identify any
+              source files you need for context from the diff.
+            - Turn 2: Use Read to open ALL needed files in parallel (batch multiple
+              Read calls in a single response). Do NOT read files one-at-a-time.
+            - Turn 3: Post ALL feedback in a single `gh pr comment`. Use
+              mcp__github_inline_comment__create_inline_comment only for the most
+              critical code-specific issues (batch all inline comments in one turn).
+            - Complete most reviews in 3-4 turns. Only use additional turns if CI
+              status is needed to explain a failure.
+
             SKIP these entirely:
             - Auto-generated files (package-lock.json, yarn.lock, go.sum, Gemfile.lock, *.generated.*, *_pb.go)
             - Binary files or large data files

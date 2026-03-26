@@ -489,21 +489,22 @@ jobs:
 
           # Project groupId is the explicit <groupId> after </parent>, or the parent's
           # groupId if the project inherits it (no explicit project-level groupId).
-          GROUP_ID=$(awk '/<\/parent>/{p=1} p && /<groupId>/{sub(/.*<groupId>/,""); sub(/<\/groupId>.*/,""); gsub(/[[:space:]]/,""); print; exit}' "$POM_FILE")
-          if [ -z "$GROUP_ID" ]; then
-            GROUP_ID=$(awk '/<groupId>/{sub(/.*<groupId>/,""); sub(/<\/groupId>.*/,""); gsub(/[[:space:]]/,""); print; exit}' "$POM_FILE")
-          fi
+          # Single awk pass: captures first <groupId> as fallback; if </parent> is seen
+          # first, replaces it with the project's own <groupId> and exits early.
+          GROUP_ID=$(awk '
+            /<\/parent>/{p=1}
+            /<groupId>/{v=$0; sub(/.*<groupId>/,"",v); sub(/<\/groupId>.*/,"",v); gsub(/[[:space:]]/,"",v); if (p) {result=v; exit} if (!result) result=v}
+            END{print result}
+          ' "$POM_FILE")
 
           if [ -z "$GROUP_ID" ] || [ -z "$ARTIFACT_ID" ]; then
             echo "ERROR: Could not read Maven coordinates from $POM_FILE"
             exit 1
           fi
 
-          # || true prevents bash -e from exiting when grep returns 1 (no matches found)
-          SNAPSHOT_REFS=$(grep '\-SNAPSHOT' "$POM_FILE" 2>/dev/null || true)
-          if [ -n "$SNAPSHOT_REFS" ]; then
+          if grep -q '\-SNAPSHOT' "$POM_FILE" 2>/dev/null; then
             echo "ERROR: Downloaded POM contains SNAPSHOT references — artifact may not be the final release build"
-            echo "$SNAPSHOT_REFS" | head -5
+            grep '\-SNAPSHOT' "$POM_FILE" | head -5
             exit 1
           fi
 

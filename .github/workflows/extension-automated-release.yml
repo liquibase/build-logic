@@ -451,13 +451,18 @@ jobs:
           # Download release assets using gh CLI, which handles private repo
           # auth correctly (unlike browser_download_url which fails on redirect).
           mkdir -p artifacts
-          gh release download "v$VERSION" \
+          if ! gh release download "v$VERSION" \
             --repo "liquibase/$REPOSITORY" \
             --pattern "*.jar" --pattern "*.pom" \
             --pattern "*.asc" --pattern "*.md5" --pattern "*.sha1" \
-            --dir artifacts
+            --dir artifacts; then
+            echo "ERROR: gh release download failed for $REPOSITORY v$VERSION"
+            exit 1
+          fi
 
           cd artifacts
+          echo "INFO: Downloaded files:"
+          ls -la
 
           # Read Maven coordinates from pom.properties inside the JAR — authoritative,
           # handles inherited groupId, and avoids POM XML parsing pitfalls entirely
@@ -466,7 +471,14 @@ jobs:
             echo "ERROR: No main JAR found in downloaded release artifacts for $REPOSITORY v$VERSION"
             exit 1
           fi
-          PROPS=$(unzip -p "$MAIN_JAR" 'META-INF/maven/*/*/pom.properties')
+          echo "INFO: Using main JAR: $MAIN_JAR"
+
+          if ! PROPS=$(unzip -p "$MAIN_JAR" 'META-INF/maven/*/*/pom.properties' 2>/dev/null); then
+            echo "ERROR: Failed to extract pom.properties from $MAIN_JAR"
+            echo "INFO: JAR META-INF/maven entries:"
+            unzip -l "$MAIN_JAR" 2>/dev/null | grep 'META-INF' | head -20 || true
+            exit 1
+          fi
           GROUP_ID=$(echo "$PROPS" | grep '^groupId=' | cut -d= -f2 | tr -d '\r')
           ARTIFACT_ID=$(echo "$PROPS" | grep '^artifactId=' | cut -d= -f2 | tr -d '\r')
           POM_FILE="${ARTIFACT_ID}-${VERSION}.pom"

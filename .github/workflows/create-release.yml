@@ -39,6 +39,11 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
+    # Serialize release-drafter runs per-repo to prevent concurrent runs from
+    # creating duplicate draft releases (https://github.com/release-drafter/release-drafter/issues/1146)
+    concurrency:
+      group: create-release-draft-${{ github.repository }}
+      cancel-in-progress: true
     steps:
       - name: Create Release Draft
         id: create-release

@@ -461,7 +461,17 @@ jobs:
 
           cd artifacts
 
-          POM_FILE=$(ls *.pom 2>/dev/null | head -1)
+          # Derive POM from the main (non-classified) JAR to avoid picking parent/dependency POMs
+          MAIN_JAR=$(ls *.jar 2>/dev/null | grep -v -- '-sources\.jar\|-javadoc\.jar' | head -1)
+          if [ -n "$MAIN_JAR" ]; then
+            POM_FILE="${MAIN_JAR%.jar}.pom"
+            if [ ! -f "$POM_FILE" ]; then
+              echo "WARNING: Expected POM $POM_FILE not found, falling back to first *.pom"
+              POM_FILE=$(ls *.pom 2>/dev/null | head -1)
+            fi
+          else
+            POM_FILE=$(ls *.pom 2>/dev/null | head -1)
+          fi
 
           # Validate artifact is not a SNAPSHOT build before uploading to Central
           if [ -n "$POM_FILE" ] && grep -q '\-SNAPSHOT' "$POM_FILE"; then

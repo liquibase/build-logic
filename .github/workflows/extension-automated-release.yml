@@ -395,10 +395,13 @@ jobs:
           echo "INFO: Checking repository: $REPOSITORY"
 
           # Check if a published (non-draft) release exists for this version
-          if ! gh release view "v$VERSION" --repo "liquibase/$REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null | grep -q 'false'; then
-            echo "WARNING: No published release found for v$VERSION"
-            echo "has_artifacts=false" >> $GITHUB_OUTPUT
-            exit 0
+          if ! IS_DRAFT=$(gh release view "v$VERSION" --repo "liquibase/$REPOSITORY" --json isDraft --jq '.isDraft'); then
+            echo "ERROR: Expected published release v$VERSION for $REPOSITORY, but it could not be loaded."
+            exit 1
+          fi
+          if [ "$IS_DRAFT" != "false" ]; then
+            echo "ERROR: Release v$VERSION for $REPOSITORY is still a draft."
+            exit 1
           fi
 
           echo "INFO: Found published release v$VERSION for $REPOSITORY"

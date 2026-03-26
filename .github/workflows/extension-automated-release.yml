@@ -323,7 +323,6 @@ jobs:
           # Give GitHub a moment to queue any CI runs triggered by the pom commit
           sleep 15
 
-          # Watch any in-progress or queued runs for this commit
           RUNS=$(gh run list --repo "$REPO_FULL" --commit "$HEAD_SHA" \
             --json databaseId,status,name \
             --jq '.[] | select(.status == "in_progress" or .status == "queued") | "\(.databaseId) \(.name)"')
@@ -477,10 +476,10 @@ jobs:
             exit 1
           fi
 
-          # Validate artifact is not a SNAPSHOT build before uploading to Central
-          if grep -q '\-SNAPSHOT' "$POM_FILE" 2>/dev/null; then
+          SNAPSHOT_REFS=$(grep '\-SNAPSHOT' "$POM_FILE" 2>/dev/null)
+          if [ -n "$SNAPSHOT_REFS" ]; then
             echo "ERROR: Downloaded POM contains SNAPSHOT references — artifact may not be the final release build"
-            grep '\-SNAPSHOT' "$POM_FILE" | head -5
+            echo "$SNAPSHOT_REFS" | head -5
             exit 1
           fi
 

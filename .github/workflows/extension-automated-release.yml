@@ -334,7 +334,7 @@ jobs:
               RUN_ID=$(echo "$run_line" | cut -d' ' -f1)
               RUN_NAME=$(echo "$run_line" | cut -d' ' -f2-)
               echo "INFO: Watching run $RUN_ID ($RUN_NAME)..."
-              gh run watch "$RUN_ID" --repo "$REPO_FULL" --exit-status || {
+              gh run watch "$RUN_ID" --repo "$REPO_FULL" --exit-status 2>/dev/null || {
                 echo "WARNING: CI run $RUN_ID ($RUN_NAME) completed with a failure"
               }
             done <<< "$RUNS"

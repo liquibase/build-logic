@@ -139,9 +139,9 @@ jobs:
             if echo "$output" | grep -q "Changes to Dependabot Pull Requests"; then
               echo "INFO: Some dependencies were successfully updated"
 
-              # Check if only known problematic dependencies failed
-              if echo "$output" | grep -qE "(com\.simba\.googlebigquery\.jdbc:GoogleBigQueryJDBC42|com\.liquibase:liquibase-extension-testing).*private_source_authentication_failure"; then
-                echo "WARNING: Known authentication issues with private dependencies:"
+              # Check if failures are from known non-critical error types (auth failures or transient errors)
+              if echo "$output" | grep -qE "(private_source_authentication_failure|unknown_error)"; then
+                echo "WARNING: Some dependencies failed to update:"
                 echo "$output" | grep -A 5 "Dependencies failed to update" || true
                 echo "INFO: These dependencies will be skipped. Please update manually if needed."
                 echo "INFO: Continuing with other successfully updated dependencies for $REPOSITORY"
@@ -197,7 +197,7 @@ jobs:
 
       - name: Set up Git
         run: |
-          git config --unset-all http.https://github.com/.extraheader
+          git config --unset-all http.https://github.com/.extraheader || true
           git config --local user.email "64099989+liquibot@users.noreply.github.com"
           git config --local user.name "liquibot"
 

@@ -316,9 +316,8 @@ jobs:
         run: |
           echo "INFO: Checking for in-progress CI runs triggered by pom update..."
           REPO_FULL="liquibase/$REPOSITORY"
-          BRANCH_INFO=$(gh repo view "$REPO_FULL" --json defaultBranchRef --jq '.defaultBranchRef | "\(.name) \(.target.oid)"')
-          DEFAULT_BRANCH=$(echo "$BRANCH_INFO" | cut -d' ' -f1)
-          HEAD_SHA=$(echo "$BRANCH_INFO" | cut -d' ' -f2)
+          DEFAULT_BRANCH=$(gh api "repos/$REPO_FULL" --jq '.default_branch')
+          HEAD_SHA=$(gh api "repos/$REPO_FULL/git/ref/heads/${DEFAULT_BRANCH}" --jq '.object.sha')
           echo "INFO: $REPOSITORY HEAD SHA: $HEAD_SHA (branch: $DEFAULT_BRANCH)"
 
           # Give GitHub a moment to queue any CI runs triggered by the pom commit

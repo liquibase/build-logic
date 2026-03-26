@@ -461,13 +461,14 @@ jobs:
           # Create base64 encoded credentials for Bearer auth
           AUTH_HEADER=$(printf "%s:%s" "$SONATYPE_USER" "$SONATYPE_TOKEN_VAR" | base64 -w 0)
 
-          # Upload bundle to Central Portal with AUTOMATIC publishing
+          # Upload bundle to Central Portal with USER_MANAGED publishing.
+          # Artifacts will sit in Sonatype staging for human review and promotion.
           echo "INFO: Uploading bundle to Sonatype Central Portal for ${ARTIFACT_ID}-${VERSION}..."
           UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST \
             -H "Authorization: Bearer ${AUTH_HEADER}" \
             -F "bundle=@central-bundle.zip" \
-            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC&name=${ARTIFACT_ID}-${VERSION}")
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED&name=${ARTIFACT_ID}-${VERSION}")
 
           # Parse response
           HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
@@ -484,7 +485,7 @@ jobs:
 
           echo "INFO: Bundle uploaded successfully to Central Portal"
           echo "INFO: Deployment ID: $DEPLOYMENT_ID"
-          echo "INFO: Automatic publishing initiated for ${ARTIFACT_ID}-${VERSION}"
+          echo "INFO: Artifacts are pending human promotion at https://central.sonatype.com/publishing/deployments"
 
           # Track successful upload
           echo "$REPOSITORY: ${ARTIFACT_ID}-${VERSION} (${DEPLOYMENT_ID})" >> ../published_extensions.txt

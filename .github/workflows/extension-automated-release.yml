@@ -405,19 +405,23 @@ jobs:
             mkdir -p artifacts
             cd artifacts
             
-            # Download all assets from the release
-            ASSETS=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | test("\\.(jar|pom|asc|md5|sha1)$")) | .browser_download_url')
-            
+            # Download all assets from the release using the API URL.
+            # browser_download_url does not work for private repos — the auth
+            # header is stripped on redirect, returning "Not Found" (9 bytes).
+            # The API asset endpoint with Accept: application/octet-stream
+            # authenticates before redirecting to a pre-signed URL.
+            ASSETS=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | test("\\.(jar|pom|asc|md5|sha1)$")) | "\(.url) \(.name)"')
+
             if [ -z "$ASSETS" ]; then
               echo "WARNING: No artifacts found in release"
               echo "has_artifacts=false" >> $GITHUB_OUTPUT
               exit 0
             fi
-            
+
             echo "INFO: Downloading artifacts..."
-            for asset_url in $ASSETS; do
-              echo "INFO: Downloading: $asset_url"
-              curl -L -H "Authorization: Bearer $TOKEN" -o "$(basename "$asset_url")" "$asset_url"
+            echo "$ASSETS" | while read -r asset_url asset_name; do
+              echo "INFO: Downloading: $asset_name"
+              curl -L -H "Accept: application/octet-stream" -H "Authorization: Bearer $TOKEN" -o "$asset_name" "$asset_url"
             done
             
             # Get artifact info from pom file

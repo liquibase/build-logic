@@ -460,29 +460,39 @@ jobs:
 
           cd artifacts
 
-          # Select the artifact POM — parent POMs declare <packaging>pom</packaging>, artifact POMs don't
-          POM_FILE=$(grep -L '<packaging>pom</packaging>' *.pom 2>/dev/null | head -1)
+          # Read Maven coordinates from pom.properties inside the JAR — authoritative,
+          # handles inherited groupId, and avoids POM XML parsing pitfalls entirely
+          MAIN_JAR=$(ls *.jar 2>/dev/null | grep -v -- '-sources\|-javadoc' | head -1)
+          if [ -z "$MAIN_JAR" ]; then
+            echo "ERROR: No main JAR found in downloaded release artifacts for $REPOSITORY v$VERSION"
+            exit 1
+          fi
+          PROPS=$(unzip -p "$MAIN_JAR" 'META-INF/maven/*/*/pom.properties')
+          GROUP_ID=$(echo "$PROPS" | grep '^groupId=' | cut -d= -f2)
+          ARTIFACT_ID=$(echo "$PROPS" | grep '^artifactId=' | cut -d= -f2)
+          POM_FILE="${ARTIFACT_ID}-${VERSION}.pom"
+
+          if [ -z "$GROUP_ID" ] || [ -z "$ARTIFACT_ID" ]; then
+            echo "ERROR: Could not read Maven coordinates from $MAIN_JAR (META-INF/maven/*/pom.properties)"
+            exit 1
+          fi
 
           # Validate artifact is not a SNAPSHOT build before uploading to Central
-          if [ -n "$POM_FILE" ] && grep -q '\-SNAPSHOT' "$POM_FILE"; then
+          if grep -q '\-SNAPSHOT' "$POM_FILE" 2>/dev/null; then
             echo "ERROR: Downloaded POM contains SNAPSHOT references — artifact may not be the final release build"
             grep '\-SNAPSHOT' "$POM_FILE" | head -5
             exit 1
           fi
 
-          if [ -f "$POM_FILE" ]; then
-            GROUP_ID=$(grep -oP '<groupId>\K[^<]+' "$POM_FILE" | head -1)
-            ARTIFACT_ID=$(grep -oP '<artifactId>\K[^<]+' "$POM_FILE" | head -1)
-
-            echo "GROUP_ID=$GROUP_ID" >> $GITHUB_OUTPUT
-            echo "ARTIFACT_ID=$ARTIFACT_ID" >> $GITHUB_OUTPUT
-            echo "has_artifacts=true" >> $GITHUB_OUTPUT
-
-            echo "INFO: Found artifacts for $GROUP_ID:$ARTIFACT_ID:$VERSION"
-          else
+          if [ ! -f "$POM_FILE" ]; then
             echo "ERROR: No POM file found in downloaded release artifacts for $REPOSITORY v$VERSION"
             exit 1
           fi
+
+          echo "GROUP_ID=$GROUP_ID" >> $GITHUB_OUTPUT
+          echo "ARTIFACT_ID=$ARTIFACT_ID" >> $GITHUB_OUTPUT
+          echo "has_artifacts=true" >> $GITHUB_OUTPUT
+          echo "INFO: Found artifacts for $GROUP_ID:$ARTIFACT_ID:$VERSION"
 
       - name: Create and upload bundle to Central Portal
         if: steps.download-artifacts.outputs.has_artifacts == 'true'

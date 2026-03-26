@@ -467,8 +467,8 @@ jobs:
             exit 1
           fi
           PROPS=$(unzip -p "$MAIN_JAR" 'META-INF/maven/*/*/pom.properties')
-          GROUP_ID=$(echo "$PROPS" | grep '^groupId=' | cut -d= -f2)
-          ARTIFACT_ID=$(echo "$PROPS" | grep '^artifactId=' | cut -d= -f2)
+          GROUP_ID=$(echo "$PROPS" | grep '^groupId=' | cut -d= -f2 | tr -d '\r')
+          ARTIFACT_ID=$(echo "$PROPS" | grep '^artifactId=' | cut -d= -f2 | tr -d '\r')
           POM_FILE="${ARTIFACT_ID}-${VERSION}.pom"
 
           if [ -z "$GROUP_ID" ] || [ -z "$ARTIFACT_ID" ]; then

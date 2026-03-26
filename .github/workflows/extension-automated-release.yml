@@ -464,8 +464,6 @@ jobs:
           echo "INFO: Downloaded files:"
           ls -la
 
-          # Read Maven coordinates from pom.properties inside the JAR — authoritative,
-          # handles inherited groupId, and avoids POM XML parsing pitfalls entirely
           MAIN_JAR=$(ls *.jar 2>/dev/null | grep -v -- '-sources\|-javadoc' | head -1)
           if [ -z "$MAIN_JAR" ]; then
             echo "ERROR: No main JAR found in downloaded release artifacts for $REPOSITORY v$VERSION"
@@ -473,18 +471,23 @@ jobs:
           fi
           echo "INFO: Using main JAR: $MAIN_JAR"
 
-          if ! PROPS=$(unzip -p "$MAIN_JAR" 'META-INF/maven/*/*/pom.properties' 2>/dev/null); then
-            echo "ERROR: Failed to extract pom.properties from $MAIN_JAR"
-            echo "INFO: JAR META-INF/maven entries:"
-            unzip -l "$MAIN_JAR" 2>/dev/null | grep 'META-INF' | head -20 || true
-            exit 1
-          fi
-          GROUP_ID=$(echo "$PROPS" | grep '^groupId=' | cut -d= -f2 | tr -d '\r')
-          ARTIFACT_ID=$(echo "$PROPS" | grep '^artifactId=' | cut -d= -f2 | tr -d '\r')
+          # Derive artifactId from JAR filename (strips -${VERSION}.jar suffix).
+          # Avoids fat JAR issues where unzip extracts pom.properties from every
+          # bundled dependency, producing multi-line ARTIFACT_ID values.
+          ARTIFACT_ID="${MAIN_JAR%-${VERSION}.jar}"
           POM_FILE="${ARTIFACT_ID}-${VERSION}.pom"
 
+          if [ ! -f "$POM_FILE" ]; then
+            echo "ERROR: No POM file found: $POM_FILE"
+            exit 1
+          fi
+
+          # GroupId may be inherited from parent — first <groupId> in the POM is correct
+          # whether it's declared explicitly or comes from the <parent> block.
+          GROUP_ID=$(grep -oP '(?<=<groupId>)[^<]+' "$POM_FILE" | head -1 | tr -d '[:space:]')
+
           if [ -z "$GROUP_ID" ] || [ -z "$ARTIFACT_ID" ]; then
-            echo "ERROR: Could not read Maven coordinates from $MAIN_JAR (META-INF/maven/*/pom.properties)"
+            echo "ERROR: Could not read Maven coordinates from $POM_FILE"
             exit 1
           fi
 
@@ -492,11 +495,6 @@ jobs:
           if [ -n "$SNAPSHOT_REFS" ]; then
             echo "ERROR: Downloaded POM contains SNAPSHOT references — artifact may not be the final release build"
             echo "$SNAPSHOT_REFS" | head -5
-            exit 1
-          fi
-
-          if [ ! -f "$POM_FILE" ]; then
-            echo "ERROR: No POM file found in downloaded release artifacts for $REPOSITORY v$VERSION"
             exit 1
           fi
 

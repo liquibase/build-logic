@@ -436,7 +436,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          LATEST_DRAFT_RELEASE=$(curl -X GET -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" | jq -r 'if .[].draft == true then .[].id else empty end')
+          RESPONSE=$(curl -sf -X GET -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100") || {
+            echo "::error::Failed to fetch releases from GitHub API"
+            exit 1
+          }
+          LATEST_DRAFT_RELEASE=$(echo "$RESPONSE" | jq -r 'map(select(.draft == true)) | .[0].id // empty')
           echo "Latest Draft Release ID: $LATEST_DRAFT_RELEASE"
           echo "RELEASE_ID=$LATEST_DRAFT_RELEASE" >> $GITHUB_ENV
 
@@ -454,12 +458,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          ARTIFACTS=$(curl -X GET -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets" | jq -r '.[].id')
+          RESPONSE=$(curl -sf -X GET -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets") || {
+            echo "::error::Failed to fetch release assets"
+            exit 1
+          }
+          ARTIFACTS=$(echo "$RESPONSE" | jq -r '.[].id')
           if [ -n "$ARTIFACTS" ]; then
             echo "Deleting existing release assets to prevent stale artifacts..."
             for artifact_id in $ARTIFACTS; do
-              curl -X DELETE -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$artifact_id"
-              echo "Deleted artifact ID: $artifact_id"
+              HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$artifact_id")
+              if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+                echo "Deleted artifact ID: $artifact_id"
+              else
+                echo "::error::Failed to delete artifact ID: $artifact_id (HTTP $HTTP_STATUS)"
+                exit 1
+              fi
             done
           else
             echo "No existing artifacts to delete"

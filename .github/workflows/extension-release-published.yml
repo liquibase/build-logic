@@ -437,8 +437,7 @@ jobs:
           for entry in $filenames
           do
             if [[ "$entry" != "${REPO_NAME}-latest.xsd" ]] && [[ "$entry" != "index.htm" ]] ;then
-              sed -ie "s/<\/ul>/  <li><a href=\"\/xml\/ns\/${NAMESPACE}\/${entry}\">${entry}<\/a><\/li>
-<\/ul>/" index-file/index.htm
+              sed -ie "s/<\/ul>/  <li><a href=\"\/xml\/ns\/${NAMESPACE}\/${entry}\">${entry}<\/a><\/li>\n<\/ul>/" index-file/index.htm
             fi
           done
 

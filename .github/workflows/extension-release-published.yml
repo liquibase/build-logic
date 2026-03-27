@@ -160,7 +160,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: liquibase/build-logic
-          ref: jandroav/dat-22608-release-fix
+          ref: ${{ github.workflow_sha }}
           path: build-logic
           sparse-checkout: .github/actions/publish-to-central-portal
 

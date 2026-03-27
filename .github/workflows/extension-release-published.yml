@@ -55,14 +55,14 @@ permissions:
 jobs:
   maven-release:
     uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@main
-    if: inputs.deployToMavenCentral == true
+    if: inputs.deployToMavenCentral == true && inputs.tag == ''
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
       javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:
-    if: inputs.deployToMavenCentral == true
+    if: inputs.deployToMavenCentral == true && (needs.maven-release.result == 'success' || needs.maven-release.result == 'skipped')
     runs-on: ubuntu-latest
     needs: maven-release
     steps:

@@ -91,37 +91,44 @@ runs:
           fi
 
           # Build -Dfiles/-Dtypes/-Dclassifiers for GPG signatures (.asc)
+          # Each list is built with a leading comma, then stripped at the end.
+          # Empty classifiers (main JAR, POM) are preserved as empty strings between commas.
           EXTRA_FILES=""
           EXTRA_TYPES=""
           EXTRA_CLASSIFIERS=""
 
-          # Main JAR signature
+          # Main JAR signature (empty classifier)
           if [ -f "${jar_file}.asc" ]; then
-            EXTRA_FILES="${jar_file}.asc"
-            EXTRA_TYPES="jar.asc"
-            EXTRA_CLASSIFIERS=""
+            EXTRA_FILES="${EXTRA_FILES},${jar_file}.asc"
+            EXTRA_TYPES="${EXTRA_TYPES},jar.asc"
+            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS},"
           fi
 
           # Sources JAR signature
           if [ -f "${sources_jar}.asc" ]; then
-            EXTRA_FILES="${EXTRA_FILES:+${EXTRA_FILES},}${sources_jar}.asc"
-            EXTRA_TYPES="${EXTRA_TYPES:+${EXTRA_TYPES},}jar.asc"
-            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS:+${EXTRA_CLASSIFIERS},}sources"
+            EXTRA_FILES="${EXTRA_FILES},${sources_jar}.asc"
+            EXTRA_TYPES="${EXTRA_TYPES},jar.asc"
+            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS},sources"
           fi
 
           # Javadoc JAR signature
           if [ -f "${javadoc_jar}.asc" ]; then
-            EXTRA_FILES="${EXTRA_FILES:+${EXTRA_FILES},}${javadoc_jar}.asc"
-            EXTRA_TYPES="${EXTRA_TYPES:+${EXTRA_TYPES},}jar.asc"
-            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS:+${EXTRA_CLASSIFIERS},}javadoc"
+            EXTRA_FILES="${EXTRA_FILES},${javadoc_jar}.asc"
+            EXTRA_TYPES="${EXTRA_TYPES},jar.asc"
+            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS},javadoc"
           fi
 
-          # POM signature
+          # POM signature (empty classifier)
           if [ -f "${pom_file}.asc" ]; then
-            EXTRA_FILES="${EXTRA_FILES:+${EXTRA_FILES},}${pom_file}.asc"
-            EXTRA_TYPES="${EXTRA_TYPES:+${EXTRA_TYPES},}pom.asc"
-            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS:+${EXTRA_CLASSIFIERS},}"
+            EXTRA_FILES="${EXTRA_FILES},${pom_file}.asc"
+            EXTRA_TYPES="${EXTRA_TYPES},pom.asc"
+            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS},"
           fi
+
+          # Strip leading commas
+          EXTRA_FILES="${EXTRA_FILES#,}"
+          EXTRA_TYPES="${EXTRA_TYPES#,}"
+          EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS#,}"
 
           if [ -n "$EXTRA_FILES" ]; then
             MVN_ARGS+=("-Dfiles=${EXTRA_FILES}" "-Dtypes=${EXTRA_TYPES}" "-Dclassifiers=${EXTRA_CLASSIFIERS}")

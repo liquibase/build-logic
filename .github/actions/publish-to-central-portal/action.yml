@@ -6,7 +6,7 @@ inputs:
     description: 'Directory containing downloaded release artifacts (jars, poms, asc signatures)'
     required: true
   version:
-    description: 'Release version (plain, no v prefix — e.g., 4.26.0)'
+    description: 'Release version (accepts v4.26.0 or 4.26.0 — leading v is stripped automatically)'
     required: true
   sonatype-username:
     description: 'Sonatype Central Portal username'

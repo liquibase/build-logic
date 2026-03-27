@@ -62,7 +62,7 @@ jobs:
       javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:
-    if: inputs.deployToMavenCentral == true && (needs.maven-release.result == 'success' || needs.maven-release.result == 'skipped')
+    if: always() && inputs.deployToMavenCentral == true && (needs.maven-release.result == 'success' || needs.maven-release.result == 'skipped')
     runs-on: ubuntu-latest
     needs: maven-release
     steps:

@@ -156,11 +156,20 @@ jobs:
           mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$RELEASE_VERSION -DpushChanges=false
           git reset HEAD~ --hard
 
+      - name: Determine build-logic ref
+        id: build-logic-ref
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          # Extract ref from workflow_ref (format: owner/repo/path@ref)
+          REF="${WORKFLOW_REF##*@}"
+          echo "ref=$REF" >> $GITHUB_OUTPUT
+
       - name: Checkout build-logic
         uses: actions/checkout@v6
         with:
           repository: liquibase/build-logic
-          ref: ${{ github.job_workflow_sha }}
+          ref: ${{ steps.build-logic-ref.outputs.ref }}
           path: build-logic
           sparse-checkout: .github/actions/publish-to-central-portal
 

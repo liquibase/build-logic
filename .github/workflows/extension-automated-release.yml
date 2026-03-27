@@ -403,20 +403,11 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repository }}
 
-      - name: Determine build-logic ref
-        id: build-logic-ref
-        env:
-          WORKFLOW_REF: ${{ github.workflow_ref }}
-        run: |
-          # Extract ref from workflow_ref (format: owner/repo/path@ref)
-          REF="${WORKFLOW_REF##*@}"
-          echo "ref=$REF" >> $GITHUB_OUTPUT
-
       - name: Checkout build-logic
         uses: actions/checkout@v6
         with:
           repository: liquibase/build-logic
-          ref: ${{ steps.build-logic-ref.outputs.ref }}
+          ref: ${{ 'jandroav/dat-22608-release-fix' }}
           path: build-logic
           sparse-checkout: .github/actions/publish-to-central-portal
 

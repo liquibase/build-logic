@@ -445,7 +445,6 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'maven'
 
       - name: Wait for published release and download artifacts
         id: download-artifacts

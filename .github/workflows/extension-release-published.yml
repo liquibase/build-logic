@@ -41,6 +41,10 @@ on:
         description: "The release id of the dry-run release"
         required: false
         type: string
+      tag:
+        description: "Release tag to download artifacts from (e.g. v5.1.1). Required for workflow_dispatch; populated automatically from release events."
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -51,14 +55,14 @@ permissions:
 jobs:
   maven-release:
     uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@main
-    if: inputs.deployToMavenCentral == true
+    if: inputs.deployToMavenCentral == true && inputs.tag == ''
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
       javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:
-    if: inputs.deployToMavenCentral == true
+    if: inputs.deployToMavenCentral == true && (needs.maven-release.result == 'success' || needs.maven-release.result == 'skipped')
     runs-on: ubuntu-latest
     needs: maven-release
     steps:
@@ -160,7 +164,7 @@ jobs:
       - name: Download Release Artifacts
         uses: robinraju/release-downloader@daf26c55d821e836577a15f77d86ddc078948b05 # v1.12
         with:
-          tag: "${{ github.event.release.tag_name }}"
+          tag: "${{ inputs.tag || github.event.release.tag_name }}"
           fileName: "*"
           out-file-path: ${{ inputs.artifactPath }}
 

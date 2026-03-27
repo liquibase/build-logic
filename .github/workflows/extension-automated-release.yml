@@ -512,6 +512,7 @@ jobs:
           version: ${{ inputs.version }}
           sonatype-username: ${{ env.SONATYPE_USERNAME }}
           sonatype-token: ${{ env.SONATYPE_TOKEN }}
+          publishing-type: AUTOMATIC
 
       - name: Track published extensions
         if: steps.download-artifacts.outputs.has_artifacts == 'true'

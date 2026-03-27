@@ -41,6 +41,10 @@ on:
         description: "The release id of the dry-run release"
         required: false
         type: string
+      tag:
+        description: "Release tag to download artifacts from (e.g. v5.1.1). Required for workflow_dispatch; populated automatically from release events."
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -160,7 +164,7 @@ jobs:
       - name: Download Release Artifacts
         uses: robinraju/release-downloader@daf26c55d821e836577a15f77d86ddc078948b05 # v1.12
         with:
-          tag: "${{ github.event.release.tag_name }}"
+          tag: "${{ inputs.tag || github.event.release.tag_name }}"
           fileName: "*"
           out-file-path: ${{ inputs.artifactPath }}
 

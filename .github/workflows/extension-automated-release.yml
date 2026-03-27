@@ -306,44 +306,67 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repository }}
           permission-contents: write
-          
+          permission-actions: read
+
       - name: Check for Artifact in Draft Releases
         env:
           REPOSITORY: ${{ matrix.repository }}
           VERSION: ${{ inputs.version }}
           GITHUB_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
-          echo "INFO: Waiting for artifacts to be available..."
-          sleep 180
-          published_drafts_file=published_drafts.txt
-          found=false
-          echo "INFO: Checking repository: $REPOSITORY"
-          assets=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/liquibase/$REPOSITORY/releases" | jq -r '[.[] | select(.draft == true)] | sort_by(.created_at) | last | .assets[]')
-          echo "INFO: Assets: $assets"
-          # check if assests are empty
-          if [ -z "$assets" ]; then
-            echo "WARNING: No assets found"
+          echo "INFO: Checking for in-progress CI runs triggered by pom update..."
+          REPO_FULL="liquibase/$REPOSITORY"
+          DEFAULT_BRANCH=$(gh api "repos/$REPO_FULL" --jq '.default_branch')
+          HEAD_SHA=$(gh api "repos/$REPO_FULL/git/ref/heads/${DEFAULT_BRANCH}" --jq '.object.sha')
+          echo "INFO: $REPOSITORY HEAD SHA: $HEAD_SHA (branch: $DEFAULT_BRANCH)"
+
+          # Give GitHub a moment to queue any CI runs triggered by the pom commit
+          sleep 15
+
+          RUNS=$(gh run list --repo "$REPO_FULL" --commit "$HEAD_SHA" \
+            --json databaseId,status,name \
+            --jq '.[] | select(.status == "in_progress" or .status == "queued") | "\(.databaseId) \(.name)"')
+
+          if [ -n "$RUNS" ]; then
+            echo "INFO: Waiting for in-progress CI runs to complete..."
+            while IFS= read -r run_line; do
+              RUN_ID=$(echo "$run_line" | cut -d' ' -f1)
+              RUN_NAME=$(echo "$run_line" | cut -d' ' -f2-)
+              echo "INFO: Watching run $RUN_ID ($RUN_NAME)..."
+              if ! gh run watch "$RUN_ID" --repo "$REPO_FULL" --exit-status; then
+                echo "ERROR: CI run $RUN_ID ($RUN_NAME) failed — artifacts may be missing or corrupt. Fix CI before retrying the release."
+                exit 1
+              fi
+            done <<< "$RUNS"
+            echo "INFO: All CI runs completed"
           else
-            if echo "$assets" | jq -e ".name | contains(\"$VERSION\")" > /dev/null; then
-              found=true
-              echo "INFO: Found an asset containing '$VERSION'"
-            else
-              echo "WARNING: No asset containing '$VERSION' found"
-            fi
-            if [ "$found" = true ] ; then
-              # Get the draft release ID
-              RELEASE_ID=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/liquibase/$REPOSITORY/releases" | jq -r '[.[] | select(.draft == true)] | sort_by(.created_at) | last | .id')
-              echo "INFO: Newest Draft release ID: $RELEASE_ID"
-              RELEASE_TITLE="v$VERSION"
-              # Publish the draft release as the latest release
-              echo "INFO: Publishing the draft release as the latest release to https://api.github.com/repos/liquibase/$REPOSITORY/releases/$RELEASE_ID"
-              curl -s -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $GITHUB_TOKEN" -d '{"draft": false}' "https://api.github.com/repos/liquibase/$REPOSITORY/releases/$RELEASE_ID"
-              echo "INFO: Draft release published as the latest release for $REPOSITORY"
-              echo "$REPOSITORY: v$VERSION" >> $published_drafts_file
-            else
-              echo "WARNING: No artifact containing '$VERSION' found in the last draft release."
-            fi
+            echo "INFO: No in-progress CI runs found for HEAD SHA, proceeding immediately"
           fi
+
+          published_drafts_file=published_drafts.txt
+          echo "INFO: Checking repository: $REPOSITORY"
+          DRAFT_RELEASE=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/liquibase/$REPOSITORY/releases" | jq --arg ver "v$VERSION" '[.[] | select(.draft == true and .tag_name == $ver)] | sort_by(.created_at) | last')
+          assets=$(echo "$DRAFT_RELEASE" | jq -r '.assets[]')
+          echo "INFO: Assets: $assets"
+          if [ -z "$assets" ]; then
+            echo "ERROR: No assets found in draft release for $REPOSITORY v$VERSION"
+            exit 1
+          fi
+          if ! echo "$DRAFT_RELEASE" | jq -e --arg ver "$VERSION" '.assets | map(select(.name | contains($ver))) | length > 0' > /dev/null; then
+            echo "ERROR: No asset containing '$VERSION' found in draft release for $REPOSITORY"
+            exit 1
+          fi
+          echo "INFO: Found an asset containing '$VERSION'"
+          RELEASE_ID=$(echo "$DRAFT_RELEASE" | jq -r '.id')
+          echo "INFO: Newest Draft release ID: $RELEASE_ID"
+          echo "INFO: Publishing the draft release as the latest release to https://api.github.com/repos/liquibase/$REPOSITORY/releases/$RELEASE_ID"
+          PATCH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $GITHUB_TOKEN" -d '{"draft": false}' "https://api.github.com/repos/liquibase/$REPOSITORY/releases/$RELEASE_ID")
+          if [ "$PATCH_STATUS" != "200" ]; then
+            echo "ERROR: Failed to publish draft release $RELEASE_ID (HTTP $PATCH_STATUS)"
+            exit 1
+          fi
+          echo "INFO: Draft release published as the latest release for $REPOSITORY"
+          echo "$REPOSITORY: v$VERSION" >> $published_drafts_file
 
   publish-to-central-portal:
     # 1. This job uses the new Central Portal API to automatically publish extension artifacts.
@@ -381,9 +404,33 @@ jobs:
           repositories: ${{ matrix.repository }}
 
       - name: Wait for GitHub releases to be available
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ steps.get-token.outputs.token }}
+          REPOSITORY: ${{ matrix.repository }}
         run: |
-          echo "INFO: Waiting for GitHub releases to be available..."
-          sleep 120
+          echo "INFO: Polling for published release v$VERSION in $REPOSITORY..."
+          MAX_WAIT=300
+          WAITED=0
+          POLL_INTERVAL=15
+
+          while [ $WAITED -lt $MAX_WAIT ]; do
+            RELEASE_STATUS=$(gh release view "v$VERSION" --repo "liquibase/$REPOSITORY" \
+              --json isDraft --jq '.isDraft' 2>/dev/null || echo "not_found")
+            if [ "$RELEASE_STATUS" = "false" ]; then
+              echo "INFO: Published release v$VERSION found after ${WAITED}s"
+              break
+            else
+              echo "INFO: Release v$VERSION not yet published (status: $RELEASE_STATUS) after ${WAITED}s, waiting..."
+            fi
+            sleep $POLL_INTERVAL
+            WAITED=$((WAITED + POLL_INTERVAL))
+          done
+
+          if [ $WAITED -ge $MAX_WAIT ]; then
+            echo "ERROR: Timed out after ${MAX_WAIT}s waiting for published release v$VERSION in $REPOSITORY"
+            exit 1
+          fi
 
       - name: Check for published release and download artifacts
         id: download-artifacts
@@ -409,29 +456,62 @@ jobs:
           # Download release assets using gh CLI, which handles private repo
           # auth correctly (unlike browser_download_url which fails on redirect).
           mkdir -p artifacts
-          gh release download "v$VERSION" \
+          if ! gh release download "v$VERSION" \
             --repo "liquibase/$REPOSITORY" \
             --pattern "*.jar" --pattern "*.pom" \
             --pattern "*.asc" --pattern "*.md5" --pattern "*.sha1" \
-            --dir artifacts
+            --dir artifacts; then
+            echo "ERROR: gh release download failed for $REPOSITORY v$VERSION"
+            exit 1
+          fi
 
           cd artifacts
+          echo "INFO: Downloaded files:"
+          ls -la
 
-          # Get artifact info from pom file
-          POM_FILE=$(ls *.pom 2>/dev/null | head -1)
-          if [ -f "$POM_FILE" ]; then
-            GROUP_ID=$(grep -oP '<groupId>\K[^<]+' "$POM_FILE" | head -1)
-            ARTIFACT_ID=$(grep -oP '<artifactId>\K[^<]+' "$POM_FILE" | head -1)
-
-            echo "GROUP_ID=$GROUP_ID" >> $GITHUB_OUTPUT
-            echo "ARTIFACT_ID=$ARTIFACT_ID" >> $GITHUB_OUTPUT
-            echo "has_artifacts=true" >> $GITHUB_OUTPUT
-
-            echo "INFO: Found artifacts for $GROUP_ID:$ARTIFACT_ID:$VERSION"
-          else
-            echo "WARNING: No POM file found"
-            echo "has_artifacts=false" >> $GITHUB_OUTPUT
+          MAIN_JAR=$(ls *.jar 2>/dev/null | grep -v -- '-sources\|-javadoc' | head -1)
+          if [ -z "$MAIN_JAR" ]; then
+            echo "ERROR: No main JAR found in downloaded release artifacts for $REPOSITORY v$VERSION"
+            exit 1
           fi
+          echo "INFO: Using main JAR: $MAIN_JAR"
+
+          # Derive artifactId from JAR filename (strips -${VERSION}.jar suffix).
+          # Avoids fat JAR issues where unzip extracts pom.properties from every
+          # bundled dependency, producing multi-line ARTIFACT_ID values.
+          ARTIFACT_ID="${MAIN_JAR%-${VERSION}.jar}"
+          POM_FILE="${ARTIFACT_ID}-${VERSION}.pom"
+
+          if [ ! -f "$POM_FILE" ]; then
+            echo "ERROR: No POM file found: $POM_FILE"
+            exit 1
+          fi
+
+          # Project groupId is the explicit <groupId> after </parent>, or the parent's
+          # groupId if the project inherits it (no explicit project-level groupId).
+          # Single awk pass: captures first <groupId> as fallback; if </parent> is seen
+          # first, replaces it with the project's own <groupId> and exits early.
+          GROUP_ID=$(awk '
+            /<\/parent>/{p=1}
+            /<groupId>/{v=$0; sub(/.*<groupId>/,"",v); sub(/<\/groupId>.*/,"",v); gsub(/[[:space:]]/,"",v); if (p) {result=v; exit} if (!result) result=v}
+            END{print result}
+          ' "$POM_FILE")
+
+          if [ -z "$GROUP_ID" ] || [ -z "$ARTIFACT_ID" ]; then
+            echo "ERROR: Could not read Maven coordinates from $POM_FILE"
+            exit 1
+          fi
+
+          if grep -q '\-SNAPSHOT' "$POM_FILE" 2>/dev/null; then
+            echo "ERROR: Downloaded POM contains SNAPSHOT references — artifact may not be the final release build"
+            grep '\-SNAPSHOT' "$POM_FILE" | head -5
+            exit 1
+          fi
+
+          echo "GROUP_ID=$GROUP_ID" >> $GITHUB_OUTPUT
+          echo "ARTIFACT_ID=$ARTIFACT_ID" >> $GITHUB_OUTPUT
+          echo "has_artifacts=true" >> $GITHUB_OUTPUT
+          echo "INFO: Found artifacts for $GROUP_ID:$ARTIFACT_ID:$VERSION"
 
       - name: Create and upload bundle to Central Portal
         if: steps.download-artifacts.outputs.has_artifacts == 'true'

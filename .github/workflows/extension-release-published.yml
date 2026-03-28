@@ -186,7 +186,7 @@ jobs:
         uses: ./build-logic/.github/actions/publish-to-central-portal
         with:
           artifacts-dir: ${{ inputs.artifactPath }}
-          version: ${{ github.event.release.tag_name }}
+          version: ${{ inputs.tag || github.event.release.tag_name }}
           sonatype-username: ${{ env.SONATYPE_USERNAME }}
           sonatype-token: ${{ env.SONATYPE_TOKEN }}
 

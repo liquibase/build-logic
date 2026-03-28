@@ -403,11 +403,15 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repository }}
 
+      - name: Get build-logic ref
+        id: build-logic-ref
+        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> $GITHUB_OUTPUT
+
       - name: Checkout build-logic
         uses: actions/checkout@v6
         with:
           repository: liquibase/build-logic
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ steps.build-logic-ref.outputs.ref }}
           path: build-logic
           sparse-checkout: .github/actions/publish-to-central-portal
 

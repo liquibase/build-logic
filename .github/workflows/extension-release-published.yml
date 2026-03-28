@@ -156,11 +156,15 @@ jobs:
           mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$RELEASE_VERSION -DpushChanges=false
           git reset HEAD~ --hard
 
+      - name: Get build-logic ref
+        id: build-logic-ref
+        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> $GITHUB_OUTPUT
+
       - name: Checkout build-logic
         uses: actions/checkout@v6
         with:
           repository: liquibase/build-logic
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ steps.build-logic-ref.outputs.ref }}
           path: build-logic
           sparse-checkout: .github/actions/publish-to-central-portal
 

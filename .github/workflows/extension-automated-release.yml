@@ -373,7 +373,7 @@ jobs:
     # 2. It downloads artifacts from published GitHub releases and creates Maven bundles.
     # 3. Each bundle is uploaded to Central Portal with USER_MANAGED publishing type.
     # 4. Operators must manually approve deployments at central.sonatype.com before they go live.
-    needs: release-draft-releases
+    needs: check-security-vulnerabilities
     runs-on: ubuntu-latest
     name: Central Portal
     strategy:

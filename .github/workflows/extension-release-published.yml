@@ -158,7 +158,14 @@ jobs:
 
       - name: Get build-logic ref
         id: build-logic-ref
-        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # In reusable workflows, github.workflow_sha resolves to the caller's SHA.
+          # Query the API to find the actual ref/SHA of this reusable workflow.
+          REF=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --jq '.referenced_workflows[] | select(.path | startswith("liquibase/build-logic/.github/workflows/extension-release-published")) | .ref')
+          echo "ref=${REF:-refs/heads/main}" >> $GITHUB_OUTPUT
 
       - name: Checkout build-logic
         uses: actions/checkout@v6

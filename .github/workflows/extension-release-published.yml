@@ -41,6 +41,10 @@ on:
         description: "The release id of the dry-run release"
         required: false
         type: string
+      tag:
+        description: "Release tag to download artifacts from (e.g. v5.1.1). Required for workflow_dispatch; populated automatically from release events."
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -51,14 +55,14 @@ permissions:
 jobs:
   maven-release:
     uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@main
-    if: inputs.deployToMavenCentral == true
+    if: inputs.deployToMavenCentral == true && inputs.tag == ''
     secrets: inherit
     with:
       extraCommand: ${{ inputs.extraCommand }}
       javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:
-    if: inputs.deployToMavenCentral == true
+    if: always() && inputs.deployToMavenCentral == true && (needs.maven-release.result == 'success' || needs.maven-release.result == 'skipped')
     runs-on: ubuntu-latest
     needs: maven-release
     steps:
@@ -152,83 +156,39 @@ jobs:
           mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$RELEASE_VERSION -DpushChanges=false
           git reset HEAD~ --hard
 
-      - name: Get Artifact ID
-        working-directory: ${{ inputs.artifactPath }}
-        id: get-artifact-id
-        run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
+      - name: Get build-logic ref
+        id: build-logic-ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # In reusable workflows, github.workflow_sha resolves to the caller's SHA.
+          # Query the API to find the actual ref/SHA of this reusable workflow.
+          REF=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --jq '.referenced_workflows[] | select(.path | startswith("liquibase/build-logic/.github/workflows/extension-release-published")) | .ref')
+          echo "ref=${REF:-refs/heads/main}" >> $GITHUB_OUTPUT
+
+      - name: Checkout build-logic
+        uses: actions/checkout@v6
+        with:
+          repository: liquibase/build-logic
+          ref: ${{ steps.build-logic-ref.outputs.ref }}
+          path: build-logic
+          sparse-checkout: .github/actions/publish-to-central-portal
 
       - name: Download Release Artifacts
         uses: robinraju/release-downloader@daf26c55d821e836577a15f77d86ddc078948b05 # v1.12
         with:
-          tag: "${{ github.event.release.tag_name }}"
+          tag: "${{ inputs.tag || github.event.release.tag_name }}"
           fileName: "*"
           out-file-path: ${{ inputs.artifactPath }}
 
-      - name: Publish to Maven Central
-        working-directory: ${{ inputs.artifactPath }}
-        env:
-          MAVEN_USERNAME: ${{ env.SONATYPE_USERNAME }}
-          MAVEN_PASSWORD: ${{ env.SONATYPE_TOKEN }}
-        run: |
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          groupId=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
-
-          # Convert groupId dots to directory separators
-          groupPath=$(echo "$groupId" | tr '.' '/')
-
-          # Process all JAR files (supports multi-module projects)
-          for jar_file in *-${version}.jar; do
-            if [ -f "$jar_file" ] && [[ ! "$jar_file" =~ (sources|javadoc)\.jar$ ]]; then
-              # Extract artifact name (remove version and .jar)
-              artifact_name="${jar_file%-${version}.jar}"
-              echo "Processing artifact: $artifact_name"
-
-              # Create Maven repository layout structure for this artifact
-              mkdir -p "bundle/${groupPath}/${artifact_name}/${version}"
-
-              # Copy all files for this artifact (jar, pom, sources, javadoc, signatures, checksums)
-              # Skip files containing "-full" in their names
-              for file in ${artifact_name}-${version}*; do
-                if [[ ! "$file" == *"-full"* ]] && [ -f "$file" ]; then
-                  cp "$file" "bundle/${groupPath}/${artifact_name}/${version}/"
-                  echo "  Copied: $file"
-                fi
-              done
-            fi
-          done
-
-          # Create the bundle zip file
-          cd bundle
-          zip -r ../central-bundle.zip .
-          cd ..
-
-          # Create base64 encoded credentials for Bearer auth
-          AUTH_HEADER=$(printf "%s:%s" "${MAVEN_USERNAME}" "${MAVEN_PASSWORD}" | base64 -w 0)
-
-          # Upload bundle to Central Portal using curl with proper authentication
-          echo "Uploading bundle to Central Portal..."
-          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -X POST \
-            -H "Authorization: Bearer ${AUTH_HEADER}" \
-            -F "bundle=@central-bundle.zip" \
-            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED&name=${{ env.artifact_id }}-${version}")
-
-          # Parse response
-          HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
-          DEPLOYMENT_ID=$(echo "$UPLOAD_RESPONSE" | head -n1)
-
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Deployment ID: $DEPLOYMENT_ID"
-
-          if [ "$HTTP_CODE" != "201" ]; then
-            echo "Upload failed with HTTP status $HTTP_CODE"
-            echo "Response: $DEPLOYMENT_ID"
-            exit 1
-          fi
-
-          echo "Bundle uploaded successfully to Central Portal"
-          echo "Deployment ID: $DEPLOYMENT_ID"
-          echo "Visit https://central.sonatype.com/publishing/deployments to view and publish your deployment"
+      - name: Publish to Central Portal
+        uses: ./build-logic/.github/actions/publish-to-central-portal
+        with:
+          artifacts-dir: ${{ inputs.artifactPath }}
+          version: ${{ inputs.tag || github.event.release.tag_name }}
+          sonatype-username: ${{ env.SONATYPE_USERNAME }}
+          sonatype-token: ${{ env.SONATYPE_TOKEN }}
 
   dry-run-release:
     if: ${{ inputs.dry_run == true }}

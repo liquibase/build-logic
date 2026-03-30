@@ -1,0 +1,235 @@
+name: 'Publish to Central Portal'
+description: 'Deploy Maven artifacts to Sonatype Central Portal using mvn deploy:deploy-file'
+
+inputs:
+  artifacts-dir:
+    description: 'Directory containing downloaded release artifacts (jars, poms, asc signatures)'
+    required: true
+  version:
+    description: 'Release version (accepts v4.26.0 or 4.26.0 — leading v is stripped automatically)'
+    required: true
+  sonatype-username:
+    description: 'Sonatype Central Portal username'
+    required: true
+  sonatype-token:
+    description: 'Sonatype Central Portal token'
+    required: true
+  publishing-type:
+    description: 'Central Portal publishing type (USER_MANAGED or AUTOMATIC)'
+    required: false
+    default: 'USER_MANAGED'
+
+outputs:
+  deployment-id:
+    description: 'Sonatype Central Portal deployment ID'
+    value: ${{ steps.upload.outputs.deployment_id }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Deploy artifacts to local staging via Maven
+      id: deploy
+      shell: bash
+      env:
+        ARTIFACTS_DIR: ${{ inputs.artifacts-dir }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        # Strip 'v' prefix if present (tags use v4.26.0, Maven uses 4.26.0)
+        VERSION="${VERSION#v}"
+
+        STAGING_DIR="$(pwd)/staging-repo"
+        mkdir -p "$STAGING_DIR"
+
+        cd "$ARTIFACTS_DIR"
+
+        echo "INFO: Scanning for artifacts in $(pwd) with version ${VERSION}"
+
+        artifacts_found=false
+
+        # --- Discover and deploy JAR-based artifacts ---
+        for jar_file in *-"${VERSION}".jar; do
+          [ -f "$jar_file" ] || continue
+
+          # Skip sources, javadoc, and fat JARs
+          if [[ "$jar_file" =~ -sources\.jar$ ]] || \
+             [[ "$jar_file" =~ -javadoc\.jar$ ]] || \
+             [[ "$jar_file" == *"-full"* ]]; then
+            continue
+          fi
+
+          artifacts_found=true
+          artifact_name="${jar_file%-${VERSION}.jar}"
+          echo "INFO: Processing JAR artifact: ${artifact_name}"
+
+          pom_file="${artifact_name}-${VERSION}.pom"
+          if [ ! -f "$pom_file" ]; then
+            echo "ERROR: POM file not found: ${pom_file}"
+            exit 1
+          fi
+
+          # Build deploy command with required args
+          MVN_ARGS=(
+            -B org.apache.maven.plugins:maven-deploy-plugin:3.1.3:deploy-file
+            "-Durl=file://${STAGING_DIR}"
+            "-DpomFile=${pom_file}"
+            -DgeneratePom=false
+            "-Dfile=${jar_file}"
+          )
+
+          # Add sources JAR if it exists
+          sources_jar="${artifact_name}-${VERSION}-sources.jar"
+          if [ -f "$sources_jar" ]; then
+            MVN_ARGS+=("-Dsources=${sources_jar}")
+          fi
+
+          # Add javadoc JAR if it exists
+          javadoc_jar="${artifact_name}-${VERSION}-javadoc.jar"
+          if [ -f "$javadoc_jar" ]; then
+            MVN_ARGS+=("-Djavadoc=${javadoc_jar}")
+          fi
+
+          # Build -Dfiles/-Dtypes/-Dclassifiers for GPG signatures (.asc)
+          # Each list is built with a leading comma, then stripped at the end.
+          # Empty classifiers (main JAR, POM) are preserved as empty strings between commas.
+          EXTRA_FILES=""
+          EXTRA_TYPES=""
+          EXTRA_CLASSIFIERS=""
+
+          # Main JAR signature (empty classifier)
+          if [ -f "${jar_file}.asc" ]; then
+            EXTRA_FILES="${EXTRA_FILES},${jar_file}.asc"
+            EXTRA_TYPES="${EXTRA_TYPES},jar.asc"
+            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS},"
+          fi
+
+          # Sources JAR signature
+          if [ -f "${sources_jar}.asc" ]; then
+            EXTRA_FILES="${EXTRA_FILES},${sources_jar}.asc"
+            EXTRA_TYPES="${EXTRA_TYPES},jar.asc"
+            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS},sources"
+          fi
+
+          # Javadoc JAR signature
+          if [ -f "${javadoc_jar}.asc" ]; then
+            EXTRA_FILES="${EXTRA_FILES},${javadoc_jar}.asc"
+            EXTRA_TYPES="${EXTRA_TYPES},jar.asc"
+            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS},javadoc"
+          fi
+
+          # POM signature (empty classifier)
+          if [ -f "${pom_file}.asc" ]; then
+            EXTRA_FILES="${EXTRA_FILES},${pom_file}.asc"
+            EXTRA_TYPES="${EXTRA_TYPES},pom.asc"
+            EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS},"
+          fi
+
+          # Strip leading commas
+          EXTRA_FILES="${EXTRA_FILES#,}"
+          EXTRA_TYPES="${EXTRA_TYPES#,}"
+          EXTRA_CLASSIFIERS="${EXTRA_CLASSIFIERS#,}"
+
+          if [ -n "$EXTRA_FILES" ]; then
+            MVN_ARGS+=("-Dfiles=${EXTRA_FILES}" "-Dtypes=${EXTRA_TYPES}" "-Dclassifiers=${EXTRA_CLASSIFIERS}")
+          fi
+
+          echo "INFO: Deploying ${artifact_name} to local staging..."
+          mvn "${MVN_ARGS[@]}"
+          echo "INFO: Successfully staged ${artifact_name}"
+        done
+
+        # --- Discover and deploy POM-only artifacts ---
+        if [ "$artifacts_found" = false ]; then
+          for pom_file in *-"${VERSION}".pom; do
+            [ -f "$pom_file" ] || continue
+
+            artifacts_found=true
+            artifact_name="${pom_file%-${VERSION}.pom}"
+            echo "INFO: Processing POM-only artifact: ${artifact_name}"
+
+            MVN_ARGS=(
+              -B org.apache.maven.plugins:maven-deploy-plugin:3.1.3:deploy-file
+              "-Durl=file://${STAGING_DIR}"
+              "-Dfile=${pom_file}"
+              "-DpomFile=${pom_file}"
+              -Dpackaging=pom
+              -DgeneratePom=false
+            )
+
+            # POM signature
+            if [ -f "${pom_file}.asc" ]; then
+              MVN_ARGS+=("-Dfiles=${pom_file}.asc" "-Dtypes=pom.asc" "-Dclassifiers=")
+            fi
+
+            echo "INFO: Deploying POM-only ${artifact_name} to local staging..."
+            mvn "${MVN_ARGS[@]}"
+            echo "INFO: Successfully staged ${artifact_name}"
+          done
+        fi
+
+        if [ "$artifacts_found" = false ]; then
+          echo "ERROR: No artifacts found matching version ${VERSION} in ${ARTIFACTS_DIR}"
+          exit 1
+        fi
+
+        echo "staging_dir=${STAGING_DIR}" >> $GITHUB_OUTPUT
+
+    - name: Create bundle and upload to Central Portal
+      id: upload
+      shell: bash
+      env:
+        STAGING_DIR: ${{ steps.deploy.outputs.staging_dir }}
+        VERSION: ${{ inputs.version }}
+        SONATYPE_USER: ${{ inputs.sonatype-username }}
+        SONATYPE_TOKEN: ${{ inputs.sonatype-token }}
+        PUBLISHING_TYPE: ${{ inputs.publishing-type }}
+      run: |
+        set -euo pipefail
+
+        # Strip 'v' prefix if present
+        VERSION="${VERSION#v}"
+
+        # Determine artifact name from staging directory structure for the upload name
+        # The staging dir has structure: groupId/artifactId/version/
+        ARTIFACT_ID=$(find "$STAGING_DIR" -name "*.pom" -not -name "maven-metadata-*" | head -1 | xargs -I{} basename {} | sed "s/-${VERSION}.pom//")
+
+        if [ -z "$ARTIFACT_ID" ]; then
+          echo "ERROR: Could not determine artifact ID from staging directory"
+          exit 1
+        fi
+
+        echo "INFO: Creating bundle zip for ${ARTIFACT_ID}-${VERSION}..."
+        cd "$STAGING_DIR"
+        zip -r "${RUNNER_TEMP:-/tmp}/central-bundle.zip" .
+        cd -
+
+        BUNDLE_PATH="${RUNNER_TEMP:-/tmp}/central-bundle.zip"
+        echo "INFO: Bundle size: $(du -h "$BUNDLE_PATH" | cut -f1)"
+
+        # Upload to Central Portal
+        AUTH_HEADER=$(printf "%s:%s" "$SONATYPE_USER" "$SONATYPE_TOKEN" | base64 -w 0)
+
+        echo "INFO: Uploading to Sonatype Central Portal (${PUBLISHING_TYPE})..."
+        UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
+          -X POST \
+          -H "Authorization: Bearer ${AUTH_HEADER}" \
+          -F "bundle=@${BUNDLE_PATH}" \
+          "https://central.sonatype.com/api/v1/publisher/upload?publishingType=${PUBLISHING_TYPE}&name=${ARTIFACT_ID}-${VERSION}")
+
+        HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+        DEPLOYMENT_ID=$(echo "$UPLOAD_RESPONSE" | head -n1)
+
+        echo "INFO: HTTP Status: $HTTP_CODE"
+
+        if [ "$HTTP_CODE" != "201" ]; then
+          echo "ERROR: Upload failed with HTTP status $HTTP_CODE"
+          echo "ERROR: Response: $DEPLOYMENT_ID"
+          exit 1
+        fi
+
+        echo "INFO: Bundle uploaded successfully to Central Portal"
+        echo "INFO: Deployment ID: $DEPLOYMENT_ID"
+        echo "INFO: Review at https://central.sonatype.com/publishing/deployments"
+
+        echo "deployment_id=${DEPLOYMENT_ID}" >> $GITHUB_OUTPUT

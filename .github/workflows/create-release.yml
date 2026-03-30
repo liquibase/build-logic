@@ -58,16 +58,17 @@ jobs:
       - name: Delete stale draft releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEWEST_DRAFT_ID: ${{ steps.create-release.outputs.id }}
+          GH_REPO: ${{ github.repository }}
         run: |
           echo "INFO: Checking for stale draft releases..."
-          NEWEST_DRAFT_ID=${{ steps.create-release.outputs.id }}
-          STALE_DRAFT_IDS=$(gh api --paginate "repos/${{ github.repository }}/releases" \
-            --jq "[.[] | select(.draft == true and .id != $NEWEST_DRAFT_ID)] | .[].id")
+          STALE_DRAFT_IDS=$(gh api --paginate "repos/${GH_REPO}/releases" \
+            --jq "[.[] | select(.draft == true and .id != ${NEWEST_DRAFT_ID})] | .[].id")
           if [ -n "$STALE_DRAFT_IDS" ]; then
             echo "$STALE_DRAFT_IDS" | while read -r id; do
               [ -z "$id" ] && continue
               echo "INFO: Deleting stale draft release ID: $id"
-              gh api --method DELETE "repos/${{ github.repository }}/releases/$id"
+              gh api --method DELETE "repos/${GH_REPO}/releases/$id"
             done
             echo "INFO: Stale draft cleanup complete"
           else

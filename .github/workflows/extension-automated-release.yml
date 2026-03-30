@@ -345,7 +345,9 @@ jobs:
 
           published_drafts_file=published_drafts.txt
           echo "INFO: Checking repository: $REPOSITORY"
-          DRAFT_RELEASE=$(curl -s -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/liquibase/$REPOSITORY/releases" | jq --arg ver "v$VERSION" '[.[] | select(.draft == true and .tag_name == $ver)] | sort_by(.created_at) | last')
+          DRAFT_RELEASE=$(gh api --paginate "repos/liquibase/$REPOSITORY/releases" \
+            | jq -s 'add' \
+            | jq --arg ver "v$VERSION" '[.[] | select(.draft == true and .tag_name == $ver)] | sort_by(.created_at) | last')
           assets=$(echo "$DRAFT_RELEASE" | jq -r '.assets[]')
           echo "INFO: Assets: $assets"
           if [ -z "$assets" ]; then

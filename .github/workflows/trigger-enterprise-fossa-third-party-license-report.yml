@@ -18,14 +18,14 @@ jobs:
     strategy:
       matrix:
         repo: [
-          { name: "DaticalDB-installer", ref: "master",owner: "Datical" },
-          {name: "ephemeral-database", ref: "master",owner: "liquibase"},
-          { name: "drivers", ref: "master",owner: "Datical" },
+          { name: "DaticalDB-installer", ref: "main",owner: "Datical" },
+          {name: "ephemeral-database", ref: "main",owner: "liquibase"},
+          { name: "drivers", ref: "main",owner: "Datical" },
           {name: "protoclub", ref: "develop",owner: "Datical"},
-          { name: "datical-sqlparser", ref: "master",owner: "Datical" },
-          { name: "storedlogic", ref: "master",owner: "Datical" },
-          { name: "AppDBA", ref: "master",owner: "Datical" },
-          { name: "liquibase-bundle", ref: "master",owner: "Datical" },
+          { name: "datical-sqlparser", ref: "main",owner: "Datical" },
+          { name: "storedlogic", ref: "main",owner: "Datical" },
+          { name: "AppDBA", ref: "main",owner: "Datical" },
+          { name: "liquibase-bundle", ref: "main",owner: "Datical" },
           { name: "liquibase", ref: "ddb",owner: "Datical" }
         ]
 
@@ -214,5 +214,5 @@ jobs:
           token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
           repository: Datical/datical-service
           event-type: trigger-fossa-report-generation
-          client-payload: '{"ref": "master", "version_number_for_3p_fossa_report_generation": "${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}"}'
+          client-payload: '{"ref": "main", "version_number_for_3p_fossa_report_generation": "${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}"}'
           

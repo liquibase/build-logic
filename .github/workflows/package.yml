@@ -1022,7 +1022,7 @@ jobs:
 
   upload_windows_package:
     if: ${{ inputs.distribution == 'liquibase' }}
-    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@master
+    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@main
     secrets: inherit
     with:
       version: ${{ inputs.version }}

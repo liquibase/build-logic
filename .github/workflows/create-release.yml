@@ -39,9 +39,38 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
+    # Serialize release-drafter runs per-repo to prevent concurrent runs from
+    # creating duplicate draft releases (https://github.com/release-drafter/release-drafter/issues/1146)
+    concurrency:
+      group: create-release-draft-${{ github.repository }}
+      cancel-in-progress: true
     steps:
       - name: Create Release Draft
         id: create-release
         uses: release-drafter/release-drafter@b1476f6e6eb133afa41ed8589daba6dc69b4d3f5 # v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Clean up stale draft releases, keeping only the most recent one.
+      # Sequential pushes to main (dependabot merges, PRs, version bumps) cause
+      # release-drafter to accumulate duplicate drafts over time (DAT-22607).
+      # https://github.com/release-drafter/release-drafter/issues/1081
+      - name: Delete stale draft releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEWEST_DRAFT_ID: ${{ steps.create-release.outputs.id }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          echo "INFO: Checking for stale draft releases..."
+          STALE_DRAFT_IDS=$(gh api --paginate "repos/${GH_REPO}/releases" \
+            --jq "[.[] | select(.draft == true and .id != ${NEWEST_DRAFT_ID})] | .[].id")
+          if [ -n "$STALE_DRAFT_IDS" ]; then
+            echo "$STALE_DRAFT_IDS" | while read -r id; do
+              [ -z "$id" ] && continue
+              echo "INFO: Deleting stale draft release ID: $id"
+              gh api --method DELETE "repos/${GH_REPO}/releases/$id"
+            done
+            echo "INFO: Stale draft cleanup complete"
+          else
+            echo "INFO: No stale drafts to clean up"
+          fi

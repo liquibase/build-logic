@@ -103,9 +103,10 @@ jobs:
             OUTPUT FORMAT:
             - Use mcp__github_inline_comment__create_inline_comment for code-specific issues
             - Use gh pr comment for overall summary
+            - REQUIRED: Always start the PR comment with the title "## Code Review"
             - Maximum 5 bullet points total
             - Each bullet point: 1 sentence maximum
-            - If no significant issues: "LGTM - no significant issues found"
+            - If no significant issues: "## Code Review\n\nLGTM - no significant issues found"
 
             FORBIDDEN:
             - Do not analyze unchanged files or code

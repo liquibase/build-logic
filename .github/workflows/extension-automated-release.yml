@@ -312,7 +312,7 @@ jobs:
         env:
           REPOSITORY: ${{ matrix.repository }}
           VERSION: ${{ inputs.version }}
-          GITHUB_TOKEN: ${{ steps.get-token.outputs.token }}
+          GH_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
           echo "INFO: Checking for in-progress CI runs triggered by pom update..."
           REPO_FULL="liquibase/$REPOSITORY"
@@ -369,10 +369,10 @@ jobs:
           echo "$REPOSITORY: v$VERSION" >> $published_drafts_file
 
   publish-to-central-portal:
-    # 1. This job uses the new Central Portal API to automatically publish extension artifacts.
+    # 1. This job uploads extension artifacts to the Central Portal API.
     # 2. It downloads artifacts from published GitHub releases and creates Maven bundles.
-    # 3. Each bundle is uploaded to Central Portal with AUTOMATIC publishing type.
-    # 4. The job tracks successful uploads and automatically publishes to Maven Central.
+    # 3. Each bundle is uploaded to Central Portal with USER_MANAGED publishing type.
+    # 4. Operators must manually approve deployments at central.sonatype.com before they go live.
     needs: release-draft-releases
     runs-on: ubuntu-latest
     name: Central Portal
@@ -403,6 +403,25 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repository }}
 
+      - name: Get build-logic ref
+        id: build-logic-ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # In reusable workflows, github.workflow_sha resolves to the caller's SHA.
+          # Query the API to find the actual ref/SHA of this reusable workflow.
+          REF=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --jq '.referenced_workflows[] | select(.path | startswith("liquibase/build-logic/.github/workflows/extension-automated-release")) | .ref')
+          echo "ref=${REF:-refs/heads/main}" >> $GITHUB_OUTPUT
+
+      - name: Checkout build-logic
+        uses: actions/checkout@v6
+        with:
+          repository: liquibase/build-logic
+          ref: ${{ steps.build-logic-ref.outputs.ref }}
+          path: build-logic
+          sparse-checkout: .github/actions/publish-to-central-portal
+
       - name: Wait for GitHub releases to be available
         env:
           VERSION: ${{ inputs.version }}
@@ -432,146 +451,86 @@ jobs:
             exit 1
           fi
 
-      - name: Check for published release and download artifacts
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Wait for published release and download artifacts
         id: download-artifacts
         env:
           VERSION: ${{ inputs.version }}
           GH_TOKEN: ${{ steps.get-token.outputs.token }}
           REPOSITORY: ${{ matrix.repository }}
         run: |
-          echo "INFO: Checking repository: $REPOSITORY"
+          echo "INFO: Waiting for published release v$VERSION for $REPOSITORY..."
 
-          # Check if a published (non-draft) release exists for this version
-          if ! IS_DRAFT=$(gh release view "v$VERSION" --repo "liquibase/$REPOSITORY" --json isDraft --jq '.isDraft'); then
-            echo "ERROR: Expected published release v$VERSION for $REPOSITORY, but it could not be loaded."
+          MAX_WAIT=300
+          POLL_INTERVAL=15
+          elapsed=0
+
+          # Poll until the release is published (non-draft) or timeout
+          while [ $elapsed -lt $MAX_WAIT ]; do
+            if IS_DRAFT=$(gh release view "v$VERSION" --repo "liquibase/$REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null); then
+              if [ "$IS_DRAFT" = "false" ]; then
+                echo "INFO: Found published release v$VERSION for $REPOSITORY (after ${elapsed}s)"
+                break
+              fi
+              echo "INFO: Release v$VERSION exists but is still a draft... (${elapsed}s/${MAX_WAIT}s)"
+            else
+              echo "INFO: Release v$VERSION not found yet... (${elapsed}s/${MAX_WAIT}s)"
+            fi
+            sleep $POLL_INTERVAL
+            elapsed=$((elapsed + POLL_INTERVAL))
+          done
+
+          if [ $elapsed -ge $MAX_WAIT ]; then
+            echo "ERROR: Timed out after ${MAX_WAIT}s waiting for published release v$VERSION for $REPOSITORY"
             exit 1
           fi
-          if [ "$IS_DRAFT" != "false" ]; then
-            echo "ERROR: Release v$VERSION for $REPOSITORY is still a draft."
-            exit 1
-          fi
-
-          echo "INFO: Found published release v$VERSION for $REPOSITORY"
 
           # Download release assets using gh CLI, which handles private repo
           # auth correctly (unlike browser_download_url which fails on redirect).
+          # Only download JARs, POMs, and GPG signatures — Maven generates its own checksums.
           mkdir -p artifacts
           if ! gh release download "v$VERSION" \
             --repo "liquibase/$REPOSITORY" \
             --pattern "*.jar" --pattern "*.pom" \
-            --pattern "*.asc" --pattern "*.md5" --pattern "*.sha1" \
+            --pattern "*.asc" \
             --dir artifacts; then
             echo "ERROR: gh release download failed for $REPOSITORY v$VERSION"
             exit 1
           fi
 
-          cd artifacts
-          echo "INFO: Downloaded files:"
-          ls -la
-
-          MAIN_JAR=$(ls *.jar 2>/dev/null | grep -v -- '-sources\|-javadoc' | head -1)
-          if [ -z "$MAIN_JAR" ]; then
-            echo "ERROR: No main JAR found in downloaded release artifacts for $REPOSITORY v$VERSION"
-            exit 1
-          fi
-          echo "INFO: Using main JAR: $MAIN_JAR"
-
-          # Derive artifactId from JAR filename (strips -${VERSION}.jar suffix).
-          # Avoids fat JAR issues where unzip extracts pom.properties from every
-          # bundled dependency, producing multi-line ARTIFACT_ID values.
-          ARTIFACT_ID="${MAIN_JAR%-${VERSION}.jar}"
-          POM_FILE="${ARTIFACT_ID}-${VERSION}.pom"
-
-          if [ ! -f "$POM_FILE" ]; then
-            echo "ERROR: No POM file found: $POM_FILE"
+          # Check if any POM file was downloaded
+          if ls artifacts/*.pom 1>/dev/null 2>&1; then
+            echo "has_artifacts=true" >> $GITHUB_OUTPUT
+            echo "INFO: Found release artifacts for $REPOSITORY"
+          else
+            echo "ERROR: No POM file found in release artifacts for $REPOSITORY"
+            echo "has_artifacts=false" >> $GITHUB_OUTPUT
             exit 1
           fi
 
-          # Project groupId is the explicit <groupId> after </parent>, or the parent's
-          # groupId if the project inherits it (no explicit project-level groupId).
-          # Single awk pass: captures first <groupId> as fallback; if </parent> is seen
-          # first, replaces it with the project's own <groupId> and exits early.
-          GROUP_ID=$(awk '
-            /<\/parent>/{p=1}
-            /<groupId>/{v=$0; sub(/.*<groupId>/,"",v); sub(/<\/groupId>.*/,"",v); gsub(/[[:space:]]/,"",v); if (p) {result=v; exit} if (!result) result=v}
-            END{print result}
-          ' "$POM_FILE")
+      - name: Publish to Central Portal
+        if: steps.download-artifacts.outputs.has_artifacts == 'true'
+        uses: ./build-logic/.github/actions/publish-to-central-portal
+        id: publish
+        with:
+          artifacts-dir: artifacts
+          version: ${{ inputs.version }}
+          sonatype-username: ${{ env.SONATYPE_USERNAME }}
+          sonatype-token: ${{ env.SONATYPE_TOKEN }}
 
-          if [ -z "$GROUP_ID" ] || [ -z "$ARTIFACT_ID" ]; then
-            echo "ERROR: Could not read Maven coordinates from $POM_FILE"
-            exit 1
-          fi
-
-          if grep -q '\-SNAPSHOT' "$POM_FILE" 2>/dev/null; then
-            echo "ERROR: Downloaded POM contains SNAPSHOT references — artifact may not be the final release build"
-            grep '\-SNAPSHOT' "$POM_FILE" | head -5
-            exit 1
-          fi
-
-          echo "GROUP_ID=$GROUP_ID" >> $GITHUB_OUTPUT
-          echo "ARTIFACT_ID=$ARTIFACT_ID" >> $GITHUB_OUTPUT
-          echo "has_artifacts=true" >> $GITHUB_OUTPUT
-          echo "INFO: Found artifacts for $GROUP_ID:$ARTIFACT_ID:$VERSION"
-
-      - name: Create and upload bundle to Central Portal
+      - name: Track published extensions
         if: steps.download-artifacts.outputs.has_artifacts == 'true'
         env:
-          GROUP_ID: ${{ steps.download-artifacts.outputs.GROUP_ID }}
-          ARTIFACT_ID: ${{ steps.download-artifacts.outputs.ARTIFACT_ID }}
-          VERSION: ${{ inputs.version }}
           REPOSITORY: ${{ matrix.repository }}
-          SONATYPE_USER: ${{ env.SONATYPE_USERNAME }}
-          SONATYPE_TOKEN_VAR: ${{ env.SONATYPE_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          DEPLOYMENT_ID: ${{ steps.publish.outputs.deployment-id }}
         run: |
-          cd artifacts
-
-          echo "INFO: Creating Maven bundle for ${ARTIFACT_ID}-${VERSION}"
-
-          # Create Maven repository layout structure for the bundle
-          GROUP_PATH=$(echo "$GROUP_ID" | tr '.' '/')
-          mkdir -p "bundle/${GROUP_PATH}/${ARTIFACT_ID}/${VERSION}"
-
-          # Copy all artifacts to proper Maven repository layout
-          cp ${ARTIFACT_ID}-${VERSION}* "bundle/${GROUP_PATH}/${ARTIFACT_ID}/${VERSION}/"
-
-          # Create the bundle zip file
-          cd bundle
-          zip -r ../central-bundle.zip .
-          cd ..
-
-          echo "INFO: Maven bundle created successfully"
-
-          # Create base64 encoded credentials for Bearer auth
-          AUTH_HEADER=$(printf "%s:%s" "$SONATYPE_USER" "$SONATYPE_TOKEN_VAR" | base64 -w 0)
-
-          # Upload bundle to Central Portal with USER_MANAGED publishing.
-          # Artifacts will sit in Sonatype staging for human review and promotion.
-          echo "INFO: Uploading bundle to Sonatype Central Portal for ${ARTIFACT_ID}-${VERSION}..."
-          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -X POST \
-            -H "Authorization: Bearer ${AUTH_HEADER}" \
-            -F "bundle=@central-bundle.zip" \
-            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED&name=${ARTIFACT_ID}-${VERSION}")
-
-          # Parse response
-          HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
-          DEPLOYMENT_ID=$(echo "$UPLOAD_RESPONSE" | head -n1)
-
-          echo "INFO: HTTP Status: $HTTP_CODE"
-          echo "INFO: Deployment ID: $DEPLOYMENT_ID"
-
-          if [ "$HTTP_CODE" != "201" ]; then
-            echo "ERROR: Upload failed with HTTP status $HTTP_CODE"
-            echo "ERROR: Response: $DEPLOYMENT_ID"
-            exit 1
-          fi
-
-          echo "INFO: Bundle uploaded successfully to Central Portal"
-          echo "INFO: Deployment ID: $DEPLOYMENT_ID"
-          echo "INFO: Artifacts are pending human promotion at https://central.sonatype.com/publishing/deployments"
-
-          # Track successful upload
-          echo "$REPOSITORY: ${ARTIFACT_ID}-${VERSION} (${DEPLOYMENT_ID})" >> ../published_extensions.txt
+          echo "$REPOSITORY: v${VERSION} (${DEPLOYMENT_ID})" >> published_extensions.txt
 
       - name: Archive published extensions
         uses: actions/upload-artifact@v7

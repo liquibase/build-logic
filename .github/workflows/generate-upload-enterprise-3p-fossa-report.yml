@@ -27,7 +27,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
@@ -88,7 +88,7 @@ jobs:
           ' fossa.json >> $csv_filename
 
       - name: Configure AWS credentials for S3 access
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
           aws-region: us-east-1

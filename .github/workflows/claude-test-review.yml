@@ -114,17 +114,17 @@ jobs:
 
             OUTPUT:
             - Post ONE consolidated `gh pr comment` with all findings grouped by file
+            - REQUIRED: Always start the PR comment with the title "## Test Quality Review"
             - Each finding should explain WHY it's a problem and suggest a concrete fix
             - Use markdown headers per file (e.g., `### path/to/test.spec.ts`) with
               line references (e.g., `L45-L60`) so authors can locate the code
-            - If no issues found: do NOT comment at all (silent pass)
+            - If no issues found: post a brief `gh pr comment` saying "## Test Quality Review\n\nNo test quality issues found." so the PR author knows the review completed successfully
             - Maximum 10 findings per review to avoid overwhelming the author
 
             FORBIDDEN:
             - Do NOT flag style preferences or formatting
             - Do NOT flag tests that are genuinely well-written just to have something to say
             - Do NOT comment on non-test files
-            - Do NOT create a comment if no issues are found
             - Focus on tests that would give false confidence or break unnecessarily
 
           claude_args: |

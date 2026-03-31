@@ -23,7 +23,7 @@ jobs:
       branch_exists: ${{ steps.check-placeholder-branch.outputs.branch_exists }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: liquibase/liquibase
 
@@ -66,7 +66,7 @@ jobs:
           echo "Latest SDKMAN version: $SDKMAN_OSS_VERSION"
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: liquibase/liquibase
 
@@ -133,7 +133,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Get Latest GitHub Version
         id: oss-latest-version
@@ -144,7 +144,7 @@ jobs:
           echo "Using GitHub latest version: $LATEST_OSS_VERSION"
 
       - name: Configure AWS credentials for S3 access
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1

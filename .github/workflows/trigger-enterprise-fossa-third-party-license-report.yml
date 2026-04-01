@@ -18,28 +18,28 @@ jobs:
     strategy:
       matrix:
         repo: [
-          { name: "DaticalDB-installer", ref: "master",owner: "Datical" },
-          {name: "ephemeral-database", ref: "master",owner: "liquibase"},
-          { name: "drivers", ref: "master",owner: "Datical" },
+          { name: "DaticalDB-installer", ref: "main",owner: "Datical" },
+          {name: "ephemeral-database", ref: "main",owner: "liquibase"},
+          { name: "drivers", ref: "main",owner: "Datical" },
           {name: "protoclub", ref: "develop",owner: "Datical"},
-          { name: "datical-sqlparser", ref: "master",owner: "Datical" },
-          { name: "storedlogic", ref: "master",owner: "Datical" },
-          { name: "AppDBA", ref: "master",owner: "Datical" },
-          { name: "liquibase-bundle", ref: "master",owner: "Datical" },
+          { name: "datical-sqlparser", ref: "main",owner: "Datical" },
+          { name: "storedlogic", ref: "main",owner: "Datical" },
+          { name: "AppDBA", ref: "main",owner: "Datical" },
+          { name: "liquibase-bundle", ref: "main",owner: "Datical" },
           { name: "liquibase", ref: "ddb",owner: "Datical" }
         ]
 
     name: "${{ matrix.repo.name }} - Fossa Report"
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
         id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
         with:
           secret-ids: |
             ,/vault/liquibase
@@ -104,27 +104,27 @@ jobs:
     needs: wait-for-fossa-report-generation
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
         id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
         with:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: liquibase/build-logic
           ref: main
           path: build-logic
 
       - name: Configure AWS credentials for S3 access
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
           aws-region: us-east-1
@@ -176,7 +176,7 @@ jobs:
 
 
       - name: Upload CSV to Artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: enterprise_report
           path: ./enterprise_report.csv
@@ -192,17 +192,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
         id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
         with:
           secret-ids: |
             ,/vault/liquibase
@@ -214,5 +214,5 @@ jobs:
           token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
           repository: Datical/datical-service
           event-type: trigger-fossa-report-generation
-          client-payload: '{"ref": "master", "version_number_for_3p_fossa_report_generation": "${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}"}'
+          client-payload: '{"ref": "main", "version_number_for_3p_fossa_report_generation": "${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}"}'
           

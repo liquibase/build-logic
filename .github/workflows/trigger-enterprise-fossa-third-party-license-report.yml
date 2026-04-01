@@ -53,7 +53,7 @@ jobs:
           fi
 
       - name: Dispatch an action and get the run ID
-        uses: codex-/return-dispatch@2dd36d60e4c18c35e6c8d3a1a3c4b31ecf8ee9bd # v1
+        uses: codex-/return-dispatch@16fa9d14771c4d56ae0196bbda1d3c17f7f3650f # v3
         id: return_dispatch
         continue-on-error: true
         with:

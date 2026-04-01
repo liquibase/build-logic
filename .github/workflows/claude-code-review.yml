@@ -35,19 +35,19 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
       - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
         id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
         with:
           secret-ids: |
             ,/vault/liquibase
@@ -103,9 +103,10 @@ jobs:
             OUTPUT FORMAT:
             - Use mcp__github_inline_comment__create_inline_comment for code-specific issues
             - Use gh pr comment for overall summary
+            - REQUIRED: Always start the PR comment with the title "## Code Review"
             - Maximum 5 bullet points total
             - Each bullet point: 1 sentence maximum
-            - If no significant issues: "LGTM - no significant issues found"
+            - If no significant issues: "## Code Review\n\nLGTM - no significant issues found"
 
             FORBIDDEN:
             - Do not analyze unchanged files or code

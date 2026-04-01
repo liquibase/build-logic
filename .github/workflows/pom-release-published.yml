@@ -13,28 +13,27 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
         id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
         with:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
 
       - name: Set up Java for publishing to Maven Central Repository
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: "21"
           distribution: "temurin"
-          cache: "maven"
           server-id: sonatype-nexus-staging
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
@@ -52,6 +51,14 @@ jobs:
           mvn -B release:clean release:prepare -Darguments="-DscmServerId=liquibase -Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" -DreleaseVersion=$RELEASE_VERSION -DpushChanges=false
           git reset HEAD~ --hard
 
+      - name: Checkout build-logic
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: liquibase/build-logic
+          ref: main
+          path: build-logic
+          sparse-checkout: .github/actions/publish-to-central-portal
+
       - name: Get Artifact ID
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
@@ -63,56 +70,13 @@ jobs:
           filename: "${{ env.artifact_id }}-*"
           out-file-path: "."
 
-      - name: Publish to Maven Central
-        env:
-          MAVEN_USERNAME: ${{ env.SONATYPE_USERNAME }}
-          MAVEN_PASSWORD: ${{ env.SONATYPE_TOKEN }}
-        run: |
-          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          groupId=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
-
-          # Create Maven repository layout structure for the bundle
-          # Convert groupId dots to directory separators
-          groupPath=$(echo "$groupId" | tr '.' '/')
-          mkdir -p "bundle/${groupPath}/${{ env.artifact_id }}/${version}"
-
-          # Copy all artifacts and their signatures/checksums to proper Maven repository layout
-          for file in ${{ env.artifact_id }}-${version}*; do
-            cp "$file" "bundle/${groupPath}/${{ env.artifact_id }}/${version}/"
-          done
-
-          # Create the bundle zip file
-          cd bundle
-          zip -r ../central-bundle.zip .
-          cd ..
-
-          # Create base64 encoded credentials for Bearer auth
-          AUTH_HEADER=$(printf "%s:%s" "${MAVEN_USERNAME}" "${MAVEN_PASSWORD}" | base64 -w 0)
-
-          # Upload bundle to Central Portal using curl with proper authentication
-          echo "Uploading bundle to Central Portal..."
-          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -X POST \
-            -H "Authorization: Bearer ${AUTH_HEADER}" \
-            -F "bundle=@central-bundle.zip" \
-            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED&name=${{ env.artifact_id }}-${version}")
-
-          # Parse response
-          HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
-          DEPLOYMENT_ID=$(echo "$UPLOAD_RESPONSE" | head -n1)
-
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Deployment ID: $DEPLOYMENT_ID"
-
-          if [ "$HTTP_CODE" != "201" ]; then
-            echo "Upload failed with HTTP status $HTTP_CODE"
-            echo "Response: $DEPLOYMENT_ID"
-            exit 1
-          fi
-
-          echo "Bundle uploaded successfully to Central Portal"
-          echo "Deployment ID: $DEPLOYMENT_ID"
-          echo "Visit https://central.sonatype.com/publishing/deployments to view and publish your deployment"
+      - name: Publish to Central Portal
+        uses: ./build-logic/.github/actions/publish-to-central-portal
+        with:
+          artifacts-dir: "."
+          version: ${{ github.event.release.tag_name }}
+          sonatype-username: ${{ env.SONATYPE_USERNAME }}
+          sonatype-token: ${{ env.SONATYPE_TOKEN }}
 
   maven-release:
     needs: release

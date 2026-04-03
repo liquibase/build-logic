@@ -101,6 +101,9 @@ jobs:
   ephemeral-cloud-infra:
     name: ${{ inputs.action}} Ephemeral Cloud Infrastructure
     runs-on: ubuntu-latest
+    env:
+      GH_RUN_ID: ${{ github.run_id }}
+      GH_REPOSITORY: ${{ github.repository }}
     outputs:
       stack_id: ${{ steps.set_stack_id.outputs.stack_id }} # Used to reference the stack created in the ephemeral infra
       resources_id: ${{ steps.create_infra.outputs.resources_id }} # Used to reference the resources created in the ephemeral infra
@@ -164,9 +167,6 @@ jobs:
         id: create_stack
         if: ${{ inputs.deploy }}
         working-directory: test-automation-ephemeral/stack
-        env:
-          GH_RUN_ID: ${{ github.run_id }}
-          GH_REPOSITORY: ${{ github.repository }}
         run: |
           terraform apply -auto-approve -var "run_id=$GH_RUN_ID" -var "run_repo=$GH_REPOSITORY"
           echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
@@ -259,8 +259,5 @@ jobs:
       - name: Destroy ephemeral stack
         if: ${{ inputs.destroy && always()}}
         working-directory: test-automation-ephemeral/stack
-        env:
-          GH_RUN_ID: ${{ github.run_id }}
-          GH_REPOSITORY: ${{ github.repository }}
         run: |
           terraform destroy -auto-approve -var "run_id=$GH_RUN_ID" -var "run_repo=$GH_REPOSITORY"

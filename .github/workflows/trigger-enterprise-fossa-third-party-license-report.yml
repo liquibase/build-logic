@@ -30,6 +30,8 @@ jobs:
         ]
 
     name: "${{ matrix.repo.name }} - Fossa Report"
+    env:
+      VERSION_INPUT: ${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -47,7 +49,6 @@ jobs:
       - name: Set workflow inputs
         env:
           REPO_NAME: ${{ matrix.repo.name }}
-          VERSION_INPUT: ${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}
         run: |
           if [[ "$REPO_NAME" ]]; then
             echo "WORKFLOW_INPUTS={ \"version_number_for_3p_fossa_report_generation\": \"$VERSION_INPUT\" }" >> $GITHUB_ENV
@@ -135,8 +136,6 @@ jobs:
           aws-region: us-east-1
 
       - name: Download reports from S3 and Rearrange CSV files
-        env:
-          VERSION_INPUT: ${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}
         run: |
           # Create a directory to store downloaded reports from S3
           mkdir -p /home/runner/work/enterprise/fossa_reports_s3

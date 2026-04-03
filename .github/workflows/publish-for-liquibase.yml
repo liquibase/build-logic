@@ -162,7 +162,6 @@ jobs:
         env:
           DEPLOY_VERSION: ${{ inputs.version }}
           DEPLOY_REPOSITORY: ${{ inputs.repository }}
-          GIT_PASSWORD_VAL: ${{ env.GIT_PASSWORD }}
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           mvn deploy:deploy-file \
@@ -174,4 +173,4 @@ jobs:
           -DrepositoryId=liquibase \
           -Durl="https://maven.pkg.github.com/${DEPLOY_REPOSITORY}" \
           -Dusername=liquibot \
-          -Dpassword="$GIT_PASSWORD_VAL" 
+          -Dpassword="$GIT_PASSWORD" 

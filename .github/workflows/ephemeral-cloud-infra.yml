@@ -164,17 +164,22 @@ jobs:
         id: create_stack
         if: ${{ inputs.deploy }}
         working-directory: test-automation-ephemeral/stack
+        env:
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_REPOSITORY: ${{ github.repository }}
         run: |
-          terraform apply -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"
+          terraform apply -auto-approve -var "run_id=$GH_RUN_ID" -var "run_repo=$GH_REPOSITORY"
           echo "EPHEMERAL_STACK_ID=$(terraform output -raw ephemeral_stack_id)" >> $GITHUB_ENV
           echo "stack_id=$(terraform output -raw ephemeral_stack_id)" >> "$GITHUB_OUTPUT"
 
       - name: Set stack ID output
         id: set_stack_id
         if: ${{ inputs.deploy }}
+        env:
+          CREATE_STACK_ID: ${{ steps.create_stack.outputs.stack_id }}
         run: |
-          echo "Ephemeral stack created with ID: ${{ steps.create_stack.outputs.stack_id }}"
-          echo "stack_id=${{ steps.create_stack.outputs.stack_id }}" >> "$GITHUB_OUTPUT"
+          echo "Ephemeral stack created with ID: $CREATE_STACK_ID"
+          echo "stack_id=$CREATE_STACK_ID" >> "$GITHUB_OUTPUT"
 
       - name: Upload Terraform state as artifact
         if: ${{ inputs.deploy && always()}}
@@ -191,26 +196,41 @@ jobs:
           SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}
           SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
           SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
+          STACK_ID: ${{ steps.create_stack.outputs.stack_id }}
+          INPUT_DYNAMODB: ${{ inputs.dynamodb }}
+          INPUT_DOCUMENTDB: ${{ inputs.documentdb }}
+          INPUT_SNOWFLAKE_OSS: ${{ inputs.snowflake_oss }}
+          INPUT_SNOWFLAKE_PRO: ${{ inputs.snowflake_pro }}
+          INPUT_SNOWFLAKE_TH: ${{ inputs.snowflake_th }}
+          INPUT_SNOWFLAKE_EXT: ${{ inputs.snowflake_ext }}
+          INPUT_AWS_POSTGRESQL: ${{ inputs.aws_postgresql }}
+          INPUT_AWS_ORACLE: ${{ inputs.aws_oracle }}
+          INPUT_AWS_MARIADB: ${{ inputs.aws_mariadb }}
+          INPUT_AWS_AURORA_MYSQL: ${{ inputs.aws_aurora_mysql }}
+          INPUT_AWS_MSSQL: ${{ inputs.aws_mssql }}
+          INPUT_AWS_AURORA_POSTGRES: ${{ inputs.aws_aurora_postgres }}
+          INPUT_AWS_MYSQL: ${{ inputs.aws_mysql }}
+          INPUT_AWS_REDSHIFT: ${{ inputs.aws_redshift }}
         run: |
-          ID=$(echo ${{ steps.create_stack.outputs.stack_id }} | cut -d '-' -f 5)
+          ID=$(echo "$STACK_ID" | cut -d '-' -f 5)
           echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_stack_id $ID
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb ${{ inputs.dynamodb }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb ${{ inputs.documentdb }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_oss ${{ inputs.snowflake_oss }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_pro ${{ inputs.snowflake_pro }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_th ${{ inputs.snowflake_th }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_ext ${{ inputs.snowflake_ext }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql ${{ inputs.aws_postgresql }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle ${{ inputs.aws_oracle }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mariadb ${{ inputs.aws_mariadb }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql ${{ inputs.aws_aurora_mysql }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mssql ${{ inputs.aws_mssql }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres ${{ inputs.aws_aurora_postgres }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql ${{ inputs.aws_mysql }}
-          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_redshift ${{ inputs.aws_redshift }}
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_dynamodb "$INPUT_DYNAMODB"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_documentdb "$INPUT_DOCUMENTDB"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_oss "$INPUT_SNOWFLAKE_OSS"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_pro "$INPUT_SNOWFLAKE_PRO"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_th "$INPUT_SNOWFLAKE_TH"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_ext "$INPUT_SNOWFLAKE_EXT"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql "$INPUT_AWS_POSTGRESQL"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle "$INPUT_AWS_ORACLE"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mariadb "$INPUT_AWS_MARIADB"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql "$INPUT_AWS_AURORA_MYSQL"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mssql "$INPUT_AWS_MSSQL"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres "$INPUT_AWS_AURORA_POSTGRES"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql "$INPUT_AWS_MYSQL"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_redshift "$INPUT_AWS_REDSHIFT"
           # Taint the LTHDB database resource to force recreation (ignore errors if resource doesn't exist)
-          if [[ "${{ inputs.snowflake_pro }}" == "true" || "${{ inputs.snowflake_th }}" == "true" ]]; then
+          if [[ "$INPUT_SNOWFLAKE_PRO" == "true" || "$INPUT_SNOWFLAKE_TH" == "true" ]]; then
             echo "Tainting LTHDB database resource to ensure clean state..."
             spacectl stack task --id $EPHEMERAL_STACK_ID --command "terraform taint 'snowflake_database.LIQUIBASETH_ORIGINAL[0]'" || echo "Resource doesn't exist or already tainted, continuing..."
           fi
@@ -239,5 +259,8 @@ jobs:
       - name: Destroy ephemeral stack
         if: ${{ inputs.destroy && always()}}
         working-directory: test-automation-ephemeral/stack
+        env:
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_REPOSITORY: ${{ github.repository }}
         run: |
-          terraform destroy -auto-approve -var "run_id=${{ github.run_id }}" -var "run_repo=${{ github.repository }}"
+          terraform destroy -auto-approve -var "run_id=$GH_RUN_ID" -var "run_repo=$GH_REPOSITORY"

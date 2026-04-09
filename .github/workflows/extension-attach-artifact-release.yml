@@ -166,7 +166,7 @@ jobs:
           git config user.email "1241802+liquibase-workflows[bot]@users.noreply.github.com"
 
       - name: Run extra Linux command
-        if: inputs.extraLinuxCommand != ''
+        if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
         shell: bash
         env:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}

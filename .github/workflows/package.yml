@@ -1022,7 +1022,7 @@ jobs:
 
   upload_windows_package:
     if: ${{ inputs.distribution == 'liquibase' }}
-    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@main
+    uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@bd84c288aa74b3d195ebcc2e7be2caa5466eb514 # main
     secrets: inherit
     with:
       version: ${{ inputs.version }}
@@ -1034,7 +1034,7 @@ jobs:
   # See: DAT-20985
   #upload_windows_secure_package:
   #  if: ${{ inputs.distribution == 'liquibase-secure' }}
-  #  uses: liquibase/liquibase-secure-chocolatey/.github/workflows/deploy-package.yml@master
+  #  uses: liquibase/liquibase-secure-chocolatey/.github/workflows/deploy-package.yml@master # commented out - DAT-20985
   #  secrets: inherit
   #  with:
   #    version: ${{ inputs.version }}
@@ -1043,7 +1043,7 @@ jobs:
 
   upload_ansible_role:
     if: ${{ inputs.distribution == 'liquibase' }}
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@main
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@c9e1fe46dc4728521ee090f34433411a24d0232d # main
     secrets: inherit
     with:
       version: ${{ inputs.version }}
@@ -1052,7 +1052,7 @@ jobs:
 
   upload_secure_ansible_role:
     if: ${{ inputs.distribution == 'liquibase-secure' }}
-    uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@main
+    uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@64b4297ea25c54e14a6c22b098b2dded35148d07 # main
     secrets: inherit
     with:
       version: ${{ inputs.version }}

@@ -228,7 +228,7 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
           AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
           LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -252,12 +252,9 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
           AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
           LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: |
-          if [ -n "${{ inputs.extraMavenArgs }}" ]; then
-            mvn -B dependency:go-offline clean package -DskipTests=true "${{ inputs.extraMavenArgs }}"
-          else
-            mvn -B dependency:go-offline clean package -DskipTests=true
-          fi
+          mvn -B clean package -DskipTests=true ${EXTRA_MAVEN_ARGS}
 
       - name: Get Project Artifact Name
         working-directory: ${{ inputs.artifactPath }}

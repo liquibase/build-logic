@@ -13,11 +13,6 @@ on:
         required: false
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
-      extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact. This runs on both Linux and Windows runners."
-        required: false
-        default: ""
-        type: string
       extraLinuxCommand:
         description: "Specify it if you want to run an extra command before attaching the artifact on Linux."
         required: false
@@ -173,20 +168,14 @@ jobs:
               }
             ]
 
-      - name: Run extra command
-        if: inputs.extraCommand != ''
-        shell: bash
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        run: |
-          eval "${EXTRA_COMMAND}"
-
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
         shell: bash
         env:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         run: |
+          # eval is required: callers pass multiline shell scripts (e.g. liquibase-checks, liquibase-aws-extension).
+          # Env-var indirection prevents GitHub Actions expression injection; eval handles multi-line interpretation.
           eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Run extra Windows Command

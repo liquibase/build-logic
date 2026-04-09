@@ -3,11 +3,6 @@ name: Release Extension to Sonatype
 on:
   workflow_call:
     inputs:
-      extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact"
-        required: false
-        default: ""
-        type: string
       nameSpace:
         description: "xsd namespace"
         required: false
@@ -58,7 +53,6 @@ jobs:
     if: inputs.deployToMavenCentral == true && inputs.tag == ''
     secrets: inherit
     with:
-      extraCommand: ${{ inputs.extraCommand }}
       javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:
@@ -136,15 +130,6 @@ jobs:
         run: |
           git config user.name "liquibase-workflows[bot]"
           git config user.email "1241802+liquibase-workflows[bot]@users.noreply.github.com"
-
-      - name: Run extra command
-        working-directory: ${{ inputs.artifactPath }}
-        if: inputs.extraCommand != ''
-        shell: bash
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        run: |
-          eval "${EXTRA_COMMAND}"
 
       - name: Build release artifacts
         working-directory: ${{ inputs.artifactPath }}

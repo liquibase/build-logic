@@ -23,11 +23,6 @@ on:
         required: false
         default: false
         type: boolean
-      extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact. This runs on both Linux and Windows runners."
-        required: false
-        default: ""
-        type: string
       extraLinuxCommand:
         description: "Specify it if you want to run an extra command before attaching the artifact on Linux."
         required: false
@@ -184,20 +179,14 @@ jobs:
               }
             ]
 
-      - name: Run extra command
-        if: inputs.extraCommand != ''
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        shell: bash
-        run: |
-          eval "${EXTRA_COMMAND}"
-
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
         env:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         shell: bash
         run: |
+          # eval is required: callers pass multiline shell scripts (e.g. liquibase-checks, liquibase-aws-extension).
+          # Env-var indirection prevents GitHub Actions expression injection; eval handles multi-line interpretation.
           eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Run extra Windows Command
@@ -414,20 +403,14 @@ jobs:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.normalize-os.outputs.platform }}-${{needs.build.outputs.artifact_version}}-artifacts
           path: ./target
 
-      - name: Run extra command
-        if: inputs.extraCommand != ''
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        shell: bash
-        run: |
-          eval "${EXTRA_COMMAND}"
-
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != '' && runner.os == 'Linux'
         env:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         shell: bash
         run: |
+          # eval is required: callers pass multiline shell scripts (e.g. liquibase-checks, liquibase-aws-extension).
+          # Env-var indirection prevents GitHub Actions expression injection; eval handles multi-line interpretation.
           eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Run extra Windows command
@@ -527,8 +510,9 @@ jobs:
 
       - name: Debug Artifact Information
         shell: bash
+        env:
+          ARTIFACT_VERSION: ${{ needs.build.outputs.artifact_version }}
         run: |
-          ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
           echo "Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
           echo "Artifact Version: ${ARTIFACT_VERSION}"
 
@@ -706,8 +690,9 @@ jobs:
 
       - name: Debug Cleanup Payload
         shell: bash
+        env:
+          ARTIFACT_VERSION: ${{ needs.build.outputs.artifact_version }}
         run: |
-          ARTIFACT_VERSION="${{needs.build.outputs.artifact_version}}"
           echo "Cleanup Project Artifact Name: ${PROJECT_ARTIFACT_NAME}"
           echo "Cleanup Artifact Version: ${ARTIFACT_VERSION}"
 
@@ -729,4 +714,3 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
     with:
-      extraCommand: ${{ inputs.extraCommand }}

@@ -3,11 +3,6 @@ name: Create Release
 on:
   workflow_call:
     inputs:
-      extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact"
-        required: false
-        default: ""
-        type: string
       artifactPath:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
         required: false
@@ -34,7 +29,6 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
     with:
-      extraCommand: ${{ inputs.extraCommand }}
 
   create-release:
     name: Create Release

@@ -15,11 +15,6 @@ on:
         required: false
         default: "false"
         type: string
-      extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact"
-        required: false
-        default: ""
-        type: string
       mavenProfiles:
         description: "Specify it if you want to run different Maven profiles from the default (coverage).  mavenProfiles example: 'coverage,run-proguard'"
         required: false
@@ -170,20 +165,14 @@ jobs:
           git config user.name "liquibase-workflows[bot]"
           git config user.email "1241802+liquibase-workflows[bot]@users.noreply.github.com"
 
-      - name: Run extra command
-        if: inputs.extraCommand != ''
-        shell: bash
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        run: |
-          eval "${EXTRA_COMMAND}"
-
       - name: Run extra Linux command
         if: inputs.extraLinuxCommand != ''
         shell: bash
         env:
           EXTRA_LINUX_COMMAND: ${{ inputs.extraLinuxCommand }}
         run: |
+          # eval is required: callers pass multiline shell scripts (e.g. liquibase-checks, liquibase-aws-extension).
+          # Env-var indirection prevents GitHub Actions expression injection; eval handles multi-line interpretation.
           eval "${EXTRA_LINUX_COMMAND}"
 
       - name: Build and Package
@@ -423,14 +412,6 @@ jobs:
             artifact_id=$(mvn help:evaluate "-Dexpression=project.artifactId" -q -DforceStdout)
           fi
           echo "artifact_id=$artifact_id" >> $GITHUB_ENV
-
-      - name: Run extra command
-        if: inputs.extraCommand
-        shell: bash
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        run: |
-          eval "${EXTRA_COMMAND}"
 
       - name: Get latest draft release ID
         if: ${{ inputs.dry_run == false }}

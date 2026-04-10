@@ -89,7 +89,7 @@ jobs:
         shell: bash
 
       - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
-        uses: Codex-/await-remote-run@1fd400f3e2033480390bd521e6626b24365c9c20 # v1
+        uses: Codex-/await-remote-run@a56c556e6434d2d7ec9438dc656143b39532324e # v1
         with:
           token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
           run_id: ${{ steps.return_dispatch.outputs.run_id }}

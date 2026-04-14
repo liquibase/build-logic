@@ -28,7 +28,6 @@ jobs:
     if: ${{ inputs.sonar == true }}
     uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
-    with:
 
   create-release:
     name: Create Release

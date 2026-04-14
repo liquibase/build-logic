@@ -713,4 +713,3 @@ jobs:
     needs: [unit-test]
     uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
-    with:

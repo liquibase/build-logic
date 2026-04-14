@@ -3,11 +3,6 @@ name: Prepare release
 on:
   workflow_call:
     inputs:
-      extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact"
-        required: false
-        default: ""
-        type: string
       artifactPath:
         description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions."
         required: false
@@ -102,15 +97,6 @@ jobs:
               }
             ]
 
-      - name: Run extra command
-        working-directory: ${{ inputs.artifactPath }}
-        if: inputs.extraCommand != ''
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        shell: bash
-        run: |
-          eval "${EXTRA_COMMAND}"
-
       - name: Configure Git
         run: |
           git config --local user.email "64099989+liquibot@users.noreply.github.com"
@@ -163,5 +149,4 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/extension-release-rollback.yml@main
     secrets: inherit
     with:
-      extraCommand: ${{ inputs.extraCommand }}
       artifactPath: ${{ inputs.artifactPath }}

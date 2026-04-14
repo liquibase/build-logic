@@ -20,11 +20,6 @@ on:
         required: false
         default: '["java"]'
         type: string
-      extraCommand:
-        description: 'Specify it if you want to run an extra command before attaching the artifact'
-        required: false
-        default: ''
-        type: string
       buildCommand:
         description: 'Custom build command'
         required: false
@@ -123,13 +118,6 @@ jobs:
         distribution: 'temurin'
         cache: 'maven'
         
-    - name: Run extra command
-      if: inputs.extraCommand != ''
-      env:
-        EXTRA_COMMAND: ${{ inputs.extraCommand }}
-      shell: bash
-      run: |
-        ${EXTRA_COMMAND}
 
     - name: Set up Maven
       if: matrix.language == 'java'

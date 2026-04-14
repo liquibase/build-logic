@@ -3,11 +3,6 @@ name: Release Extension to Sonatype
 on:
   workflow_call:
     inputs:
-      extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact"
-        required: false
-        default: ""
-        type: string
       nameSpace:
         description: "xsd namespace"
         required: false
@@ -58,7 +53,6 @@ jobs:
     if: inputs.deployToMavenCentral == true && inputs.tag == ''
     secrets: inherit
     with:
-      extraCommand: ${{ inputs.extraCommand }}
       javaBuildVersion: ${{ inputs.javaBuildVersion }}
 
   release:
@@ -136,15 +130,6 @@ jobs:
         run: |
           git config user.name "liquibase-workflows[bot]"
           git config user.email "1241802+liquibase-workflows[bot]@users.noreply.github.com"
-
-      - name: Run extra command
-        working-directory: ${{ inputs.artifactPath }}
-        if: inputs.extraCommand != ''
-        shell: bash
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        run: |
-          eval "${EXTRA_COMMAND}"
 
       - name: Build release artifacts
         working-directory: ${{ inputs.artifactPath }}
@@ -294,9 +279,11 @@ jobs:
 
       - name: Rename SNAPSHOTS to dry_run version
         working-directory: ${{ inputs.artifactPath }}
+        env:
+          DRY_RUN_VERSION: ${{ inputs.dry_run_version }}
         run: |
           # Validate and sanitize dry_run_version input (Maven-style: letters, digits, dots, hyphens, underscores)
-          raw_version="${{ inputs.dry_run_version }}"
+          raw_version="$DRY_RUN_VERSION"
           if [[ ! "$raw_version" =~ ^[a-zA-Z0-9._-]+$ ]]; then
             echo "ERROR: Invalid dry_run_version format: '$raw_version'"
             echo "Version must contain only letters, digits, dots, hyphens, and underscores"

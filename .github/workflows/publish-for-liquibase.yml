@@ -159,15 +159,18 @@ jobs:
             ]
 
       - name: Publish to GitHub Packages
+        env:
+          DEPLOY_VERSION: ${{ inputs.version }}
+          DEPLOY_REPOSITORY: ${{ inputs.repository }}
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           mvn deploy:deploy-file \
-          -Dfile="./artifacts/liquibase-checks-${{ inputs.version }}.jar" \
+          -Dfile="./artifacts/liquibase-checks-${DEPLOY_VERSION}.jar" \
           -DgroupId=org.liquibase.ext \
           -DartifactId=liquibase-checks \
-          -Dversion=${{ inputs.version }} \
+          -Dversion="${DEPLOY_VERSION}" \
           -Dpackaging=jar \
           -DrepositoryId=liquibase \
-          -Durl=https://maven.pkg.github.com/${{ inputs.repository }} \
+          -Durl="https://maven.pkg.github.com/${DEPLOY_REPOSITORY}" \
           -Dusername=liquibot \
-          -Dpassword=${{ env.GIT_PASSWORD }} 
+          -Dpassword="$GIT_PASSWORD" 

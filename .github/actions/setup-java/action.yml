@@ -1,0 +1,38 @@
+name: 'Liquibase Setup Java'
+description: 'Org-standard Java setup — SHA managed centrally in build-logic'
+inputs:
+  java-version:
+    description: 'Java version to set up'
+    required: false
+    default: '17'
+  distribution:
+    description: 'Java distribution'
+    required: false
+    default: 'temurin'
+  cache:
+    description: 'Build tool cache (maven, gradle, sbt)'
+    required: false
+    default: 'maven'
+  server-id:
+    description: 'Maven server ID for settings.xml'
+    required: false
+    default: ''
+  server-username:
+    description: 'Environment variable for Maven server username'
+    required: false
+    default: ''
+  server-password:
+    description: 'Environment variable for Maven server password'
+    required: false
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+      with:
+        java-version: ${{ inputs.java-version }}
+        distribution: ${{ inputs.distribution }}
+        cache: ${{ inputs.cache }}
+        server-id: ${{ inputs.server-id }}
+        server-username: ${{ inputs.server-username }}
+        server-password: ${{ inputs.server-password }}

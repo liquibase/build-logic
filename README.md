@@ -53,6 +53,50 @@ If inputs are not provided, `'[8, 11, 17, 18]'` and `'["ubuntu-latest", "windows
 - **artifactId**: Value from the `artifactId` field in the pom file. i.e. `liquibase`
 - **version**: Value from the `version` field in the pom file. i.e `4.23.1`
 
+## 🧩 Composite Action Wrappers
+
+To reduce Dependabot noise and centralize SHA management, this repo provides **composite action wrappers** for high-frequency third-party actions. Instead of every repo pinning SHAs individually, repos reference the wrapper — and SHAs are updated in one place.
+
+### 📦 Available Wrappers
+
+| Wrapper | Wraps | Usage |
+|---------|-------|-------|
+| `checkout` | `actions/checkout` | `uses: liquibase/build-logic/.github/actions/checkout@main` |
+| `setup-java` | `actions/setup-java` | `uses: liquibase/build-logic/.github/actions/setup-java@main` |
+| `configure-aws-credentials` | `aws-actions/configure-aws-credentials` | `uses: liquibase/build-logic/.github/actions/configure-aws-credentials@main` |
+| `setup-aws-vault` | AWS credentials + Secrets Manager | `uses: liquibase/build-logic/.github/actions/setup-aws-vault@main` |
+| `setup-google-credentials` | Google Cloud credentials | `uses: liquibase/build-logic/.github/actions/setup-google-credentials@main` |
+
+### 🚀 Usage Example
+
+**Before** (every repo pins its own SHA):
+```yml
+- uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  with:
+    fetch-depth: 0
+```
+
+**After** (SHA managed centrally in build-logic):
+```yml
+- uses: liquibase/build-logic/.github/actions/checkout@main
+  with:
+    fetch-depth: 0
+```
+
+### 🔄 How SHA Updates Work
+
+1. Dependabot monitors each composite action directory in `build-logic`
+2. When a new version is released, Dependabot opens **one PR** in `build-logic`
+3. After merge, all calling repos automatically use the updated SHA on next run
+4. No more N Dependabot PRs across N repos for the same action update! 🎉
+
+### ⚠️ Important Notes
+
+- Composite actions can only contain **steps**, not jobs
+- Calling repos reference wrappers with `@main` — a bad merge to `build-logic` affects all repos simultaneously
+- Always test composite action changes thoroughly before merging
+- Each wrapper exposes only the most commonly used inputs — check the `action.yml` for available parameters
+
 ## Example Build/Test/Release Extension Workflow
 
 ```mermaid

@@ -5,7 +5,28 @@
 
 version: 2
 updates:
-  - package-ecosystem: "github-actions" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    # Also scan composite action directories for SHA updates
+  - package-ecosystem: "github-actions"
+    directory: "/.github/actions/checkout"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/.github/actions/setup-java"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/.github/actions/configure-aws-credentials"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/.github/actions/setup-aws-vault"
     schedule:
       interval: "weekly"

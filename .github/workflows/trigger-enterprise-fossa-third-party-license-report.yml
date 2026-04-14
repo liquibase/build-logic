@@ -30,6 +30,8 @@ jobs:
         ]
 
     name: "${{ matrix.repo.name }} - Fossa Report"
+    env:
+      VERSION_INPUT: ${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -45,9 +47,11 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
       - name: Set workflow inputs
+        env:
+          REPO_NAME: ${{ matrix.repo.name }}
         run: |
-          if [[ "${{ matrix.repo.name }}" ]]; then
-            echo "WORKFLOW_INPUTS={ \"version_number_for_3p_fossa_report_generation\": \"${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}\" }" >> $GITHUB_ENV
+          if [[ "$REPO_NAME" ]]; then
+            echo "WORKFLOW_INPUTS={ \"version_number_for_3p_fossa_report_generation\": \"$VERSION_INPUT\" }" >> $GITHUB_ENV
           else
             echo "WORKFLOW_INPUTS={}" >> $GITHUB_ENV
           fi
@@ -65,11 +69,13 @@ jobs:
           workflow_inputs: ${{ env.WORKFLOW_INPUTS }}
 
       - name: Retry fetching run ID (max 4 attempts with 5 seconds delay)
+        env:
+          DISPATCH_RUN_ID: ${{ steps.return_dispatch.outputs.run_id }}
         run: |
           retries=7
           delay=5  # Delay of 5 seconds between retries
           for i in $(seq 1 $retries); do
-            run_id="${{ steps.return_dispatch.outputs.run_id }}"
+            run_id="$DISPATCH_RUN_ID"
             if [ -n "$run_id" ]; then
               echo "Found run ID: $run_id"
               echo "run_id=$run_id" >> $GITHUB_ENV
@@ -135,7 +141,7 @@ jobs:
           mkdir -p /home/runner/work/enterprise/fossa_reports_s3
 
           # Download all files from the specified S3 bucket to the created directory
-          aws s3 cp --recursive s3://liquibaseorg-origin/enterprise_fossa_report/${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}/raw_reports /home/runner/work/enterprise/fossa_reports_s3/
+          aws s3 cp --recursive "s3://liquibaseorg-origin/enterprise_fossa_report/${VERSION_INPUT}/raw_reports" /home/runner/work/enterprise/fossa_reports_s3/
 
           # List the contents of the directory to confirm successful download
           ls -l /home/runner/work/enterprise/fossa_reports_s3

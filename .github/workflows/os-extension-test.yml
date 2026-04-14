@@ -23,11 +23,6 @@ on:
         required: false
         default: false
         type: boolean
-      extraCommand:
-        description: "Specify it if you want to run an extra command before attaching the artifact"
-        required: false
-        default: ""
-        type: string
       extraMavenArgs:
         description: "Specify it if you want to run an extra maven argument"
         required: false
@@ -130,14 +125,6 @@ jobs:
                 "password": "${{ env.LIQUIBOT_PAT_GPM_ACCESS }}"
               }
             ]
-
-      - name: Run extra command
-        if: inputs.extraCommand != ''
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        shell: bash
-        run: |
-          eval "${EXTRA_COMMAND}"
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
@@ -276,14 +263,6 @@ jobs:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: ./target
 
-      - name: Run extra command
-        if: inputs.extraCommand != ''
-        env:
-          EXTRA_COMMAND: ${{ inputs.extraCommand }}
-        shell: bash
-        run: |
-          eval "${EXTRA_COMMAND}"
-
       - name: Run Tests
         if: ${{ !inputs.nightly }}
         env:
@@ -342,5 +321,4 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
     with:
-      extraCommand: ${{ inputs.extraCommand }}
       javaBuildVersion: ${{ inputs.javaBuildVersion }}

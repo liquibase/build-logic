@@ -32,6 +32,8 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-22.04
+    env:
+      REPO_DIR: ${{ inputs.repository }}
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -105,14 +107,16 @@ jobs:
 
       - name: Build project
         run: |
-          cd ${{ inputs.repository }}
+          cd "$REPO_DIR"
           mvn clean install -DskipTests
 
       - name: Run OWASP Dependency Check
         id: run_owasp
+        env:
+          NVD_API_KEY_VAL: ${{ env.NVD_API_KEY }}
         run: |
-          cd ${{ inputs.repository }}
-          mvn org.owasp:dependency-check-maven:aggregate -DnvdApiKey=${{ env.NVD_API_KEY }} -DfailOnError=true
+          cd "$REPO_DIR"
+          mvn org.owasp:dependency-check-maven:aggregate -DnvdApiKey="$NVD_API_KEY_VAL" -DfailOnError=true
 
       - name: Upload OWASP Dependency-Check results
         if: always()

@@ -2,27 +2,83 @@ name: 'Liquibase Setup Java'
 description: 'Org-standard Java setup — SHA managed centrally in build-logic'
 inputs:
   java-version:
-    description: 'Java version to set up'
+    description: 'The Java version to set up (whole or semver)'
     required: false
     default: '17'
+  java-version-file:
+    description: 'The path to the .java-version file'
+    required: false
+    default: ''
   distribution:
-    description: 'Java distribution'
+    description: 'Java distribution (e.g. temurin, zulu, adopt, corretto)'
     required: false
     default: 'temurin'
-  cache:
-    description: 'Build tool cache (maven, gradle, sbt)'
+  java-package:
+    description: 'The package type (jdk, jre, jdk+fx, jre+fx)'
     required: false
-    default: 'maven'
+    default: 'jdk'
+  architecture:
+    description: 'The architecture of the package (defaults to runner architecture)'
+    required: false
+    default: ''
+  jdkFile:
+    description: 'Path to where the compressed JDK is located'
+    required: false
+    default: ''
+  check-latest:
+    description: 'Set this option to check for the latest available version'
+    required: false
+    default: 'false'
   server-id:
-    description: 'Maven server ID for settings.xml'
+    description: 'ID of the distributionManagement repository in the pom.xml file'
     required: false
     default: ''
   server-username:
-    description: 'Environment variable for Maven server username'
+    description: 'Environment variable name for the username for Maven repository authentication'
     required: false
     default: ''
   server-password:
-    description: 'Environment variable for Maven server password'
+    description: 'Environment variable name for password/token for Maven repository authentication'
+    required: false
+    default: ''
+  settings-path:
+    description: 'Path to where the settings.xml file will be written (default ~/.m2)'
+    required: false
+    default: ''
+  overwrite-settings:
+    description: 'Overwrite the settings.xml file if it exists'
+    required: false
+    default: 'true'
+  gpg-private-key:
+    description: 'GPG private key to import'
+    required: false
+    default: ''
+  gpg-passphrase:
+    description: 'Environment variable name for the GPG private key passphrase'
+    required: false
+    default: ''
+  cache:
+    description: 'Name of the build platform to cache dependencies (maven, gradle, sbt)'
+    required: false
+    default: 'maven'
+  cache-dependency-path:
+    description: 'The path to a dependency file (pom.xml, build.gradle, build.sbt, etc.)'
+    required: false
+    default: ''
+  job-status:
+    description: 'Workaround to pass job status to post job step (not for manual setting)'
+    required: false
+    default: ${{ job.status }}
+  token:
+    description: 'Token used to authenticate when fetching version manifests from github.com'
+    required: false
+    default: ${{ github.server_url == 'https://github.com' && github.token || '' }}
+  mvn-toolchain-id:
+    description: 'Name of Maven Toolchain ID if the default name is not wanted'
+    required: false
+    default: ''
+  mvn-toolchain-vendor:
+    description: 'Name of Maven Toolchain Vendor if the default name is not wanted'
     required: false
     default: ''
 runs:
@@ -31,8 +87,22 @@ runs:
     - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         java-version: ${{ inputs.java-version }}
+        java-version-file: ${{ inputs.java-version-file }}
         distribution: ${{ inputs.distribution }}
-        cache: ${{ inputs.cache }}
+        java-package: ${{ inputs.java-package }}
+        architecture: ${{ inputs.architecture }}
+        jdkFile: ${{ inputs.jdkFile }}
+        check-latest: ${{ inputs.check-latest }}
         server-id: ${{ inputs.server-id }}
         server-username: ${{ inputs.server-username }}
         server-password: ${{ inputs.server-password }}
+        settings-path: ${{ inputs.settings-path }}
+        overwrite-settings: ${{ inputs.overwrite-settings }}
+        gpg-private-key: ${{ inputs.gpg-private-key }}
+        gpg-passphrase: ${{ inputs.gpg-passphrase }}
+        cache: ${{ inputs.cache }}
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+        job-status: ${{ inputs.job-status }}
+        token: ${{ inputs.token }}
+        mvn-toolchain-id: ${{ inputs.mvn-toolchain-id }}
+        mvn-toolchain-vendor: ${{ inputs.mvn-toolchain-vendor }}

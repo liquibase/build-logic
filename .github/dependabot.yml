@@ -30,3 +30,7 @@ updates:
     directory: "/.github/actions/setup-aws-vault"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/.github/actions/setup-google-credentials"
+    schedule:
+      interval: "weekly"

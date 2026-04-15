@@ -112,10 +112,27 @@ inputs:
     description: 'A global timeout in seconds for the action'
     required: false
     default: ''
+outputs:
+  aws-account-id:
+    description: 'The AWS account ID for the provided credentials'
+    value: ${{ steps.configure.outputs.aws-account-id }}
+  aws-access-key-id:
+    description: 'The AWS access key ID for the provided credentials'
+    value: ${{ steps.configure.outputs.aws-access-key-id }}
+  aws-secret-access-key:
+    description: 'The AWS secret access key for the provided credentials'
+    value: ${{ steps.configure.outputs.aws-secret-access-key }}
+  aws-session-token:
+    description: 'The AWS session token for the provided credentials'
+    value: ${{ steps.configure.outputs.aws-session-token }}
+  aws-expiration:
+    description: 'The expiration time for the provided credentials'
+    value: ${{ steps.configure.outputs.aws-expiration }}
 runs:
   using: 'composite'
   steps:
-    - uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+    - id: configure
+      uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
       with:
         aws-region: ${{ inputs.aws-region }}
         role-to-assume: ${{ inputs.role-to-assume }}

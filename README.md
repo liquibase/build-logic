@@ -95,7 +95,7 @@ To reduce Dependabot noise and centralize SHA management, this repo provides **c
 - Composite actions can only contain **steps**, not jobs
 - Calling repos reference wrappers with `@main` — a bad merge to `build-logic` affects all repos simultaneously
 - Always test composite action changes thoroughly before merging
-- Each wrapper exposes only the most commonly used inputs — check the `action.yml` for available parameters
+- Each wrapper passes through the full set of upstream inputs — see the `action.yml` for all available parameters
 
 ## Example Build/Test/Release Extension Workflow
 

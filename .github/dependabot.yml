@@ -9,6 +9,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    reviewers:
+      - "liquibase/liquibase-devops"
+    commit-message:
+      prefix: "chore(deps)"
     groups:
       github-actions:
         patterns:
@@ -18,19 +22,39 @@ updates:
     directory: "/.github/actions/checkout"
     schedule:
       interval: "weekly"
+    reviewers:
+      - "liquibase/liquibase-devops"
+    commit-message:
+      prefix: "chore(deps)"
   - package-ecosystem: "github-actions"
     directory: "/.github/actions/setup-java"
     schedule:
       interval: "weekly"
+    reviewers:
+      - "liquibase/liquibase-devops"
+    commit-message:
+      prefix: "chore(deps)"
   - package-ecosystem: "github-actions"
     directory: "/.github/actions/configure-aws-credentials"
     schedule:
       interval: "weekly"
+    reviewers:
+      - "liquibase/liquibase-devops"
+    commit-message:
+      prefix: "chore(deps)"
   - package-ecosystem: "github-actions"
     directory: "/.github/actions/setup-aws-vault"
     schedule:
       interval: "weekly"
+    reviewers:
+      - "liquibase/liquibase-devops"
+    commit-message:
+      prefix: "chore(deps)"
   - package-ecosystem: "github-actions"
     directory: "/.github/actions/setup-google-credentials"
     schedule:
       interval: "weekly"
+    reviewers:
+      - "liquibase/liquibase-devops"
+    commit-message:
+      prefix: "chore(deps)"

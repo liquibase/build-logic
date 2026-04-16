@@ -1,0 +1,9 @@
+# CODEOWNERS for liquibase/build-logic
+#
+# This repo contains reusable GitHub Actions workflows consumed by ~1000+
+# org repos via `@main`. Any change to .github/ is high blast-radius and
+# must be reviewed by the DevOps team.
+#
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+/.github/ @liquibase/liquibase-devops

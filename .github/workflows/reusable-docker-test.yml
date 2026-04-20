@@ -26,12 +26,14 @@ on:
         required: false
         type: string
         default: 'main'
-    secrets: inherit
 
 jobs:
   test:
     name: Build & Test ${{ inputs.dockerfile_path }} - ${{ inputs.runs_on }}
     runs-on: ${{ inputs.runs_on }}
+    permissions:
+      contents: read
+      id-token: write
     env:
       CONTAINER_NAME: "liquibase"
       IMAGE_TAG: ${{ inputs.image_tag }}

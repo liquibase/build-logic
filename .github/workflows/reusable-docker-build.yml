@@ -135,7 +135,6 @@ on:
       tags:
         description: 'Comma-separated list of all tags pushed'
         value: ${{ jobs.build.outputs.tags }}
-    secrets: inherit
 
 jobs:
   build:
@@ -190,6 +189,7 @@ jobs:
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
           aws-region: us-east-1
+          output-credentials: true
 
       - name: Login to Docker Hub
         if: ${{ !inputs.dry_run && inputs.push_dockerhub }}

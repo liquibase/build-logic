@@ -70,7 +70,6 @@ on:
       ghcr_ref:
         description: 'Full GHCR image reference including tag'
         value: ${{ jobs.build-qa.outputs.ghcr_ref }}
-    secrets: inherit
 
 jobs:
   build-qa:
@@ -559,8 +558,8 @@ jobs:
             TAGS="${TAGS}${GHCR_REF}"
           fi
           if [[ -z "$TAGS" ]]; then
-            echo "::warning::Neither push_nexus nor push_ghcr is enabled — no tags generated."
-            TAGS="ghcr.io/${REPOSITORY}/liquibase-${GHCR_NAME}:${IMAGE_TAG}"
+            echo "::error::Neither push_nexus nor push_ghcr is enabled; no push target is available."
+            exit 1
           fi
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 

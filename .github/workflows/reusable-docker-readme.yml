@@ -51,7 +51,7 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
-          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d)
+          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d | tr -d '\r\n')
           echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
 
       - name: Update Docker Hub README

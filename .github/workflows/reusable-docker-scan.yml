@@ -99,7 +99,7 @@ jobs:
             GHCR_NAME=$(echo "$IMAGE_NAME" | awk -F'/' '{print $NF}')
           fi
           GHCR_IMAGE="ghcr.io/${REPOSITORY}/liquibase-${GHCR_NAME}:${GHCR_TAG}"
-          echo "ghcr_image=${GHCR_IMAGE}" >> $GITHUB_OUTPUT
+          echo "ghcr_image=${GHCR_IMAGE}" >> "$GITHUB_OUTPUT"
           echo "GHCR target: ${GHCR_IMAGE}"
 
       - name: Build and push to GHCR
@@ -184,7 +184,7 @@ jobs:
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
           decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d)
-          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> $GITHUB_ENV
+          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
 
       - name: Login to Docker Hub
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
@@ -288,11 +288,12 @@ jobs:
           PKG_WITH_TAG="${GHCR_IMAGE#ghcr.io/${REPO_OWNER}/}"
           PACKAGE_NAME="${PKG_WITH_TAG%%:*}"
           TAG="${PKG_WITH_TAG##*:}"
-          ENCODED_PACKAGE_NAME=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${PACKAGE_NAME}', safe=''))")
+          # Pass PACKAGE_NAME via sys.argv to avoid shell interpolation into Python
+          ENCODED_PACKAGE_NAME=$(python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=''))" "$PACKAGE_NAME")
 
           VERSION_ID=$(gh api \
             "/orgs/${REPO_OWNER}/packages/container/${ENCODED_PACKAGE_NAME}/versions" \
-            --jq ".[] | select(.metadata.container.tags[] == \"${TAG}\") | .id" 2>/dev/null || echo "")
+            --jq --arg tag "$TAG" '.[] | select(.metadata.container.tags[] == $tag) | .id' 2>/dev/null || echo "")
           if [ -n "$VERSION_ID" ]; then
             gh api --method DELETE \
               "/orgs/${REPO_OWNER}/packages/container/${ENCODED_PACKAGE_NAME}/versions/${VERSION_ID}"

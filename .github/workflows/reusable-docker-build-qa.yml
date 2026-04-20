@@ -143,12 +143,12 @@ jobs:
           if [ "$WORKFLOW_RUN" = "null" ] || [ -z "$WORKFLOW_RUN" ]; then
             echo "No successful workflow run found for branch ${BRANCH_NAME}"
             echo "Will build using standard Dockerfile from branch source instead"
-            echo "workflow_run_id=" >> $GITHUB_OUTPUT
-            echo "has_workflow_run=false" >> $GITHUB_OUTPUT
+            echo "workflow_run_id=" >> "$GITHUB_OUTPUT"
+            echo "has_workflow_run=false" >> "$GITHUB_OUTPUT"
           else
             echo "Found workflow run ID: $WORKFLOW_RUN"
-            echo "workflow_run_id=$WORKFLOW_RUN" >> $GITHUB_OUTPUT
-            echo "has_workflow_run=true" >> $GITHUB_OUTPUT
+            echo "workflow_run_id=$WORKFLOW_RUN" >> "$GITHUB_OUTPUT"
+            echo "has_workflow_run=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Download liquibase build artifact (Community) or from S3 (Liquibase-Secure)
@@ -203,21 +203,21 @@ jobs:
                 # If secure_version is provided, don't trigger workflow - the build should exist
                 if [[ -n "$SECURE_VERSION" ]]; then
                   echo "ERROR: secure_version specified but build not found in S3. Build should already exist for version $SECURE_VERSION"
-                  echo "trigger_liquibase_secure_workflow=false" >> $GITHUB_OUTPUT
-                  echo "build_ready=false" >> $GITHUB_OUTPUT
-                  echo "use_fallback=true" >> $GITHUB_OUTPUT
+                  echo "trigger_liquibase_secure_workflow=false" >> "$GITHUB_OUTPUT"
+                  echo "build_ready=false" >> "$GITHUB_OUTPUT"
+                  echo "use_fallback=true" >> "$GITHUB_OUTPUT"
                 else
                   echo "Branch-based build not found. Will trigger workflow to create it..."
-                  echo "trigger_liquibase_secure_workflow=true" >> $GITHUB_OUTPUT
-                  echo "build_ready=false" >> $GITHUB_OUTPUT
-                  echo "use_fallback=false" >> $GITHUB_OUTPUT
+                  echo "trigger_liquibase_secure_workflow=true" >> "$GITHUB_OUTPUT"
+                  echo "build_ready=false" >> "$GITHUB_OUTPUT"
+                  echo "use_fallback=false" >> "$GITHUB_OUTPUT"
                 fi
               fi
             else
               echo "Successfully downloaded Liquibase-Secure build from S3"
-              echo "trigger_liquibase_secure_workflow=false" >> $GITHUB_OUTPUT
-              echo "build_ready=true" >> $GITHUB_OUTPUT
-              echo "use_fallback=false" >> $GITHUB_OUTPUT
+              echo "trigger_liquibase_secure_workflow=false" >> "$GITHUB_OUTPUT"
+              echo "build_ready=true" >> "$GITHUB_OUTPUT"
+              echo "use_fallback=false" >> "$GITHUB_OUTPUT"
 
               # Extract the liquibase Secure archive
               mkdir -p liquibase-build
@@ -234,8 +234,8 @@ jobs:
             # Community build handling
             if [[ "$HAS_WORKFLOW_RUN" == "false" ]]; then
               echo "No workflow run available, will use fallback build from branch source"
-              echo "build_ready=false" >> $GITHUB_OUTPUT
-              echo "use_fallback=true" >> $GITHUB_OUTPUT
+              echo "build_ready=false" >> "$GITHUB_OUTPUT"
+              echo "use_fallback=true" >> "$GITHUB_OUTPUT"
             else
               echo "Downloading Community build from GitHub artifacts..."
 
@@ -258,8 +258,8 @@ jobs:
                 echo "Available artifacts:"
                 echo "$ARTIFACTS_RESPONSE" | jq -r '.artifacts[].name'
                 echo "Will use fallback build from branch source instead"
-                echo "build_ready=false" >> $GITHUB_OUTPUT
-                echo "use_fallback=true" >> $GITHUB_OUTPUT
+                echo "build_ready=false" >> "$GITHUB_OUTPUT"
+                echo "use_fallback=true" >> "$GITHUB_OUTPUT"
               else
                 echo "Downloading artifact from: $ARTIFACT_URL"
 
@@ -282,8 +282,8 @@ jobs:
                   echo "Contents of extracted artifact:"
                   find . -type f
                   echo "Will use fallback build from branch source instead"
-                  echo "build_ready=false" >> $GITHUB_OUTPUT
-                  echo "use_fallback=true" >> $GITHUB_OUTPUT
+                  echo "build_ready=false" >> "$GITHUB_OUTPUT"
+                  echo "use_fallback=true" >> "$GITHUB_OUTPUT"
                 else
                   echo "Found liquibase zip: $LIQUIBASE_ZIP"
 
@@ -292,8 +292,8 @@ jobs:
                   unzip -q "$LIQUIBASE_ZIP" -d liquibase-build/
 
                   echo "Liquibase build extracted to liquibase-build/"
-                  echo "build_ready=true" >> $GITHUB_OUTPUT
-                  echo "use_fallback=false" >> $GITHUB_OUTPUT
+                  echo "build_ready=true" >> "$GITHUB_OUTPUT"
+                  echo "use_fallback=false" >> "$GITHUB_OUTPUT"
                 fi
               fi
             fi
@@ -350,8 +350,8 @@ jobs:
           if ! aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP"; then
             echo "Failed to download Liquibase Secure build even after workflow completion"
             echo "Will use fallback build from branch source instead"
-            echo "build_ready=false" >> $GITHUB_OUTPUT
-            echo "use_fallback=true" >> $GITHUB_OUTPUT
+            echo "build_ready=false" >> "$GITHUB_OUTPUT"
+            echo "use_fallback=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -368,8 +368,8 @@ jobs:
           fi
           echo "Contents of liquibase-build:"
           ls -la liquibase-build/
-          echo "build_ready=true" >> $GITHUB_OUTPUT
-          echo "use_fallback=false" >> $GITHUB_OUTPUT
+          echo "build_ready=true" >> "$GITHUB_OUTPUT"
+          echo "use_fallback=false" >> "$GITHUB_OUTPUT"
 
       - name: Validate and prepare liquibase build
         if: ${{ (inputs.build_type == 'Community' && (steps.download-artifact.outputs.build_ready == 'true' || steps.download-artifact.outputs.use_fallback == 'true')) || inputs.build_type == 'secure' }}
@@ -404,7 +404,7 @@ jobs:
 
           if [[ "$USE_FALLBACK" == "true" ]]; then
             echo "Using fallback mode - will build from standard Dockerfile using branch source"
-            echo "use_fallback_build=true" >> $GITHUB_OUTPUT
+            echo "use_fallback_build=true" >> "$GITHUB_OUTPUT"
           else
             # Validate the liquibase build structure
             if [ ! -f "liquibase-build/liquibase" ]; then
@@ -423,7 +423,7 @@ jobs:
             echo "Liquibase build validation successful"
             echo "Final liquibase-build contents:"
             ls -la liquibase-build/
-            echo "use_fallback_build=false" >> $GITHUB_OUTPUT
+            echo "use_fallback_build=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Modify Dockerfiles for artifact-based build
@@ -543,10 +543,12 @@ jobs:
           else
             IMAGE_TAG="$BRANCH_NAME"
           fi
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          # Sanitize IMAGE_TAG for Docker tag safety (replace invalid chars with -)
+          IMAGE_TAG=$(echo "$IMAGE_TAG" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
           GHCR_REF="ghcr.io/${REPOSITORY}/liquibase-${GHCR_NAME}:${GIT_SHA}"
-          echo "ghcr_ref=${GHCR_REF}" >> $GITHUB_OUTPUT
+          echo "ghcr_ref=${GHCR_REF}" >> "$GITHUB_OUTPUT"
 
           # Build comma-separated tag list for build-push-action
           TAGS=""
@@ -561,7 +563,7 @@ jobs:
             echo "::error::Neither push_nexus nor push_ghcr is enabled; no push target is available."
             exit 1
           fi
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         if: ${{ steps.validate-build.outcome == 'success' }}

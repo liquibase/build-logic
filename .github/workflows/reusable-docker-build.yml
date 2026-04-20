@@ -171,7 +171,7 @@ jobs:
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
           decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d)
-          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> $GITHUB_ENV
+          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
@@ -224,9 +224,9 @@ jobs:
           PRIVATE_ECR_DRY_RUN_REPO: ${{ env.PRIVATE_ECR_DRY_RUN_REPO }}
         run: |
           if [[ -n "$DRY_RUN_ECR_REPO_INPUT" ]]; then
-            echo "repo=$DRY_RUN_ECR_REPO_INPUT" >> $GITHUB_OUTPUT
+            echo "repo=$DRY_RUN_ECR_REPO_INPUT" >> "$GITHUB_OUTPUT"
           else
-            echo "repo=$PRIVATE_ECR_DRY_RUN_REPO" >> $GITHUB_OUTPUT
+            echo "repo=$PRIVATE_ECR_DRY_RUN_REPO" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Login to Private ECR Registry (dry-run)
@@ -255,6 +255,15 @@ jobs:
           PUSH_GHCR: ${{ inputs.push_ghcr }}
           GHCR_REPO: ${{ inputs.ghcr_repo }}
         run: |
+          # Preflight: fail fast when dry_run is false and no push targets are enabled
+          if [[ "${IS_DRY_RUN}" != "true" ]] && \
+             [[ "${PUSH_DOCKERHUB}" != "true" ]] && \
+             [[ "${PUSH_ECR}" != "true" ]] && \
+             [[ "${PUSH_GHCR}" != "true" ]]; then
+            echo "::error::No push targets enabled and dry_run is false. Set dry_run: true for validation-only runs, or enable at least one of push_dockerhub/push_ghcr/push_ecr."
+            exit 1
+          fi
+
           TAGS=""
 
           if [[ "${IS_DRY_RUN}" == "true" ]]; then
@@ -283,12 +292,14 @@ jobs:
             fi
 
             if [[ -z "${TAGS}" ]]; then
-              echo "::warning::No registries selected. Falling back to dry-run ECR."
-              TAGS="${DRY_RUN_REPO}:${LATEST_TAG}${SUFFIX}"
+              # This branch is unreachable due to the preflight guard above,
+              # but kept as a safety net to avoid an empty tag list.
+              echo "::error::No registries selected (unexpected — preflight guard should have caught this)."
+              exit 1
             fi
           fi
 
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
           if [[ "${IS_DRY_RUN}" == "true" ]]; then
             echo "Generated tags (dry-run): ${TAGS}"
           else

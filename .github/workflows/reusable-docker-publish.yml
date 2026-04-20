@@ -36,6 +36,26 @@ jobs:
       contents: write
 
     steps:
+      - name: Validate release_type / tag_suffix consistency
+        env:
+          RELEASE_TYPE: ${{ inputs.release_type }}
+          TAG_SUFFIX: ${{ inputs.tag_suffix }}
+        run: |
+          if [[ "$RELEASE_TYPE" == "liquibase-release" ]]; then
+            if [[ "$TAG_SUFFIX" != "" ]]; then
+              echo "::error::release_type 'liquibase-release' requires an empty tag_suffix (got '${TAG_SUFFIX}'). Community releases must not carry a suffix."
+              exit 1
+            fi
+          elif [[ "$RELEASE_TYPE" == "liquibase-secure-release" ]]; then
+            if [[ "$TAG_SUFFIX" != "-SECURE" ]]; then
+              echo "::error::release_type 'liquibase-secure-release' requires tag_suffix '-SECURE' (got '${TAG_SUFFIX}'). Publishing a Secure release without the suffix would create a conflicting community tag."
+              exit 1
+            fi
+          else
+            echo "::error::Unknown release_type '${RELEASE_TYPE}'. Must be 'liquibase-release' or 'liquibase-secure-release'."
+            exit 1
+          fi
+
       - name: Determine Release Tag
         id: release-tag
         env:
@@ -49,8 +69,8 @@ jobs:
           else
             RELEASE_NAME="v${VERSION}"
           fi
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
-          echo "release_name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
           echo "::notice::Publishing GitHub release for ${RELEASE_TYPE} on tag: ${TAG_NAME}"
 
       - name: Get Release Notes from Release Drafter Draft
@@ -76,17 +96,22 @@ jobs:
               return isSecure ? r.tag_name.includes('SECURE') : !r.tag_name.includes('SECURE');
             });
 
-            if (draft && draft.body) {
-              core.setOutput('body', draft.body);
-              core.setOutput('found', 'true');
-
-              // Delete the draft - we'll create the real release
+            if (draft) {
+              // Delete the draft regardless of body content — we'll create the real release
               await github.rest.repos.deleteRelease({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release_id: draft.id
               });
               core.info(`Deleted Release Drafter draft: ${draft.name}`);
+
+              if (draft.body) {
+                core.setOutput('body', draft.body);
+                core.setOutput('found', 'true');
+              } else {
+                core.setOutput('found', 'false');
+                core.info('Draft had empty body, using default release notes');
+              }
             } else {
               core.setOutput('found', 'false');
               core.info('No Release Drafter draft found, using default release notes');

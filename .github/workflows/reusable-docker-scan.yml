@@ -1,0 +1,285 @@
+name: Reusable Docker Scan
+
+on:
+  workflow_call:
+    inputs:
+      dockerfile_path:
+        description: 'Dockerfile for the image to scan'
+        required: true
+        type: string
+      image_name:
+        description: 'Image base name, e.g. liquibase/liquibase or liquibase/liquibase-secure'
+        required: true
+        type: string
+      suffix:
+        description: 'Image suffix, e.g. "" or -alpine'
+        required: false
+        type: string
+        default: ''
+      ghcr_tag:
+        description: 'GHCR tag used for the scan target'
+        required: false
+        type: string
+        default: ${{ github.sha }}
+      vex_enabled:
+        description: 'Enable VEX passthrough to reusable-vulnerability-scan.yml (Secure ONLY)'
+        required: false
+        type: boolean
+        default: false
+      upload_sarif:
+        description: 'Upload Trivy SARIF results to GitHub Security tab'
+        required: false
+        type: boolean
+        default: true
+      dispatch_new_cves:
+        description: 'Pass through to reusable-vulnerability-scan.yml for CVE dispatch'
+        required: false
+        type: boolean
+        default: true
+      scout_enabled:
+        description: 'Run Docker Scout job'
+        required: false
+        type: boolean
+        default: true
+      build_logic_ref:
+        description: 'Ref for liquibase/build-logic and nested reusable call'
+        required: false
+        type: string
+        default: 'main'
+    outputs:
+      scan_status:
+        description: 'pass or fail based on vulnerability thresholds'
+        value: ${{ jobs.vulnerability-scan.outputs.scan_status }}
+      total_vulnerabilities:
+        description: 'Count reported by Trivy'
+        value: ${{ jobs.vulnerability-scan.outputs.total_vulnerabilities }}
+    secrets: inherit
+
+jobs:
+  # ============================================
+  # BUILD AND PUSH TO GHCR FOR SCANNING
+  # ============================================
+  build-ghcr:
+    name: Build and push to GHCR
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      ghcr_image: ${{ steps.set-ghcr-ref.outputs.ghcr_image }}
+
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive GHCR image name
+        id: set-ghcr-ref
+        run: |
+          # Sanitize suffix for use in image tag (strip leading dash)
+          SAFE_SUFFIX=$(echo "${{ inputs.suffix }}" | sed 's/^-//')
+          if [[ -n "$SAFE_SUFFIX" ]]; then
+            GHCR_NAME="${SAFE_SUFFIX}"
+          else
+            # Use last segment of image_name as discriminator (e.g. liquibase-secure)
+            GHCR_NAME=$(echo "${{ inputs.image_name }}" | awk -F'/' '{print $NF}')
+          fi
+          GHCR_IMAGE="ghcr.io/${{ github.repository }}/liquibase-${GHCR_NAME}:${{ inputs.ghcr_tag }}"
+          echo "ghcr_image=${GHCR_IMAGE}" >> $GITHUB_OUTPUT
+          echo "GHCR target: ${GHCR_IMAGE}"
+
+      - name: Build and push to GHCR
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: ${{ inputs.dockerfile_path }}
+          push: true
+          tags: ${{ steps.set-ghcr-ref.outputs.ghcr_image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================
+  # VULNERABILITY SCAN (REUSABLE WORKFLOW)
+  # ============================================
+  vulnerability-scan:
+    needs: build-ghcr
+    name: Trivy Scan ${{ inputs.image_name }}${{ inputs.suffix }}
+    uses: liquibase/build-logic/.github/workflows/reusable-vulnerability-scan.yml@main
+    with:
+      mode: docker
+      source: ${{ needs.build-ghcr.outputs.ghcr_image }}
+      image_name: ${{ inputs.image_name }}
+      image_tag: ${{ inputs.suffix != '' && inputs.suffix || 'latest' }}
+      fail_on_vulnerabilities: true
+      upload_sarif: ${{ inputs.upload_sarif }}
+      sarif_category: ${{ inputs.image_name }}${{ inputs.suffix }}
+      generate_sbom: true
+      vex_enabled: ${{ inputs.vex_enabled }}
+      build_logic_ref: ${{ inputs.build_logic_ref }}
+      dispatch_new_cves: ${{ inputs.dispatch_new_cves }}
+    secrets: inherit
+
+  # ============================================
+  # DOCKER SCOUT
+  # ============================================
+  scout:
+    needs: build-ghcr
+    if: inputs.scout_enabled
+    name: Docker Scout ${{ inputs.image_name }}${{ inputs.suffix }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      security-events: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Build ${{ inputs.image_name }}${{ inputs.suffix }} from Dockerfile
+        run: |
+          docker build -f ${{ inputs.dockerfile_path }} \
+            -t ${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag }} .
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Decode DOCKERHUB_USERNAME
+        run: |
+          decoded_username=$(echo "${{ env.DOCKERHUB_USERNAME }}" | base64 -d)
+          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> $GITHUB_ENV
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME_DECODED }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Download VEX files for Scout
+        if: inputs.vex_enabled
+        run: |
+          mkdir -p ./vex
+          curl -sSfL "https://raw.githubusercontent.com/liquibase/vex-repo/main/pkg/maven/org.liquibase/liquibase-core/vex.openvex.json" \
+            -o ./vex/liquibase-core.vex.json
+          echo "VEX file downloaded: $(jq '.statements | length' ./vex/liquibase-core.vex.json) statements"
+
+      - name: Docker Scout (with VEX)
+        if: inputs.vex_enabled
+        uses: docker/scout-action@8910519cee8ac046f3ee99686b0dc6654d5ba1a7 # v1.20.3
+        with:
+          command: cves
+          image: "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag }}"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          write-comment: true
+          sarif-file: "scout-results.sarif"
+          summary: true
+          exit-code: true
+          only-severities: "critical,high"
+          vex-location: ./vex
+          only-vex-affected: true
+          vex-author: "Liquibase Security Team"
+
+      - name: Docker Scout (without VEX)
+        if: ${{ !inputs.vex_enabled }}
+        uses: docker/scout-action@8910519cee8ac046f3ee99686b0dc6654d5ba1a7 # v1.20.3
+        with:
+          command: cves
+          image: "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag }}"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          write-comment: true
+          sarif-file: "scout-results.sarif"
+          summary: true
+          exit-code: true
+          only-severities: "critical,high"
+
+      - name: Docker Scout JSON output
+        if: always()
+        run: |
+          SCOUT_ARGS=(
+            --format json
+            --output scout-results.json
+            --only-severities critical,high
+          )
+          if [[ "${{ inputs.vex_enabled }}" == "true" ]]; then
+            SCOUT_ARGS+=(--vex-location ./vex --only-vex-affected --vex-author "Liquibase Security Team")
+          fi
+          docker scout cves "${SCOUT_ARGS[@]}" \
+            "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag }}" || true
+
+      - name: Upload Scout JSON results
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: scout-results${{ inputs.vex_enabled && '-secure' || inputs.suffix }}
+          path: scout-results.json
+          if-no-files-found: warn
+
+      - name: Upload Scout scan results to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@b1bff81932f5cdfc8695c7752dcee935dcd061c8 # v4.33.0
+        with:
+          sarif_file: "scout-results.sarif"
+          category: "${{ inputs.image_name }}${{ inputs.suffix }}"
+
+  # ============================================
+  # CLEANUP GHCR IMAGES (always runs)
+  # ============================================
+  cleanup-ghcr:
+    needs: [build-ghcr, vulnerability-scan]
+    if: always()
+    name: Cleanup GHCR ${{ inputs.image_name }}${{ inputs.suffix }}
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Delete GHCR image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_IMAGE: ${{ needs.build-ghcr.outputs.ghcr_image }}
+        run: |
+          # Parse org, package name and tag from the full image ref
+          # ghcr.io/<org>/<repo>/<pkg>:<tag>
+          REPO_NAME="${{ github.event.repository.name }}"
+          # Extract package sub-path from ghcr_image: everything after "ghcr.io/<org>/"
+          PKG_WITH_TAG="${GHCR_IMAGE#ghcr.io/${{ github.repository_owner }}/}"
+          PACKAGE_NAME="${PKG_WITH_TAG%%:*}"
+          TAG="${PKG_WITH_TAG##*:}"
+          ENCODED_PACKAGE_NAME=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${PACKAGE_NAME}', safe=''))")
+
+          VERSION_ID=$(gh api \
+            "/orgs/${{ github.repository_owner }}/packages/container/${ENCODED_PACKAGE_NAME}/versions" \
+            --jq ".[] | select(.metadata.container.tags[] == \"${TAG}\") | .id" 2>/dev/null || echo "")
+          if [ -n "$VERSION_ID" ]; then
+            gh api --method DELETE \
+              "/orgs/${{ github.repository_owner }}/packages/container/${ENCODED_PACKAGE_NAME}/versions/${VERSION_ID}"
+            echo "Deleted ${PACKAGE_NAME}:${TAG}"
+          else
+            echo "No version found for ${PACKAGE_NAME}:${TAG}, skipping"
+          fi

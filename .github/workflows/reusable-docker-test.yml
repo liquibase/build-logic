@@ -1,0 +1,633 @@
+name: Reusable Docker Test
+
+on:
+  workflow_call:
+    inputs:
+      dockerfile_path:
+        description: 'Dockerfile to build and test, e.g. Dockerfile, DockerfileSecure, Dockerfile.alpine'
+        required: true
+        type: string
+      runs_on:
+        description: 'Runner label: ubuntu-latest or macos-15-intel'
+        required: true
+        type: string
+      image_tag:
+        description: 'Local-only tag for the built image'
+        required: false
+        type: string
+        default: 'test'
+      test_fixtures_path:
+        description: 'Path within build-logic repo where test fixtures are located'
+        required: false
+        type: string
+        default: 'docker/test-fixtures'
+      build_logic_ref:
+        description: 'Ref for liquibase/build-logic checkout'
+        required: false
+        type: string
+        default: 'main'
+    secrets: inherit
+
+jobs:
+  test:
+    name: Build & Test ${{ inputs.dockerfile_path }} - ${{ inputs.runs_on }}
+    runs-on: ${{ inputs.runs_on }}
+    env:
+      CONTAINER_NAME: "liquibase"
+      IMAGE_TAG: ${{ inputs.image_tag }}
+
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Checkout build-logic (test fixtures)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: liquibase/build-logic
+          ref: ${{ inputs.build_logic_ref }}
+          path: build-logic
+
+      - name: Setup Docker on macOS
+        if: inputs.runs_on == 'macos-15-intel'
+        uses: douglascamata/setup-docker-macos-action@d5ccc6aae0ce23e7700154f5e63cc53e6433ac48 # v1.1.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Build image from ${{ inputs.dockerfile_path }}
+        run: |
+          docker build -f ${{ inputs.dockerfile_path }} -t liquibase/liquibase:${{ env.IMAGE_TAG }} .
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      # ============================================
+      # CORE LIFECYCLE TESTS
+      # ============================================
+      - name: Test liquibase init start-h2
+        run: |
+          LOG_STRING="The database does not persist data"
+          docker run --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name $CONTAINER_NAME -d \
+            -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} init start-h2
+          sleep 30
+          if docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q "true"; then
+            if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "$LOG_STRING"; then
+              echo "The log contains the string: $LOG_STRING"
+            else
+              echo "The log does not contain the string: $LOG_STRING"
+              exit 1
+            fi
+          else
+            echo "Error: Container $CONTAINER_NAME is not running."
+            exit 2
+          fi
+
+      - name: Test liquibase version
+        run: |
+          LOG_STRING="Starting Liquibase"
+          if docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q "true"; then
+            if docker exec $CONTAINER_NAME liquibase --version 2>&1 | grep -q "$LOG_STRING"; then
+              echo "The log contains the string: $LOG_STRING"
+            else
+              echo "The log does not contain the string: $LOG_STRING"
+              exit 1
+            fi
+          else
+            echo "Error: Container $CONTAINER_NAME is not running."
+            exit 2
+          fi
+
+      - name: Test liquibase update
+        run: |
+          LOG_STRING="Update has been successful"
+          if docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q "true"; then
+            if docker exec $CONTAINER_NAME liquibase update \
+                --defaultsFile=/liquibase/changelog/liquibase.properties \
+                --changelog-file=/changelog/example-changelog.xml 2>&1 | grep -q "$LOG_STRING"; then
+              echo "The log contains the string: $LOG_STRING"
+            else
+              echo "The log does not contain the string: $LOG_STRING"
+              exit 1
+            fi
+          else
+            echo "Error: Container $CONTAINER_NAME is not running."
+            exit 2
+          fi
+
+      - name: Test liquibase wrong ENV variable
+        run: |
+          LOG_STRING="Error: Unable to access jarfile wrong_path/internal/lib/"
+          docker stop $CONTAINER_NAME
+          docker rm $CONTAINER_NAME
+          if docker run --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name $CONTAINER_NAME -d \
+              -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
+              -e LIQUIBASE_HOME="wrong_path" \
+              liquibase/liquibase:${{ env.IMAGE_TAG }} init start-h2 2>&1 | grep -q "$LOG_STRING"; then
+            echo "The log does not contain the string: $LOG_STRING"
+            exit 1
+          else
+            echo "The log contains the string: $LOG_STRING"
+          fi
+
+      - name: Test liquibase good ENV variable
+        run: |
+          LOG_STRING="The database does not persist data"
+          docker stop $CONTAINER_NAME
+          docker rm $CONTAINER_NAME
+          docker run --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name $CONTAINER_NAME -d \
+            -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
+            -e LIQUIBASE_HOME="/liquibase" \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} init start-h2
+          sleep 30
+          docker logs $CONTAINER_NAME
+          if docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q "true"; then
+            if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "$LOG_STRING"; then
+              echo "The log contains the string: $LOG_STRING"
+            else
+              echo "The log does not contain the string: $LOG_STRING"
+              exit 1
+            fi
+          else
+            echo "Error: Container $CONTAINER_NAME is not running."
+            exit 2
+          fi
+
+      - name: Test volume persistence
+        run: |
+          LOG_STRING="Update has been successful"
+          docker stop $CONTAINER_NAME
+          docker start $CONTAINER_NAME
+          sleep 30
+          if docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q "true"; then
+            if docker exec $CONTAINER_NAME liquibase update \
+                --defaultsFile=/liquibase/changelog/liquibase.properties \
+                --changelog-file=/changelog/example-changelog.xml 2>&1 | grep -q "$LOG_STRING"; then
+              echo "The log contains the string: $LOG_STRING"
+            else
+              echo "The log does not contain the string: $LOG_STRING"
+              exit 1
+            fi
+          else
+            echo "Error: Container $CONTAINER_NAME is not running."
+            exit 2
+          fi
+
+      - name: Test extension loading
+        run: |
+          LOG_STRING="liquibase-redshift"
+          docker exec $CONTAINER_NAME lpm add liquibase-redshift --category=extension -g
+          if docker exec $CONTAINER_NAME liquibase --version 2>&1 | grep -q "$LOG_STRING"; then
+            echo "The log contains the string: $LOG_STRING"
+          else
+            echo "The log does not contain the string: $LOG_STRING"
+            exit 1
+          fi
+
+      - name: Test driver connection
+        run: |
+          LOG_STRING="successfully installed in classpath"
+          docker stop $CONTAINER_NAME
+          docker rm $CONTAINER_NAME
+          docker network create --driver bridge test_network
+          docker run -d --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name $CONTAINER_NAME --network test_network \
+            -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} init start-h2
+          if docker exec $CONTAINER_NAME lpm add mssql --category=driver -g 2>&1 | grep -q "$LOG_STRING"; then
+            echo "The log contains the string: $LOG_STRING"
+          else
+            echo "The log does not contain the string: $LOG_STRING"
+            exit 1
+          fi
+
+      - name: Test custom entrypoint
+        run: |
+          LOG_STRING="Update has been successful"
+          docker build -f ${{ inputs.dockerfile_path }} -t liquibase:test-entrypoint .
+          docker build -f $(pwd)/build-logic/${{ inputs.test_fixtures_path }}/Dockerfile \
+            -t liquibase:test $(pwd)/build-logic/${{ inputs.test_fixtures_path }}/
+          docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name liquibase-test \
+            --entrypoint="/scripts/liquibase_command.sh" \
+            -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
+            liquibase:test "version"
+
+      # ============================================
+      # CLI-DOCKER COMPATIBILITY TESTS
+      # ============================================
+      - name: Test CLI-Docker compatibility - Working directory change
+        run: |
+          echo "Testing that working directory changes to /liquibase/changelog when mounted..."
+          mkdir -p test-compatibility
+          cat > test-compatibility/test.properties << EOF
+          changelogFile=test-changelog.xml
+          url=offline:postgresql
+          driver=org.postgresql.Driver
+          EOF
+          cat > test-compatibility/test-changelog.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <sql>SELECT 'Test';</sql>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            -v $(pwd)/test-compatibility:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            --defaultsFile=test.properties validate 2>&1)
+          echo "Container output: $RESULT"
+          if echo "$RESULT" | grep -q "No validation errors found"; then
+            echo "SUCCESS: Working directory correctly changed to mounted changelog directory"
+          else
+            echo "FAIL: Working directory did not change to changelog directory or validation failed"
+            exit 1
+          fi
+          rm -rf test-compatibility
+
+      - name: Test CLI-Docker compatibility - Relative path file creation
+        run: |
+          echo "Testing relative path file creation with new CLI-Docker compatibility..."
+          mkdir -p test-file-creation
+          cat > test-file-creation/test-changelog.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <createTable tableName="test_table">
+                      <column name="id" type="int"/>
+                  </createTable>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            -v $(pwd)/test-file-creation:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            updateSQL --changelogFile=test-changelog.xml --url=offline:postgresql --outputFile=generated-update.sql
+          if [ -f "test-file-creation/generated-update.sql" ]; then
+            echo "SUCCESS: File created in mounted directory with relative path"
+          else
+            echo "FAIL: File not created in expected location"
+            exit 1
+          fi
+          rm -rf test-file-creation
+
+      - name: Test CLI-Docker compatibility - Properties file resolution
+        run: |
+          echo "Testing properties file resolution with relative paths..."
+          mkdir -p test-properties
+          cat > test-properties/test.properties << EOF
+          changelogFile=test-changelog.xml
+          url=offline:postgresql
+          driver=org.postgresql.Driver
+          EOF
+          cat > test-properties/test-changelog.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <comment>Test changeset</comment>
+                  <sql>SELECT 'Test';</sql>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            -v $(pwd)/test-properties:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            --defaultsFile=test.properties validate 2>&1)
+          echo "Validation result: $RESULT"
+          if echo "$RESULT" | grep -q "No validation errors found"; then
+            echo "SUCCESS: Properties file resolved correctly with relative path"
+          else
+            echo "FAIL: Properties file resolution failed"
+            exit 1
+          fi
+          rm -rf test-properties
+
+      - name: Test backward compatibility - No changelog directory
+        run: |
+          echo "Testing backward compatibility when no /liquibase/changelog is mounted..."
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} --version 2>&1)
+          echo "Container output: $RESULT"
+          if echo "$RESULT" | grep -q "Liquibase.*Version"; then
+            echo "SUCCESS: Container works without changelog mount (backward compatible)"
+          else
+            echo "FAIL: Container broken when no changelog directory mounted"
+            exit 1
+          fi
+
+      - name: Test backward compatibility - Mixed path usage scenarios
+        run: |
+          echo "Testing mixed path usage scenarios work correctly..."
+          mkdir -p test-mixed-paths
+          cat > test-mixed-paths/test-changelog.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <sql>SELECT 'Test';</sql>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          RESULT1=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            -v $(pwd)/test-mixed-paths:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            validate --changelogFile=test-changelog.xml --url=offline:postgresql 2>&1)
+          if echo "$RESULT1" | grep -q "No validation errors found"; then
+            echo "SUCCESS: Relative paths work with CLI-Docker compatibility"
+          else
+            echo "FAIL: Relative paths don't work"
+            echo "Output: $RESULT1"
+            exit 1
+          fi
+          RESULT2=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            --env SHOULD_CHANGE_DIR=false \
+            -v $(pwd)/test-mixed-paths:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            validate --changelogFile=test-changelog.xml --url=offline:postgresql 2>&1)
+          if echo "$RESULT2" | grep -q "No validation errors found"; then
+            echo "SUCCESS: SHOULD_CHANGE_DIR=false preserves old behavior"
+          else
+            echo "EXPECTED: SHOULD_CHANGE_DIR=false correctly prevents automatic directory changes"
+          fi
+          docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            -v $(pwd)/test-mixed-paths:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            update-sql --changelogFile=test-changelog.xml --url=offline:postgresql --output-file=generated-sql.sql
+          if [ -f "test-mixed-paths/generated-sql.sql" ]; then
+            echo "SUCCESS: Generated files are created in mounted directory"
+          else
+            echo "FAIL: Generated file not found in mounted directory"
+            exit 1
+          fi
+          rm -rf test-mixed-paths
+
+      - name: Test CLI-Docker compatibility - Generate changelog creates files in mounted directory
+        run: |
+          echo "Testing that generate-changelog command creates files in mounted directory..."
+          mkdir -p test-generate-changelog
+          cat > test-generate-changelog/liquibase.properties << EOF
+          url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+          username=sa
+          password=
+          driver=org.h2.Driver
+          EOF
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            -v $(pwd)/test-generate-changelog:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            generate-changelog \
+            --defaultsFile=liquibase.properties \
+            --changelog-file=generated-changelog.xml 2>&1)
+          echo "Generate changelog result: $RESULT"
+          if echo "$RESULT" | grep -q "was executed successfully"; then
+            echo "SUCCESS: generate-changelog command executed successfully"
+          else
+            echo "FAIL: generate-changelog command failed"
+            echo "Full output: $RESULT"
+            exit 1
+          fi
+          cat > test-generate-changelog/test-changelog.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <createTable tableName="test_table">
+                      <column name="id" type="int"/>
+                      <column name="name" type="varchar(255)"/>
+                  </createTable>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            -v $(pwd)/test-generate-changelog:/liquibase/changelog \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            update-sql \
+            --changelog-file=test-changelog.xml \
+            --url=jdbc:h2:mem:testdb \
+            --username=sa \
+            --output-file=generated-output.sql
+          if [ -f "test-generate-changelog/generated-output.sql" ]; then
+            echo "SUCCESS: Output file created in mounted directory using relative path"
+            if grep -q "CREATE TABLE.*test_table" test-generate-changelog/generated-output.sql; then
+              echo "SUCCESS: Generated file contains expected SQL content"
+            else
+              echo "FAIL: Generated file does not contain expected SQL content"
+              exit 1
+            fi
+          else
+            echo "FAIL: Output file was not created in the mounted directory"
+            exit 1
+          fi
+          rm -rf test-generate-changelog
+
+      - name: Test CLI-Docker compatibility - Complex scenario
+        run: |
+          echo "Testing complex scenario with multiple relative paths..."
+          mkdir -p test-complex/{changelog,lib}
+          cat > test-complex/changelog/db.changelog-root.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <include file="001-tables.xml" relativeToChangelogFile="true"/>
+          </databaseChangeLog>
+          EOF
+          cat > test-complex/changelog/001-tables.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <createTable tableName="test_table">
+                      <column name="id" type="int"/>
+                  </createTable>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          cat > test-complex/app.properties << EOF
+          changelogFile=db.changelog-root.xml
+          url=offline:postgresql
+          driver=org.postgresql.Driver
+          EOF
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            -v $(pwd)/test-complex/changelog:/liquibase/changelog \
+            -v $(pwd)/test-complex:/liquibase/app \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            --defaultsFile=../app/app.properties validate 2>&1)
+          echo "Complex validation result: $RESULT"
+          if echo "$RESULT" | grep -q "No validation errors found"; then
+            echo "SUCCESS: Complex relative path scenario works"
+          else
+            echo "FAIL: Complex relative path scenario failed"
+            exit 1
+          fi
+          rm -rf test-complex
+
+      # ============================================
+      # SEARCH PATH PRESERVATION TESTS (DAT-21189)
+      # ============================================
+      - name: Test custom LIQUIBASE_SEARCH_PATH env var is preserved
+        if: inputs.runs_on == 'ubuntu-latest'
+        run: |
+          echo "Testing that custom LIQUIBASE_SEARCH_PATH environment variable is not overridden..."
+          mkdir -p test-search-path-env/custom-path
+          cat > test-search-path-env/custom-path/main-changelog.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <sql>SELECT 'Using custom search path';</sql>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          set +e
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            --env LIQUIBASE_SEARCH_PATH="/liquibase/custom-path" \
+            -v $(pwd)/test-search-path-env/custom-path:/liquibase/custom-path \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            --changelogFile=main-changelog.xml \
+            --url=offline:postgresql \
+            validate 2>&1)
+          EXIT_CODE=$?
+          set -e
+          echo "Search path test output: $RESULT"
+          if echo "$RESULT" | grep -q "No validation errors found"; then
+            echo "SUCCESS: Custom LIQUIBASE_SEARCH_PATH environment variable was preserved"
+          else
+            echo "FAIL: Custom search path was not respected or overridden"
+            exit 1
+          fi
+          rm -rf test-search-path-env
+
+      - name: Test explicit --search-path CLI argument is not overridden
+        if: inputs.runs_on == 'ubuntu-latest'
+        run: |
+          echo "Testing that explicit --search-path command-line argument is respected..."
+          mkdir -p test-search-path-cli/cli-path
+          cat > test-search-path-cli/cli-path/main-changelog.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <sql>SELECT 'CLI Search Path Respected';</sql>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          set +e
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            -v $(pwd)/test-search-path-cli/cli-path:/liquibase/cli-path \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            --changelogFile=main-changelog.xml \
+            --search-path=/liquibase/cli-path \
+            --url=offline:postgresql \
+            validate 2>&1)
+          EXIT_CODE=$?
+          set -e
+          echo "CLI search path test output: $RESULT"
+          if echo "$RESULT" | grep -q "No validation errors found"; then
+            echo "SUCCESS: Explicit --search-path CLI argument was respected"
+          else
+            echo "FAIL: Explicit search path argument was overridden"
+            exit 1
+          fi
+          rm -rf test-search-path-cli
+
+      - name: Test relative paths work WITH custom search path (regression test)
+        if: inputs.runs_on == 'ubuntu-latest'
+        run: |
+          echo "Testing relative paths combined with custom search path (DAT-21189 regression)..."
+          mkdir -p test-search-path-combo/shared
+          cat > test-search-path-combo/shared/main-changelog.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <sql>SELECT 'Custom search path respected';</sql>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          set +e
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            --env LIQUIBASE_SEARCH_PATH="/liquibase/shared" \
+            -v $(pwd)/test-search-path-combo/shared:/liquibase/shared \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            --changelogFile=main-changelog.xml \
+            --url=offline:postgresql \
+            validate 2>&1)
+          EXIT_CODE=$?
+          set -e
+          echo "Regression test output: $RESULT"
+          if echo "$RESULT" | grep -q "No validation errors found"; then
+            echo "SUCCESS: Custom search path preserved correctly (DAT-21189 fixed)"
+          else
+            echo "FAIL: Custom search path was not preserved (DAT-21189 regression)"
+            exit 1
+          fi
+          rm -rf test-search-path-combo
+
+      - name: Test search path not injected when LIQUIBASE_SEARCH_PATH with multiple paths
+        if: inputs.runs_on == 'ubuntu-latest'
+        run: |
+          echo "Testing multiple search paths in LIQUIBASE_SEARCH_PATH are preserved..."
+          mkdir -p test-multi-search/path1
+          mkdir -p test-multi-search/path2
+          cat > test-multi-search/path1/main.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <sql>SELECT 'Multiple paths preserved';</sql>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          set +e
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+            --env LIQUIBASE_SEARCH_PATH="/liquibase/path1,/liquibase/path2" \
+            -v $(pwd)/test-multi-search/path1:/liquibase/path1 \
+            -v $(pwd)/test-multi-search/path2:/liquibase/path2 \
+            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            --changelogFile=main.xml \
+            --url=offline:postgresql \
+            validate 2>&1)
+          EXIT_CODE=$?
+          set -e
+          echo "Multiple search paths test output: $RESULT"
+          if echo "$RESULT" | grep -q "No validation errors found"; then
+            echo "SUCCESS: Multiple search paths in LIQUIBASE_SEARCH_PATH are preserved"
+          else
+            echo "FAIL: Multiple search paths were not properly handled"
+            exit 1
+          fi
+          rm -rf test-multi-search

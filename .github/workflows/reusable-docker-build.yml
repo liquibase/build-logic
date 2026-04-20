@@ -1,0 +1,346 @@
+name: Reusable Docker Build
+
+on:
+  workflow_call:
+    inputs:
+      dockerfile_path:
+        description: 'Path to Dockerfile, e.g. Dockerfile, DockerfileSecure, Dockerfile.alpine'
+        required: true
+        type: string
+      build_context:
+        description: 'Docker build context path'
+        required: false
+        type: string
+        default: '.'
+      image_name:
+        description: 'Base image name, e.g. liquibase/liquibase or liquibase/liquibase-secure'
+        required: true
+        type: string
+      suffix:
+        description: 'Image tag suffix, e.g. "" or -alpine'
+        required: false
+        type: string
+        default: ''
+      version:
+        description: 'Full release version, e.g. 5.0.1'
+        required: true
+        type: string
+      minor_version:
+        description: 'Major.minor version, e.g. 5.0'
+        required: true
+        type: string
+      latest_tag:
+        description: 'Floating tag to push (latest or alpine)'
+        required: false
+        type: string
+        default: 'latest'
+      platforms:
+        description: 'Buildx platform list'
+        required: false
+        type: string
+        default: 'linux/amd64,linux/arm64'
+      push_dockerhub:
+        description: 'Push to Docker Hub'
+        required: false
+        type: boolean
+        default: true
+      push_ghcr:
+        description: 'Push to GHCR'
+        required: false
+        type: boolean
+        default: true
+      push_ecr:
+        description: 'Push to Amazon ECR Public'
+        required: false
+        type: boolean
+        default: true
+      dockerhub_repo:
+        description: 'Full Docker Hub repo, e.g. liquibase/liquibase'
+        required: true
+        type: string
+      ghcr_repo:
+        description: 'Full GHCR repo, e.g. ghcr.io/liquibase/liquibase'
+        required: true
+        type: string
+      ecr_repo:
+        description: 'Full ECR Public repo'
+        required: true
+        type: string
+      dry_run:
+        description: 'If true: push only to private dry-run ECR; skip DockerHub/GHCR/public ECR'
+        required: false
+        type: boolean
+        default: false
+      dry_run_ecr_repo_env:
+        description: 'Vault secret name holding dry-run ECR repo URL'
+        required: false
+        type: string
+        default: 'PRIVATE_ECR_DRY_RUN_REPO'
+      no_cache:
+        description: 'Disable Docker layer cache'
+        required: false
+        type: boolean
+        default: true
+      cache_from_gha:
+        description: 'Use GitHub Actions cache (set true for QA/trivy builds)'
+        required: false
+        type: boolean
+        default: false
+      sign_with_cosign:
+        description: 'Enable cosign keyless signing (Secure ONLY)'
+        required: false
+        type: boolean
+        default: false
+      generate_sbom:
+        description: 'Attach SBOM to image (Secure ONLY)'
+        required: false
+        type: boolean
+        default: false
+      provenance_mode:
+        description: 'Provenance mode: "false" or "mode=max"'
+        required: false
+        type: string
+        default: 'false'
+      cosign_identity_regexp:
+        description: 'Regexp for cosign --certificate-identity-regexp'
+        required: false
+        type: string
+        default: ''
+      image_source_url:
+        description: 'OCI label org.opencontainers.image.source'
+        required: true
+        type: string
+      image_description:
+        description: 'OCI label org.opencontainers.image.description'
+        required: true
+        type: string
+      image_licenses:
+        description: 'OCI label: FSL-1.1-ALv2 (community) or LicenseRef-Liquibase-EULA (secure)'
+        required: true
+        type: string
+      image_licenses_url:
+        description: 'License URL (secure: https://www.liquibase.com/eula)'
+        required: false
+        type: string
+        default: ''
+      build_logic_ref:
+        description: 'Ref for liquibase/build-logic checkout; override during contract-churn branches'
+        required: false
+        type: string
+        default: 'main'
+    outputs:
+      digest:
+        description: 'Image digest of the pushed image (sha256:...)'
+        value: ${{ jobs.build.outputs.digest }}
+      tags:
+        description: 'Comma-separated list of all tags pushed'
+        value: ${{ jobs.build.outputs.tags }}
+    secrets: inherit
+
+jobs:
+  build:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      digest: ${{ steps.build-and-push.outputs.digest }}
+      tags: ${{ steps.generate-tags.outputs.tags }}
+
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Decode DOCKERHUB_USERNAME
+        run: |
+          decoded_username=$(echo "${{ env.DOCKERHUB_USERNAME }}" | base64 -d)
+          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> $GITHUB_ENV
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Install Cosign
+        if: inputs.sign_with_cosign
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Configure AWS credentials for PROD ECR
+        id: configure-aws-credentials-prod
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
+          aws-region: us-east-1
+
+      - name: Login to Docker Hub
+        if: ${{ !inputs.dry_run && inputs.push_dockerhub }}
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME_DECODED }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        if: ${{ !inputs.dry_run && inputs.push_ghcr }}
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ECR Registry (public)
+        if: ${{ !inputs.dry_run && inputs.push_ecr }}
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        env:
+          AWS_REGION: us-east-1
+        with:
+          registry: public.ecr.aws
+          username: ${{ steps.configure-aws-credentials-prod.outputs.aws_access_key_id }}
+          password: ${{ steps.configure-aws-credentials-prod.outputs.aws_secret_access_key }}
+
+      - name: Login to Private ECR Registry (dry-run)
+        if: inputs.dry_run
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        env:
+          AWS_REGION: us-east-1
+        with:
+          registry: ${{ env[inputs.dry_run_ecr_repo_env] || env.PRIVATE_ECR_DRY_RUN_REPO }}
+          username: ${{ steps.configure-aws-credentials-prod.outputs.aws_access_key_id }}
+          password: ${{ steps.configure-aws-credentials-prod.outputs.aws_secret_access_key }}
+
+      - name: Generate Docker Tags
+        id: generate-tags
+        run: |
+          VERSION="${{ inputs.version }}"
+          MINOR_VERSION="${{ inputs.minor_version }}"
+          SUFFIX="${{ inputs.suffix }}"
+          LATEST_TAG="${{ inputs.latest_tag }}"
+          IS_DRY_RUN="${{ inputs.dry_run }}"
+          DRY_RUN_REPO="${{ env[inputs.dry_run_ecr_repo_env] || env.PRIVATE_ECR_DRY_RUN_REPO }}"
+          TAGS=""
+
+          if [[ "${IS_DRY_RUN}" == "true" ]]; then
+            TAGS="${DRY_RUN_REPO}:${LATEST_TAG}${SUFFIX}"
+            TAGS="${TAGS},${DRY_RUN_REPO}:${VERSION}${SUFFIX}"
+            TAGS="${TAGS},${DRY_RUN_REPO}:${MINOR_VERSION}${SUFFIX}"
+          else
+            if [[ "${{ inputs.push_dockerhub }}" == "true" ]]; then
+              TAGS="${{ inputs.dockerhub_repo }}:${LATEST_TAG}${SUFFIX}"
+              TAGS="${TAGS},${{ inputs.dockerhub_repo }}:${VERSION}${SUFFIX}"
+              TAGS="${TAGS},${{ inputs.dockerhub_repo }}:${MINOR_VERSION}${SUFFIX}"
+            fi
+
+            if [[ "${{ inputs.push_ecr }}" == "true" ]]; then
+              if [[ -n "${TAGS}" ]]; then TAGS="${TAGS},"; fi
+              TAGS="${TAGS}${{ inputs.ecr_repo }}:${LATEST_TAG}${SUFFIX}"
+              TAGS="${TAGS},${{ inputs.ecr_repo }}:${VERSION}${SUFFIX}"
+              TAGS="${TAGS},${{ inputs.ecr_repo }}:${MINOR_VERSION}${SUFFIX}"
+            fi
+
+            if [[ "${{ inputs.push_ghcr }}" == "true" ]]; then
+              if [[ -n "${TAGS}" ]]; then TAGS="${TAGS},"; fi
+              TAGS="${TAGS}${{ inputs.ghcr_repo }}:${LATEST_TAG}${SUFFIX}"
+              TAGS="${TAGS},${{ inputs.ghcr_repo }}:${VERSION}${SUFFIX}"
+              TAGS="${TAGS},${{ inputs.ghcr_repo }}:${MINOR_VERSION}${SUFFIX}"
+            fi
+
+            if [[ -z "${TAGS}" ]]; then
+              echo "::warning::No registries selected. Falling back to dry-run ECR."
+              TAGS="${DRY_RUN_REPO}:${LATEST_TAG}${SUFFIX}"
+            fi
+          fi
+
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          if [[ "${IS_DRY_RUN}" == "true" ]]; then
+            echo "Generated tags (dry-run): ${TAGS}"
+          else
+            echo "Generated tags: ${TAGS}"
+          fi
+        env:
+          PRIVATE_ECR_DRY_RUN_REPO: ${{ env.PRIVATE_ECR_DRY_RUN_REPO }}
+
+      - name: Build and Push Docker Image
+        id: build-and-push
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: ${{ inputs.build_context }}
+          file: ${{ inputs.dockerfile_path }}
+          no-cache: ${{ inputs.no_cache }}
+          cache-from: ${{ inputs.cache_from_gha && 'type=gha' || '' }}
+          cache-to: ${{ inputs.cache_from_gha && 'type=gha,mode=max' || '' }}
+          push: true
+          platforms: ${{ inputs.platforms }}
+          sbom: ${{ inputs.generate_sbom }}
+          provenance: ${{ inputs.provenance_mode }}
+          tags: ${{ steps.generate-tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ inputs.image_source_url }}
+            org.opencontainers.image.description=${{ inputs.image_description }}
+            org.opencontainers.image.licenses=${{ inputs.image_licenses }}
+            ${{ inputs.image_licenses_url != '' && format('org.opencontainers.image.licenses.url={0}', inputs.image_licenses_url) || '' }}
+            org.opencontainers.image.vendor=Liquibase
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.documentation=https://docs.liquibase.com
+          annotations: |
+            org.opencontainers.image.source=${{ inputs.image_source_url }}
+            org.opencontainers.image.description=${{ inputs.image_description }}
+            org.opencontainers.image.licenses=${{ inputs.image_licenses }}
+            ${{ inputs.image_licenses_url != '' && format('org.opencontainers.image.licenses.url={0}', inputs.image_licenses_url) || '' }}
+            org.opencontainers.image.vendor=Liquibase
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.documentation=https://docs.liquibase.com
+
+      # Cosign keyless signing — Secure images only (3 registries, each conditional)
+      - name: Sign Docker Hub Image with Cosign
+        if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_dockerhub }}
+        run: |
+          echo "Signing Docker Hub image with Cosign keyless signing..."
+          cosign sign --yes \
+            --certificate-identity-regexp="${{ inputs.cosign_identity_regexp }}" \
+            ${{ inputs.dockerhub_repo }}@${{ steps.build-and-push.outputs.digest }}
+          echo "Docker Hub image signed successfully"
+
+      - name: Sign GHCR Image with Cosign
+        if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_ghcr }}
+        run: |
+          echo "Signing GHCR image with Cosign keyless signing..."
+          cosign sign --yes \
+            --certificate-identity-regexp="${{ inputs.cosign_identity_regexp }}" \
+            ${{ inputs.ghcr_repo }}@${{ steps.build-and-push.outputs.digest }}
+          echo "GHCR image signed successfully"
+
+      - name: Sign ECR Image with Cosign
+        if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_ecr }}
+        run: |
+          echo "Signing ECR image with Cosign keyless signing..."
+          cosign sign --yes \
+            --certificate-identity-regexp="${{ inputs.cosign_identity_regexp }}" \
+            ${{ inputs.ecr_repo }}@${{ steps.build-and-push.outputs.digest }}
+          echo "ECR image signed successfully"
+
+      - name: Sign Dry-Run ECR Image with Cosign
+        if: ${{ inputs.sign_with_cosign && inputs.dry_run }}
+        run: |
+          echo "Signing dry-run ECR image with Cosign keyless signing..."
+          cosign sign --yes \
+            --certificate-identity-regexp="${{ inputs.cosign_identity_regexp }}" \
+            ${{ env[inputs.dry_run_ecr_repo_env] || env.PRIVATE_ECR_DRY_RUN_REPO }}@${{ steps.build-and-push.outputs.digest }}
+          echo "Dry-run ECR image signed successfully"
+        env:
+          PRIVATE_ECR_DRY_RUN_REPO: ${{ env.PRIVATE_ECR_DRY_RUN_REPO }}

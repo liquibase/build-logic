@@ -55,8 +55,11 @@ jobs:
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Build image from ${{ inputs.dockerfile_path }}
+        env:
+          DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
-          docker build -f ${{ inputs.dockerfile_path }} -t liquibase/liquibase:${{ env.IMAGE_TAG }} .
+          docker build -f "$DOCKERFILE_PATH" -t "liquibase/liquibase:$IMAGE_TAG" .
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -76,11 +79,15 @@ jobs:
       # CORE LIFECYCLE TESTS
       # ============================================
       - name: Test liquibase init start-h2
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          TEST_FIXTURES_PATH: ${{ inputs.test_fixtures_path }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           LOG_STRING="The database does not persist data"
-          docker run --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name $CONTAINER_NAME -d \
-            -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} init start-h2
+          docker run --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" --name $CONTAINER_NAME -d \
+            -v $(pwd)/build-logic/"$TEST_FIXTURES_PATH":/liquibase/changelog \
+            "liquibase/liquibase:$IMAGE_TAG" init start-h2
           sleep 30
           if docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q "true"; then
             if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "$LOG_STRING"; then
@@ -127,14 +134,18 @@ jobs:
           fi
 
       - name: Test liquibase wrong ENV variable
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          TEST_FIXTURES_PATH: ${{ inputs.test_fixtures_path }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           LOG_STRING="Error: Unable to access jarfile wrong_path/internal/lib/"
           docker stop $CONTAINER_NAME
           docker rm $CONTAINER_NAME
-          if docker run --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name $CONTAINER_NAME -d \
-              -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
+          if docker run --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" --name $CONTAINER_NAME -d \
+              -v $(pwd)/build-logic/"$TEST_FIXTURES_PATH":/liquibase/changelog \
               -e LIQUIBASE_HOME="wrong_path" \
-              liquibase/liquibase:${{ env.IMAGE_TAG }} init start-h2 2>&1 | grep -q "$LOG_STRING"; then
+              "liquibase/liquibase:$IMAGE_TAG" init start-h2 2>&1 | grep -q "$LOG_STRING"; then
             echo "The log does not contain the string: $LOG_STRING"
             exit 1
           else
@@ -142,14 +153,18 @@ jobs:
           fi
 
       - name: Test liquibase good ENV variable
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          TEST_FIXTURES_PATH: ${{ inputs.test_fixtures_path }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           LOG_STRING="The database does not persist data"
           docker stop $CONTAINER_NAME
           docker rm $CONTAINER_NAME
-          docker run --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name $CONTAINER_NAME -d \
-            -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
+          docker run --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" --name $CONTAINER_NAME -d \
+            -v $(pwd)/build-logic/"$TEST_FIXTURES_PATH":/liquibase/changelog \
             -e LIQUIBASE_HOME="/liquibase" \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} init start-h2
+            "liquibase/liquibase:$IMAGE_TAG" init start-h2
           sleep 30
           docker logs $CONTAINER_NAME
           if docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q "true"; then
@@ -196,14 +211,18 @@ jobs:
           fi
 
       - name: Test driver connection
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          TEST_FIXTURES_PATH: ${{ inputs.test_fixtures_path }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           LOG_STRING="successfully installed in classpath"
           docker stop $CONTAINER_NAME
           docker rm $CONTAINER_NAME
           docker network create --driver bridge test_network
-          docker run -d --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name $CONTAINER_NAME --network test_network \
-            -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} init start-h2
+          docker run -d --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" --name $CONTAINER_NAME --network test_network \
+            -v $(pwd)/build-logic/"$TEST_FIXTURES_PATH":/liquibase/changelog \
+            "liquibase/liquibase:$IMAGE_TAG" init start-h2
           if docker exec $CONTAINER_NAME lpm add mssql --category=driver -g 2>&1 | grep -q "$LOG_STRING"; then
             echo "The log contains the string: $LOG_STRING"
           else
@@ -212,20 +231,27 @@ jobs:
           fi
 
       - name: Test custom entrypoint
+        env:
+          DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+          TEST_FIXTURES_PATH: ${{ inputs.test_fixtures_path }}
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
         run: |
           LOG_STRING="Update has been successful"
-          docker build -f ${{ inputs.dockerfile_path }} -t liquibase:test-entrypoint .
-          docker build -f $(pwd)/build-logic/${{ inputs.test_fixtures_path }}/Dockerfile \
-            -t liquibase:test $(pwd)/build-logic/${{ inputs.test_fixtures_path }}/
-          docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} --name liquibase-test \
+          docker build -f "$DOCKERFILE_PATH" -t liquibase:test-entrypoint .
+          docker build -f "$(pwd)/build-logic/$TEST_FIXTURES_PATH/Dockerfile" \
+            -t liquibase:test "$(pwd)/build-logic/$TEST_FIXTURES_PATH/"
+          docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" --name liquibase-test \
             --entrypoint="/scripts/liquibase_command.sh" \
-            -v $(pwd)/build-logic/${{ inputs.test_fixtures_path }}:/liquibase/changelog \
+            -v "$(pwd)/build-logic/$TEST_FIXTURES_PATH":/liquibase/changelog \
             liquibase:test "version"
 
       # ============================================
       # CLI-DOCKER COMPATIBILITY TESTS
       # ============================================
       - name: Test CLI-Docker compatibility - Working directory change
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing that working directory changes to /liquibase/changelog when mounted..."
           mkdir -p test-compatibility
@@ -245,9 +271,9 @@ jobs:
               </changeSet>
           </databaseChangeLog>
           EOF
-          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             -v $(pwd)/test-compatibility:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             --defaultsFile=test.properties validate 2>&1)
           echo "Container output: $RESULT"
           if echo "$RESULT" | grep -q "No validation errors found"; then
@@ -259,6 +285,9 @@ jobs:
           rm -rf test-compatibility
 
       - name: Test CLI-Docker compatibility - Relative path file creation
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing relative path file creation with new CLI-Docker compatibility..."
           mkdir -p test-file-creation
@@ -275,9 +304,9 @@ jobs:
               </changeSet>
           </databaseChangeLog>
           EOF
-          docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             -v $(pwd)/test-file-creation:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             updateSQL --changelogFile=test-changelog.xml --url=offline:postgresql --outputFile=generated-update.sql
           if [ -f "test-file-creation/generated-update.sql" ]; then
             echo "SUCCESS: File created in mounted directory with relative path"
@@ -288,6 +317,9 @@ jobs:
           rm -rf test-file-creation
 
       - name: Test CLI-Docker compatibility - Properties file resolution
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing properties file resolution with relative paths..."
           mkdir -p test-properties
@@ -308,9 +340,9 @@ jobs:
               </changeSet>
           </databaseChangeLog>
           EOF
-          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             -v $(pwd)/test-properties:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             --defaultsFile=test.properties validate 2>&1)
           echo "Validation result: $RESULT"
           if echo "$RESULT" | grep -q "No validation errors found"; then
@@ -322,10 +354,13 @@ jobs:
           rm -rf test-properties
 
       - name: Test backward compatibility - No changelog directory
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing backward compatibility when no /liquibase/changelog is mounted..."
-          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} --version 2>&1)
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
+            "liquibase/liquibase:$IMAGE_TAG" --version 2>&1)
           echo "Container output: $RESULT"
           if echo "$RESULT" | grep -q "Liquibase.*Version"; then
             echo "SUCCESS: Container works without changelog mount (backward compatible)"
@@ -335,6 +370,9 @@ jobs:
           fi
 
       - name: Test backward compatibility - Mixed path usage scenarios
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing mixed path usage scenarios work correctly..."
           mkdir -p test-mixed-paths
@@ -349,9 +387,9 @@ jobs:
               </changeSet>
           </databaseChangeLog>
           EOF
-          RESULT1=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT1=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             -v $(pwd)/test-mixed-paths:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             validate --changelogFile=test-changelog.xml --url=offline:postgresql 2>&1)
           if echo "$RESULT1" | grep -q "No validation errors found"; then
             echo "SUCCESS: Relative paths work with CLI-Docker compatibility"
@@ -360,19 +398,19 @@ jobs:
             echo "Output: $RESULT1"
             exit 1
           fi
-          RESULT2=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT2=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             --env SHOULD_CHANGE_DIR=false \
             -v $(pwd)/test-mixed-paths:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             validate --changelogFile=test-changelog.xml --url=offline:postgresql 2>&1)
           if echo "$RESULT2" | grep -q "No validation errors found"; then
             echo "SUCCESS: SHOULD_CHANGE_DIR=false preserves old behavior"
           else
             echo "EXPECTED: SHOULD_CHANGE_DIR=false correctly prevents automatic directory changes"
           fi
-          docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             -v $(pwd)/test-mixed-paths:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             update-sql --changelogFile=test-changelog.xml --url=offline:postgresql --output-file=generated-sql.sql
           if [ -f "test-mixed-paths/generated-sql.sql" ]; then
             echo "SUCCESS: Generated files are created in mounted directory"
@@ -383,6 +421,9 @@ jobs:
           rm -rf test-mixed-paths
 
       - name: Test CLI-Docker compatibility - Generate changelog creates files in mounted directory
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing that generate-changelog command creates files in mounted directory..."
           mkdir -p test-generate-changelog
@@ -392,9 +433,9 @@ jobs:
           password=
           driver=org.h2.Driver
           EOF
-          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             -v $(pwd)/test-generate-changelog:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             generate-changelog \
             --defaultsFile=liquibase.properties \
             --changelog-file=generated-changelog.xml 2>&1)
@@ -420,9 +461,9 @@ jobs:
               </changeSet>
           </databaseChangeLog>
           EOF
-          docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             -v $(pwd)/test-generate-changelog:/liquibase/changelog \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             update-sql \
             --changelog-file=test-changelog.xml \
             --url=jdbc:h2:mem:testdb \
@@ -443,6 +484,9 @@ jobs:
           rm -rf test-generate-changelog
 
       - name: Test CLI-Docker compatibility - Complex scenario
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing complex scenario with multiple relative paths..."
           mkdir -p test-complex/{changelog,lib}
@@ -473,10 +517,10 @@ jobs:
           url=offline:postgresql
           driver=org.postgresql.Driver
           EOF
-          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             -v $(pwd)/test-complex/changelog:/liquibase/changelog \
             -v $(pwd)/test-complex:/liquibase/app \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             --defaultsFile=../app/app.properties validate 2>&1)
           echo "Complex validation result: $RESULT"
           if echo "$RESULT" | grep -q "No validation errors found"; then
@@ -492,6 +536,9 @@ jobs:
       # ============================================
       - name: Test custom LIQUIBASE_SEARCH_PATH env var is preserved
         if: inputs.runs_on == 'ubuntu-latest'
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing that custom LIQUIBASE_SEARCH_PATH environment variable is not overridden..."
           mkdir -p test-search-path-env/custom-path
@@ -507,10 +554,10 @@ jobs:
           </databaseChangeLog>
           EOF
           set +e
-          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             --env LIQUIBASE_SEARCH_PATH="/liquibase/custom-path" \
             -v $(pwd)/test-search-path-env/custom-path:/liquibase/custom-path \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             --changelogFile=main-changelog.xml \
             --url=offline:postgresql \
             validate 2>&1)
@@ -527,6 +574,9 @@ jobs:
 
       - name: Test explicit --search-path CLI argument is not overridden
         if: inputs.runs_on == 'ubuntu-latest'
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing that explicit --search-path command-line argument is respected..."
           mkdir -p test-search-path-cli/cli-path
@@ -542,9 +592,9 @@ jobs:
           </databaseChangeLog>
           EOF
           set +e
-          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             -v $(pwd)/test-search-path-cli/cli-path:/liquibase/cli-path \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             --changelogFile=main-changelog.xml \
             --search-path=/liquibase/cli-path \
             --url=offline:postgresql \
@@ -562,6 +612,9 @@ jobs:
 
       - name: Test relative paths work WITH custom search path (regression test)
         if: inputs.runs_on == 'ubuntu-latest'
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing relative paths combined with custom search path (DAT-21189 regression)..."
           mkdir -p test-search-path-combo/shared
@@ -577,10 +630,10 @@ jobs:
           </databaseChangeLog>
           EOF
           set +e
-          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             --env LIQUIBASE_SEARCH_PATH="/liquibase/shared" \
             -v $(pwd)/test-search-path-combo/shared:/liquibase/shared \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             --changelogFile=main-changelog.xml \
             --url=offline:postgresql \
             validate 2>&1)
@@ -597,6 +650,9 @@ jobs:
 
       - name: Test search path not injected when LIQUIBASE_SEARCH_PATH with multiple paths
         if: inputs.runs_on == 'ubuntu-latest'
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           echo "Testing multiple search paths in LIQUIBASE_SEARCH_PATH are preserved..."
           mkdir -p test-multi-search/path1
@@ -613,11 +669,11 @@ jobs:
           </databaseChangeLog>
           EOF
           set +e
-          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY=${{ env.PRO_LICENSE_KEY }} \
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
             --env LIQUIBASE_SEARCH_PATH="/liquibase/path1,/liquibase/path2" \
             -v $(pwd)/test-multi-search/path1:/liquibase/path1 \
             -v $(pwd)/test-multi-search/path2:/liquibase/path2 \
-            liquibase/liquibase:${{ env.IMAGE_TAG }} \
+            "liquibase/liquibase:$IMAGE_TAG" \
             --changelogFile=main.xml \
             --url=offline:postgresql \
             validate 2>&1)

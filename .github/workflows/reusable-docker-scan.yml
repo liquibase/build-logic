@@ -85,16 +85,21 @@ jobs:
 
       - name: Derive GHCR image name
         id: set-ghcr-ref
+        env:
+          SUFFIX: ${{ inputs.suffix }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          GHCR_TAG: ${{ inputs.ghcr_tag }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           # Sanitize suffix for use in image tag (strip leading dash)
-          SAFE_SUFFIX=$(echo "${{ inputs.suffix }}" | sed 's/^-//')
+          SAFE_SUFFIX=$(echo "$SUFFIX" | sed 's/^-//')
           if [[ -n "$SAFE_SUFFIX" ]]; then
             GHCR_NAME="${SAFE_SUFFIX}"
           else
             # Use last segment of image_name as discriminator (e.g. liquibase-secure)
-            GHCR_NAME=$(echo "${{ inputs.image_name }}" | awk -F'/' '{print $NF}')
+            GHCR_NAME=$(echo "$IMAGE_NAME" | awk -F'/' '{print $NF}')
           fi
-          GHCR_IMAGE="ghcr.io/${{ github.repository }}/liquibase-${GHCR_NAME}:${{ inputs.ghcr_tag }}"
+          GHCR_IMAGE="ghcr.io/${REPOSITORY}/liquibase-${GHCR_NAME}:${GHCR_TAG}"
           echo "ghcr_image=${GHCR_IMAGE}" >> $GITHUB_OUTPUT
           echo "GHCR target: ${GHCR_IMAGE}"
 
@@ -152,9 +157,14 @@ jobs:
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Build ${{ inputs.image_name }}${{ inputs.suffix }} from Dockerfile
+        env:
+          DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          SUFFIX: ${{ inputs.suffix }}
+          GHCR_TAG: ${{ inputs.ghcr_tag }}
         run: |
-          docker build -f ${{ inputs.dockerfile_path }} \
-            -t ${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag }} .
+          docker build -f "$DOCKERFILE_PATH" \
+            -t "${IMAGE_NAME}${SUFFIX}:${GHCR_TAG}" .
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -171,8 +181,10 @@ jobs:
           parse-json-secrets: true
 
       - name: Decode DOCKERHUB_USERNAME
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
-          decoded_username=$(echo "${{ env.DOCKERHUB_USERNAME }}" | base64 -d)
+          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d)
           echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> $GITHUB_ENV
 
       - name: Login to Docker Hub
@@ -220,17 +232,22 @@ jobs:
 
       - name: Docker Scout JSON output
         if: always()
+        env:
+          VEX_ENABLED: ${{ inputs.vex_enabled }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          SUFFIX: ${{ inputs.suffix }}
+          GHCR_TAG: ${{ inputs.ghcr_tag }}
         run: |
           SCOUT_ARGS=(
             --format json
             --output scout-results.json
             --only-severities critical,high
           )
-          if [[ "${{ inputs.vex_enabled }}" == "true" ]]; then
+          if [[ "$VEX_ENABLED" == "true" ]]; then
             SCOUT_ARGS+=(--vex-location ./vex --only-vex-affected --vex-author "Liquibase Security Team")
           fi
           docker scout cves "${SCOUT_ARGS[@]}" \
-            "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag }}" || true
+            "${IMAGE_NAME}${SUFFIX}:${GHCR_TAG}" || true
 
       - name: Upload Scout JSON results
         if: always()
@@ -263,22 +280,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_IMAGE: ${{ needs.build-ghcr.outputs.ghcr_image }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           # Parse org, package name and tag from the full image ref
           # ghcr.io/<org>/<repo>/<pkg>:<tag>
-          REPO_NAME="${{ github.event.repository.name }}"
           # Extract package sub-path from ghcr_image: everything after "ghcr.io/<org>/"
-          PKG_WITH_TAG="${GHCR_IMAGE#ghcr.io/${{ github.repository_owner }}/}"
+          PKG_WITH_TAG="${GHCR_IMAGE#ghcr.io/${REPO_OWNER}/}"
           PACKAGE_NAME="${PKG_WITH_TAG%%:*}"
           TAG="${PKG_WITH_TAG##*:}"
           ENCODED_PACKAGE_NAME=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${PACKAGE_NAME}', safe=''))")
 
           VERSION_ID=$(gh api \
-            "/orgs/${{ github.repository_owner }}/packages/container/${ENCODED_PACKAGE_NAME}/versions" \
+            "/orgs/${REPO_OWNER}/packages/container/${ENCODED_PACKAGE_NAME}/versions" \
             --jq ".[] | select(.metadata.container.tags[] == \"${TAG}\") | .id" 2>/dev/null || echo "")
           if [ -n "$VERSION_ID" ]; then
             gh api --method DELETE \
-              "/orgs/${{ github.repository_owner }}/packages/container/${ENCODED_PACKAGE_NAME}/versions/${VERSION_ID}"
+              "/orgs/${REPO_OWNER}/packages/container/${ENCODED_PACKAGE_NAME}/versions/${VERSION_ID}"
             echo "Deleted ${PACKAGE_NAME}:${TAG}"
           else
             echo "No version found for ${PACKAGE_NAME}:${TAG}, skipping"

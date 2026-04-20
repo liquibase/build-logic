@@ -130,16 +130,19 @@ jobs:
       - name: Get latest workflow run for branch
         if: ${{ inputs.build_type == 'Community' }}
         id: get-workflow-run
+        env:
+          LIQUIBOT_PAT_GPM_ACCESS: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
+          BRANCH_NAME: ${{ inputs.branch_name }}
         run: |
           # Get the latest successful workflow run for the specified branch
           WORKFLOW_RUN=$(curl -s \
-            -H "Authorization: Bearer ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}" \
+            -H "Authorization: Bearer $LIQUIBOT_PAT_GPM_ACCESS" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/liquibase/liquibase/actions/workflows/run-tests.yml/runs?branch=${{ inputs.branch_name }}&status=completed&conclusion=success&per_page=1" \
+            "https://api.github.com/repos/liquibase/liquibase/actions/workflows/run-tests.yml/runs?branch=${BRANCH_NAME}&status=completed&conclusion=success&per_page=1" \
             | jq -r '.workflow_runs[0].id')
 
           if [ "$WORKFLOW_RUN" = "null" ] || [ -z "$WORKFLOW_RUN" ]; then
-            echo "No successful workflow run found for branch ${{ inputs.branch_name }}"
+            echo "No successful workflow run found for branch ${BRANCH_NAME}"
             echo "Will build using standard Dockerfile from branch source instead"
             echo "workflow_run_id=" >> $GITHUB_OUTPUT
             echo "has_workflow_run=false" >> $GITHUB_OUTPUT
@@ -151,15 +154,22 @@ jobs:
 
       - name: Download liquibase build artifact (Community) or from S3 (Liquibase-Secure)
         id: download-artifact
+        env:
+          BUILD_TYPE: ${{ inputs.build_type }}
+          SECURE_VERSION: ${{ inputs.secure_version }}
+          BRANCH_NAME: ${{ inputs.branch_name }}
+          LIQUIBOT_PAT_GPM_ACCESS: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
+          HAS_WORKFLOW_RUN: ${{ steps.get-workflow-run.outputs.has_workflow_run }}
+          WORKFLOW_RUN_ID: ${{ steps.get-workflow-run.outputs.workflow_run_id }}
         run: |
-          if [[ "${{ inputs.build_type }}" == "secure" ]]; then
+          if [[ "$BUILD_TYPE" == "secure" ]]; then
             echo "Downloading Liquibase Secure build from S3..."
 
             # Determine S3 path based on whether secure_version is provided
-            if [[ -n "${{ inputs.secure_version }}" ]]; then
-              echo "Using secure_version: ${{ inputs.secure_version }}"
+            if [[ -n "$SECURE_VERSION" ]]; then
+              echo "Using secure_version: $SECURE_VERSION"
               # Extract base version and RC number for RC versions
-              VERSION="${{ inputs.secure_version }}"
+              VERSION="$SECURE_VERSION"
               if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-RC([0-9]+)$ ]]; then
                 BASE_VERSION="${BASH_REMATCH[1]}"
                 RC_NUMBER="${BASH_REMATCH[2]}"
@@ -173,10 +183,10 @@ jobs:
                 echo "Using production S3 path: $S3_URL"
               fi
             else
-              echo "Using branch-based build: ${{ inputs.branch_name }}"
+              echo "Using branch-based build: $BRANCH_NAME"
               # Original branch-based logic
-              LIQUIBASE_SECURE_ZIP="liquibase-secure-${{ inputs.branch_name }}.zip"
-              S3_URL="s3://repo.liquibase.com/releases/secure/${{ inputs.branch_name }}/$LIQUIBASE_SECURE_ZIP"
+              LIQUIBASE_SECURE_ZIP="liquibase-secure-${BRANCH_NAME}.zip"
+              S3_URL="s3://repo.liquibase.com/releases/secure/${BRANCH_NAME}/$LIQUIBASE_SECURE_ZIP"
             fi
 
             echo "Downloading from S3: $S3_URL"
@@ -192,8 +202,8 @@ jobs:
               else
                 echo "Liquibase-Secure build not found in S3."
                 # If secure_version is provided, don't trigger workflow - the build should exist
-                if [[ -n "${{ inputs.secure_version }}" ]]; then
-                  echo "ERROR: secure_version specified but build not found in S3. Build should already exist for version ${{ inputs.secure_version }}"
+                if [[ -n "$SECURE_VERSION" ]]; then
+                  echo "ERROR: secure_version specified but build not found in S3. Build should already exist for version $SECURE_VERSION"
                   echo "trigger_liquibase_secure_workflow=false" >> $GITHUB_OUTPUT
                   echo "build_ready=false" >> $GITHUB_OUTPUT
                   echo "use_fallback=true" >> $GITHUB_OUTPUT
@@ -223,7 +233,7 @@ jobs:
 
           else
             # Community build handling
-            if [[ "${{ steps.get-workflow-run.outputs.has_workflow_run }}" == "false" ]]; then
+            if [[ "$HAS_WORKFLOW_RUN" == "false" ]]; then
               echo "No workflow run available, will use fallback build from branch source"
               echo "build_ready=false" >> $GITHUB_OUTPUT
               echo "use_fallback=true" >> $GITHUB_OUTPUT
@@ -231,13 +241,13 @@ jobs:
               echo "Downloading Community build from GitHub artifacts..."
 
               # Get artifact download URL
-              ARTIFACT_NAME="liquibase-zip-${{ inputs.branch_name }}"
+              ARTIFACT_NAME="liquibase-zip-${BRANCH_NAME}"
               echo "Looking for artifact: $ARTIFACT_NAME"
 
               ARTIFACTS_RESPONSE=$(curl -s \
-                -H "Authorization: Bearer ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}" \
+                -H "Authorization: Bearer $LIQUIBOT_PAT_GPM_ACCESS" \
                 -H "Accept: application/vnd.github.v3+json" \
-                "https://api.github.com/repos/liquibase/liquibase/actions/runs/${{ steps.get-workflow-run.outputs.workflow_run_id }}/artifacts")
+                "https://api.github.com/repos/liquibase/liquibase/actions/runs/${WORKFLOW_RUN_ID}/artifacts")
 
               echo "Available artifacts:"
               echo "$ARTIFACTS_RESPONSE" | jq -r '.artifacts[].name'
@@ -256,7 +266,7 @@ jobs:
 
                 # Download and extract artifact
                 curl -L \
-                  -H "Authorization: Bearer ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}" \
+                  -H "Authorization: Bearer $LIQUIBOT_PAT_GPM_ACCESS" \
                   -H "Accept: application/vnd.github.v3+json" \
                   -o liquibase-artifact.zip \
                   "$ARTIFACT_URL"
@@ -314,11 +324,14 @@ jobs:
       - name: Download Liquibase Secure build from S3 after workflow completion
         if: ${{ inputs.build_type == 'secure' && steps.download-artifact.outputs.trigger_liquibase_secure_workflow == 'true' && steps.download-artifact.outputs.use_fallback != 'true' }}
         id: download-after-trigger
+        env:
+          SECURE_VERSION: ${{ inputs.secure_version }}
+          BRANCH_NAME: ${{ inputs.branch_name }}
         run: |
           # Determine S3 path based on whether secure_version is provided (same logic as initial download)
-          if [[ -n "${{ inputs.secure_version }}" ]]; then
-            echo "Using secure_version: ${{ inputs.secure_version }}"
-            VERSION="${{ inputs.secure_version }}"
+          if [[ -n "$SECURE_VERSION" ]]; then
+            echo "Using secure_version: $SECURE_VERSION"
+            VERSION="$SECURE_VERSION"
             if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-RC([0-9]+)$ ]]; then
               BASE_VERSION="${BASH_REMATCH[1]}"
               RC_NUMBER="${BASH_REMATCH[2]}"
@@ -329,8 +342,8 @@ jobs:
               S3_URL="s3://repo.liquibase.com/releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
             fi
           else
-            LIQUIBASE_SECURE_ZIP="liquibase-secure-${{ inputs.branch_name }}.zip"
-            S3_URL="s3://repo.liquibase.com/releases/secure/${{ inputs.branch_name }}/$LIQUIBASE_SECURE_ZIP"
+            LIQUIBASE_SECURE_ZIP="liquibase-secure-${BRANCH_NAME}.zip"
+            S3_URL="s3://repo.liquibase.com/releases/secure/${BRANCH_NAME}/$LIQUIBASE_SECURE_ZIP"
           fi
 
           echo "Downloading Liquibase Secure build from S3 after workflow completion..."
@@ -362,21 +375,29 @@ jobs:
       - name: Validate and prepare liquibase build
         if: ${{ (inputs.build_type == 'Community' && (steps.download-artifact.outputs.build_ready == 'true' || steps.download-artifact.outputs.use_fallback == 'true')) || inputs.build_type == 'secure' }}
         id: validate-build
+        env:
+          BUILD_TYPE: ${{ inputs.build_type }}
+          DOWNLOAD_USE_FALLBACK: ${{ steps.download-artifact.outputs.use_fallback }}
+          DOWNLOAD_AFTER_USE_FALLBACK: ${{ steps.download-after-trigger.outputs.use_fallback }}
+          DOWNLOAD_TRIGGERED: ${{ steps.download-artifact.outputs.trigger_liquibase_secure_workflow }}
+          TRIGGER_OUTCOME: ${{ steps.trigger-liquibase-secure-release.outcome }}
+          DOWNLOAD_BUILD_READY: ${{ steps.download-artifact.outputs.build_ready }}
+          DOWNLOAD_AFTER_BUILD_READY: ${{ steps.download-after-trigger.outputs.build_ready }}
         run: |
           # Determine build mode
           USE_FALLBACK="false"
-          if [[ "${{ inputs.build_type }}" == "Community" && "${{ steps.download-artifact.outputs.use_fallback }}" == "true" ]]; then
+          if [[ "$BUILD_TYPE" == "Community" && "$DOWNLOAD_USE_FALLBACK" == "true" ]]; then
             USE_FALLBACK="true"
-          elif [[ "${{ inputs.build_type }}" == "secure" ]]; then
+          elif [[ "$BUILD_TYPE" == "secure" ]]; then
             # Check for Secure fallback conditions
-            if [[ "${{ steps.download-artifact.outputs.use_fallback }}" == "true" ]] || [[ "${{ steps.download-after-trigger.outputs.use_fallback }}" == "true" ]]; then
+            if [[ "$DOWNLOAD_USE_FALLBACK" == "true" ]] || [[ "$DOWNLOAD_AFTER_USE_FALLBACK" == "true" ]]; then
               USE_FALLBACK="true"
             # Check if Liquibase Secure workflow was triggered but failed
-            elif [[ "${{ steps.download-artifact.outputs.trigger_liquibase_secure_workflow }}" == "true" ]] && [[ "${{ steps.trigger-liquibase-secure-release.outcome }}" == "failure" ]]; then
+            elif [[ "$DOWNLOAD_TRIGGERED" == "true" ]] && [[ "$TRIGGER_OUTCOME" == "failure" ]]; then
               echo "Liquibase Secure workflow trigger failed, falling back to standard Dockerfile build"
               USE_FALLBACK="true"
             # Check if Liquibase Secure workflow succeeded but download still failed
-            elif [[ "${{ steps.download-artifact.outputs.trigger_liquibase_secure_workflow }}" == "true" ]] && [[ "${{ steps.download-artifact.outputs.build_ready }}" != "true" ]] && [[ "${{ steps.download-after-trigger.outputs.build_ready }}" != "true" ]]; then
+            elif [[ "$DOWNLOAD_TRIGGERED" == "true" ]] && [[ "$DOWNLOAD_BUILD_READY" != "true" ]] && [[ "$DOWNLOAD_AFTER_BUILD_READY" != "true" ]]; then
               echo "Liquibase Secure workflow completed but build still not available, falling back to standard Dockerfile build"
               USE_FALLBACK="true"
             fi
@@ -408,24 +429,27 @@ jobs:
 
       - name: Modify Dockerfiles for artifact-based build
         if: ${{ steps.validate-build.outputs.use_fallback_build == 'false' }}
+        env:
+          DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+          BRANCH_NAME: ${{ inputs.branch_name }}
         run: |
-          echo "Modifying ${{ inputs.dockerfile_path }} to use downloaded artifact instead of GitHub releases..."
+          echo "Modifying $DOCKERFILE_PATH to use downloaded artifact instead of GitHub releases..."
 
           # Create backup
-          cp "${{ inputs.dockerfile_path }}" "${{ inputs.dockerfile_path }}.backup"
+          cp "$DOCKERFILE_PATH" "${DOCKERFILE_PATH}.backup"
 
           # Set version ARG based on dockerfile type
-          if [[ "${{ inputs.dockerfile_path }}" == "DockerfileSecure" ]]; then
+          if [[ "$DOCKERFILE_PATH" == "DockerfileSecure" ]]; then
             VERSION_ARG="LIQUIBASE_SECURE_VERSION"
           else
             VERSION_ARG="LIQUIBASE_VERSION"
           fi
 
           # Replace version ARG with branch name
-          sed -i "s|ARG ${VERSION_ARG}=.*|ARG ${VERSION_ARG}=${{ inputs.branch_name }}|" "${{ inputs.dockerfile_path }}"
+          sed -i "s|ARG ${VERSION_ARG}=.*|ARG ${VERSION_ARG}=${BRANCH_NAME}|" "$DOCKERFILE_PATH"
 
           # Create modified Dockerfile using awk for cleaner handling
-          cat "${{ inputs.dockerfile_path }}" | awk -v dockerfile="${{ inputs.dockerfile_path }}" -v branch="${{ inputs.branch_name }}" '
+          cat "$DOCKERFILE_PATH" | awk -v dockerfile="$DOCKERFILE_PATH" -v branch="$BRANCH_NAME" '
           BEGIN {
             in_wget_block = 0
             skip_line = 0
@@ -483,49 +507,60 @@ jobs:
 
           # Print all other lines
           { print }
-          ' > "${{ inputs.dockerfile_path }}.tmp"
+          ' > "${DOCKERFILE_PATH}.tmp"
 
           # Replace original with modified version
-          mv "${{ inputs.dockerfile_path }}.tmp" "${{ inputs.dockerfile_path }}"
+          mv "${DOCKERFILE_PATH}.tmp" "$DOCKERFILE_PATH"
 
-          echo "Modified ${{ inputs.dockerfile_path }}"
+          echo "Modified $DOCKERFILE_PATH"
           echo "=== Changes made ==="
-          echo "- Set ${VERSION_ARG} to ${{ inputs.branch_name }}"
+          echo "- Set ${VERSION_ARG} to ${BRANCH_NAME}"
           echo "- Removed wget download commands"
           echo "- Removed SHA256 checksum validation"
           echo "- Added COPY liquibase-build/ ./"
 
           echo ""
           echo "=== Modified Dockerfile content preview ==="
-          echo "First 30 lines of modified ${{ inputs.dockerfile_path }}:"
-          head -30 "${{ inputs.dockerfile_path }}"
+          echo "First 30 lines of modified $DOCKERFILE_PATH:"
+          head -30 "$DOCKERFILE_PATH"
           echo "..."
 
       - name: Compute image tag and build tag list
         id: image-tag
+        env:
+          IS_RC: ${{ inputs.is_rc }}
+          SECURE_VERSION: ${{ inputs.secure_version }}
+          BRANCH_NAME: ${{ inputs.branch_name }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_SHA: ${{ github.sha }}
+          GHCR_NAME: ${{ inputs.ghcr_name }}
+          PUSH_NEXUS: ${{ inputs.push_nexus }}
+          PUSH_GHCR: ${{ inputs.push_ghcr }}
+          REPO_URL: ${{ env.REPO_URL }}
+          IMAGE_NAME: ${{ inputs.image_name }}
         run: |
-          if [[ "${{ inputs.is_rc }}" == "true" && -n "${{ inputs.secure_version }}" ]]; then
-            IMAGE_TAG="${{ inputs.secure_version }}"
+          if [[ "$IS_RC" == "true" && -n "$SECURE_VERSION" ]]; then
+            IMAGE_TAG="$SECURE_VERSION"
           else
-            IMAGE_TAG="${{ inputs.branch_name }}"
+            IMAGE_TAG="$BRANCH_NAME"
           fi
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
-          GHCR_REF="ghcr.io/${{ github.repository }}/liquibase-${{ inputs.ghcr_name }}:${{ github.sha }}"
+          GHCR_REF="ghcr.io/${REPOSITORY}/liquibase-${GHCR_NAME}:${GIT_SHA}"
           echo "ghcr_ref=${GHCR_REF}" >> $GITHUB_OUTPUT
 
           # Build comma-separated tag list for build-push-action
           TAGS=""
-          if [[ "${{ inputs.push_nexus }}" == "true" ]]; then
-            TAGS="${{ env.REPO_URL }}/${{ inputs.image_name }}:${IMAGE_TAG}"
+          if [[ "$PUSH_NEXUS" == "true" ]]; then
+            TAGS="${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
           fi
-          if [[ "${{ inputs.push_ghcr }}" == "true" ]]; then
+          if [[ "$PUSH_GHCR" == "true" ]]; then
             if [[ -n "$TAGS" ]]; then TAGS="${TAGS},"; fi
             TAGS="${TAGS}${GHCR_REF}"
           fi
           if [[ -z "$TAGS" ]]; then
             echo "::warning::Neither push_nexus nor push_ghcr is enabled — no tags generated."
-            TAGS="ghcr.io/${{ github.repository }}/liquibase-${{ inputs.ghcr_name }}:${IMAGE_TAG}"
+            TAGS="ghcr.io/${REPOSITORY}/liquibase-${GHCR_NAME}:${IMAGE_TAG}"
           fi
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
@@ -576,24 +611,45 @@ jobs:
 
       - name: Image build summary
         if: ${{ steps.validate-build.outcome == 'success' }}
+        env:
+          USE_FALLBACK_BUILD: ${{ steps.validate-build.outputs.use_fallback_build }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.image_tag }}
+          REPO_URL: ${{ env.REPO_URL }}
+          IMAGE_NAME: ${{ inputs.image_name }}
         run: |
-          BUILD_MODE="${{ steps.validate-build.outputs.use_fallback_build == 'true' && 'fallback (standard Dockerfile)' || 'artifact-based' }}"
-          IMAGE_TAG="${{ steps.image-tag.outputs.image_tag }}"
-          echo "Successfully built and pushed: ${{ env.REPO_URL }}/${{ inputs.image_name }}:$IMAGE_TAG"
+          if [[ "$USE_FALLBACK_BUILD" == "true" ]]; then
+            BUILD_MODE="fallback (standard Dockerfile)"
+          else
+            BUILD_MODE="artifact-based"
+          fi
+          echo "Successfully built and pushed: ${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
           echo "Build mode: $BUILD_MODE"
 
       - name: Workflow execution summary
         if: always()
+        env:
+          BRANCH_NAME: ${{ inputs.branch_name }}
+          DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+          BUILD_TYPE: ${{ inputs.build_type }}
+          VALIDATE_USE_FALLBACK: ${{ steps.validate-build.outputs.use_fallback_build }}
+          DOWNLOAD_USE_FALLBACK: ${{ steps.download-artifact.outputs.use_fallback }}
+          DOWNLOAD_AFTER_USE_FALLBACK: ${{ steps.download-after-trigger.outputs.use_fallback }}
+          DOWNLOAD_TRIGGERED: ${{ steps.download-artifact.outputs.trigger_liquibase_secure_workflow }}
+          DOWNLOAD_AFTER_BUILD_READY: ${{ steps.download-after-trigger.outputs.build_ready }}
+          JOB_STATUS: ${{ job.status }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.image_tag }}
+          REPO_URL: ${{ env.REPO_URL }}
+          IMAGE_NAME: ${{ inputs.image_name }}
         run: |
           echo "=== QA Docker Build Workflow Summary ==="
-          echo "Branch: ${{ inputs.branch_name }}"
-          echo "Dockerfile: ${{ inputs.dockerfile_path }}"
-          echo "Build Type: ${{ inputs.build_type }}"
+          echo "Branch: ${BRANCH_NAME}"
+          echo "Dockerfile: ${DOCKERFILE_PATH}"
+          echo "Build Type: ${BUILD_TYPE}"
           echo ""
 
           # Determine if fallback was used
           USE_FALLBACK="false"
-          if [[ "${{ steps.validate-build.outputs.use_fallback_build }}" == "true" ]] || [[ "${{ steps.download-artifact.outputs.use_fallback }}" == "true" ]] || [[ "${{ steps.download-after-trigger.outputs.use_fallback }}" == "true" ]]; then
+          if [[ "$VALIDATE_USE_FALLBACK" == "true" ]] || [[ "$DOWNLOAD_USE_FALLBACK" == "true" ]] || [[ "$DOWNLOAD_AFTER_USE_FALLBACK" == "true" ]]; then
             USE_FALLBACK="true"
           fi
 
@@ -601,13 +657,13 @@ jobs:
             echo "Build Mode: FALLBACK (Standard Dockerfile from branch source)"
             echo "   - No pre-built artifacts were available"
             echo "   - Used standard Dockerfile without modification"
-            echo "   - Built directly from liquibase branch: ${{ inputs.branch_name }}"
-          elif [[ "${{ inputs.build_type }}" == "secure" ]]; then
-            if [[ "${{ steps.download-artifact.outputs.trigger_liquibase_secure_workflow }}" == "true" ]]; then
+            echo "   - Built directly from liquibase branch: ${BRANCH_NAME}"
+          elif [[ "$BUILD_TYPE" == "secure" ]]; then
+            if [[ "$DOWNLOAD_TRIGGERED" == "true" ]]; then
               echo "Build Mode: ARTIFACT-BASED (Secure workflow triggered)"
-              echo "   - S3 build was missing for branch ${{ inputs.branch_name }}"
+              echo "   - S3 build was missing for branch ${BRANCH_NAME}"
               echo "   - Automatically triggered pro-release-to-s3.yml workflow"
-              if [[ "${{ steps.download-after-trigger.outputs.build_ready }}" == "true" ]]; then
+              if [[ "$DOWNLOAD_AFTER_BUILD_READY" == "true" ]]; then
                 echo "   - Liquibase-Secure workflow completed successfully"
                 echo "   - Liquibase-Secure build downloaded and Docker image built"
               else
@@ -624,10 +680,9 @@ jobs:
           fi
 
           echo ""
-          if [[ "${{ job.status }}" == "success" ]]; then
+          if [[ "$JOB_STATUS" == "success" ]]; then
             echo "Overall Status: SUCCESS"
-            IMAGE_TAG="${{ steps.image-tag.outputs.image_tag }}"
-            echo "Image Available: ${{ env.REPO_URL }}/${{ inputs.image_name }}:$IMAGE_TAG"
+            echo "Image Available: ${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
             if [[ "$USE_FALLBACK" == "true" ]]; then
               echo "Built using fallback mode - standard Dockerfile from branch source"
             fi

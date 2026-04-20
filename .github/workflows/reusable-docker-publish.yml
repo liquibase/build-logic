@@ -39,16 +39,20 @@ jobs:
     steps:
       - name: Determine Release Tag
         id: release-tag
+        env:
+          VERSION: ${{ inputs.version }}
+          TAG_SUFFIX: ${{ inputs.tag_suffix }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
         run: |
-          TAG_NAME="v${{ inputs.version }}${{ inputs.tag_suffix }}"
-          if [[ "${{ inputs.release_type }}" == "liquibase-secure-release" ]]; then
-            RELEASE_NAME="v${{ inputs.version }} SECURE"
+          TAG_NAME="v${VERSION}${TAG_SUFFIX}"
+          if [[ "$RELEASE_TYPE" == "liquibase-secure-release" ]]; then
+            RELEASE_NAME="v${VERSION} SECURE"
           else
-            RELEASE_NAME="v${{ inputs.version }}"
+            RELEASE_NAME="v${VERSION}"
           fi
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "release_name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
-          echo "::notice::Publishing GitHub release for ${{ inputs.release_type }} on tag: ${TAG_NAME}"
+          echo "::notice::Publishing GitHub release for ${RELEASE_TYPE} on tag: ${TAG_NAME}"
 
       - name: Get Release Notes from Release Drafter Draft
         id: get-release-notes
@@ -100,14 +104,16 @@ jobs:
       - name: Publish Release (draft=false, latest=true)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release-tag.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          TAG="${{ steps.release-tag.outputs.tag_name }}"
-          if ! gh release view "${TAG}" --repo "${{ github.repository }}" &>/dev/null; then
+          TAG="${RELEASE_TAG}"
+          if ! gh release view "${TAG}" --repo "${REPOSITORY}" &>/dev/null; then
             echo "::warning::Release '${TAG}' not found — skipping publish."
             exit 0
           fi
           gh release edit "${TAG}" \
-            --repo "${{ github.repository }}" \
+            --repo "${REPOSITORY}" \
             --draft=false \
             --latest=true
           echo "Release ${TAG} published successfully"

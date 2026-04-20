@@ -49,8 +49,10 @@ jobs:
           parse-json-secrets: true
 
       - name: Decode DOCKERHUB_USERNAME
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
-          decoded_username=$(echo "${{ env.DOCKERHUB_USERNAME }}" | base64 -d)
+          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d)
           echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> $GITHUB_ENV
 
       - name: Update Docker Hub README

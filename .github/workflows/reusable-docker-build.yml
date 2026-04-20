@@ -71,11 +71,11 @@ on:
         required: false
         type: boolean
         default: false
-      dry_run_ecr_repo_env:
-        description: 'Vault secret name holding dry-run ECR repo URL'
+      dry_run_ecr_repo:
+        description: 'Dry-run ECR repo URL (leave empty to fall back to PRIVATE_ECR_DRY_RUN_REPO vault secret)'
         required: false
         type: string
-        default: 'PRIVATE_ECR_DRY_RUN_REPO'
+        default: ''
       no_cache:
         description: 'Disable Docker layer cache'
         required: false
@@ -168,8 +168,10 @@ jobs:
           parse-json-secrets: true
 
       - name: Decode DOCKERHUB_USERNAME
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
-          decoded_username=$(echo "${{ env.DOCKERHUB_USERNAME }}" | base64 -d)
+          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d)
           echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> $GITHUB_ENV
 
       - name: Set up QEMU
@@ -214,25 +216,45 @@ jobs:
           username: ${{ steps.configure-aws-credentials-prod.outputs.aws_access_key_id }}
           password: ${{ steps.configure-aws-credentials-prod.outputs.aws_secret_access_key }}
 
+      - name: Resolve dry-run ECR repo
+        if: inputs.dry_run
+        id: resolve-dry-run-repo
+        env:
+          DRY_RUN_ECR_REPO_INPUT: ${{ inputs.dry_run_ecr_repo }}
+          PRIVATE_ECR_DRY_RUN_REPO: ${{ env.PRIVATE_ECR_DRY_RUN_REPO }}
+        run: |
+          if [[ -n "$DRY_RUN_ECR_REPO_INPUT" ]]; then
+            echo "repo=$DRY_RUN_ECR_REPO_INPUT" >> $GITHUB_OUTPUT
+          else
+            echo "repo=$PRIVATE_ECR_DRY_RUN_REPO" >> $GITHUB_OUTPUT
+          fi
+
       - name: Login to Private ECR Registry (dry-run)
         if: inputs.dry_run
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         env:
           AWS_REGION: us-east-1
         with:
-          registry: ${{ env[inputs.dry_run_ecr_repo_env] || env.PRIVATE_ECR_DRY_RUN_REPO }}
+          registry: ${{ steps.resolve-dry-run-repo.outputs.repo }}
           username: ${{ steps.configure-aws-credentials-prod.outputs.aws_access_key_id }}
           password: ${{ steps.configure-aws-credentials-prod.outputs.aws_secret_access_key }}
 
       - name: Generate Docker Tags
         id: generate-tags
+        env:
+          VERSION: ${{ inputs.version }}
+          MINOR_VERSION: ${{ inputs.minor_version }}
+          SUFFIX: ${{ inputs.suffix }}
+          LATEST_TAG: ${{ inputs.latest_tag }}
+          IS_DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN_REPO: ${{ steps.resolve-dry-run-repo.outputs.repo }}
+          PUSH_DOCKERHUB: ${{ inputs.push_dockerhub }}
+          DOCKERHUB_REPO: ${{ inputs.dockerhub_repo }}
+          PUSH_ECR: ${{ inputs.push_ecr }}
+          ECR_REPO: ${{ inputs.ecr_repo }}
+          PUSH_GHCR: ${{ inputs.push_ghcr }}
+          GHCR_REPO: ${{ inputs.ghcr_repo }}
         run: |
-          VERSION="${{ inputs.version }}"
-          MINOR_VERSION="${{ inputs.minor_version }}"
-          SUFFIX="${{ inputs.suffix }}"
-          LATEST_TAG="${{ inputs.latest_tag }}"
-          IS_DRY_RUN="${{ inputs.dry_run }}"
-          DRY_RUN_REPO="${{ env[inputs.dry_run_ecr_repo_env] || env.PRIVATE_ECR_DRY_RUN_REPO }}"
           TAGS=""
 
           if [[ "${IS_DRY_RUN}" == "true" ]]; then
@@ -240,24 +262,24 @@ jobs:
             TAGS="${TAGS},${DRY_RUN_REPO}:${VERSION}${SUFFIX}"
             TAGS="${TAGS},${DRY_RUN_REPO}:${MINOR_VERSION}${SUFFIX}"
           else
-            if [[ "${{ inputs.push_dockerhub }}" == "true" ]]; then
-              TAGS="${{ inputs.dockerhub_repo }}:${LATEST_TAG}${SUFFIX}"
-              TAGS="${TAGS},${{ inputs.dockerhub_repo }}:${VERSION}${SUFFIX}"
-              TAGS="${TAGS},${{ inputs.dockerhub_repo }}:${MINOR_VERSION}${SUFFIX}"
+            if [[ "${PUSH_DOCKERHUB}" == "true" ]]; then
+              TAGS="${DOCKERHUB_REPO}:${LATEST_TAG}${SUFFIX}"
+              TAGS="${TAGS},${DOCKERHUB_REPO}:${VERSION}${SUFFIX}"
+              TAGS="${TAGS},${DOCKERHUB_REPO}:${MINOR_VERSION}${SUFFIX}"
             fi
 
-            if [[ "${{ inputs.push_ecr }}" == "true" ]]; then
+            if [[ "${PUSH_ECR}" == "true" ]]; then
               if [[ -n "${TAGS}" ]]; then TAGS="${TAGS},"; fi
-              TAGS="${TAGS}${{ inputs.ecr_repo }}:${LATEST_TAG}${SUFFIX}"
-              TAGS="${TAGS},${{ inputs.ecr_repo }}:${VERSION}${SUFFIX}"
-              TAGS="${TAGS},${{ inputs.ecr_repo }}:${MINOR_VERSION}${SUFFIX}"
+              TAGS="${TAGS}${ECR_REPO}:${LATEST_TAG}${SUFFIX}"
+              TAGS="${TAGS},${ECR_REPO}:${VERSION}${SUFFIX}"
+              TAGS="${TAGS},${ECR_REPO}:${MINOR_VERSION}${SUFFIX}"
             fi
 
-            if [[ "${{ inputs.push_ghcr }}" == "true" ]]; then
+            if [[ "${PUSH_GHCR}" == "true" ]]; then
               if [[ -n "${TAGS}" ]]; then TAGS="${TAGS},"; fi
-              TAGS="${TAGS}${{ inputs.ghcr_repo }}:${LATEST_TAG}${SUFFIX}"
-              TAGS="${TAGS},${{ inputs.ghcr_repo }}:${VERSION}${SUFFIX}"
-              TAGS="${TAGS},${{ inputs.ghcr_repo }}:${MINOR_VERSION}${SUFFIX}"
+              TAGS="${TAGS}${GHCR_REPO}:${LATEST_TAG}${SUFFIX}"
+              TAGS="${TAGS},${GHCR_REPO}:${VERSION}${SUFFIX}"
+              TAGS="${TAGS},${GHCR_REPO}:${MINOR_VERSION}${SUFFIX}"
             fi
 
             if [[ -z "${TAGS}" ]]; then
@@ -272,8 +294,6 @@ jobs:
           else
             echo "Generated tags: ${TAGS}"
           fi
-        env:
-          PRIVATE_ECR_DRY_RUN_REPO: ${{ env.PRIVATE_ECR_DRY_RUN_REPO }}
 
       - name: Build and Push Docker Image
         id: build-and-push
@@ -309,38 +329,52 @@ jobs:
       # Cosign keyless signing — Secure images only (3 registries, each conditional)
       - name: Sign Docker Hub Image with Cosign
         if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_dockerhub }}
+        env:
+          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
+          DOCKERHUB_REPO: ${{ inputs.dockerhub_repo }}
+          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "Signing Docker Hub image with Cosign keyless signing..."
           cosign sign --yes \
-            --certificate-identity-regexp="${{ inputs.cosign_identity_regexp }}" \
-            ${{ inputs.dockerhub_repo }}@${{ steps.build-and-push.outputs.digest }}
+            --certificate-identity-regexp="${COSIGN_IDENTITY_REGEXP}" \
+            "${DOCKERHUB_REPO}@${IMAGE_DIGEST}"
           echo "Docker Hub image signed successfully"
 
       - name: Sign GHCR Image with Cosign
         if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_ghcr }}
+        env:
+          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
+          GHCR_REPO: ${{ inputs.ghcr_repo }}
+          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "Signing GHCR image with Cosign keyless signing..."
           cosign sign --yes \
-            --certificate-identity-regexp="${{ inputs.cosign_identity_regexp }}" \
-            ${{ inputs.ghcr_repo }}@${{ steps.build-and-push.outputs.digest }}
+            --certificate-identity-regexp="${COSIGN_IDENTITY_REGEXP}" \
+            "${GHCR_REPO}@${IMAGE_DIGEST}"
           echo "GHCR image signed successfully"
 
       - name: Sign ECR Image with Cosign
         if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_ecr }}
+        env:
+          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
+          ECR_REPO: ${{ inputs.ecr_repo }}
+          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "Signing ECR image with Cosign keyless signing..."
           cosign sign --yes \
-            --certificate-identity-regexp="${{ inputs.cosign_identity_regexp }}" \
-            ${{ inputs.ecr_repo }}@${{ steps.build-and-push.outputs.digest }}
+            --certificate-identity-regexp="${COSIGN_IDENTITY_REGEXP}" \
+            "${ECR_REPO}@${IMAGE_DIGEST}"
           echo "ECR image signed successfully"
 
       - name: Sign Dry-Run ECR Image with Cosign
         if: ${{ inputs.sign_with_cosign && inputs.dry_run }}
+        env:
+          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
+          DRY_RUN_REPO: ${{ steps.resolve-dry-run-repo.outputs.repo }}
+          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "Signing dry-run ECR image with Cosign keyless signing..."
           cosign sign --yes \
-            --certificate-identity-regexp="${{ inputs.cosign_identity_regexp }}" \
-            ${{ env[inputs.dry_run_ecr_repo_env] || env.PRIVATE_ECR_DRY_RUN_REPO }}@${{ steps.build-and-push.outputs.digest }}
+            --certificate-identity-regexp="${COSIGN_IDENTITY_REGEXP}" \
+            "${DRY_RUN_REPO}@${IMAGE_DIGEST}"
           echo "Dry-run ECR image signed successfully"
-        env:
-          PRIVATE_ECR_DRY_RUN_REPO: ${{ env.PRIVATE_ECR_DRY_RUN_REPO }}

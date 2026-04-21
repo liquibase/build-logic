@@ -118,7 +118,7 @@ jobs:
   vulnerability-scan:
     needs: build-ghcr
     name: Trivy Scan ${{ inputs.image_name }}${{ inputs.suffix }}
-    uses: liquibase/build-logic/.github/workflows/reusable-vulnerability-scan.yml@${{ inputs.build_logic_ref }}
+    uses: liquibase/build-logic/.github/workflows/reusable-vulnerability-scan.yml@main
     with:
       mode: docker
       source: ${{ needs.build-ghcr.outputs.ghcr_image }}

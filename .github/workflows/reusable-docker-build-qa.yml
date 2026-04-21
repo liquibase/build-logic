@@ -39,10 +39,10 @@ on:
         required: true
         type: string
       is_rc:
-        description: 'Whether this is an RC build (true/false string from matrix)'
+        description: 'Whether this is an RC build (accepts boolean or string "true"/"false")'
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: 'false'
       platforms:
         description: 'Buildx platform list'
         required: false

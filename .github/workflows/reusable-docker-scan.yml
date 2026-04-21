@@ -152,6 +152,7 @@ jobs:
       packages: read
       security-events: write
       pull-requests: write
+      actions: read
 
     steps:
       - name: Checkout caller repository

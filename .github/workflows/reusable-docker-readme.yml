@@ -20,6 +20,11 @@ on:
         required: false
         type: string
         default: 'main'
+      dry_run:
+        description: 'Preview without pushing README to Docker Hub (for validation runs)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   sync-readme:
@@ -55,6 +60,7 @@ jobs:
           echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
 
       - name: Update Docker Hub README
+        if: ${{ !inputs.dry_run }}
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
           username: ${{ env.DOCKERHUB_USERNAME_DECODED }}
@@ -62,3 +68,18 @@ jobs:
           repository: ${{ inputs.target_image }}
           readme-filepath: ${{ inputs.readme_path }}
           short-description: ${{ inputs.short_description }}
+
+      - name: Dry-run preview (no push)
+        if: ${{ inputs.dry_run }}
+        env:
+          TARGET_IMAGE: ${{ inputs.target_image }}
+          README_PATH: ${{ inputs.readme_path }}
+          SHORT_DESCRIPTION: ${{ inputs.short_description }}
+        run: |
+          echo "DRY RUN — would push README to Docker Hub:"
+          echo "  repository: $TARGET_IMAGE"
+          echo "  short-description: $SHORT_DESCRIPTION"
+          echo "  readme-filepath: $README_PATH"
+          echo ""
+          echo "--- first 50 lines of $README_PATH ---"
+          head -50 "$README_PATH"

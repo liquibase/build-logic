@@ -1,0 +1,85 @@
+name: Reusable Docker README Sync
+
+on:
+  workflow_call:
+    inputs:
+      target_image:
+        description: 'Docker Hub repo to update: liquibase/liquibase or liquibase/liquibase-secure'
+        required: true
+        type: string
+      readme_path:
+        description: 'Path to README in caller repo: README.md or README-secure.md'
+        required: true
+        type: string
+      short_description:
+        description: 'Docker Hub short description (<=100 chars)'
+        required: true
+        type: string
+      build_logic_ref:
+        description: 'Ref for liquibase/build-logic checkout'
+        required: false
+        type: string
+        default: 'main'
+      dry_run:
+        description: 'Preview without pushing README to Docker Hub (for validation runs)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  sync-readme:
+    name: Sync Docker Hub README for ${{ inputs.target_image }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        id: vault-secrets
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Decode DOCKERHUB_USERNAME
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
+        run: |
+          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d | tr -d '\r\n')
+          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
+
+      - name: Update Docker Hub README
+        if: ${{ !inputs.dry_run }}
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME_DECODED }}
+          password: ${{ env.DOCKERHUB_UPDATE_README }}
+          repository: ${{ inputs.target_image }}
+          readme-filepath: ${{ inputs.readme_path }}
+          short-description: ${{ inputs.short_description }}
+
+      - name: Dry-run preview (no push)
+        if: ${{ inputs.dry_run }}
+        env:
+          TARGET_IMAGE: ${{ inputs.target_image }}
+          README_PATH: ${{ inputs.readme_path }}
+          SHORT_DESCRIPTION: ${{ inputs.short_description }}
+        run: |
+          echo "DRY RUN — would push README to Docker Hub:"
+          echo "  repository: $TARGET_IMAGE"
+          echo "  short-description: $SHORT_DESCRIPTION"
+          echo "  readme-filepath: $README_PATH"
+          echo ""
+          echo "--- first 50 lines of $README_PATH ---"
+          head -50 "$README_PATH"

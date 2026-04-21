@@ -338,54 +338,46 @@ jobs:
             org.opencontainers.image.documentation=https://docs.liquibase.com
 
       # Cosign keyless signing — Secure images only (3 registries, each conditional)
+      # Cosign keyless signing uses the OIDC token identity automatically — no
+      # --certificate-identity-regexp flag here (that flag belongs to `cosign verify`).
+      # The cosign_identity_regexp input documents the identity regexp consumers
+      # should use when verifying signatures produced by this workflow.
       - name: Sign Docker Hub Image with Cosign
         if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_dockerhub }}
         env:
-          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
           DOCKERHUB_REPO: ${{ inputs.dockerhub_repo }}
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "Signing Docker Hub image with Cosign keyless signing..."
-          cosign sign --yes \
-            --certificate-identity-regexp="${COSIGN_IDENTITY_REGEXP}" \
-            "${DOCKERHUB_REPO}@${IMAGE_DIGEST}"
+          cosign sign --yes "${DOCKERHUB_REPO}@${IMAGE_DIGEST}"
           echo "Docker Hub image signed successfully"
 
       - name: Sign GHCR Image with Cosign
         if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_ghcr }}
         env:
-          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
           GHCR_REPO: ${{ inputs.ghcr_repo }}
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "Signing GHCR image with Cosign keyless signing..."
-          cosign sign --yes \
-            --certificate-identity-regexp="${COSIGN_IDENTITY_REGEXP}" \
-            "${GHCR_REPO}@${IMAGE_DIGEST}"
+          cosign sign --yes "${GHCR_REPO}@${IMAGE_DIGEST}"
           echo "GHCR image signed successfully"
 
       - name: Sign ECR Image with Cosign
         if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_ecr }}
         env:
-          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
           ECR_REPO: ${{ inputs.ecr_repo }}
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "Signing ECR image with Cosign keyless signing..."
-          cosign sign --yes \
-            --certificate-identity-regexp="${COSIGN_IDENTITY_REGEXP}" \
-            "${ECR_REPO}@${IMAGE_DIGEST}"
+          cosign sign --yes "${ECR_REPO}@${IMAGE_DIGEST}"
           echo "ECR image signed successfully"
 
       - name: Sign Dry-Run ECR Image with Cosign
         if: ${{ inputs.sign_with_cosign && inputs.dry_run }}
         env:
-          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
           DRY_RUN_REPO: ${{ steps.resolve-dry-run-repo.outputs.repo }}
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "Signing dry-run ECR image with Cosign keyless signing..."
-          cosign sign --yes \
-            --certificate-identity-regexp="${COSIGN_IDENTITY_REGEXP}" \
-            "${DRY_RUN_REPO}@${IMAGE_DIGEST}"
+          cosign sign --yes "${DRY_RUN_REPO}@${IMAGE_DIGEST}"
           echo "Dry-run ECR image signed successfully"

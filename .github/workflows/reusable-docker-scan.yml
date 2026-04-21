@@ -17,10 +17,10 @@ on:
         type: string
         default: ''
       ghcr_tag:
-        description: 'GHCR tag used for the scan target'
+        description: 'GHCR tag used for the scan target; defaults to github.sha when empty'
         required: false
         type: string
-        default: ${{ github.sha }}
+        default: ''
       vex_enabled:
         description: 'Enable VEX passthrough to reusable-vulnerability-scan.yml (Secure ONLY)'
         required: false
@@ -92,7 +92,7 @@ jobs:
         env:
           SUFFIX: ${{ inputs.suffix }}
           IMAGE_NAME: ${{ inputs.image_name }}
-          GHCR_TAG: ${{ inputs.ghcr_tag }}
+          GHCR_TAG: ${{ inputs.ghcr_tag || github.sha }}
           REPOSITORY: ${{ github.repository }}
         run: |
           # Sanitize suffix for use in image tag (strip leading dash)
@@ -166,7 +166,7 @@ jobs:
           BUILD_CONTEXT: ${{ inputs.build_context }}
           IMAGE_NAME: ${{ inputs.image_name }}
           SUFFIX: ${{ inputs.suffix }}
-          GHCR_TAG: ${{ inputs.ghcr_tag }}
+          GHCR_TAG: ${{ inputs.ghcr_tag || github.sha }}
         run: |
           docker build -f "$DOCKERFILE_PATH" \
             -t "${IMAGE_NAME}${SUFFIX}:${GHCR_TAG}" "$BUILD_CONTEXT"
@@ -211,7 +211,7 @@ jobs:
         uses: docker/scout-action@8910519cee8ac046f3ee99686b0dc6654d5ba1a7 # v1.20.3
         with:
           command: cves
-          image: "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag }}"
+          image: "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag || github.sha }}"
           github-token: ${{ secrets.GITHUB_TOKEN }}
           write-comment: true
           sarif-file: "scout-results.sarif"
@@ -227,7 +227,7 @@ jobs:
         uses: docker/scout-action@8910519cee8ac046f3ee99686b0dc6654d5ba1a7 # v1.20.3
         with:
           command: cves
-          image: "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag }}"
+          image: "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag || github.sha }}"
           github-token: ${{ secrets.GITHUB_TOKEN }}
           write-comment: true
           sarif-file: "scout-results.sarif"
@@ -241,7 +241,7 @@ jobs:
           VEX_ENABLED: ${{ inputs.vex_enabled }}
           IMAGE_NAME: ${{ inputs.image_name }}
           SUFFIX: ${{ inputs.suffix }}
-          GHCR_TAG: ${{ inputs.ghcr_tag }}
+          GHCR_TAG: ${{ inputs.ghcr_tag || github.sha }}
         run: |
           SCOUT_ARGS=(
             --format json

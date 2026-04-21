@@ -41,6 +41,11 @@ on:
         required: false
         type: boolean
         default: true
+      build_context:
+        description: 'Docker build context path'
+        required: false
+        type: string
+        default: '.'
       build_logic_ref:
         description: 'Ref for liquibase/build-logic and nested reusable call'
         required: false
@@ -105,7 +110,7 @@ jobs:
       - name: Build and push to GHCR
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
-          context: .
+          context: ${{ inputs.build_context }}
           file: ${{ inputs.dockerfile_path }}
           push: true
           tags: ${{ steps.set-ghcr-ref.outputs.ghcr_image }}
@@ -158,12 +163,13 @@ jobs:
       - name: Build ${{ inputs.image_name }}${{ inputs.suffix }} from Dockerfile
         env:
           DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+          BUILD_CONTEXT: ${{ inputs.build_context }}
           IMAGE_NAME: ${{ inputs.image_name }}
           SUFFIX: ${{ inputs.suffix }}
           GHCR_TAG: ${{ inputs.ghcr_tag }}
         run: |
           docker build -f "$DOCKERFILE_PATH" \
-            -t "${IMAGE_NAME}${SUFFIX}:${GHCR_TAG}" .
+            -t "${IMAGE_NAME}${SUFFIX}:${GHCR_TAG}" "$BUILD_CONTEXT"
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0

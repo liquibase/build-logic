@@ -141,10 +141,16 @@ jobs:
           # multi-line string assignments that can confuse YAML parsers
           NOTES_FILE="$(mktemp)"
 
-          # Write existing body first
-          printf '%s' "${EXISTING_BODY}" > "${NOTES_FILE}"
+          # Idempotency guard: strip any pre-existing "## Docker Images" section
+          # before re-appending. Handles retries / manual re-dispatch without
+          # duplicating the section. awk prints every line up to (but not
+          # including) the first "## Docker Images" header.
+          printf '%s' "${EXISTING_BODY}" \
+            | awk '/^## Docker Images[[:space:]]*$/ {exit} {print}' \
+            | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
+            > "${NOTES_FILE}"
 
-          # Append Docker section header and image list (R6.6)
+          # Append fresh Docker section header and image list (R6.6)
           {
             printf "\n\n## Docker Images\n\nThe following Docker images were published for this release:\n"
             if [[ -n "${IMAGE_NAME}" ]]; then

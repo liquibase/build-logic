@@ -49,6 +49,11 @@ on:
         required: false
         type: string
         default: 'latest'
+      extra_tags:
+        description: 'Newline-separated list of additional published tags to list in the Docker Images section (e.g. alpine variants like liquibase/liquibase:5.0.2-alpine). Each non-empty line appended as a bullet.'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   publish-release:
@@ -126,6 +131,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           MINOR_VERSION: ${{ inputs.minor_version }}
           LATEST_TAG: ${{ inputs.latest_tag }}
+          EXTRA_TAGS: ${{ inputs.extra_tags }}
         run: |
           TAG="${RELEASE_TAG}"
 
@@ -157,6 +163,16 @@ jobs:
               printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${VERSION}"
               printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${MINOR_VERSION}"
               printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${LATEST_TAG}"
+            fi
+            # Append any extra tags (e.g. alpine variants) passed by caller.
+            # Each non-empty, non-blank line in EXTRA_TAGS becomes an additional bullet.
+            if [[ -n "${EXTRA_TAGS}" ]]; then
+              while IFS= read -r extra_tag; do
+                # Strip surrounding whitespace; skip blank lines
+                trimmed="$(echo "$extra_tag" | awk '{$1=$1}1')"
+                [[ -z "$trimmed" ]] && continue
+                printf "\n- \`%s\`" "$trimmed"
+              done <<< "$EXTRA_TAGS"
             fi
           } >> "${NOTES_FILE}"
 

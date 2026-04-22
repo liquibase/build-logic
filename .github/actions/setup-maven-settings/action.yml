@@ -1,33 +1,59 @@
 name: 'Liquibase Setup Maven Settings'
-description: 'Writes ~/.m2/settings.xml with Liquibase GPM repositories and liquibot server credentials'
+description: 'Writes ~/.m2/settings.xml. Supports a Liquibase GPM preset (simple mode) and full JSON override (advanced mode) for any Maven settings.xml shape.'
 inputs:
+  # ---------------------------------------------------------------------------
+  # SIMPLE MODE — Liquibase GPM preset (liquibase + liquibase-pro)
+  # Used by most build-logic reusable workflows and by downstream extension
+  # repos. Provide gpm-token + optional releases-enabled + optional extra-*.
+  # ---------------------------------------------------------------------------
   gpm-token:
-    description: 'liquibot PAT value for GitHub Packages (Maven) access'
-    required: true
+    description: 'liquibot PAT for GitHub Packages. Required in simple mode; ignored in advanced mode.'
+    required: false
+    default: ''
+  releases-enabled:
+    description: '(Simple mode) Whether <releases><enabled> is true on the preset repos. Use "true" for release/publish flows, "false" for snapshot-only test flows.'
+    required: false
+    default: 'true'
   extra-repository-id:
-    description: 'Optional ID for a third <repository> entry (requires extra-repository-url)'
+    description: '(Simple mode) Optional 3rd <repository> id. Must be paired with extra-repository-url.'
     required: false
     default: ''
   extra-repository-url:
-    description: 'Optional URL for the third <repository> entry (requires extra-repository-id)'
+    description: '(Simple mode) Optional 3rd <repository> url. Must be paired with extra-repository-id.'
     required: false
     default: ''
   extra-server-id:
-    description: 'Optional ID for a third <server> entry. Set independently from the extra repository because some callers need a server id that does not match the repository id.'
+    description: '(Simple mode) Optional 3rd <server> id. Set independently from the repo id because some callers need them to differ.'
     required: false
     default: ''
   extra-server-username:
-    description: 'Username for the extra server. Defaults to liquibot.'
+    description: '(Simple mode) Username for the extra server. Default liquibot.'
     required: false
     default: 'liquibot'
   extra-server-password:
-    description: 'Password for the extra server. Defaults to gpm-token (so a single liquibot PAT is reused). Override when the extra server uses different credentials.'
+    description: '(Simple mode) Password for the extra server. Default gpm-token.'
     required: false
     default: ''
+
+  # ---------------------------------------------------------------------------
+  # ADVANCED MODE — full JSON override (same shape whelk-io accepted)
+  # When set, replaces the simple-mode preset entirely. Use for callers that
+  # need arbitrary repo sets, non-liquibot usernames, or app-token auth.
+  # ---------------------------------------------------------------------------
+  repositories:
+    description: '(Advanced) JSON array of Maven <repository> entries. When set, overrides the simple-mode preset entirely. Shape: [{"id","url","releases":{"enabled"},"snapshots":{"enabled","updatePolicy"}}, ...]'
+    required: false
+    default: ''
+  servers:
+    description: '(Advanced) JSON array of Maven <server> entries. When set, overrides the simple-mode preset entirely. Shape: [{"id","username","password"}, ...]'
+    required: false
+    default: ''
+
   settings-path:
-    description: 'Destination path for settings.xml. Defaults to $HOME/.m2/settings.xml.'
+    description: 'Destination path. Default $HOME/.m2/settings.xml.'
     required: false
     default: ''
+
 runs:
   using: 'composite'
   steps:
@@ -35,91 +61,146 @@ runs:
       shell: bash
       env:
         GPM_TOKEN: ${{ inputs.gpm-token }}
+        RELEASES_ENABLED: ${{ inputs.releases-enabled }}
         EXTRA_REPO_ID: ${{ inputs.extra-repository-id }}
         EXTRA_REPO_URL: ${{ inputs.extra-repository-url }}
         EXTRA_SERVER_ID: ${{ inputs.extra-server-id }}
         EXTRA_SERVER_USERNAME: ${{ inputs.extra-server-username }}
         EXTRA_SERVER_PASSWORD: ${{ inputs.extra-server-password }}
+        REPOSITORIES_JSON: ${{ inputs.repositories }}
+        SERVERS_JSON: ${{ inputs.servers }}
         SETTINGS_PATH_IN: ${{ inputs.settings-path }}
       run: |
         set -eu
         settings_path="${SETTINGS_PATH_IN:-$HOME/.m2/settings.xml}"
         mkdir -p "$(dirname "$settings_path")"
 
-        # Fail loudly on asymmetric extra-repository inputs instead of silently
-        # dropping the <repository> entry — the id/url pair must both be set or
-        # both be empty.
-        if { [ -n "$EXTRA_REPO_ID" ] && [ -z "$EXTRA_REPO_URL" ]; } \
-           || { [ -z "$EXTRA_REPO_ID" ] && [ -n "$EXTRA_REPO_URL" ]; }; then
-          echo "::error::extra-repository-id and extra-repository-url must be set together." >&2
-          exit 1
+        # ----- Mode resolution -----
+        # Advanced if either JSON input is non-empty. In advanced mode both
+        # must be supplied (no partial overrides — keeps semantics predictable).
+        advanced=0
+        if [ -n "$REPOSITORIES_JSON" ] || [ -n "$SERVERS_JSON" ]; then
+          advanced=1
+          if [ -z "$REPOSITORIES_JSON" ] || [ -z "$SERVERS_JSON" ]; then
+            echo "::error::advanced mode requires BOTH 'repositories' and 'servers' inputs. Got repositories=$([ -n "$REPOSITORIES_JSON" ] && echo set || echo empty), servers=$([ -n "$SERVERS_JSON" ] && echo set || echo empty)." >&2
+            exit 1
+          fi
+        else
+          # Simple mode requires gpm-token.
+          if [ -z "$GPM_TOKEN" ]; then
+            echo "::error::simple mode requires 'gpm-token'. For custom configs, use 'repositories' + 'servers' instead." >&2
+            exit 1
+          fi
+          # Asymmetric extra-repo inputs => fail loud.
+          if { [ -n "$EXTRA_REPO_ID" ] && [ -z "$EXTRA_REPO_URL" ]; } \
+             || { [ -z "$EXTRA_REPO_ID" ] && [ -n "$EXTRA_REPO_URL" ]; }; then
+            echo "::error::extra-repository-id and extra-repository-url must be set together." >&2
+            exit 1
+          fi
+          # releases-enabled must be "true" or "false".
+          case "$RELEASES_ENABLED" in
+            true|false) ;;
+            *) echo "::error::releases-enabled must be 'true' or 'false' (got '$RELEASES_ENABLED')." >&2; exit 1 ;;
+          esac
         fi
 
-        # Escape XML predefined entities so that credentials / URLs containing
-        # &, <, >, ", or ' cannot produce malformed settings.xml. Nexus
-        # credentials in particular come from the vault and have an
-        # unconstrained charset.
+        # ----- XML escape helper -----
         xml_escape() {
           printf '%s' "$1" \
             | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' \
                   -e "s/'/\\&apos;/g" -e 's/"/\&quot;/g'
         }
-        GPM_TOKEN_ESC=$(xml_escape "$GPM_TOKEN")
-        EXTRA_REPO_ID_ESC=$(xml_escape "$EXTRA_REPO_ID")
-        EXTRA_REPO_URL_ESC=$(xml_escape "$EXTRA_REPO_URL")
-        EXTRA_SERVER_ID_ESC=$(xml_escape "$EXTRA_SERVER_ID")
-        EXTRA_SERVER_USERNAME_ESC=$(xml_escape "$EXTRA_SERVER_USERNAME")
 
+        # ----- Emit <servers> block -----
+        emit_servers() {
+          if [ "$advanced" = "1" ]; then
+            # jq iterates each server; defaults mirror whelk-io/Maven defaults.
+            echo "$SERVERS_JSON" | jq -r '.[] |
+              "    <server>",
+              "      <id>\(.id | @html)</id>",
+              "      <username>\(.username | @html)</username>",
+              "      <password>\(.password | @html)</password>",
+              "    </server>"'
+          else
+            local token_esc
+            token_esc=$(xml_escape "$GPM_TOKEN")
+            echo "    <server>"
+            echo "      <id>liquibase</id>"
+            echo "      <username>liquibot</username>"
+            echo "      <password>${token_esc}</password>"
+            echo "    </server>"
+            echo "    <server>"
+            echo "      <id>liquibase-pro</id>"
+            echo "      <username>liquibot</username>"
+            echo "      <password>${token_esc}</password>"
+            echo "    </server>"
+            if [ -n "$EXTRA_SERVER_ID" ]; then
+              local extra_pw_raw extra_pw_esc id_esc user_esc
+              extra_pw_raw="${EXTRA_SERVER_PASSWORD:-$GPM_TOKEN}"
+              extra_pw_esc=$(xml_escape "$extra_pw_raw")
+              id_esc=$(xml_escape "$EXTRA_SERVER_ID")
+              user_esc=$(xml_escape "$EXTRA_SERVER_USERNAME")
+              echo "    <server>"
+              echo "      <id>${id_esc}</id>"
+              echo "      <username>${user_esc}</username>"
+              echo "      <password>${extra_pw_esc}</password>"
+              echo "    </server>"
+            fi
+          fi
+        }
+
+        # ----- Emit <repositories> block -----
+        emit_repositories() {
+          if [ "$advanced" = "1" ]; then
+            # jq handles string-or-bool "enabled" and defaults missing keys.
+            echo "$REPOSITORIES_JSON" | jq -r '.[] |
+              "        <repository>",
+              "          <id>\(.id | @html)</id>",
+              "          <url>\(.url | @html)</url>",
+              "          <releases><enabled>\(.releases.enabled // true | tostring | @html)</enabled></releases>",
+              "          <snapshots><enabled>\(.snapshots.enabled // true | tostring | @html)</enabled><updatePolicy>\(.snapshots.updatePolicy // "always" | @html)</updatePolicy></snapshots>",
+              "        </repository>"'
+          else
+            echo "        <repository>"
+            echo "          <id>liquibase</id>"
+            echo "          <url>https://maven.pkg.github.com/liquibase/liquibase</url>"
+            echo "          <releases><enabled>${RELEASES_ENABLED}</enabled></releases>"
+            echo "          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>"
+            echo "        </repository>"
+            echo "        <repository>"
+            echo "          <id>liquibase-pro</id>"
+            echo "          <url>https://maven.pkg.github.com/liquibase/liquibase-pro</url>"
+            echo "          <releases><enabled>${RELEASES_ENABLED}</enabled></releases>"
+            echo "          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>"
+            echo "        </repository>"
+            if [ -n "$EXTRA_REPO_ID" ]; then
+              local id_esc url_esc
+              id_esc=$(xml_escape "$EXTRA_REPO_ID")
+              url_esc=$(xml_escape "$EXTRA_REPO_URL")
+              echo "        <repository>"
+              echo "          <id>${id_esc}</id>"
+              echo "          <url>${url_esc}</url>"
+              echo "          <releases><enabled>${RELEASES_ENABLED}</enabled></releases>"
+              echo "          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>"
+              echo "        </repository>"
+            fi
+          fi
+        }
+
+        # ----- Compose settings.xml -----
         {
           echo '<?xml version="1.0" encoding="UTF-8"?>'
           echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"'
           echo '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
           echo '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">'
           echo '  <servers>'
-          echo '    <server>'
-          echo '      <id>liquibase</id>'
-          echo '      <username>liquibot</username>'
-          echo "      <password>${GPM_TOKEN_ESC}</password>"
-          echo '    </server>'
-          echo '    <server>'
-          echo '      <id>liquibase-pro</id>'
-          echo '      <username>liquibot</username>'
-          echo "      <password>${GPM_TOKEN_ESC}</password>"
-          echo '    </server>'
-          if [ -n "$EXTRA_SERVER_ID" ]; then
-            extra_password_raw="${EXTRA_SERVER_PASSWORD:-$GPM_TOKEN}"
-            extra_password_esc=$(xml_escape "$extra_password_raw")
-            echo '    <server>'
-            echo "      <id>${EXTRA_SERVER_ID_ESC}</id>"
-            echo "      <username>${EXTRA_SERVER_USERNAME_ESC}</username>"
-            echo "      <password>${extra_password_esc}</password>"
-            echo '    </server>'
-          fi
+          emit_servers
           echo '  </servers>'
           echo '  <profiles>'
           echo '    <profile>'
           echo '      <id>github</id>'
           echo '      <repositories>'
-          echo '        <repository>'
-          echo '          <id>liquibase</id>'
-          echo '          <url>https://maven.pkg.github.com/liquibase/liquibase</url>'
-          echo '          <releases><enabled>true</enabled></releases>'
-          echo '          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>'
-          echo '        </repository>'
-          echo '        <repository>'
-          echo '          <id>liquibase-pro</id>'
-          echo '          <url>https://maven.pkg.github.com/liquibase/liquibase-pro</url>'
-          echo '          <releases><enabled>true</enabled></releases>'
-          echo '          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>'
-          echo '        </repository>'
-          if [ -n "$EXTRA_REPO_ID" ]; then
-            echo '        <repository>'
-            echo "          <id>${EXTRA_REPO_ID_ESC}</id>"
-            echo "          <url>${EXTRA_REPO_URL_ESC}</url>"
-            echo '          <releases><enabled>true</enabled></releases>'
-            echo '          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>'
-            echo '        </repository>'
-          fi
+          emit_repositories
           echo '      </repositories>'
           echo '    </profile>'
           echo '  </profiles>'

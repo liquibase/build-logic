@@ -1,0 +1,107 @@
+name: 'Liquibase Setup Maven Settings'
+description: 'Writes ~/.m2/settings.xml with Liquibase GPM repositories and liquibot server credentials'
+inputs:
+  gpm-token:
+    description: 'liquibot PAT value for GitHub Packages (Maven) access'
+    required: true
+  extra-repository-id:
+    description: 'Optional ID for a third <repository> entry (requires extra-repository-url)'
+    required: false
+    default: ''
+  extra-repository-url:
+    description: 'Optional URL for the third <repository> entry (requires extra-repository-id)'
+    required: false
+    default: ''
+  extra-server-id:
+    description: 'Optional ID for a third <server> entry. Set independently from the extra repository because some callers need a server id that does not match the repository id.'
+    required: false
+    default: ''
+  extra-server-username:
+    description: 'Username for the extra server. Defaults to liquibot.'
+    required: false
+    default: 'liquibot'
+  extra-server-password:
+    description: 'Password for the extra server. Defaults to gpm-token (so a single liquibot PAT is reused). Override when the extra server uses different credentials.'
+    required: false
+    default: ''
+  settings-path:
+    description: 'Destination path for settings.xml. Defaults to $HOME/.m2/settings.xml.'
+    required: false
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - name: Write Maven settings.xml
+      shell: bash
+      env:
+        GPM_TOKEN: ${{ inputs.gpm-token }}
+        EXTRA_REPO_ID: ${{ inputs.extra-repository-id }}
+        EXTRA_REPO_URL: ${{ inputs.extra-repository-url }}
+        EXTRA_SERVER_ID: ${{ inputs.extra-server-id }}
+        EXTRA_SERVER_USERNAME: ${{ inputs.extra-server-username }}
+        EXTRA_SERVER_PASSWORD: ${{ inputs.extra-server-password }}
+        SETTINGS_PATH_IN: ${{ inputs.settings-path }}
+      run: |
+        set -eu
+        settings_path="${SETTINGS_PATH_IN:-$HOME/.m2/settings.xml}"
+        mkdir -p "$(dirname "$settings_path")"
+
+        {
+          echo '<?xml version="1.0" encoding="UTF-8"?>'
+          echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"'
+          echo '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+          echo '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">'
+          echo '  <servers>'
+          echo '    <server>'
+          echo '      <id>liquibase</id>'
+          echo '      <username>liquibot</username>'
+          echo "      <password>${GPM_TOKEN}</password>"
+          echo '    </server>'
+          echo '    <server>'
+          echo '      <id>liquibase-pro</id>'
+          echo '      <username>liquibot</username>'
+          echo "      <password>${GPM_TOKEN}</password>"
+          echo '    </server>'
+          if [ -n "$EXTRA_SERVER_ID" ]; then
+            extra_password="${EXTRA_SERVER_PASSWORD:-$GPM_TOKEN}"
+            echo '    <server>'
+            echo "      <id>${EXTRA_SERVER_ID}</id>"
+            echo "      <username>${EXTRA_SERVER_USERNAME}</username>"
+            echo "      <password>${extra_password}</password>"
+            echo '    </server>'
+          fi
+          echo '  </servers>'
+          echo '  <profiles>'
+          echo '    <profile>'
+          echo '      <id>github</id>'
+          echo '      <repositories>'
+          echo '        <repository>'
+          echo '          <id>liquibase</id>'
+          echo '          <url>https://maven.pkg.github.com/liquibase/liquibase</url>'
+          echo '          <releases><enabled>true</enabled></releases>'
+          echo '          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>'
+          echo '        </repository>'
+          echo '        <repository>'
+          echo '          <id>liquibase-pro</id>'
+          echo '          <url>https://maven.pkg.github.com/liquibase/liquibase-pro</url>'
+          echo '          <releases><enabled>true</enabled></releases>'
+          echo '          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>'
+          echo '        </repository>'
+          if [ -n "$EXTRA_REPO_ID" ] && [ -n "$EXTRA_REPO_URL" ]; then
+            echo '        <repository>'
+            echo "          <id>${EXTRA_REPO_ID}</id>"
+            echo "          <url>${EXTRA_REPO_URL}</url>"
+            echo '          <releases><enabled>true</enabled></releases>'
+            echo '          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>'
+            echo '        </repository>'
+          fi
+          echo '      </repositories>'
+          echo '    </profile>'
+          echo '  </profiles>'
+          echo '  <activeProfiles>'
+          echo '    <activeProfile>github</activeProfile>'
+          echo '  </activeProfiles>'
+          echo '</settings>'
+        } > "$settings_path"
+
+        echo "Wrote Maven settings to $settings_path"

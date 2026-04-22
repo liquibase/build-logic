@@ -46,6 +46,30 @@ runs:
         settings_path="${SETTINGS_PATH_IN:-$HOME/.m2/settings.xml}"
         mkdir -p "$(dirname "$settings_path")"
 
+        # Fail loudly on asymmetric extra-repository inputs instead of silently
+        # dropping the <repository> entry — the id/url pair must both be set or
+        # both be empty.
+        if { [ -n "$EXTRA_REPO_ID" ] && [ -z "$EXTRA_REPO_URL" ]; } \
+           || { [ -z "$EXTRA_REPO_ID" ] && [ -n "$EXTRA_REPO_URL" ]; }; then
+          echo "::error::extra-repository-id and extra-repository-url must be set together." >&2
+          exit 1
+        fi
+
+        # Escape XML predefined entities so that credentials / URLs containing
+        # &, <, >, ", or ' cannot produce malformed settings.xml. Nexus
+        # credentials in particular come from the vault and have an
+        # unconstrained charset.
+        xml_escape() {
+          printf '%s' "$1" \
+            | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' \
+                  -e "s/'/\\&apos;/g" -e 's/"/\&quot;/g'
+        }
+        GPM_TOKEN_ESC=$(xml_escape "$GPM_TOKEN")
+        EXTRA_REPO_ID_ESC=$(xml_escape "$EXTRA_REPO_ID")
+        EXTRA_REPO_URL_ESC=$(xml_escape "$EXTRA_REPO_URL")
+        EXTRA_SERVER_ID_ESC=$(xml_escape "$EXTRA_SERVER_ID")
+        EXTRA_SERVER_USERNAME_ESC=$(xml_escape "$EXTRA_SERVER_USERNAME")
+
         {
           echo '<?xml version="1.0" encoding="UTF-8"?>'
           echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"'
@@ -55,19 +79,20 @@ runs:
           echo '    <server>'
           echo '      <id>liquibase</id>'
           echo '      <username>liquibot</username>'
-          echo "      <password>${GPM_TOKEN}</password>"
+          echo "      <password>${GPM_TOKEN_ESC}</password>"
           echo '    </server>'
           echo '    <server>'
           echo '      <id>liquibase-pro</id>'
           echo '      <username>liquibot</username>'
-          echo "      <password>${GPM_TOKEN}</password>"
+          echo "      <password>${GPM_TOKEN_ESC}</password>"
           echo '    </server>'
           if [ -n "$EXTRA_SERVER_ID" ]; then
-            extra_password="${EXTRA_SERVER_PASSWORD:-$GPM_TOKEN}"
+            extra_password_raw="${EXTRA_SERVER_PASSWORD:-$GPM_TOKEN}"
+            extra_password_esc=$(xml_escape "$extra_password_raw")
             echo '    <server>'
-            echo "      <id>${EXTRA_SERVER_ID}</id>"
-            echo "      <username>${EXTRA_SERVER_USERNAME}</username>"
-            echo "      <password>${extra_password}</password>"
+            echo "      <id>${EXTRA_SERVER_ID_ESC}</id>"
+            echo "      <username>${EXTRA_SERVER_USERNAME_ESC}</username>"
+            echo "      <password>${extra_password_esc}</password>"
             echo '    </server>'
           fi
           echo '  </servers>'
@@ -87,10 +112,10 @@ runs:
           echo '          <releases><enabled>true</enabled></releases>'
           echo '          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>'
           echo '        </repository>'
-          if [ -n "$EXTRA_REPO_ID" ] && [ -n "$EXTRA_REPO_URL" ]; then
+          if [ -n "$EXTRA_REPO_ID" ]; then
             echo '        <repository>'
-            echo "          <id>${EXTRA_REPO_ID}</id>"
-            echo "          <url>${EXTRA_REPO_URL}</url>"
+            echo "          <id>${EXTRA_REPO_ID_ESC}</id>"
+            echo "          <url>${EXTRA_REPO_URL_ESC}</url>"
             echo '          <releases><enabled>true</enabled></releases>'
             echo '          <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>'
             echo '        </repository>'

@@ -152,13 +152,16 @@ runs:
         # ----- Emit <repositories> block -----
         emit_repositories() {
           if [ "$advanced" = "1" ]; then
-            # jq handles string-or-bool "enabled" and defaults missing keys.
+            # Use `if . == null` rather than `// default` so that an explicit
+            # boolean false is preserved. jq's // operator filters out BOTH
+            # null AND false, which would silently flip `"enabled": false`
+            # into the fallback `true`.
             echo "$REPOSITORIES_JSON" | jq -r '.[] |
               "        <repository>",
               "          <id>\(.id | @html)</id>",
               "          <url>\(.url | @html)</url>",
-              "          <releases><enabled>\(.releases.enabled // true | tostring | @html)</enabled></releases>",
-              "          <snapshots><enabled>\(.snapshots.enabled // true | tostring | @html)</enabled><updatePolicy>\(.snapshots.updatePolicy // "always" | @html)</updatePolicy></snapshots>",
+              "          <releases><enabled>\((if .releases.enabled == null then true else .releases.enabled end) | tostring | @html)</enabled></releases>",
+              "          <snapshots><enabled>\((if .snapshots.enabled == null then true else .snapshots.enabled end) | tostring | @html)</enabled><updatePolicy>\(.snapshots.updatePolicy // "always" | @html)</updatePolicy></snapshots>",
               "        </repository>"'
           else
             echo "        <repository>"

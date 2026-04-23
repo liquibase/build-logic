@@ -106,7 +106,6 @@ jobs:
           gpm-token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
           extra-repository-id: extension-repo
           extra-repository-url: https://maven.pkg.github.com/${{ inputs.repository }}
-          extra-server-id: github
 
       - name: Publish to GitHub Packages
         env:

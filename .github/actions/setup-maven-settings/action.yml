@@ -71,7 +71,7 @@ runs:
         SERVERS_JSON: ${{ inputs.servers }}
         SETTINGS_PATH_IN: ${{ inputs.settings-path }}
       run: |
-        set -eu
+        set -euo pipefail
         settings_path="${SETTINGS_PATH_IN:-$HOME/.m2/settings.xml}"
         mkdir -p "$(dirname "$settings_path")"
 
@@ -83,6 +83,26 @@ runs:
           advanced=1
           if [ -z "$REPOSITORIES_JSON" ] || [ -z "$SERVERS_JSON" ]; then
             echo "::error::advanced mode requires BOTH 'repositories' and 'servers' inputs. Got repositories=$([ -n "$REPOSITORIES_JSON" ] && echo set || echo empty), servers=$([ -n "$SERVERS_JSON" ] && echo set || echo empty)." >&2
+            exit 1
+          fi
+          # Reject simple-mode inputs mixed with advanced — catches half-finished
+          # migrations where a caller copies the old whelk-io JSON AND also sets
+          # gpm-token/extra-* thinking they apply. Advanced fully overrides.
+          if [ -n "$GPM_TOKEN" ] || [ -n "$EXTRA_REPO_ID" ] || [ -n "$EXTRA_REPO_URL" ] \
+             || [ -n "$EXTRA_SERVER_ID" ] || [ -n "$EXTRA_SERVER_PASSWORD" ]; then
+            echo "::error::advanced mode ('repositories'/'servers') cannot be combined with simple-mode inputs (gpm-token, extra-repository-*, extra-server-*). Pick one mode." >&2
+            exit 1
+          fi
+          # Shape check: both inputs must be JSON arrays. Produces a friendly
+          # error instead of a bare `jq: Cannot iterate over ...` stack trace.
+          repos_type=$(printf '%s' "$REPOSITORIES_JSON" | jq -r 'type' 2>/dev/null || echo "invalid")
+          if [ "$repos_type" != "array" ]; then
+            echo "::error::'repositories' must be a JSON array, got type=${repos_type}." >&2
+            exit 1
+          fi
+          servers_type=$(printf '%s' "$SERVERS_JSON" | jq -r 'type' 2>/dev/null || echo "invalid")
+          if [ "$servers_type" != "array" ]; then
+            echo "::error::'servers' must be a JSON array, got type=${servers_type}." >&2
             exit 1
           fi
         else
@@ -161,7 +181,7 @@ runs:
               "          <id>\(.id | @html)</id>",
               "          <url>\(.url | @html)</url>",
               "          <releases><enabled>\((if .releases.enabled == null then true else .releases.enabled end) | tostring | @html)</enabled></releases>",
-              "          <snapshots><enabled>\((if .snapshots.enabled == null then true else .snapshots.enabled end) | tostring | @html)</enabled><updatePolicy>\(.snapshots.updatePolicy // "always" | @html)</updatePolicy></snapshots>",
+              "          <snapshots><enabled>\((if .snapshots.enabled == null then true else .snapshots.enabled end) | tostring | @html)</enabled><updatePolicy>\(.snapshots.updatePolicy // "daily" | @html)</updatePolicy></snapshots>",
               "        </repository>"'
           else
             echo "        <repository>"

@@ -140,8 +140,10 @@ jobs:
             MINOR_VERSION="${VERSION%.*}"
           fi
 
-          # Fetch current Release body
-          EXISTING_BODY="$(gh release view "${TAG}" --repo "${REPOSITORY}" --json body --jq '.body')"
+          # Fetch current Release body. `--jq '.body // ""'` coerces a null body
+          # (empty Release) to an empty string; without this, jq emits the literal
+          # word `null`, which then gets written back into the Release notes.
+          EXISTING_BODY="$(gh release view "${TAG}" --repo "${REPOSITORY}" --json body --jq '.body // ""')"
 
           # Build Docker images section (R6.6) using a temp file to avoid
           # multi-line string assignments that can confuse YAML parsers
@@ -149,10 +151,15 @@ jobs:
 
           # Idempotency guard: strip any pre-existing "## Docker Images" section
           # before re-appending. Handles retries / manual re-dispatch without
-          # duplicating the section. awk prints every line up to (but not
-          # including) the first "## Docker Images" header.
+          # duplicating the section. Skips the Docker block only (until the next
+          # "## " header) so any content added after it by another job or human
+          # is preserved.
           printf '%s' "${EXISTING_BODY}" \
-            | awk '/^## Docker Images[[:space:]]*$/ {exit} {print}' \
+            | awk '
+                /^## Docker Images[[:space:]]*$/ { skip = 1; next }
+                skip && /^## / { skip = 0 }
+                !skip { print }
+              ' \
             | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
             > "${NOTES_FILE}"
 
@@ -161,7 +168,11 @@ jobs:
             printf "\n\n## Docker Images\n\nThe following Docker images were published for this release:\n"
             if [[ -n "${IMAGE_NAME}" ]]; then
               printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${VERSION}"
-              printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${MINOR_VERSION}"
+              # Skip the minor_version bullet if it collapses to the same string
+              # as VERSION (e.g. when VERSION is already X.Y or malformed like "5").
+              if [[ "${MINOR_VERSION}" != "${VERSION}" ]]; then
+                printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${MINOR_VERSION}"
+              fi
               printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${LATEST_TAG}"
             fi
             # Append any extra tags (e.g. alpine variants) passed by caller.

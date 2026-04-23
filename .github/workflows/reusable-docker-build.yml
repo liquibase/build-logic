@@ -86,6 +86,11 @@ on:
         required: false
         type: boolean
         default: false
+      build_args:
+        description: 'Multi-line Docker `--build-arg` overrides (KEY=VALUE per line). Dockerfile ARG defaults apply for unset keys.'
+        required: false
+        type: string
+        default: ''
       sign_with_cosign:
         description: 'Enable cosign keyless signing (Secure ONLY)'
         required: false
@@ -319,6 +324,7 @@ jobs:
           platforms: ${{ inputs.platforms }}
           sbom: ${{ inputs.generate_sbom }}
           provenance: ${{ inputs.provenance_mode }}
+          build-args: ${{ inputs.build_args }}
           tags: ${{ steps.generate-tags.outputs.tags }}
           labels: |
             org.opencontainers.image.source=${{ inputs.image_source_url }}

@@ -63,6 +63,11 @@ on:
         required: false
         type: string
         default: 'main'
+      build_context:
+        description: 'Docker build context path. Default "." matches the legacy layout where Dockerfiles live at the repo root. Set to e.g. "docker/" when the Dockerfile lives in a subdirectory and uses paths relative to that subdirectory in COPY/ADD instructions.'
+        required: false
+        type: string
+        default: '.'
     outputs:
       image_tag:
         description: 'Tag used for the pushed image (branch name or RC version)'
@@ -595,8 +600,10 @@ jobs:
       - name: Build and push Docker image
         if: ${{ steps.validate-build.outcome == 'success' }}
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        env:
+          BUILD_CONTEXT: ${{ inputs.build_context }}
         with:
-          context: .
+          context: ${{ env.BUILD_CONTEXT }}
           file: ${{ inputs.dockerfile_path }}
           push: true
           platforms: ${{ inputs.platforms }}

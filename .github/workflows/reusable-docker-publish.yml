@@ -26,6 +26,34 @@ on:
         required: false
         type: string
         default: 'main'
+      reuse_existing_release:
+        description: >
+          When true: skip Release creation; locate existing Release by tag and append
+          Docker image notes to its body. Fails fast if no Release exists for the tag.
+          Default false preserves existing draft-create-then-publish behavior.
+        required: false
+        type: boolean
+        default: false
+      image_name:
+        description: 'Docker image name for the appended notes section, e.g. liquibase/liquibase (used when reuse_existing_release: true)'
+        required: false
+        type: string
+        default: ''
+      minor_version:
+        description: 'Major.minor version string, e.g. 5.0 (used when reuse_existing_release: true; derived from version if empty)'
+        required: false
+        type: string
+        default: ''
+      latest_tag:
+        description: 'Floating tag to list in Docker notes section, e.g. latest or alpine (used when reuse_existing_release: true)'
+        required: false
+        type: string
+        default: 'latest'
+      extra_tags:
+        description: 'Newline-separated list of additional published tags to list in the Docker Images section (e.g. alpine variants like liquibase/liquibase:5.0.2-alpine). Each non-empty line appended as a bullet.'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   publish-release:
@@ -73,7 +101,105 @@ jobs:
           echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
           echo "::notice::Publishing GitHub release for ${RELEASE_TYPE} on tag: ${TAG_NAME}"
 
+      # ── reuse_existing_release: true path ────────────────────────────────────
+      # Locate the existing Release (created by Maven), verify it exists, then
+      # append a Docker images section to its body. Does NOT create a new Release
+      # or call softprops/action-gh-release. Fails fast if no Release is found.
+
+      - name: Preflight — verify existing Release exists (reuse path)
+        if: ${{ inputs.reuse_existing_release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release-tag.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          TAG="${RELEASE_TAG}"
+          if ! gh release view "${TAG}" --repo "${REPOSITORY}" &>/dev/null; then
+            echo "::error::reuse_existing_release: true but no Release exists for tag ${TAG}."
+            echo "::error::Ensure the Maven deploy-maven job completed successfully and created the Release before Docker publish runs."
+            exit 1
+          fi
+          echo "::notice::Release ${TAG} found — will append Docker notes."
+
+      - name: Append Docker images section to existing Release (reuse path)
+        if: ${{ inputs.reuse_existing_release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release-tag.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          VERSION: ${{ inputs.version }}
+          MINOR_VERSION: ${{ inputs.minor_version }}
+          LATEST_TAG: ${{ inputs.latest_tag }}
+          EXTRA_TAGS: ${{ inputs.extra_tags }}
+        run: |
+          TAG="${RELEASE_TAG}"
+
+          # Derive major.minor from version if minor_version input is empty
+          if [[ -z "${MINOR_VERSION}" ]]; then
+            MINOR_VERSION="${VERSION%.*}"
+          fi
+
+          # Fetch current Release body. `--jq '.body // ""'` coerces a null body
+          # (empty Release) to an empty string; without this, jq emits the literal
+          # word `null`, which then gets written back into the Release notes.
+          EXISTING_BODY="$(gh release view "${TAG}" --repo "${REPOSITORY}" --json body --jq '.body // ""')"
+
+          # Build Docker images section (R6.6) using a temp file to avoid
+          # multi-line string assignments that can confuse YAML parsers
+          NOTES_FILE="$(mktemp)"
+
+          # Idempotency guard: strip any pre-existing "## Docker Images" section
+          # before re-appending. Handles retries / manual re-dispatch without
+          # duplicating the section. Skips the Docker block only (until the next
+          # "## " header) so any content added after it by another job or human
+          # is preserved.
+          printf '%s' "${EXISTING_BODY}" \
+            | awk '
+                /^## Docker Images[[:space:]]*$/ { skip = 1; next }
+                skip && /^## / { skip = 0 }
+                !skip { print }
+              ' \
+            | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
+            > "${NOTES_FILE}"
+
+          # Append fresh Docker section header and image list (R6.6)
+          {
+            printf "\n\n## Docker Images\n\nThe following Docker images were published for this release:\n"
+            if [[ -n "${IMAGE_NAME}" ]]; then
+              printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${VERSION}"
+              # Skip the minor_version bullet if it collapses to the same string
+              # as VERSION (e.g. when VERSION is already X.Y or malformed like "5").
+              if [[ "${MINOR_VERSION}" != "${VERSION}" ]]; then
+                printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${MINOR_VERSION}"
+              fi
+              printf "\n- \`%s:%s\`" "${IMAGE_NAME}" "${LATEST_TAG}"
+            fi
+            # Append any extra tags (e.g. alpine variants) passed by caller.
+            # Each non-empty, non-blank line in EXTRA_TAGS becomes an additional bullet.
+            if [[ -n "${EXTRA_TAGS}" ]]; then
+              while IFS= read -r extra_tag; do
+                # Strip surrounding whitespace; skip blank lines
+                trimmed="$(echo "$extra_tag" | awk '{$1=$1}1')"
+                [[ -z "$trimmed" ]] && continue
+                printf "\n- \`%s\`" "$trimmed"
+              done <<< "$EXTRA_TAGS"
+            fi
+          } >> "${NOTES_FILE}"
+
+          gh release edit "${TAG}" \
+            --repo "${REPOSITORY}" \
+            --notes-file "${NOTES_FILE}"
+
+          rm -f "${NOTES_FILE}"
+          echo "::notice::Docker images section appended to Release ${TAG}."
+
+      # ── reuse_existing_release: false path (default / existing behavior) ─────
+      # Regression guard: all steps below run only when reuse_existing_release is
+      # false (the default). Existing Secure callers are fully unaffected.
+
       - name: Get Release Notes from Release Drafter Draft
+        if: ${{ !inputs.reuse_existing_release }}
         id: get-release-notes
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
@@ -118,6 +244,7 @@ jobs:
             }
 
       - name: Create GitHub Release (draft)
+        if: ${{ !inputs.reuse_existing_release }}
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
         with:
           name: ${{ steps.release-tag.outputs.release_name }}
@@ -131,6 +258,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish Release (draft=false, latest=true)
+        if: ${{ !inputs.reuse_existing_release }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.release-tag.outputs.tag_name }}

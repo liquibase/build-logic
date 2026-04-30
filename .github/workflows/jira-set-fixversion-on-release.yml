@@ -36,8 +36,17 @@ name: "Jira: Set Fix Version on release tag"
 #     first-ever release, falls back to the last 100 commits in the tag's
 #     history with a warning.
 #   - Extracts unique Jira ticket keys (anchored regex; same hardening as
-#     jira-transition-on-pr-merge) and sets `fixVersion` on each via
-#     PUT /rest/api/3/issue/{key} with `update.fixVersions.add`.
+#     jira-transition-on-pr-merge).
+#   - For each ticket, reads its current `fixVersions` and chooses one of
+#     three update strategies (this matches the v0.2 "one field for both
+#     planning and actuals" goal — see release-runbook.md):
+#       * Already has the released version → skip (idempotent).
+#       * Empty → add the released version.
+#       * Exactly one Fix Version, currently unreleased → REPLACE it
+#         (planning value 5.2.2 swaps for actual release 5.2.1 when the
+#         ticket merges early).
+#       * Anything else (released entries, multi-valued) → append, so
+#         legitimate backport / multi-release history stays intact.
 #   - For each Jira project that has at least one updated ticket, marks
 #     the version as Released with today's date.
 #   - Skips silently with a warning when:
@@ -197,7 +206,14 @@ jobs:
             }
             console.log(`Found ${keys.size} ticket(s): ${[...keys].sort().join(', ')}`);
 
-            // ---- Add fixVersion on each ticket -----------------------
+            // ---- Update fixVersion on each ticket --------------------
+            // Per-ticket: read current fixVersions, decide replace vs.
+            // append. The "replace one unreleased" branch is the v0.2
+            // single-field-for-planning-and-actuals semantic — a ticket
+            // planned for 5.2.2 that merges early gets its 5.2.2
+            // overwritten with the actual 5.2.1 at release time, instead
+            // of carrying both. Released entries are never replaced so
+            // backport history is preserved.
             const auth = `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`;
             const headers = {
               Authorization: auth,
@@ -208,18 +224,55 @@ jobs:
             const projectsTouched = new Set();
             for (const key of keys) {
               projectsTouched.add(key.split('-')[0]);
+
+              const getResp = await fetch(
+                `${baseUrl}/rest/api/3/issue/${key}?fields=fixVersions`,
+                { headers }
+              );
+              if (!getResp.ok) {
+                core.warning(
+                  `Failed to read fixVersions on ${key}: ` +
+                  `${getResp.status} ${await getResp.text()}`
+                );
+                continue;
+              }
+              const issue = await getResp.json();
+              const current = issue.fields?.fixVersions || [];
+
+              // Decide update strategy.
+              if (current.some(v => v.name === versionName)) {
+                console.log(`${key}: skip (already has fixVersion=${versionName})`);
+                continue;
+              }
+
+              let body, action;
+              if (current.length === 0) {
+                body = { update: { fixVersions: [{ add: { name: versionName } }] } };
+                action = `add ${versionName} (was empty)`;
+              } else if (current.length === 1 && current[0].released === false) {
+                // Single unreleased planning value → replace with actual release.
+                body = { fields: { fixVersions: [{ name: versionName }] } };
+                action = `replace ${current[0].name} (unreleased) → ${versionName}`;
+              } else {
+                // Multi-valued or has released entries → append (preserve history).
+                body = { update: { fixVersions: [{ add: { name: versionName } }] } };
+                const existing = current
+                  .map(v => `${v.name}${v.released ? '*' : ''}`)
+                  .join(', ');
+                action = `add ${versionName} (existing: [${existing}])`;
+              }
+
               const resp = await fetch(`${baseUrl}/rest/api/3/issue/${key}`, {
                 method: 'PUT',
                 headers,
-                body: JSON.stringify({
-                  update: { fixVersions: [{ add: { name: versionName } }] },
-                }),
+                body: JSON.stringify(body),
               });
               if (resp.ok) {
-                console.log(`Set fixVersion=${versionName} on ${key}`);
+                console.log(`${key}: ${action}`);
               } else {
                 core.warning(
-                  `Failed to set fixVersion on ${key}: ${resp.status} ${await resp.text()}`
+                  `Failed to update fixVersion on ${key}: ` +
+                  `${resp.status} ${await resp.text()}`
                 );
               }
             }

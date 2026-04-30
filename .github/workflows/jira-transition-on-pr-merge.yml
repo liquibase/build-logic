@@ -89,7 +89,23 @@ jobs:
           JIRA_TOKEN: ${{ env.JIRA_SERVICE_ACCOUNT_API_TOKEN }}
         with:
           script: |
+            // Defense in depth: callers should gate the job on
+            // `github.event.pull_request.merged == true`, but if a future
+            // caller wires this in without that condition we still want a
+            // safe no-op rather than a Jira write on a closed-without-merge
+            // event or a non-PR event.
             const { pull_request } = context.payload;
+            if (!pull_request) {
+              core.warning('No pull_request payload on this event; skipping');
+              return;
+            }
+            if (!pull_request.merged) {
+              console.log(
+                `PR #${pull_request.number} closed without merge; skipping Jira transition`
+              );
+              return;
+            }
+
             const projectKeys = process.env.PROJECT_KEYS
               .split(',')
               .map(s => s.trim())
@@ -107,8 +123,16 @@ jobs:
               return;
             }
 
-            // First match wins; case-insensitive on the key prefix.
-            const keyRegex = new RegExp(`(${projectKeys.join('|')})-\\d+`, 'i');
+            // First match wins; case-insensitive on the key prefix. Word
+            // boundaries prevent matching inside a longer token (e.g.
+            // `DAT-123` inside `NOTDAT-123`). Project keys are regex-
+            // escaped in case any contain special characters in the
+            // future.
+            const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const keyRegex = new RegExp(
+              `\\b(?:${projectKeys.map(escapeRegex).join('|')})-\\d+\\b`,
+              'i'
+            );
             const haystack = `${pull_request.title || ''} ${pull_request.head?.ref || ''}`;
             const match = haystack.match(keyRegex);
 

@@ -13,7 +13,7 @@ name: "Jira: Transition issue on PR merge"
 #
 #   name: Auto-transition Jira on PR merge
 #   on:
-#     pull_request_target:
+#     pull_request:
 #       types: [closed]
 #       branches: [main]   # or [master]
 #   jobs:
@@ -21,6 +21,14 @@ name: "Jira: Transition issue on PR merge"
 #       if: github.event.pull_request.merged == true
 #       uses: liquibase/build-logic/.github/workflows/jira-transition-on-pr-merge.yml@main
 #       secrets: inherit
+#
+# Use `pull_request` (not `pull_request_target`). This workflow only reads
+# the event payload and calls Jira via REST — never checks out PR code —
+# so the extra privilege of `pull_request_target` is unnecessary. Side
+# effect: PRs from forks won't have secrets and the workflow will skip
+# the transition; that's the correct trade-off for a public-fork
+# scenario (we don't want to auto-transition tickets for community PRs
+# anyway).
 #
 # Required org-level setup (one-time):
 #   /vault/liquibase must contain

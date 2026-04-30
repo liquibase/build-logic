@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: 'docker/test-fixtures'
+      build_context:
+        description: 'Docker build context path'
+        required: false
+        type: string
+        default: '.'
       build_logic_ref:
         description: 'Ref for liquibase/build-logic checkout'
         required: false
@@ -59,9 +64,10 @@ jobs:
       - name: Build image from ${{ inputs.dockerfile_path }}
         env:
           DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+          BUILD_CONTEXT: ${{ inputs.build_context }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
-          docker build -f "$DOCKERFILE_PATH" -t "liquibase/liquibase:$IMAGE_TAG" .
+          docker build -f "$DOCKERFILE_PATH" -t "liquibase/liquibase:$IMAGE_TAG" "$BUILD_CONTEXT"
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -235,11 +241,12 @@ jobs:
       - name: Test custom entrypoint
         env:
           DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+          BUILD_CONTEXT: ${{ inputs.build_context }}
           TEST_FIXTURES_PATH: ${{ inputs.test_fixtures_path }}
           PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
         run: |
           LOG_STRING="Update has been successful"
-          docker build -f "$DOCKERFILE_PATH" -t liquibase:test-entrypoint .
+          docker build -f "$DOCKERFILE_PATH" -t liquibase:test-entrypoint "$BUILD_CONTEXT"
           docker build -f "$(pwd)/build-logic/$TEST_FIXTURES_PATH/Dockerfile" \
             -t liquibase:test "$(pwd)/build-logic/$TEST_FIXTURES_PATH/"
           docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" --name liquibase-test \

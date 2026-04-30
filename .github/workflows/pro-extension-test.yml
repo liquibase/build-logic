@@ -445,7 +445,7 @@ jobs:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
         run: |
           if [ -n "$EXTRA_MAVEN_ARGS" ]; then
-            mvn -B test -P "$MAVEN_PROFILES" "$EXTRA_MAVEN_ARGS"
+            mvn -B test -P "$MAVEN_PROFILES" $EXTRA_MAVEN_ARGS
           else
             mvn -B test -P "$MAVEN_PROFILES"
           fi
@@ -463,7 +463,7 @@ jobs:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
         run: |
           if [ -n "$EXTRA_MAVEN_ARGS" ]; then
-            mvn -B test -P "$MAVEN_PROFILES" "$EXTRA_MAVEN_ARGS" "-Dliquibase.version=master-SNAPSHOT"
+            mvn -B test -P "$MAVEN_PROFILES" $EXTRA_MAVEN_ARGS "-Dliquibase.version=master-SNAPSHOT"
           else
             mvn -B test -P "$MAVEN_PROFILES" "-Dliquibase.version=master-SNAPSHOT"
           fi

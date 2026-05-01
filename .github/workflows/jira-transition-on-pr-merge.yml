@@ -32,10 +32,12 @@ name: "Jira: Transition issue on PR merge"
 #
 # Required org-level setup (one-time):
 #   /vault/liquibase must contain
-#       JIRA_SERVICE_ACCOUNT_EMAIL       — service-account email
-#       JIRA_SERVICE_ACCOUNT_API_TOKEN   — token from id.atlassian.com
-#   The service account needs Browse + Transition Issues on every project
-#   you want auto-transitioned.
+#       JIRA_USER        — Jira account email
+#       JIRA_API_TOKEN   — token from id.atlassian.com
+#   The account needs Browse + Transition Issues on every project you
+#   want auto-transitioned. (These are the same vault keys used by
+#   other Liquibase Jira automation; renamed from the original
+#   JIRA_SERVICE_ACCOUNT_* spec to align with what's actually in vault.)
 
 on:
   workflow_call:
@@ -85,8 +87,8 @@ jobs:
           JIRA_BASE_URL: ${{ inputs.jira_base_url }}
           # parse-json-secrets exposes vault keys as env vars; pass them
           # under non-prefixed names for the script.
-          JIRA_EMAIL: ${{ env.JIRA_SERVICE_ACCOUNT_EMAIL }}
-          JIRA_TOKEN: ${{ env.JIRA_SERVICE_ACCOUNT_API_TOKEN }}
+          JIRA_EMAIL: ${{ env.JIRA_USER }}
+          JIRA_TOKEN: ${{ env.JIRA_API_TOKEN }}
         with:
           script: |
             // Defense in depth: callers should gate the job on
@@ -117,8 +119,7 @@ jobs:
 
             if (!email || !token) {
               core.setFailed(
-                'JIRA_SERVICE_ACCOUNT_EMAIL or JIRA_SERVICE_ACCOUNT_API_TOKEN ' +
-                'not set in /vault/liquibase'
+                'JIRA_USER or JIRA_API_TOKEN not set in /vault/liquibase'
               );
               return;
             }

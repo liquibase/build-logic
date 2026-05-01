@@ -28,6 +28,11 @@ on:
         required: false
         default: ""
         type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions / monorepos."
+        required: false
+        default: "."
+        type: string
       skipSonar:
         description: "Skip SonarQube analysis"
         required: false
@@ -154,6 +159,7 @@ jobs:
 
       - name: Get Project Artifact Name
         id: get-artifact-name
+        working-directory: ${{ inputs.artifactPath }}
         shell: bash
         run: |
           PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
@@ -164,7 +170,7 @@ jobs:
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
-            target/*
+            ${{ inputs.artifactPath }}/target/*
 
       - name: Save Event File
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -202,6 +208,7 @@ jobs:
 
       - name: Get Project Artifact Name
         id: get-artifact-name
+        working-directory: ${{ inputs.artifactPath }}
         shell: bash
         run: |
           PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)

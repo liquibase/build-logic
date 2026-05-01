@@ -1,0 +1,323 @@
+name: "Jira: Set Fix Version on release tag"
+
+# Reusable workflow. When a release tag is pushed in the caller repo, this
+# workflow extracts Jira ticket keys from commit messages between the
+# previous tag and the new tag, sets each linked ticket's `fixVersion` to
+# the released version, and marks the matching Jira version as Released.
+#
+# Step 2 of Unified Workflow v0.2 release automation (deck slide 13) —
+# pairs with `jira-transition-on-pr-merge.yml` (step 1).
+#
+# Caller pattern (in any repo):
+#
+#   name: "Jira: Set Fix Version on release"
+#   on:
+#     push:
+#       tags: ['v*.*.*']
+#   permissions:
+#     id-token: write
+#     contents: read
+#   jobs:
+#     fixversion:
+#       uses: liquibase/build-logic/.github/workflows/jira-set-fixversion-on-release.yml@main
+#       secrets: inherit
+#
+# Required org-level setup (one-time, shared with jira-transition-on-pr-merge):
+#   /vault/liquibase must contain
+#       JIRA_SERVICE_ACCOUNT_EMAIL
+#       JIRA_SERVICE_ACCOUNT_API_TOKEN
+#   The service account needs Browse + Edit Issues + Resolve Issues on every
+#   project (Resolve Issues is the perm that gates Fix Version writes — see
+#   DAT-22616 learnings).
+#
+# Behaviour:
+#   - Looks up the previous tag via the GitHub API and compares commits
+#     between previous tag → current tag (no checkout needed). On the
+#     first-ever release, falls back to the last 100 commits in the tag's
+#     history with a warning.
+#   - Extracts unique Jira ticket keys (anchored regex; same hardening as
+#     jira-transition-on-pr-merge).
+#   - For each ticket, reads its current `fixVersions` and chooses one of
+#     three update strategies (this matches the v0.2 "one field for both
+#     planning and actuals" goal — see release-runbook.md):
+#       * Already has the released version → skip (idempotent).
+#       * Empty → add the released version.
+#       * Exactly one Fix Version, currently unreleased → REPLACE it
+#         (planning value 5.2.2 swaps for actual release 5.2.1 when the
+#         ticket merges early).
+#       * Anything else (released entries, multi-valued) → append, so
+#         legitimate backport / multi-release history stays intact.
+#   - For each Jira project that has at least one updated ticket, marks
+#     the version as Released with today's date.
+#   - Skips silently with a warning when:
+#       * the version doesn't exist in a project (so cross-repo tags are safe)
+#       * the version is already marked released
+#       * no ticket keys appear in the commit range
+#   - Fails loudly only on real Jira / GitHub API errors.
+
+on:
+  workflow_call:
+    inputs:
+      project_keys:
+        description: "Comma-separated Jira project keys to recognise."
+        required: false
+        type: string
+        default: "TECHOPS,SECURE,LSI,INT,CSOL,LAI,PD,DAT,DEVX,ITOPS"
+      target_version_name:
+        description: "Override the Jira version name. Default: tag with leading 'v' stripped (e.g. v5.3.0 → 5.3.0)."
+        required: false
+        type: string
+        default: ""
+      jira_base_url:
+        description: "Jira Cloud base URL."
+        required: false
+        type: string
+        default: "https://datical.atlassian.net"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  set-fixversion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get Jira service-account credentials from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Set Fix Version + mark released
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          PROJECT_KEYS: ${{ inputs.project_keys }}
+          TARGET_VERSION_NAME: ${{ inputs.target_version_name }}
+          JIRA_BASE_URL: ${{ inputs.jira_base_url }}
+          JIRA_EMAIL: ${{ env.JIRA_SERVICE_ACCOUNT_EMAIL }}
+          JIRA_TOKEN: ${{ env.JIRA_SERVICE_ACCOUNT_API_TOKEN }}
+        with:
+          script: |
+            // ---- Inputs / context ------------------------------------
+            const ref = context.ref || '';
+            if (!ref.startsWith('refs/tags/')) {
+              core.setFailed(
+                `Expected a tag push event (got ref '${ref}'); caller workflow misconfigured?`
+              );
+              return;
+            }
+            const currentTag = ref.replace(/^refs\/tags\//, '');
+            const versionName = (process.env.TARGET_VERSION_NAME || '').trim()
+              || currentTag.replace(/^v/, '');
+            const projectKeys = process.env.PROJECT_KEYS
+              .split(',').map(s => s.trim()).filter(Boolean);
+            const baseUrl = process.env.JIRA_BASE_URL.replace(/\/$/, '');
+            const email = process.env.JIRA_EMAIL;
+            const token = process.env.JIRA_TOKEN;
+
+            if (!email || !token) {
+              core.setFailed(
+                'JIRA_SERVICE_ACCOUNT_EMAIL or JIRA_SERVICE_ACCOUNT_API_TOKEN ' +
+                'not set in /vault/liquibase'
+              );
+              return;
+            }
+
+            console.log(`Current tag: ${currentTag}`);
+            console.log(`Version name to set in Jira: ${versionName}`);
+
+            // ---- Resolve previous tag via GitHub API -----------------
+            // listTags returns newest-first. The current tag should be at
+            // index 0 (since the workflow fires on its push); the previous
+            // tag is index 1. If only one tag exists, fall back to listing
+            // commits in the current tag's history.
+            const { data: tags } = await github.rest.repos.listTags({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const currentIdx = tags.findIndex(t => t.name === currentTag);
+            if (currentIdx === -1) {
+              core.setFailed(
+                `Current tag ${currentTag} not found in repo's first-page tag listing. ` +
+                `Either tag indexing is lagging or there are >100 newer tags.`
+              );
+              return;
+            }
+            const previousTag = currentIdx + 1 < tags.length ? tags[currentIdx + 1].name : null;
+            console.log(`Previous tag: ${previousTag || '(none — first release)'}`);
+
+            // ---- Collect commits in scope ----------------------------
+            let commits = [];
+            if (previousTag) {
+              const { data: cmp } = await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: previousTag,
+                head: currentTag,
+              });
+              commits = cmp.commits || [];
+              if (cmp.total_commits > commits.length) {
+                core.warning(
+                  `compareCommits returned ${commits.length} of ${cmp.total_commits} commits. ` +
+                  `Tickets mentioned only in commits beyond the API page limit will be missed.`
+                );
+              }
+            } else {
+              const { data } = await github.rest.repos.listCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: currentTag,
+                per_page: 100,
+              });
+              commits = data;
+              core.warning(
+                `No previous tag found. Falling back to the last 100 commits in ${currentTag}'s history.`
+              );
+            }
+            console.log(`Commits in scope: ${commits.length}`);
+
+            // ---- Extract unique ticket keys --------------------------
+            const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const keyRegex = new RegExp(
+              `\\b(?:${projectKeys.map(escapeRegex).join('|')})-\\d+\\b`,
+              'gi'
+            );
+            const keys = new Set();
+            for (const c of commits) {
+              const msg = c.commit?.message || '';
+              const matches = msg.match(keyRegex);
+              if (matches) matches.forEach(k => keys.add(k.toUpperCase()));
+            }
+
+            if (keys.size === 0) {
+              core.warning(
+                `No Jira ticket keys found in commits between ` +
+                `${previousTag || 'genesis'} and ${currentTag}.`
+              );
+              return;
+            }
+            console.log(`Found ${keys.size} ticket(s): ${[...keys].sort().join(', ')}`);
+
+            // ---- Update fixVersion on each ticket --------------------
+            // Per-ticket: read current fixVersions, decide replace vs.
+            // append. The "replace one unreleased" branch is the v0.2
+            // single-field-for-planning-and-actuals semantic — a ticket
+            // planned for 5.2.2 that merges early gets its 5.2.2
+            // overwritten with the actual 5.2.1 at release time, instead
+            // of carrying both. Released entries are never replaced so
+            // backport history is preserved.
+            const auth = `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`;
+            const headers = {
+              Authorization: auth,
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            };
+
+            const projectsTouched = new Set();
+            for (const key of keys) {
+              projectsTouched.add(key.split('-')[0]);
+
+              const getResp = await fetch(
+                `${baseUrl}/rest/api/3/issue/${key}?fields=fixVersions`,
+                { headers }
+              );
+              if (!getResp.ok) {
+                core.warning(
+                  `Failed to read fixVersions on ${key}: ` +
+                  `${getResp.status} ${await getResp.text()}`
+                );
+                continue;
+              }
+              const issue = await getResp.json();
+              const current = issue.fields?.fixVersions || [];
+
+              // Decide update strategy.
+              if (current.some(v => v.name === versionName)) {
+                console.log(`${key}: skip (already has fixVersion=${versionName})`);
+                continue;
+              }
+
+              let body, action;
+              if (current.length === 0) {
+                body = { update: { fixVersions: [{ add: { name: versionName } }] } };
+                action = `add ${versionName} (was empty)`;
+              } else if (current.length === 1 && current[0].released === false) {
+                // Single unreleased planning value → replace with actual release.
+                body = { fields: { fixVersions: [{ name: versionName }] } };
+                action = `replace ${current[0].name} (unreleased) → ${versionName}`;
+              } else {
+                // Multi-valued or has released entries → append (preserve history).
+                body = { update: { fixVersions: [{ add: { name: versionName } }] } };
+                const existing = current
+                  .map(v => `${v.name}${v.released ? '*' : ''}`)
+                  .join(', ');
+                action = `add ${versionName} (existing: [${existing}])`;
+              }
+
+              const resp = await fetch(`${baseUrl}/rest/api/3/issue/${key}`, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify(body),
+              });
+              if (resp.ok) {
+                console.log(`${key}: ${action}`);
+              } else {
+                core.warning(
+                  `Failed to update fixVersion on ${key}: ` +
+                  `${resp.status} ${await resp.text()}`
+                );
+              }
+            }
+
+            // ---- Mark Jira version as released per project ------------
+            const today = new Date().toISOString().slice(0, 10);
+            for (const project of projectsTouched) {
+              const versionsResp = await fetch(
+                `${baseUrl}/rest/api/3/project/${project}/versions`,
+                { headers }
+              );
+              if (!versionsResp.ok) {
+                core.warning(
+                  `Failed to list versions for ${project}: ` +
+                  `${versionsResp.status} ${await versionsResp.text()}`
+                );
+                continue;
+              }
+              const versions = await versionsResp.json();
+              const version = versions.find(v => v.name === versionName);
+              if (!version) {
+                core.warning(
+                  `Version ${versionName} not found in project ${project}; ` +
+                  `tickets got fixVersion but the version wasn't marked released.`
+                );
+                continue;
+              }
+              if (version.released) {
+                console.log(`Version ${project}/${versionName} already released; skipping`);
+                continue;
+              }
+              const markResp = await fetch(
+                `${baseUrl}/rest/api/3/version/${version.id}`,
+                {
+                  method: 'PUT',
+                  headers,
+                  body: JSON.stringify({ released: true, releaseDate: today }),
+                }
+              );
+              if (markResp.ok) {
+                console.log(`Marked ${project}/${versionName} released (${today})`);
+              } else {
+                core.warning(
+                  `Failed to mark ${project}/${versionName} released: ` +
+                  `${markResp.status} ${await markResp.text()}`
+                );
+              }
+            }

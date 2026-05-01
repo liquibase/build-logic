@@ -24,11 +24,12 @@ name: "Jira: Set Fix Version on release tag"
 #
 # Required org-level setup (one-time, shared with jira-transition-on-pr-merge):
 #   /vault/liquibase must contain
-#       JIRA_SERVICE_ACCOUNT_EMAIL
-#       JIRA_SERVICE_ACCOUNT_API_TOKEN
-#   The service account needs Browse + Edit Issues + Resolve Issues on every
+#       JIRA_USER       — Jira account email
+#       JIRA_API_TOKEN  — token from id.atlassian.com
+#   The account needs Browse + Edit Issues + Resolve Issues on every
 #   project (Resolve Issues is the perm that gates Fix Version writes — see
-#   DAT-22616 learnings).
+#   DAT-22616 learnings). Renamed from the original JIRA_SERVICE_ACCOUNT_*
+#   spec to align with what's actually in vault.
 #
 # Behaviour:
 #   - Looks up the previous tag via the GitHub API and compares commits
@@ -101,8 +102,8 @@ jobs:
           PROJECT_KEYS: ${{ inputs.project_keys }}
           TARGET_VERSION_NAME: ${{ inputs.target_version_name }}
           JIRA_BASE_URL: ${{ inputs.jira_base_url }}
-          JIRA_EMAIL: ${{ env.JIRA_SERVICE_ACCOUNT_EMAIL }}
-          JIRA_TOKEN: ${{ env.JIRA_SERVICE_ACCOUNT_API_TOKEN }}
+          JIRA_EMAIL: ${{ env.JIRA_USER }}
+          JIRA_TOKEN: ${{ env.JIRA_API_TOKEN }}
         with:
           script: |
             // ---- Inputs / context ------------------------------------
@@ -124,8 +125,7 @@ jobs:
 
             if (!email || !token) {
               core.setFailed(
-                'JIRA_SERVICE_ACCOUNT_EMAIL or JIRA_SERVICE_ACCOUNT_API_TOKEN ' +
-                'not set in /vault/liquibase'
+                'JIRA_USER or JIRA_API_TOKEN not set in /vault/liquibase'
               );
               return;
             }

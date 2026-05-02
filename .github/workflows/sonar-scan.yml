@@ -194,7 +194,15 @@ jobs:
             [ -n "$SONAR_ORG" ] && SONAR_PROPS="$SONAR_PROPS -Dsonar.organization=$SONAR_ORG"
           fi
 
+          # sonar.host.url must be passed explicitly: this workflow runs from
+          # ${{ inputs.artifactPath }}, which can be a sub-module whose effective
+          # POM does not inherit the consumer repo's <sonar.host.url> profile
+          # property (e.g. tools/liquibase-license-utility uses spring-boot-starter-parent
+          # as parent, not the liquibase-pro root). Without this, the Sonar Maven
+          # plugin defaults to http://localhost:9000 and the scan fails with
+          # "Connection refused" (DAT-22961).
           mvn -B -Daws.region="us-east-1" -Dsonar.token=$SONAR_TOKEN \
+              -Dsonar.host.url=https://sonarcloud.io \
               $PR_FLAGS $SONAR_PROPS \
               -Dsonar.scm.revision=$SCM_REVISION \
               package -DskipTests sonar:sonar

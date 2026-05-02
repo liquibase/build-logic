@@ -274,26 +274,37 @@ jobs:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: ./target
 
+      # `shell: bash` forces bash on Windows runners (where the default is
+      # PowerShell). Without it, pwsh does not word-split ${EXTRA_MAVEN_ARGS},
+      # so `-pl :module -am` is delivered to mvn as a single mangled argument
+      # and the reactor filter is silently ignored — every distribution-profile
+      # module then builds, which is both wasteful and (for liquibase-pro)
+      # crashes the pro/ test fork on a half-built reactor (DAT-22961).
+      # Mirrors the existing `shell: bash` declarations in pro-extension-test.yml.
       - name: Run Tests
         if: ${{ !inputs.nightly }}
+        shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS}
 
       - name: Run Tests
         if: ${{ inputs.nightly }}
+        shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Run Integration Tests
         if: ${{ !inputs.nightly && inputs.runIntegrationTests }}
+        shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS}
 
       - name: Run Integration Tests
         if: ${{ inputs.nightly && inputs.runIntegrationTests }}
+        shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"

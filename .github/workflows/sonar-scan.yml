@@ -205,16 +205,28 @@ jobs:
           # SonarCloud's PR-decoration API then 404s with
           # `Could not find the pullrequest with key 'NNNN'` because it's
           # looking in the wrong bound repo.
-          # Skip PR_FLAGS for multi-module callers: scans still run and post
-          # results to SonarCloud as branch analyses, just without inline PR
-          # comments. Proper resolution is SonarCloud-side: re-bind each
-          # per-module project's GitHub integration to the consumer monorepo.
-          # (DAT-22961, PR 3666 Round 23.)
+          #
+          # Just dropping PR_FLAGS is not enough -- sonar-maven-plugin
+          # auto-detects PR context from GitHub Actions env vars
+          # (GITHUB_EVENT_NAME=pull_request etc.) independently of our -D
+          # flags, then queries the same PR-decoration API. To genuinely
+          # force branch-analysis mode, we must explicitly set
+          # `sonar.branch.name`, which overrides the auto-detection. Use the
+          # PR head-ref so the analysis is associated with the contributing
+          # branch on SonarCloud (PR 3666 Round 24).
+          #
+          # Proper resolution is SonarCloud-side: re-bind each per-module
+          # project's GitHub integration to the consumer monorepo
+          # (DAT-22961, tracked as Task #91).
           PR_FLAGS=""
           if [ -n "$PR_NUMBER" ] && [ "${{ inputs.artifactPath }}" = "." ]; then
             PR_FLAGS="-Dsonar.pullrequest.key=$PR_NUMBER \
                       -Dsonar.pullrequest.branch=$PR_HEAD_REF \
                       -Dsonar.pullrequest.base=$PR_BASE_REF"
+          elif [ "${{ inputs.artifactPath }}" != "." ] && [ -n "$PR_HEAD_REF" ]; then
+            # Multi-module + PR context: force branch mode so
+            # sonar-maven-plugin does not try the cross-repo PR-decoration API.
+            PR_FLAGS="-Dsonar.branch.name=$PR_HEAD_REF"
           fi
 
           SONAR_PROPS=""

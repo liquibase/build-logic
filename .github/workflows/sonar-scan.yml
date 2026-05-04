@@ -196,8 +196,22 @@ jobs:
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           SCM_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          # PR-decoration flags only make sense if the SonarCloud project is
+          # bound (via the GitHub integration) to the SAME repo the PR lives
+          # in. For multi-module callers (artifactPath != "."), the per-module
+          # SonarCloud project (e.g. liquibase_liquibase-cassandra) is bound
+          # to the *archived* standalone repo (liquibase/liquibase-cassandra),
+          # while the PR lives in the consumer monorepo (liquibase/liquibase-pro).
+          # SonarCloud's PR-decoration API then 404s with
+          # `Could not find the pullrequest with key 'NNNN'` because it's
+          # looking in the wrong bound repo.
+          # Skip PR_FLAGS for multi-module callers: scans still run and post
+          # results to SonarCloud as branch analyses, just without inline PR
+          # comments. Proper resolution is SonarCloud-side: re-bind each
+          # per-module project's GitHub integration to the consumer monorepo.
+          # (DAT-22961, PR 3666 Round 23.)
           PR_FLAGS=""
-          if [ -n "$PR_NUMBER" ]; then
+          if [ -n "$PR_NUMBER" ] && [ "${{ inputs.artifactPath }}" = "." ]; then
             PR_FLAGS="-Dsonar.pullrequest.key=$PR_NUMBER \
                       -Dsonar.pullrequest.branch=$PR_HEAD_REF \
                       -Dsonar.pullrequest.base=$PR_BASE_REF"

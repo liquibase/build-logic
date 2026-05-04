@@ -218,8 +218,27 @@ jobs:
           # as parent, not the liquibase-pro root). Without this, the Sonar Maven
           # plugin defaults to http://localhost:9000 and the scan fails with
           # "Connection refused" (DAT-22961).
+          #
+          # When running against a sub-module (artifactPath != "."), the prior
+          # "Install dependencies" step has already compiled, packaged, and
+          # installed the module. Re-running `package` here re-invokes
+          # maven-shade-plugin (and any other package-bound plugin), which
+          # rewrites project.basedir to the dependency-reduced-pom location
+          # under <basedir>/target/. That breaks `sonar.tests` path resolution:
+          # a relative path like `src/test/groovy` becomes
+          # `<basedir>/target/src/test/groovy`, which doesn't exist
+          # (PR 3666 Round 22 cassandra symptom). Run `sonar:sonar` standalone
+          # for multi-module callers; preserve `package -DskipTests sonar:sonar`
+          # for single-module (artifactPath: ".") callers since their workflow
+          # has not done a prior install. (DAT-22961.)
+          if [ "${{ inputs.artifactPath }}" != "." ]; then
+            MVN_GOALS="sonar:sonar"
+          else
+            MVN_GOALS="package -DskipTests sonar:sonar"
+          fi
+
           mvn -B -Daws.region="us-east-1" -Dsonar.token=$SONAR_TOKEN \
               -Dsonar.host.url=https://sonarcloud.io \
               $PR_FLAGS $SONAR_PROPS \
               -Dsonar.scm.revision=$SCM_REVISION \
-              package -DskipTests sonar:sonar
+              $MVN_GOALS

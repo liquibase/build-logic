@@ -104,6 +104,23 @@ jobs:
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
+      # When sonar-scan is run for a single module of a multi-module reactor
+      # (artifactPath != "."), `mvn ... package sonar:sonar` from the module's
+      # directory cannot resolve in-reactor SNAPSHOT dependencies because they
+      # have never been published to any remote repo. Build the transitive
+      # closure into the local Maven repo first via -pl :MODULE -am from repo
+      # root; then the subsequent Sonar Scan step in the module directory has
+      # everything it needs. (DAT-22961.)
+      #
+      # `-P distribution` is liquibase-pro-specific; on consumer repos that
+      # don't define that profile, Maven warns and proceeds -- no harm done.
+      - name: Install dependencies for module reactor (skip tests)
+        if: ${{ inputs.artifactPath != '.' }}
+        shell: bash
+        run: |
+          mvn -B -ntp install -DskipTests=true -P distribution \
+              -pl :${{ env.artifact_id }} -am
+
       - name: Find test reports artifact
         id: find-test-reports
         shell: bash

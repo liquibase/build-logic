@@ -34,7 +34,13 @@ on:
         default: ""
         type: string
       extraMavenArgs:
-        description: "Specify it if you want to run an extra maven argument"
+        description: >-
+          Extra Maven arg(s) appended to test invocations. The value is
+          word-split on whitespace so multi-token use is supported (e.g.
+          '-pl :liquibase-aws-extension -am'). Values containing internal
+          spaces — e.g. quoted property arguments like '-DargLine="-Xmx512m
+          -XX:+UseG1GC"' — are NOT supported via this input; pass them
+          through alternative channels.
         required: false
         default: ""
         type: string

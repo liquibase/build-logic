@@ -19,7 +19,7 @@ on:
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
       nightly:
-        description: "Specifies nightly builds against liquibase master-SNAPSHOT"
+        description: "Specifies nightly builds against liquibase main-SNAPSHOT"
         required: false
         default: false
         type: boolean
@@ -217,7 +217,7 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
           AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
           LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
-        run: mvn -B clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B clean package -DskipTests=true "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -463,9 +463,9 @@ jobs:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
         run: |
           if [ -n "$EXTRA_MAVEN_ARGS" ]; then
-            mvn -B test -P "$MAVEN_PROFILES" "$EXTRA_MAVEN_ARGS" "-Dliquibase.version=master-SNAPSHOT"
+            mvn -B test -P "$MAVEN_PROFILES" "$EXTRA_MAVEN_ARGS" "-Dliquibase.version=main-SNAPSHOT"
           else
-            mvn -B test -P "$MAVEN_PROFILES" "-Dliquibase.version=master-SNAPSHOT"
+            mvn -B test -P "$MAVEN_PROFILES" "-Dliquibase.version=main-SNAPSHOT"
           fi
 
       - name: Notify Slack on Build Failure

@@ -118,8 +118,12 @@ jobs:
         if: ${{ inputs.artifactPath != '.' }}
         shell: bash
         run: |
+          # CodeQL: artifact_id was written to $GITHUB_ENV in the prior step,
+          # so it is available as a real shell variable here. Reference the
+          # shell var $artifact_id rather than the env-context expression so
+          # the value never enters the script body via Actions interpolation.
           mvn -B -ntp install -DskipTests=true -P distribution \
-              -pl :${{ env.artifact_id }} -am
+              -pl ":$artifact_id" -am
 
       - name: Find test reports artifact
         id: find-test-reports
@@ -195,6 +199,11 @@ jobs:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           SCM_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+          # Map inputs.artifactPath through the env block so the run script
+          # below references it via $INPUT_ARTIFACT_PATH (real shell var)
+          # rather than as an Actions context expression that would be
+          # interpolated into the script body (CodeQL: code injection).
+          INPUT_ARTIFACT_PATH: ${{ inputs.artifactPath }}
         run: |
           # PR-decoration flags only make sense if the SonarCloud project is
           # bound (via the GitHub integration) to the SAME repo the PR lives
@@ -219,11 +228,11 @@ jobs:
           # project's GitHub integration to the consumer monorepo
           # (DAT-22961, tracked as Task #91).
           PR_FLAGS=""
-          if [ -n "$PR_NUMBER" ] && [ "${{ inputs.artifactPath }}" = "." ]; then
+          if [ -n "$PR_NUMBER" ] && [ "$INPUT_ARTIFACT_PATH" = "." ]; then
             PR_FLAGS="-Dsonar.pullrequest.key=$PR_NUMBER \
                       -Dsonar.pullrequest.branch=$PR_HEAD_REF \
                       -Dsonar.pullrequest.base=$PR_BASE_REF"
-          elif [ "${{ inputs.artifactPath }}" != "." ] && [ -n "$PR_HEAD_REF" ]; then
+          elif [ "$INPUT_ARTIFACT_PATH" != "." ] && [ -n "$PR_HEAD_REF" ]; then
             # Multi-module + PR context: force branch mode so
             # sonar-maven-plugin does not try the cross-repo PR-decoration API.
             PR_FLAGS="-Dsonar.branch.name=$PR_HEAD_REF"
@@ -238,8 +247,8 @@ jobs:
           fi
 
           # sonar.host.url must be passed explicitly: this workflow runs from
-          # ${{ inputs.artifactPath }}, which can be a sub-module whose effective
-          # POM does not inherit the consumer repo's <sonar.host.url> profile
+          # the inputs.artifactPath directory, which can be a sub-module whose
+          # effective POM does not inherit the consumer repo's <sonar.host.url> profile
           # property (e.g. tools/liquibase-license-utility uses spring-boot-starter-parent
           # as parent, not the liquibase-pro root). Without this, the Sonar Maven
           # plugin defaults to http://localhost:9000 and the scan fails with
@@ -257,7 +266,7 @@ jobs:
           # for multi-module callers; preserve `package -DskipTests sonar:sonar`
           # for single-module (artifactPath: ".") callers since their workflow
           # has not done a prior install. (DAT-22961.)
-          if [ "${{ inputs.artifactPath }}" != "." ]; then
+          if [ "$INPUT_ARTIFACT_PATH" != "." ]; then
             MVN_GOALS="sonar:sonar"
           else
             MVN_GOALS="package -DskipTests sonar:sonar"

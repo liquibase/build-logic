@@ -19,7 +19,7 @@ on:
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
       nightly:
-        description: "Specifies nightly builds against liquibase master-SNAPSHOT"
+        description: "Specifies nightly builds against liquibase main-SNAPSHOT"
         required: false
         default: false
         type: boolean
@@ -130,7 +130,7 @@ jobs:
         if: ${{ inputs.nightly }}
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -277,7 +277,7 @@ jobs:
         if: ${{ inputs.nightly }}
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Run Integration Tests
         if: ${{ !inputs.nightly && inputs.runIntegrationTests }}
@@ -289,7 +289,7 @@ jobs:
         if: ${{ inputs.nightly && inputs.runIntegrationTests }}
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

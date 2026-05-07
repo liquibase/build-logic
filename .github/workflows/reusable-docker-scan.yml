@@ -32,10 +32,10 @@ on:
         type: boolean
         default: true
       dispatch_new_cves:
-        description: 'Pass through to reusable-vulnerability-scan.yml for CVE dispatch'
+        description: 'Pass through to reusable-vulnerability-scan.yml for CVE dispatch. Defaults to false; secure-image callers must opt in explicitly.'
         required: false
         type: boolean
-        default: true
+        default: false
       scout_enabled:
         description: 'Run Docker Scout job'
         required: false

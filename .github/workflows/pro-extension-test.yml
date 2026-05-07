@@ -34,7 +34,13 @@ on:
         default: ""
         type: string
       extraMavenArgs:
-        description: "Specify it if you want to run an extra maven argument"
+        description: >-
+          Extra Maven arg(s) appended to test invocations. The value is
+          word-split on whitespace so multi-token use is supported (e.g.
+          '-pl :liquibase-aws-extension -am'). Values containing internal
+          spaces — e.g. quoted property arguments like '-DargLine="-Xmx512m
+          -XX:+UseG1GC"' — are NOT supported via this input; pass them
+          through alternative channels.
         required: false
         default: ""
         type: string
@@ -63,6 +69,20 @@ on:
         required: false
         default: ""
         type: string
+      # TODO - debate (DAT-22596): per-module Sonar in a monorepo currently
+      # fails with `Unable to determine structure of project... "Liquibase"
+      # is orphan` because each per-module CI runs `mvn ... sonar:sonar`
+      # over a partial reactor (-pl :module -am). Letting callers opt out
+      # via skipSonar is a stopgap; the long-term resolution belongs to
+      # TechOps/DevOps under DAT-22596 (CI/CD selective module testing for
+      # PRs and nightly builds, assigned to Filipe Lautert), where Sonar
+      # would run from the full-reactor nightly path instead of per-module.
+      # Mirrors the existing skipSonar input on os-extension-test.yml.
+      skipSonar:
+        description: "Skip SonarQube analysis"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -445,7 +465,7 @@ jobs:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
         run: |
           if [ -n "$EXTRA_MAVEN_ARGS" ]; then
-            mvn -B test -P "$MAVEN_PROFILES" "$EXTRA_MAVEN_ARGS"
+            mvn -B test -P "$MAVEN_PROFILES" $EXTRA_MAVEN_ARGS
           else
             mvn -B test -P "$MAVEN_PROFILES"
           fi
@@ -463,7 +483,7 @@ jobs:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
         run: |
           if [ -n "$EXTRA_MAVEN_ARGS" ]; then
-            mvn -B test -P "$MAVEN_PROFILES" "$EXTRA_MAVEN_ARGS" "-Dliquibase.version=main-SNAPSHOT"
+            mvn -B test -P "$MAVEN_PROFILES" $EXTRA_MAVEN_ARGS "-Dliquibase.version=main-SNAPSHOT"
           else
             mvn -B test -P "$MAVEN_PROFILES" "-Dliquibase.version=main-SNAPSHOT"
           fi
@@ -709,7 +729,7 @@ jobs:
             }
 
   sonar-pr:
-    if: ${{ !inputs.nightly }}
+    if: ${{ !inputs.skipSonar && !inputs.nightly }}
     needs: [unit-test]
     uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit

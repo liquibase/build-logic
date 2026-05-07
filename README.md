@@ -411,7 +411,7 @@ The project has to be configured with the following Maven plugins:
 
 For Maven multimodule projects it is recommended to follow this pattern from SonarSource where there is a specific module to leave the aggregated report:
 
-- [Multi-module Apache Maven example](https://github.com/SonarSource/sonar-scanning-examples/blob/main/sonarqube-scanner-maven/maven-multimodule/README.md)
+- [Multi-module Apache Maven example](https://github.com/SonarSource/sonar-scanning-examples/blob/master/sonarqube-scanner-maven/maven-multimodule/README.md)
 
 In the following example we demonstrate how `liquibase-pro` works:
 

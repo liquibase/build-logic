@@ -128,7 +128,9 @@ jobs:
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=main-SNAPSHOT"
+        env:
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -146,7 +148,9 @@ jobs:
 
       - name: Build and Package
         if: ${{ !inputs.nightly }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true
+        env:
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS}
 
       - name: Get Project Artifact Name
         id: get-artifact-name

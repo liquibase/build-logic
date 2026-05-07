@@ -189,7 +189,7 @@ jobs:
 | `upload_sarif` | boolean | no | `false` | Upload to GitHub Security tab |
 | `sarif_category` | string | no | `vulnerability-scan` | SARIF category |
 | `generate_sbom` | boolean | no | `true` | Generate SBOM (docker only) |
-| `build_logic_ref` | string | no | `master` | build-logic branch/tag |
+| `build_logic_ref` | string | no | `main` | build-logic branch/tag |
 
 ### Outputs
 
@@ -210,7 +210,7 @@ The `.trivyignore` file at the root of build-logic contains documented false pos
   uses: actions/checkout@v4
   with:
     repository: liquibase/build-logic
-    ref: master
+    ref: main
     path: build-logic
 
 - name: Setup Trivy ignore file
@@ -411,7 +411,7 @@ The project has to be configured with the following Maven plugins:
 
 For Maven multimodule projects it is recommended to follow this pattern from SonarSource where there is a specific module to leave the aggregated report:
 
-- [Multi-module Apache Maven example](https://github.com/SonarSource/sonar-scanning-examples/blob/master/sonarqube-scanner-maven/maven-multimodule/README.md)
+- [Multi-module Apache Maven example](https://github.com/SonarSource/sonar-scanning-examples/blob/main/sonarqube-scanner-maven/maven-multimodule/README.md)
 
 In the following example we demonstrate how `liquibase-pro` works:
 

@@ -470,6 +470,11 @@ jobs:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
+          # liquibaseVersion input is optional; fall back to pom.xml so release:prepare gets a non-empty -DreleaseVersion
+          if [ -z "$RELEASE_VERSION" ]; then
+            RELEASE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+            echo "Derived RELEASE_VERSION from pom.xml: $RELEASE_VERSION"
+          fi
           mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$RELEASE_VERSION -DpushChanges=false -P "$MAVEN_PROFILES" \
           -DscmServerId=liquibase

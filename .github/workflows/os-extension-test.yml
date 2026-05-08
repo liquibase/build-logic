@@ -19,7 +19,7 @@ on:
         default: '["ubuntu-latest", "windows-latest"]'
         type: string
       nightly:
-        description: "Specifies nightly builds against liquibase master-SNAPSHOT"
+        description: "Specifies nightly builds against liquibase main-SNAPSHOT"
         required: false
         default: false
         type: boolean
@@ -27,6 +27,11 @@ on:
         description: "Specify it if you want to run an extra maven argument"
         required: false
         default: ""
+        type: string
+      artifactPath:
+        description: "Specify the path to the artifacts that should be attached to the build. Useful for multi-module extensions / monorepos."
+        required: false
+        default: "."
         type: string
       skipSonar:
         description: "Skip SonarQube analysis"
@@ -91,7 +96,9 @@ jobs:
 
       - name: Build and Package latest liquibase version
         if: ${{ inputs.nightly }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true "-Dliquibase.version=master-SNAPSHOT"
+        env:
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -109,10 +116,13 @@ jobs:
 
       - name: Build and Package
         if: ${{ !inputs.nightly }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true
+        env:
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS}
 
       - name: Get Project Artifact Name
         id: get-artifact-name
+        working-directory: ${{ inputs.artifactPath }}
         shell: bash
         run: |
           PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
@@ -123,7 +133,7 @@ jobs:
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
-            target/*
+            ${{ inputs.artifactPath }}/target/*
 
       - name: Save Event File
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -159,13 +169,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
-      - name: Get Project Artifact Name
-        id: get-artifact-name
-        shell: bash
-        run: |
-          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
-          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
-
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
@@ -178,6 +181,23 @@ jobs:
         with:
           maven-version: ${{ env.MAVEN_VERSION }}
 
+      # `mvn help:evaluate` MUST run after Set up JDK + Set up Maven, otherwise
+      # it falls back to the runner image's bundled Maven. On Windows runners
+      # specifically, the bundled Maven is a recurring flake source: this step
+      # has hit `Process completed with exit code 1` (no detail) on Cassandra
+      # J17 Win (PR 3666 Round 21), MongoDB J21 Win + J25 Win (Round 18),
+      # MongoDB J21 Win (Round 11), Vault J21 Ubuntu (Round 20). Running it
+      # AFTER setup-java + setup-maven uses the pinned Maven 3.9.5 with a
+      # cached ~/.m2/repository (via setup-java's `cache: maven`), which
+      # measurably reduces the flake rate.
+      - name: Get Project Artifact Name
+        id: get-artifact-name
+        working-directory: ${{ inputs.artifactPath }}
+        shell: bash
+        run: |
+          PROJECT_ARTIFACT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "PROJECT_ARTIFACT_NAME=${PROJECT_ARTIFACT_NAME}" >> $GITHUB_ENV
+
       # look for dependencies in maven
       - name: Set up Maven settings.xml
         uses: liquibase/build-logic/.github/actions/setup-maven-settings@main
@@ -189,29 +209,40 @@ jobs:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: ./target
 
+      # `shell: bash` forces bash on Windows runners (where the default is
+      # PowerShell). Without it, pwsh does not word-split ${EXTRA_MAVEN_ARGS},
+      # so `-pl :module -am` is delivered to mvn as a single mangled argument
+      # and the reactor filter is silently ignored — every distribution-profile
+      # module then builds, which is both wasteful and (for liquibase-pro)
+      # crashes the pro/ test fork on a half-built reactor (DAT-22961).
+      # Mirrors the existing `shell: bash` declarations in pro-extension-test.yml.
       - name: Run Tests
         if: ${{ !inputs.nightly }}
+        shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS}
 
       - name: Run Tests
         if: ${{ inputs.nightly }}
+        shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Run Integration Tests
         if: ${{ !inputs.nightly && inputs.runIntegrationTests }}
+        shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS}
 
       - name: Run Integration Tests
         if: ${{ inputs.nightly && inputs.runIntegrationTests }}
+        shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=master-SNAPSHOT"
+        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}
@@ -247,4 +278,12 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
     with:
+      # Forward artifactPath so sonar-scan.yml runs `mvn sonar:sonar` from the
+      # consumer module's directory instead of the repo root. This is required
+      # for the per-module sonar-project.properties pattern (each Maven module
+      # owns its own SonarCloud project, e.g. liquibase_liquibase-cassandra)
+      # and avoids the multi-module reactor `Liquibase orphan` error that
+      # otherwise fires when the scan walks pro-distribution's <modules> tree.
+      # (DAT-22961.)
+      artifactPath: ${{ inputs.artifactPath }}
       javaBuildVersion: ${{ inputs.javaBuildVersion }}

@@ -67,6 +67,27 @@ jobs:
         id: get-artifact-id
         run: echo "artifact_id=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_ENV
 
+      # When sonar-scan is run for a single module of a multi-module reactor
+      # (artifactPath != "."), `mvn ... package sonar:sonar` from the module's
+      # directory cannot resolve in-reactor SNAPSHOT dependencies because they
+      # have never been published to any remote repo. Build the transitive
+      # closure into the local Maven repo first via -pl :MODULE -am from repo
+      # root; then the subsequent Sonar Scan step in the module directory has
+      # everything it needs. (DAT-22961.)
+      #
+      # `-P distribution` is liquibase-pro-specific; on consumer repos that
+      # don't define that profile, Maven warns and proceeds -- no harm done.
+      - name: Install dependencies for module reactor (skip tests)
+        if: ${{ inputs.artifactPath != '.' }}
+        shell: bash
+        run: |
+          # CodeQL: artifact_id was written to $GITHUB_ENV in the prior step,
+          # so it is available as a real shell variable here. Reference the
+          # shell var $artifact_id rather than the env-context expression so
+          # the value never enters the script body via Actions interpolation.
+          mvn -B -ntp install -DskipTests=true -P distribution \
+              -pl ":$artifact_id" -am
+
       - name: Find test reports artifact
         id: find-test-reports
         shell: bash
@@ -141,12 +162,43 @@ jobs:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           SCM_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+          # Map inputs.artifactPath through the env block so the run script
+          # below references it via $INPUT_ARTIFACT_PATH (real shell var)
+          # rather than as an Actions context expression that would be
+          # interpolated into the script body (CodeQL: code injection).
+          INPUT_ARTIFACT_PATH: ${{ inputs.artifactPath }}
         run: |
+          # PR-decoration flags only make sense if the SonarCloud project is
+          # bound (via the GitHub integration) to the SAME repo the PR lives
+          # in. For multi-module callers (artifactPath != "."), the per-module
+          # SonarCloud project (e.g. liquibase_liquibase-cassandra) is bound
+          # to the *archived* standalone repo (liquibase/liquibase-cassandra),
+          # while the PR lives in the consumer monorepo (liquibase/liquibase-pro).
+          # SonarCloud's PR-decoration API then 404s with
+          # `Could not find the pullrequest with key 'NNNN'` because it's
+          # looking in the wrong bound repo.
+          #
+          # Just dropping PR_FLAGS is not enough -- sonar-maven-plugin
+          # auto-detects PR context from GitHub Actions env vars
+          # (GITHUB_EVENT_NAME=pull_request etc.) independently of our -D
+          # flags, then queries the same PR-decoration API. To genuinely
+          # force branch-analysis mode, we must explicitly set
+          # `sonar.branch.name`, which overrides the auto-detection. Use the
+          # PR head-ref so the analysis is associated with the contributing
+          # branch on SonarCloud (PR 3666 Round 24).
+          #
+          # Proper resolution is SonarCloud-side: re-bind each per-module
+          # project's GitHub integration to the consumer monorepo
+          # (DAT-22961, tracked as Task #91).
           PR_FLAGS=""
-          if [ -n "$PR_NUMBER" ]; then
+          if [ -n "$PR_NUMBER" ] && [ "$INPUT_ARTIFACT_PATH" = "." ]; then
             PR_FLAGS="-Dsonar.pullrequest.key=$PR_NUMBER \
                       -Dsonar.pullrequest.branch=$PR_HEAD_REF \
                       -Dsonar.pullrequest.base=$PR_BASE_REF"
+          elif [ "$INPUT_ARTIFACT_PATH" != "." ] && [ -n "$PR_HEAD_REF" ]; then
+            # Multi-module + PR context: force branch mode so
+            # sonar-maven-plugin does not try the cross-repo PR-decoration API.
+            PR_FLAGS="-Dsonar.branch.name=$PR_HEAD_REF"
           fi
 
           SONAR_PROPS=""
@@ -157,7 +209,49 @@ jobs:
             [ -n "$SONAR_ORG" ] && SONAR_PROPS="$SONAR_PROPS -Dsonar.organization=$SONAR_ORG"
           fi
 
+          # sonar.host.url must be passed explicitly: this workflow runs from
+          # the inputs.artifactPath directory, which can be a sub-module whose
+          # effective POM does not inherit the consumer repo's <sonar.host.url> profile
+          # property (e.g. tools/liquibase-license-utility uses spring-boot-starter-parent
+          # as parent, not the liquibase-pro root). Without this, the Sonar Maven
+          # plugin defaults to http://localhost:9000 and the scan fails with
+          # "Connection refused" (DAT-22961).
+          #
+          # When running against a sub-module (artifactPath != "."), the prior
+          # "Install dependencies" step has already compiled, packaged, and
+          # installed the module. Re-running `package` here re-invokes
+          # maven-shade-plugin (and any other package-bound plugin), which
+          # rewrites project.basedir to the dependency-reduced-pom location
+          # under <basedir>/target/. That breaks `sonar.tests` path resolution:
+          # a relative path like `src/test/groovy` becomes
+          # `<basedir>/target/src/test/groovy`, which doesn't exist
+          # (PR 3666 Round 22 cassandra symptom). Run `sonar:sonar` standalone
+          # for multi-module callers; preserve `package -DskipTests sonar:sonar`
+          # for single-module (artifactPath: ".") callers since their workflow
+          # has not done a prior install. (DAT-22961.)
+          if [ "$INPUT_ARTIFACT_PATH" != "." ]; then
+            MVN_GOALS="sonar:sonar"
+          else
+            MVN_GOALS="package -DskipTests sonar:sonar"
+          fi
+
+          # Activate the consumer's `sonar` Maven profile (when present): in
+          # liquibase-pro's root pom, that profile pins sonar-maven-plugin to
+          # 5.5.0.6356. Without `-P sonar`, Maven falls back to its default
+          # plugin resolution which produces an old version (observed:
+          # 4.0.0.4121) that mishandles the multi-module reactor and fails
+          # with "Unable to determine structure of project. Probably you use
+          # Maven Advanced Reactor Options with a broken tree of modules.
+          # 'Liquibase' is orphan" when running sonar:sonar from a child
+          # module's directory (working-directory: inputs.artifactPath).
+          #
+          # On consumer repos that don't define a `sonar` profile, Maven
+          # warns "[WARNING] The requested profile 'sonar' could not be
+          # activated because it does not exist" and proceeds — no harm.
+          # (DAT-22961.)
           mvn -B -Daws.region="us-east-1" -Dsonar.token=$SONAR_TOKEN \
+              -Dsonar.host.url=https://sonarcloud.io \
+              -P sonar \
               $PR_FLAGS $SONAR_PROPS \
               -Dsonar.scm.revision=$SCM_REVISION \
-              package -DskipTests sonar:sonar
+              $MVN_GOALS

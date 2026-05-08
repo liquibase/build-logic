@@ -32,10 +32,10 @@ on:
         type: boolean
         default: true
       dispatch_new_cves:
-        description: 'Pass through to reusable-vulnerability-scan.yml for CVE dispatch'
+        description: 'Pass through to reusable-vulnerability-scan.yml for CVE dispatch. Defaults to false; secure-image callers must opt in explicitly.'
         required: false
         type: boolean
-        default: true
+        default: false
       scout_enabled:
         description: 'Run Docker Scout job'
         required: false
@@ -202,10 +202,25 @@ jobs:
       - name: Download VEX files for Scout
         if: inputs.vex_enabled
         run: |
+          # Mirror the full liquibase/vex-repo tree so Scout sees one VEX
+          # statement set per transitive package. Trivy auto-discovers via
+          # ~/.trivy/vex/repository.yaml in reusable-vulnerability-scan.yml,
+          # but Scout's --vex-location only reads files in the directory it is
+          # pointed at, so we flatten every pkg/**/vex.openvex.json into ./vex/.
           mkdir -p ./vex
-          curl -sSfL "https://raw.githubusercontent.com/liquibase/vex-repo/main/pkg/maven/org.liquibase/liquibase-core/vex.openvex.json" \
-            -o ./vex/liquibase-core.vex.json
-          echo "VEX file downloaded: $(jq '.statements | length' ./vex/liquibase-core.vex.json) statements"
+          git clone --depth 1 https://github.com/liquibase/vex-repo /tmp/vex-repo
+
+          count=0
+          while IFS= read -r f; do
+            rel="${f#/tmp/vex-repo/}"
+            flat="${rel//\//-}"
+            cp "$f" "./vex/$flat"
+            count=$((count + 1))
+          done < <(find /tmp/vex-repo/pkg -type f -name 'vex.openvex.json')
+
+          total=$(find ./vex -type f -name '*.json' -exec jq '.statements | length' {} \; \
+            | awk '{s+=$1} END{print s+0}')
+          echo "VEX files copied to ./vex/: $count file(s), $total total statement(s)"
 
       - name: Docker Scout (with VEX)
         if: inputs.vex_enabled

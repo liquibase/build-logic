@@ -1,5 +1,5 @@
 name: Build & Deploy extension jar to GPM
-# This action will download an extension from github repo, build it, and deploy it to GPM as version master-SNAPSHOT.
+# This action will download an extension from github repo, build it, and deploy it to GPM as version main-SNAPSHOT.
 
 on:
   workflow_call:
@@ -148,7 +148,7 @@ jobs:
           GITHUB_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
           cd "${EXTENSION}"
-          EXTENSION_VERSION="master-SNAPSHOT"
+          EXTENSION_VERSION="main-SNAPSHOT"
           mvn versions:set -DnewVersion=$EXTENSION_VERSION
           mvn clean install -DskipTests
           # Debug token info (masked in logs)

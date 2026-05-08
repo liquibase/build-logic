@@ -157,7 +157,7 @@ jobs:
 
             // 1. Read current status
             const issueResp = await fetch(
-              `${baseUrl}/rest/api/3/issue/${key}?fields=status`,
+              `${baseUrl}/rest/api/3/issue/${key}?fields=status,issuetype`,
               { headers }
             );
             if (issueResp.status === 404) {
@@ -170,8 +170,25 @@ jobs:
             }
             const issue = await issueResp.json();
             const currentStatus = issue.fields?.status?.name;
+            const issueType = issue.fields?.issuetype?.name;
             if (!currentStatus) {
               core.warning(`${key} has no readable status; skipping`);
+              return;
+            }
+            // An Epic should never be auto-transitioned by a single PR merge.
+            // Epics complete when *all* their child issues are Done — that
+            // policy lives in Jira automation, not here. PR titles often
+            // reference an Epic key alongside the actual ticket key (e.g.
+            // `[TECHOPS-318][TECHOPS-349]`); the regex returns the first
+            // match, which is sometimes the Epic. Skip Epics defensively
+            // so the convention slip doesn't propagate to a wrong-status
+            // transition.
+            if (issueType && issueType.toLowerCase() === 'epic') {
+              console.log(
+                `${key} is an Epic — auto-transition skipped. Epics complete ` +
+                `when all child issues are Done; PR-merge transitions only ` +
+                `apply to non-Epic tickets.`
+              );
               return;
             }
             if (currentStatus.toLowerCase() === targetStatus.toLowerCase()) {

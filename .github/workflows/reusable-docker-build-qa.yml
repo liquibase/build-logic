@@ -544,6 +544,34 @@ jobs:
           head -30 "$DOCKERFILE_PATH"
           echo "..."
 
+      # The awk rewrite emits "COPY liquibase-build/ ./" which buildx
+      # resolves relative to the build context. When build_context is a
+      # subdirectory (e.g. "docker/"), liquibase-build/ — extracted at the
+      # workflow root by the download step — needs to be moved into that
+      # subdirectory so buildx can find it. Skip when build_context already
+      # contains liquibase-build/ or is the workflow root.
+      - name: Place liquibase-build inside build context
+        if: ${{ steps.validate-build.outputs.use_fallback_build == 'false' }}
+        env:
+          BUILD_CONTEXT: ${{ inputs.build_context }}
+        run: |
+          CTX="${BUILD_CONTEXT%/}"
+          if [[ -z "$CTX" || "$CTX" == "." ]]; then
+            echo "build_context is the workflow root; liquibase-build/ already accessible."
+            exit 0
+          fi
+          if [[ -d "$CTX/liquibase-build" ]]; then
+            echo "$CTX/liquibase-build already exists; nothing to move."
+            exit 0
+          fi
+          if [[ ! -d liquibase-build ]]; then
+            echo "::error::liquibase-build/ not found at workflow root — extract step did not run as expected"
+            exit 1
+          fi
+          echo "Moving liquibase-build/ into $CTX/ so buildx can resolve COPY liquibase-build/ ./"
+          mv liquibase-build "$CTX/liquibase-build"
+          ls -la "$CTX/liquibase-build" | head -5
+
       - name: Compute image tag and build tag list
         id: image-tag
         env:

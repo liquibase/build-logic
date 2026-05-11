@@ -403,9 +403,16 @@ jobs:
             RELEASE_VERSION=${RELEASE_VERSION%-SNAPSHOT}
             echo "Derived RELEASE_VERSION from pom.xml: $RELEASE_VERSION"
           fi
+          # Provide explicit tag + developmentVersion so input-variables phase doesn't need to prompt for defaults
+          # (in batch mode, missing defaults raise "Project tag cannot be selected if version is not yet mapped").
+          IFS=. read -r MAJOR MINOR PATCH <<< "$RELEASE_VERSION"
+          DEV_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
+          ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          RELEASE_TAG="${ARTIFACT_ID}-${RELEASE_VERSION}"
+          echo "Using developmentVersion=$DEV_VERSION tag=$RELEASE_TAG"
           mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
-          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$RELEASE_VERSION -DpushChanges=false -P "$MAVEN_PROFILES" \
-          -DscmServerId=liquibase
+          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$RELEASE_VERSION -DdevelopmentVersion=$DEV_VERSION -Dtag=$RELEASE_TAG \
+          -DpushChanges=false -P "$MAVEN_PROFILES" -DscmServerId=liquibase
           git reset HEAD~ --hard
           # Use GitHub's default branch from repository settings
           echo "Using default branch: $DEFAULT_BRANCH"

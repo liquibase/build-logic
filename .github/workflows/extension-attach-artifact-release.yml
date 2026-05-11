@@ -410,10 +410,13 @@ jobs:
           ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
           RELEASE_TAG="${ARTIFACT_ID}-${RELEASE_VERSION}"
           echo "Using developmentVersion=$DEV_VERSION tag=$RELEASE_TAG"
+          # Capture HEAD so we can reset cleanly whether or not release:prepare creates local commits.
+          PRE_PREPARE_SHA=$(git rev-parse HEAD)
           mvn -B release:clean release:prepare -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
           -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$RELEASE_VERSION -DdevelopmentVersion=$DEV_VERSION -Dtag=$RELEASE_TAG \
           -DpushChanges=false -P "$MAVEN_PROFILES" -DscmServerId=liquibase
-          git reset HEAD~ --hard
+          git reset --hard "$PRE_PREPARE_SHA"
+          git clean -fd
           # Use GitHub's default branch from repository settings
           echo "Using default branch: $DEFAULT_BRANCH"
           mvn clean install -DskipTests -P "$MAVEN_PROFILES" -DbuildNumber=$DEFAULT_BRANCH

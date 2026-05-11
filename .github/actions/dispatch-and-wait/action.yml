@@ -76,8 +76,16 @@ runs:
           esac
         }
 
+        # Always pass --repo to gh; otherwise gh falls back to discovering the
+        # current repo from git, which fails when the caller workflow hasn't
+        # done actions/checkout. Default to the env var GITHUB_REPOSITORY
+        # (auto-populated by GitHub Actions) when no explicit repo is provided.
         REPO_ARG=()
-        [ -n "$IN_REPO" ] && REPO_ARG=(--repo "$IN_REPO")
+        if [ -n "$IN_REPO" ]; then
+          REPO_ARG=(--repo "$IN_REPO")
+        elif [ -n "${GITHUB_REPOSITORY:-}" ]; then
+          REPO_ARG=(--repo "$GITHUB_REPOSITORY")
+        fi
 
         # Build --field args from the JSON inputs map.
         FIELD_ARGS=()

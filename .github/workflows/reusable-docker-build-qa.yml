@@ -439,24 +439,36 @@ jobs:
         env:
           DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
           BRANCH_NAME: ${{ inputs.branch_name }}
+          BUILD_TYPE: ${{ inputs.build_type }}
         run: |
-          echo "Modifying $DOCKERFILE_PATH to use downloaded artifact instead of GitHub releases..."
+          echo "Modifying $DOCKERFILE_PATH (build_type=$BUILD_TYPE) to use downloaded artifact instead of GitHub releases..."
 
           # Create backup
           cp "$DOCKERFILE_PATH" "${DOCKERFILE_PATH}.backup"
 
-          # Set version ARG based on dockerfile type
-          if [[ "$DOCKERFILE_PATH" == "DockerfileSecure" ]]; then
+          # Discriminate by build_type instead of filename. Callers may pass
+          # a path-prefixed dockerfile_path (e.g. "docker/Dockerfile") that
+          # has secure semantics even though the basename is "Dockerfile";
+          # filename inference would silently mis-classify those builds.
+          if [[ "$BUILD_TYPE" == "secure" ]]; then
             VERSION_ARG="LIQUIBASE_SECURE_VERSION"
           else
             VERSION_ARG="LIQUIBASE_VERSION"
           fi
 
+          # Discriminate alpine community by basename (the only OSS-alpine
+          # build path uses a Dockerfile.alpine wget block that needs a
+          # different anchor than the standard community wget).
+          DOCKERFILE_BASENAME=$(basename "$DOCKERFILE_PATH")
+
           # Replace version ARG with branch name
           sed -i "s|ARG ${VERSION_ARG}=.*|ARG ${VERSION_ARG}=${BRANCH_NAME}|" "$DOCKERFILE_PATH"
 
           # Create modified Dockerfile using awk for cleaner handling
-          cat "$DOCKERFILE_PATH" | awk -v dockerfile="$DOCKERFILE_PATH" -v branch="$BRANCH_NAME" '
+          cat "$DOCKERFILE_PATH" | awk \
+            -v build_type="$BUILD_TYPE" \
+            -v dockerfile_basename="$DOCKERFILE_BASENAME" \
+            -v branch="$BRANCH_NAME" '
           BEGIN {
             in_wget_block = 0
             skip_line = 0
@@ -469,8 +481,8 @@ jobs:
           /^ARG LIQUIBASE_VERSION=/ { print "ARG LIQUIBASE_VERSION=" branch; next }
           /^ARG LIQUIBASE_SECURE_VERSION=/ { print "ARG LIQUIBASE_SECURE_VERSION=" branch; next }
 
-          # Handle standard Dockerfile wget block
-          dockerfile == "Dockerfile" && /^RUN wget.*github\.com.*liquibase.*tar\.gz/ {
+          # Handle Secure Dockerfile wget block (any filename; build_type wins)
+          build_type == "secure" && /^RUN wget.*repo\.liquibase\.com.*tar\.gz/ {
             print "# Copy the extracted liquibase build from the build context"
             print "COPY liquibase-build/ ./"
             print ""
@@ -481,8 +493,8 @@ jobs:
             next
           }
 
-          # Handle alpine Dockerfile wget block
-          dockerfile == "Dockerfile.alpine" && /^RUN set -x/ {
+          # Handle standard community Dockerfile wget block
+          build_type != "secure" && dockerfile_basename == "Dockerfile" && /^RUN wget.*github\.com.*liquibase.*tar\.gz/ {
             print "# Copy the extracted liquibase build from the build context"
             print "COPY liquibase-build/ ./"
             print ""
@@ -493,8 +505,8 @@ jobs:
             next
           }
 
-          # Handle Secure Dockerfile wget block
-          dockerfile == "DockerfileSecure" && /^RUN wget.*repo\.liquibase\.com.*tar\.gz/ {
+          # Handle alpine community Dockerfile wget block
+          build_type != "secure" && dockerfile_basename == "Dockerfile.alpine" && /^RUN set -x/ {
             print "# Copy the extracted liquibase build from the build context"
             print "COPY liquibase-build/ ./"
             print ""

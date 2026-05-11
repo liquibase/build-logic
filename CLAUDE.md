@@ -107,7 +107,7 @@ These branches are automatically deleted when packages are verified as available
 ### os-extension-test.yml
 - `java`: Java versions array (default: `"[11, 17, 21]"`)
 - `os`: Operating systems array (default: `'["ubuntu-latest", "windows-latest"]'`)
-- `nightly`: Boolean for master-SNAPSHOT testing
+- `nightly`: Boolean for main-SNAPSHOT testing
 - `skipSonar`: Skip SonarQube analysis
 - `runIntegrationTests`: Enable integration test execution
 

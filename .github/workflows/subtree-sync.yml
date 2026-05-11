@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       source_branch:
-        description: 'Branch to sync from (e.g., "master", "main")'
+        description: 'Branch to sync from (e.g., "main")'
         required: true
         type: string
       pr_branch_name:

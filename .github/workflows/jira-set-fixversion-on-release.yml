@@ -48,6 +48,11 @@ name: "Jira: Set Fix Version on release tag"
 #         ticket merges early).
 #       * Anything else (released entries, multi-valued) → append, so
 #         legitimate backport / multi-release history stays intact.
+#   - When the REPLACE branch fires, the workflow surfaces the overwrite in
+#     three places so the swap is never silent: a `::warning::` annotation on
+#     the run, a Step Summary table at the end of the run, and a comment on
+#     the affected Jira ticket. Visibility is best-effort — failures to post
+#     comments or write the summary never fail the workflow itself.
 #   - For each Jira project that has at least one updated ticket, marks
 #     the version as Released with today's date.
 #   - Skips silently with a warning when:
@@ -222,6 +227,10 @@ jobs:
             };
 
             const projectsTouched = new Set();
+            // Collect REPLACE-mode overwrites so they can be surfaced in the
+            // run's Step Summary and audited on the affected tickets after
+            // the per-ticket loop completes. Each entry: { key, from, to }.
+            const replaces = [];
             for (const key of keys) {
               projectsTouched.add(key.split('-')[0]);
 
@@ -245,14 +254,18 @@ jobs:
                 continue;
               }
 
-              let body, action;
+              let body, action, replaceInfo = null;
               if (current.length === 0) {
                 body = { update: { fixVersions: [{ add: { name: versionName } }] } };
                 action = `add ${versionName} (was empty)`;
               } else if (current.length === 1 && current[0].released === false) {
                 // Single unreleased planning value → replace with actual release.
+                // Tracked in `replaceInfo` so a successful overwrite gets a
+                // ::warning::, a Step Summary row, and a Jira audit comment —
+                // see the visibility block after this loop.
                 body = { fields: { fixVersions: [{ name: versionName }] } };
                 action = `replace ${current[0].name} (unreleased) → ${versionName}`;
+                replaceInfo = { key, from: current[0].name, to: versionName };
               } else {
                 // Multi-valued or has released entries → append (preserve history).
                 body = { update: { fixVersions: [{ add: { name: versionName } }] } };
@@ -269,11 +282,94 @@ jobs:
               });
               if (resp.ok) {
                 console.log(`${key}: ${action}`);
+                if (replaceInfo) {
+                  replaces.push(replaceInfo);
+                  core.warning(
+                    `${replaceInfo.key}: Fix Version replaced ` +
+                    `${replaceInfo.from} → ${replaceInfo.to}. ` +
+                    `If the PR was merged into the wrong release line, ` +
+                    `investigate before the next release.`
+                  );
+                }
               } else {
                 core.warning(
                   `Failed to update fixVersion on ${key}: ` +
                   `${resp.status} ${await resp.text()}`
                 );
+              }
+            }
+
+            // ---- Visibility: surface every REPLACE overwrite -----------
+            // Three layers: ::warning:: annotations (already emitted inline
+            // above), a Step Summary table for at-a-glance review, and a
+            // Jira audit comment on each affected ticket. Visibility is
+            // best-effort — failures here are logged but do not fail the
+            // workflow because the Fix Version writes have already succeeded
+            // and re-running won't fix audit gaps.
+            if (replaces.length > 0) {
+              try {
+                await core.summary
+                  .addHeading(
+                    `⚠️ ${replaces.length} Fix Version overwrite(s) during ${versionName} release`,
+                    2
+                  )
+                  .addRaw(
+                    'Each ticket below had a single unreleased Fix Version ' +
+                    'that was replaced by the release just shipped. If the ' +
+                    'early merge was intentional (ticket pulled forward into ' +
+                    'this release), no action needed. If unintended, ' +
+                    'investigate the PR merge before the next release.\n\n'
+                  )
+                  .addTable([
+                    [
+                      { data: 'Ticket', header: true },
+                      { data: 'Was', header: true },
+                      { data: 'Now', header: true },
+                    ],
+                    ...replaces.map(r => [
+                      `<a href="${baseUrl}/browse/${r.key}">${r.key}</a>`,
+                      r.from,
+                      r.to,
+                    ]),
+                  ])
+                  .write();
+              } catch (e) {
+                core.warning(`Failed to write Step Summary for overwrites: ${e.message}`);
+              }
+
+              for (const r of replaces) {
+                const commentBody = {
+                  body: {
+                    type: 'doc',
+                    version: 1,
+                    content: [{
+                      type: 'paragraph',
+                      content: [{
+                        type: 'text',
+                        text:
+                          `⚠️ Fix Version automatically changed from ` +
+                          `${r.from} → ${r.to} by release automation ` +
+                          `(jira-set-fixversion-on-release). If unintended, ` +
+                          `the PR may have been merged into a wrong-target ` +
+                          `branch — investigate before the next release.`,
+                      }],
+                    }],
+                  },
+                };
+                const commentResp = await fetch(
+                  `${baseUrl}/rest/api/3/issue/${r.key}/comment`,
+                  {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(commentBody),
+                  }
+                );
+                if (!commentResp.ok) {
+                  core.warning(
+                    `Failed to post audit comment on ${r.key}: ` +
+                    `${commentResp.status} ${await commentResp.text()}`
+                  );
+                }
               }
             }
 

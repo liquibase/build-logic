@@ -659,3 +659,13 @@ jobs:
     needs: [unit-test]
     uses: liquibase/build-logic/.github/workflows/sonar-scan.yml@main
     secrets: inherit
+    with:
+      # Forward artifactPath so sonar-scan.yml runs `mvn sonar:sonar` from the
+      # consumer module's directory instead of the repo root. Required for the
+      # per-module sonar-project.properties pattern (each Maven module owns
+      # its own SonarCloud project, e.g. liquibase_hashicorp-vault-plugin)
+      # and avoids the multi-module reactor "Liquibase orphan" error that
+      # otherwise fires when the scan walks pro-distribution's <modules> from
+      # repo root. Mirrors the same forwarding already in place on
+      # os-extension-test.yml's sonar-pr job (DAT-22961).
+      artifactPath: ${{ inputs.artifactPath }}

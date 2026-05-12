@@ -235,23 +235,8 @@ jobs:
             MVN_GOALS="package -DskipTests sonar:sonar"
           fi
 
-          # Activate the consumer's `sonar` Maven profile (when present): in
-          # liquibase-pro's root pom, that profile pins sonar-maven-plugin to
-          # 5.5.0.6356. Without `-P sonar`, Maven falls back to its default
-          # plugin resolution which produces an old version (observed:
-          # 4.0.0.4121) that mishandles the multi-module reactor and fails
-          # with "Unable to determine structure of project. Probably you use
-          # Maven Advanced Reactor Options with a broken tree of modules.
-          # 'Liquibase' is orphan" when running sonar:sonar from a child
-          # module's directory (working-directory: inputs.artifactPath).
-          #
-          # On consumer repos that don't define a `sonar` profile, Maven
-          # warns "[WARNING] The requested profile 'sonar' could not be
-          # activated because it does not exist" and proceeds — no harm.
-          # (DAT-22961.)
           mvn -B -Daws.region="us-east-1" -Dsonar.token=$SONAR_TOKEN \
               -Dsonar.host.url=https://sonarcloud.io \
-              -P sonar \
               $PR_FLAGS $SONAR_PROPS \
               -Dsonar.scm.revision=$SCM_REVISION \
               $MVN_GOALS

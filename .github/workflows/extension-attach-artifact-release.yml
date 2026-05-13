@@ -447,9 +447,17 @@ jobs:
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
           CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
+          # Provide explicit tag + developmentVersion so input-variables phase doesn't need to prompt for defaults
+          # (in batch mode, missing defaults raise "Project tag cannot be selected if version is not yet mapped").
+          # DRY_RUN_VERSION is always shape "0.0.<run_number>", so the IFS-split below is safe.
+          IFS=. read -r MAJOR MINOR PATCH <<< "$DRY_RUN_VERSION"
+          DEV_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
+          ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          RELEASE_TAG="${ARTIFACT_ID}-${DRY_RUN_VERSION}"
+          echo "Using developmentVersion=$DEV_VERSION tag=$RELEASE_TAG"
           mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
-          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$DRY_RUN_VERSION -DpushChanges=false -P "$MAVEN_PROFILES" \
-          -DscmServerId=liquibase
+          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$DRY_RUN_VERSION -DdevelopmentVersion=$DEV_VERSION -Dtag=$RELEASE_TAG \
+          -DpushChanges=false -P "$MAVEN_PROFILES" -DscmServerId=liquibase
           # Use current branch name for dry runs
           echo "Using current branch: $CURRENT_BRANCH"
           mvn clean install -DskipTests -P "$MAVEN_PROFILES" -DbuildNumber=$CURRENT_BRANCH

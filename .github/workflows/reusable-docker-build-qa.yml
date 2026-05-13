@@ -233,7 +233,7 @@ jobs:
                 tar -xzf "$LIQUIBASE_SECURE_ZIP" -C liquibase-build/
                 echo "Liquibase Secure build extracted from tar.gz to liquibase-build/"
               else
-                unzip -q "$LIQUIBASE_SECURE_ZIP" -d liquibase-build/
+                unzip -qo "$LIQUIBASE_SECURE_ZIP" -d liquibase-build/
                 echo "Liquibase Secure build extracted from zip to liquibase-build/"
               fi
             fi
@@ -279,7 +279,7 @@ jobs:
                   "$ARTIFACT_URL"
 
                 # Extract the artifact
-                unzip -q liquibase-artifact.zip
+                unzip -qo liquibase-artifact.zip
                 echo "Artifact contents:"
                 ls -la
 
@@ -297,7 +297,7 @@ jobs:
 
                   # Extract the liquibase zip
                   mkdir -p liquibase-build
-                  unzip -q "$LIQUIBASE_ZIP" -d liquibase-build/
+                  unzip -qo "$LIQUIBASE_ZIP" -d liquibase-build/
 
                   echo "Liquibase build extracted to liquibase-build/"
                   echo "build_ready=true" >> "$GITHUB_OUTPUT"
@@ -371,7 +371,7 @@ jobs:
             tar -xzf "$LIQUIBASE_SECURE_ZIP" -C liquibase-build/
             echo "Liquibase Secure build extracted from tar.gz to liquibase-build/"
           else
-            unzip -q "$LIQUIBASE_SECURE_ZIP" -d liquibase-build/
+            unzip -qo "$LIQUIBASE_SECURE_ZIP" -d liquibase-build/
             echo "Liquibase Secure build extracted from zip to liquibase-build/"
           fi
           echo "Contents of liquibase-build:"
@@ -493,8 +493,14 @@ jobs:
             next
           }
 
-          # Handle standard community Dockerfile wget block
-          build_type != "secure" && dockerfile_basename == "Dockerfile" && /^RUN wget.*github\.com.*liquibase.*tar\.gz/ {
+          # Handle standard community Dockerfile wget block.
+          # Anchor on the destination filename rather than the source host —
+          # the URL moved from github.com (releases/download) to
+          # package.liquibase.com (downloads/dockerhub/official) in #7669
+          # when the community Dockerfile was migrated into liquibase/docker,
+          # and may change again. Matching on `-O liquibase-…tar.gz` is
+          # URL-agnostic and matches both layouts.
+          build_type != "secure" && dockerfile_basename == "Dockerfile" && /^RUN wget.*-O liquibase-.*\.tar\.gz/ {
             print "# Copy the extracted liquibase build from the build context"
             print "COPY liquibase-build/ ./"
             print ""

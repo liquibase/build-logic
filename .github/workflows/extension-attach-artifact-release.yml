@@ -438,6 +438,12 @@ jobs:
           DRY_RUN_VERSION: ${{ inputs.dry_run_version }}
         run: |
           mvn versions:set -DnewVersion=$DRY_RUN_VERSION-SNAPSHOT -DgenerateBackupPoms=false -DprocessAllModules=true
+          # Commit so phase 2 (scm-check-modifications) of release:prepare sees a clean working copy.
+          # We cannot exclude pom.xml via -DcheckModificationExcludeList because maven-release-plugin 3.3.x's
+          # AbstractMapVersionsPhase now ALSO reads that list and would skip the project from version mapping,
+          # making phase 8 (rewrite-poms-for-release) fail with "Version for '...' was not mapped".
+          git add -u
+          git commit -m "[dry-run] temp version bump" --no-verify
 
       - name: Build release artifacts (dry-run)
         if: ${{ inputs.dry_run == true }}
@@ -456,7 +462,7 @@ jobs:
           RELEASE_TAG="${ARTIFACT_ID}-${DRY_RUN_VERSION}"
           echo "Using developmentVersion=$DEV_VERSION tag=$RELEASE_TAG"
           mvn -B release:clean release:prepare -DdryRun=true -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
-          -DcheckModificationExcludeList=** -DignoreSnapshots=true -DreleaseVersion=$DRY_RUN_VERSION -DdevelopmentVersion=$DEV_VERSION -Dtag=$RELEASE_TAG \
+          -DignoreSnapshots=true -DreleaseVersion=$DRY_RUN_VERSION -DdevelopmentVersion=$DEV_VERSION -Dtag=$RELEASE_TAG \
           -DpushChanges=false -P "$MAVEN_PROFILES" -DscmServerId=liquibase
           # Use current branch name for dry runs
           echo "Using current branch: $CURRENT_BRANCH"

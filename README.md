@@ -203,19 +203,41 @@ jobs:
 
 ### Suppressing False Positives
 
-The `.trivyignore` file at the root of build-logic contains documented false positive suppressions. Consuming workflows should copy this file:
+Two suppression mechanisms exist, applied independently by the reusable
+vulnerability-scan workflow:
+
+| Mechanism | Where it lives | Who uses it | Why |
+|-----------|----------------|-------------|-----|
+| **VEX** (`vex/assessments.yaml`) | `liquibase/liquibase-pro` | `liquibase-secure` scans (`vex_enabled: true`) | Cross-scanner (Trivy + Grype + OSV), per-package, structured justifications. Single source of truth for the secure product. |
+| **`.trivyignore`** | Calling repo (default path `docker/.trivyignore`) | Community / OSS Docker scans (TECHOPS-432) | Community workflows cannot reach `liquibase-pro/vex/assessments.yaml` (TECHOPS-408 forbids `dispatch_new_cves`). `.trivyignore` is the documented carve-out for these scans only. |
+
+The reusable workflow fetches the caller's `.trivyignore` via `gh api
+contents/`; missing file is a silent no-op (behavior identical to no input set).
+
+**Caller usage:**
 
 ```yaml
-- name: Checkout build-logic
-  uses: actions/checkout@v4
-  with:
-    repository: liquibase/build-logic
-    ref: master
-    path: build-logic
-
-- name: Setup Trivy ignore file
-  run: cp build-logic/.trivyignore .trivyignore
+uses: liquibase/build-logic/.github/workflows/reusable-vulnerability-scan.yml@main
+with:
+  trivyignore_path: docker/.trivyignore   # default — override or set to '' to disable
 ```
+
+**File format & conventions** (enforced by review, not CI):
+
+- Plain Trivy-native syntax (one CVE per line, `#` comments, `exp:YYYY-MM-DD` for expiry — Trivy auto-skips expired entries).
+- EVERY entry MUST be preceded by a `# reason:` comment block explaining the suppression.
+- Prefer a `review-date` (≤ 6 months) over no expiry.
+- For `liquibase-secure`, use VEX. `.trivyignore` is **community-only**.
+
+**When to use which:**
+
+- Multi-scanner suppression needed → VEX (Trivy + Grype + OSV).
+- Single-scanner Trivy false positive on a community/OSS image → `.trivyignore`.
+- Pro-secure callers MUST NOT define `.trivyignore` unless explicitly waived; VEX is the canonical path.
+
+The standalone `build-logic/.trivyignore` file at this repo root is a legacy
+copy-pattern artifact and is NOT applied by any current workflow. Cleanup is
+tracked separately.
 
 ### Scripts
 

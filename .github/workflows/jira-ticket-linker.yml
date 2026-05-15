@@ -1,10 +1,18 @@
 name: Jira Ticket Linker
 
+# Single or comma-separated list of Jira project key prefixes (e.g. "LSI"
+# or "NTT,LSI"). When multiple are given, the workflow matches any of
+# them and reconstructs the ticket ID from the matched prefix, so a PR
+# referencing `NTT-123` and another referencing `LSI-660` both get the
+# correct "Related Ticket" footer link. Backward compatible: a single
+# prefix behaves exactly as before. Multi-prefix support added per
+# TECHOPS-447 to bridge the LSI → NTT project rename transition window.
+
 on:
   workflow_call:
     inputs:
       ticket_prefix:
-        description: "The ticket prefix to search for (IO, DAT, INT, etc.)"
+        description: "Jira ticket prefix(es). Single (e.g. 'DAT') or comma-separated (e.g. 'NTT,LSI')."
         required: true
         type: string
 
@@ -28,25 +36,42 @@ jobs:
             const ticketPrefix = process.env.TICKET_PREFIX;
             const atlassianBaseUrl = 'https://datical.atlassian.net/browse';
 
-            // Extract ticket number from PR title, branch name, or body
-            const ticketRegex = new RegExp(`${ticketPrefix}-(\\d+)`, 'i');
+            // Parse comma-separated prefixes; single prefix still works.
+            const prefixes = ticketPrefix
+              .split(',')
+              .map(p => p.trim())
+              .filter(Boolean);
+
+            if (prefixes.length === 0) {
+              console.log('No ticket prefixes provided; nothing to do.');
+              return;
+            }
+
+            // Escape regex metachars in each prefix, then build an
+            // alternation group. The capture groups are:
+            //   [1] = matched prefix (e.g. "NTT")
+            //   [2] = ticket number (e.g. "123")
+            const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const alternation = prefixes.map(escapeRegex).join('|');
+            const ticketRegex = new RegExp(`(${alternation})-(\\d+)`, 'i');
 
             const title = pull_request.title || '';
             const branchName = pull_request.head.ref || '';
             const body = pull_request.body || '';
 
             // Look for ticket number in title, branch name, or body
-            let ticketMatch = title.match(ticketRegex) || 
-                             branchName.match(ticketRegex) || 
+            let ticketMatch = title.match(ticketRegex) ||
+                             branchName.match(ticketRegex) ||
                              body.match(ticketRegex);
 
             if (!ticketMatch) {
-              console.log(`No ticket number found with prefix "${ticketPrefix}" in PR title, branch name, or body`);
+              console.log(`No ticket number found with prefix(es) "${prefixes.join(', ')}" in PR title, branch name, or body`);
               return;
             }
 
-            const ticketNumber = ticketMatch[1];
-            const ticketId = `${ticketPrefix}-${ticketNumber}`;
+            const matchedPrefix = ticketMatch[1].toUpperCase();
+            const ticketNumber = ticketMatch[2];
+            const ticketId = `${matchedPrefix}-${ticketNumber}`;
             const ticketUrl = `${atlassianBaseUrl}/${ticketId}`;
 
             console.log(`Found ticket number: ${ticketId}`);

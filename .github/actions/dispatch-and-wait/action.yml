@@ -1,0 +1,170 @@
+name: 'Dispatch Workflow and Wait'
+description: >
+  Dispatches a workflow_dispatch event to a (possibly cross-repo) GitHub Actions workflow
+  via the `gh` CLI and optionally waits for the dispatched run to complete. Replacement for
+  the archived third-party action `the-actions-org/workflow-dispatch` (TECHOPS-156).
+
+inputs:
+  workflow:
+    description: 'Target workflow filename (e.g. build.yml) or numeric ID.'
+    required: true
+  repo:
+    description: 'Target repo as owner/name. Defaults to the current repo when empty.'
+    required: false
+    default: ''
+  ref:
+    description: 'Branch / tag / SHA on the target repo to dispatch the workflow against.'
+    required: false
+    default: 'main'
+  inputs:
+    description: 'JSON object of inputs to pass through to the dispatched workflow. Default: empty object (no inputs).'
+    required: false
+    default: '{}'
+  wait:
+    description: 'If "true", poll the dispatched run until it completes and fail this step if its conclusion is not "success".'
+    required: false
+    default: 'true'
+  timeout:
+    description: 'Maximum time to wait for completion. Suffixes: s/m/h. Default: 60m.'
+    required: false
+    default: '60m'
+  interval:
+    description: 'Poll interval. Suffixes: s/m/h. Default: 30s.'
+    required: false
+    default: '30s'
+  gh-token:
+    description: 'GitHub token with `actions:write` permission for the target repo (typically a PAT or GitHub App token).'
+    required: true
+
+outputs:
+  run-id:
+    description: 'Numeric ID of the dispatched workflow run (empty if wait=false and lookup is skipped).'
+    value: ${{ steps.dispatch.outputs.run-id }}
+  run-url:
+    description: 'HTML URL of the dispatched workflow run.'
+    value: ${{ steps.dispatch.outputs.run-url }}
+  conclusion:
+    description: 'Final conclusion of the dispatched run (success | failure | cancelled | timed_out). Empty if wait=false.'
+    value: ${{ steps.dispatch.outputs.conclusion }}
+
+runs:
+  using: composite
+  steps:
+    - name: Dispatch and (optionally) wait
+      id: dispatch
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh-token }}
+        IN_WORKFLOW: ${{ inputs.workflow }}
+        IN_REPO: ${{ inputs.repo }}
+        IN_REF: ${{ inputs.ref }}
+        IN_INPUTS: ${{ inputs.inputs }}
+        IN_WAIT: ${{ inputs.wait }}
+        IN_TIMEOUT: ${{ inputs.timeout }}
+        IN_INTERVAL: ${{ inputs.interval }}
+      run: |
+        set -euo pipefail
+
+        # Convert "60m" / "1h" / "30s" / bare seconds to integer seconds.
+        to_seconds() {
+          local v="$1"
+          case "$v" in
+            *h) echo $(( ${v%h} * 3600 ));;
+            *m) echo $(( ${v%m} * 60 ));;
+            *s) echo "${v%s}";;
+            *)  echo "$v";;
+          esac
+        }
+
+        # Always pass --repo to gh; otherwise gh falls back to discovering the
+        # current repo from git, which fails when the caller workflow hasn't
+        # done actions/checkout. Default to the env var GITHUB_REPOSITORY
+        # (auto-populated by GitHub Actions) when no explicit repo is provided.
+        REPO_ARG=()
+        if [ -n "$IN_REPO" ]; then
+          REPO_ARG=(--repo "$IN_REPO")
+        elif [ -n "${GITHUB_REPOSITORY:-}" ]; then
+          REPO_ARG=(--repo "$GITHUB_REPOSITORY")
+        fi
+
+        # Build --field args from the JSON inputs map.
+        FIELD_ARGS=()
+        if [ -n "$IN_INPUTS" ] && [ "$IN_INPUTS" != "{}" ]; then
+          while IFS=$'\t' read -r k v; do
+            FIELD_ARGS+=(--field "${k}=${v}")
+          done < <(echo "$IN_INPUTS" | jq -r 'to_entries[] | [.key, (.value|tostring)] | @tsv')
+        fi
+
+        DISPATCH_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        echo "::group::Dispatch"
+        echo "workflow=$IN_WORKFLOW repo=${IN_REPO:-<current>} ref=$IN_REF"
+        echo "inputs=$IN_INPUTS"
+        echo "dispatch_time=$DISPATCH_TIME"
+        gh workflow run "$IN_WORKFLOW" "${REPO_ARG[@]}" --ref "$IN_REF" "${FIELD_ARGS[@]}"
+        echo "::endgroup::"
+
+        if [ "$IN_WAIT" != "true" ]; then
+          echo "wait=false; not polling for completion."
+          exit 0
+        fi
+
+        # Find the dispatched run. GitHub creates the run a few seconds after the
+        # dispatch event is accepted; poll list endpoint for up to ~60s.
+        echo "::group::Locate dispatched run"
+        RUN_ID=""
+        for _ in $(seq 1 12); do
+          sleep 5
+          RUN_ID=$(gh run list "${REPO_ARG[@]}" --workflow "$IN_WORKFLOW" \
+              --event workflow_dispatch --limit 20 \
+              --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt >= \"$DISPATCH_TIME\")] | first | .databaseId" \
+              2>/dev/null || true)
+          if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
+            break
+          fi
+        done
+
+        if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+          echo "ERROR: could not locate the dispatched run within 60s." >&2
+          echo "::endgroup::"
+          exit 1
+        fi
+
+        RUN_URL=$(gh run view "$RUN_ID" "${REPO_ARG[@]}" --json url --jq .url)
+        echo "Dispatched run: $RUN_URL (id=$RUN_ID)"
+        echo "run-id=$RUN_ID" >> "$GITHUB_OUTPUT"
+        echo "run-url=$RUN_URL" >> "$GITHUB_OUTPUT"
+        echo "::endgroup::"
+
+        TIMEOUT_SEC=$(to_seconds "$IN_TIMEOUT")
+        INTERVAL_SEC=$(to_seconds "$IN_INTERVAL")
+
+        echo "::group::Wait for run $RUN_ID (timeout=${TIMEOUT_SEC}s, interval=${INTERVAL_SEC}s)"
+        ELAPSED=0
+        STATUS="in_progress"
+        CONCLUSION=""
+        while [ "$ELAPSED" -lt "$TIMEOUT_SEC" ]; do
+          read -r STATUS CONCLUSION < <(
+            gh run view "$RUN_ID" "${REPO_ARG[@]}" --json status,conclusion \
+              --jq '"\(.status) \(.conclusion // "-")"'
+          )
+          echo "  [${ELAPSED}s] status=$STATUS conclusion=$CONCLUSION"
+          if [ "$STATUS" = "completed" ]; then
+            break
+          fi
+          sleep "$INTERVAL_SEC"
+          ELAPSED=$(( ELAPSED + INTERVAL_SEC ))
+        done
+
+        if [ "$STATUS" != "completed" ]; then
+          CONCLUSION="timed_out"
+          echo "WARN: hit timeout (${TIMEOUT_SEC}s) before run completed; conclusion=timed_out"
+        fi
+        echo "Final: status=$STATUS conclusion=$CONCLUSION"
+        echo "conclusion=$CONCLUSION" >> "$GITHUB_OUTPUT"
+        echo "::endgroup::"
+
+        if [ "$CONCLUSION" != "success" ]; then
+          echo "ERROR: dispatched run $RUN_URL did not succeed (conclusion=$CONCLUSION)." >&2
+          exit 1
+        fi

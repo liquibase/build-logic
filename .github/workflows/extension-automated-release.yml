@@ -239,12 +239,16 @@ jobs:
     # 2. If draft releases are found, check if they contain the specified version to release.
     # 3. If the version is found publish it as the latest release.
     # 4. Print relevant information about the process.
+    # liquibase-parent-pom is excluded because it uses its own 1.x versioning,
+    # so it never has a v<liquibase-version> draft for this matrix to find.
     needs: update-pom
     runs-on: ubuntu-latest
     name: Release Draft
     strategy:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
+        exclude:
+          - repository: liquibase-parent-pom
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -338,12 +342,16 @@ jobs:
     # 2. It downloads artifacts from published GitHub releases and creates Maven bundles.
     # 3. Each bundle is uploaded to Central Portal with USER_MANAGED publishing type.
     # 4. Operators must manually approve deployments at central.sonatype.com before they go live.
+    # liquibase-parent-pom is excluded because it uses its own 1.x versioning,
+    # so it never has a v<liquibase-version> published release to bundle.
     needs: release-draft-releases
     runs-on: ubuntu-latest
     name: Central Portal
     strategy:
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
+        exclude:
+          - repository: liquibase-parent-pom
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0

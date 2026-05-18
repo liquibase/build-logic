@@ -202,20 +202,29 @@ jobs:
           LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: |
-          # SECURE-127: nightly is a consumer-style build (pre-migration model).
-          # liquibase-core:main-SNAPSHOT comes from upstream's GitHub Packages,
-          # liquibase-commercial:main-SNAPSHOT from liquibase-pro's GitHub Packages
-          # (published on every main push via the branch-named SNAPSHOT convention).
+          # SECURE-127: nightly is a consumer-style build (pre-migration model),
+          # implemented as 2 stages:
           #
-          # We KEEP -am so private siblings still get built locally (e.g.
-          # tools/liquibase-checks/phileas/ → ai.philterd:phileas-core, not published
-          # anywhere outside this monorepo). We EXCLUDE :liquibase-commercial from
-          # the reactor so pro/ is not source-compiled against upstream main-SNAPSHOT:
-          # its Pro-only deps on liquibase.validate.* / liquibase.metadata.* (live in
-          # the core/ subtree by design) don't exist in upstream main. pro/ is
-          # resolved as a pre-built JAR from GitHub Packages instead.
-          EXTRA_FIXED=$(echo "$EXTRA_MAVEN_ARGS" | sed -E 's/(-pl :[^ ]+)/\1,!:liquibase-commercial/')
-          mvn -B clean package -DskipTests=true ${EXTRA_FIXED} "-Dliquibase.version=main-SNAPSHOT"
+          # Stage 1 — install all in-tree sibling artifacts to ~/.m2 at their native
+          # 5.2.0-SNAPSHOT version. No liquibase.version override here, so pro/
+          # compiles cleanly against in-tree liquibase-core (which has the Pro-only
+          # liquibase.validate.* / liquibase.metadata.* classes by design). Ensures
+          # private siblings like tools/liquibase-checks/phileas/ (ai.philterd:phileas-
+          # core, not published anywhere outside this monorepo) are installed.
+          mvn -B install -DskipTests=true ${EXTRA_MAVEN_ARGS}
+
+          # Stage 2 — re-compile only the target extension against upstream
+          # main-SNAPSHOT, the actual forward-compat check. Strip -am so reactor
+          # siblings are NOT rebuilt; their resolution falls back to:
+          #   - liquibase-core:main-SNAPSHOT       → upstream's GitHub Packages
+          #   - liquibase-commercial:main-SNAPSHOT → liquibase-pro's GitHub Packages
+          #                                          (published every main push via
+          #                                          the branch-named SNAPSHOT convention)
+          #   - private siblings (phileas-core etc.) → ~/.m2 from stage 1
+          # pro/ is NOT source-compiled against upstream main, avoiding the Pro-only-
+          # class compile error that was the original SECURE-127 root cause.
+          EXTRA_NO_AM=$(echo "$EXTRA_MAVEN_ARGS" | sed -E 's/(^| )-am( |$)/\1\2/g')
+          mvn -B clean package -DskipTests=true ${EXTRA_NO_AM} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

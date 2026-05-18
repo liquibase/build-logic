@@ -99,18 +99,18 @@ jobs:
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: |
-          # SECURE-127: nightly is a consumer-style build (pre-migration model).
-          # liquibase-core:main-SNAPSHOT comes from upstream's GitHub Packages
-          # (published on every main push via the branch-named SNAPSHOT convention).
+          # SECURE-127: nightly is a consumer-style build (pre-migration model),
+          # implemented as 2 stages. See pro-extension-test.yml for the full rationale.
           #
-          # We KEEP -am so private siblings still get built locally. We EXCLUDE
-          # :liquibase-commercial from the reactor so pro/ is not source-compiled
-          # against upstream main-SNAPSHOT: its Pro-only deps on liquibase.validate.*
-          # / liquibase.metadata.* (live in the core/ subtree by design) don't exist
-          # in upstream main. pro/ is resolved as a pre-built JAR from GitHub Packages
-          # instead.
-          EXTRA_FIXED=$(echo "$EXTRA_MAVEN_ARGS" | sed -E 's/(-pl :[^ ]+)/\1,!:liquibase-commercial/')
-          mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_FIXED} "-Dliquibase.version=main-SNAPSHOT"
+          # Stage 1 — install all in-tree sibling artifacts to ~/.m2 at native version.
+          mvn -B install -DskipTests=true ${EXTRA_MAVEN_ARGS}
+
+          # Stage 2 — re-compile only the target extension against upstream
+          # main-SNAPSHOT. Strip -am so reactor siblings are not rebuilt; they
+          # resolve from ~/.m2 (stage 1) or GitHub Packages (liquibase-core from
+          # upstream, liquibase-commercial from liquibase-pro).
+          EXTRA_NO_AM=$(echo "$EXTRA_MAVEN_ARGS" | sed -E 's/(^| )-am( |$)/\1\2/g')
+          mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_NO_AM} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

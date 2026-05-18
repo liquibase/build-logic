@@ -419,6 +419,11 @@ jobs:
           # Remove only maven-release-plugin leftovers; do NOT git-clean everything because the workflow
           # downloads sign_artifact.sh / get_draft_release.sh / upload_asset.sh into .github/ earlier.
           rm -f pom.xml.releaseBackup pom.xml.next pom.xml.tag pom.xml.branch pom.xml.backup release.properties
+          # Set pom to the release version (no -SNAPSHOT) so the subsequent build and the
+          # "Resolve release version" step below produce/read $RELEASE_VERSION without the suffix.
+          # Without this, the post-reset pom is back at <version>-SNAPSHOT and downstream steps
+          # tag the release and name the artifacts as <version>-SNAPSHOT.
+          mvn versions:set -DnewVersion=$RELEASE_VERSION -DgenerateBackupPoms=false -DprocessAllModules=true
           # Use GitHub's default branch from repository settings
           echo "Using default branch: $DEFAULT_BRANCH"
           mvn clean install -DskipTests -P "$MAVEN_PROFILES" -DbuildNumber=$DEFAULT_BRANCH

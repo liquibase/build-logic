@@ -200,7 +200,17 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
           AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
           LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
-        run: mvn -B clean package -DskipTests=true "-Dliquibase.version=main-SNAPSHOT"
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: |
+          # SECURE-127: nightly is a consumer-style build (pre-migration model):
+          # liquibase-core:main-SNAPSHOT comes from upstream's GitHub Packages,
+          # liquibase-commercial:main-SNAPSHOT from liquibase-pro's GitHub Packages
+          # (published on every main push via the branch-named SNAPSHOT convention).
+          # Strip -am so pro/ is NOT rebuilt from source: its compile-time deps on
+          # liquibase.validate.* / liquibase.metadata.* (Pro-only classes living in
+          # the core/ subtree by design) don't exist in upstream main-SNAPSHOT.
+          EXTRA_NO_AM=$(echo "$EXTRA_MAVEN_ARGS" | sed -E 's/(^| )-am( |$)/\1\2/g')
+          mvn -B clean package -DskipTests=true ${EXTRA_NO_AM} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

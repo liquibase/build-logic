@@ -98,7 +98,15 @@ jobs:
         if: ${{ inputs.nightly }}
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
+        run: |
+          # SECURE-127: nightly is a consumer-style build (pre-migration model):
+          # liquibase-core:main-SNAPSHOT comes from upstream's GitHub Packages
+          # (published on every main push via the branch-named SNAPSHOT convention).
+          # Strip -am so reactor siblings are NOT rebuilt from source: notably pro/'s
+          # compile-time deps on liquibase.validate.* / liquibase.metadata.* (Pro-only
+          # classes living in the core/ subtree by design) don't exist in upstream main.
+          EXTRA_NO_AM=$(echo "$EXTRA_MAVEN_ARGS" | sed -E 's/(^| )-am( |$)/\1\2/g')
+          mvn -B dependency:go-offline clean package -DskipTests=true ${EXTRA_NO_AM} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

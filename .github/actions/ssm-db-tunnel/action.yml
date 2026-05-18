@@ -76,6 +76,26 @@ runs:
       run: |
         set -euo pipefail
 
+        # Validate every input against a strict allowlist before it touches a
+        # shell-expanded context. Defense-in-depth even though inputs come
+        # from the caller workflow (which is itself a trusted boundary).
+        # Required by CodeQL rule actions/envvar-injection.
+        validate() {
+          local name="$1" value="$2" pattern="$3"
+          if [[ ! "$value" =~ $pattern ]]; then
+            echo "::error::Input '$name' value does not match required pattern $pattern" >&2
+            exit 1
+          fi
+        }
+        validate bastion-instance-id  "${BASTION_ID}"      '^i-[0-9a-f]{8,17}$'
+        validate db-host              "${DB_HOST}"         '^[A-Za-z0-9.-]{1,253}$'
+        validate db-port              "${DB_PORT}"         '^[0-9]{1,5}$'
+        validate aws-region           "${AWS_REGION_IN}"   '^[a-z]{2}-[a-z]+-[0-9]+$'
+        validate wait-timeout-seconds "${WAIT_SECONDS}"    '^[0-9]{1,4}$'
+        if [ -n "${LOCAL_PORT_IN}" ]; then
+          validate local-port         "${LOCAL_PORT_IN}"   '^[0-9]{1,5}$'
+        fi
+
         LOCAL_PORT="${LOCAL_PORT_IN:-$DB_PORT}"
 
         PARAMS_FILE="$(mktemp)"

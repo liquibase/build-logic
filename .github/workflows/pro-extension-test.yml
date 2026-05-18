@@ -202,15 +202,20 @@ jobs:
           LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: |
-          # SECURE-127: nightly is a consumer-style build (pre-migration model):
+          # SECURE-127: nightly is a consumer-style build (pre-migration model).
           # liquibase-core:main-SNAPSHOT comes from upstream's GitHub Packages,
           # liquibase-commercial:main-SNAPSHOT from liquibase-pro's GitHub Packages
           # (published on every main push via the branch-named SNAPSHOT convention).
-          # Strip -am so pro/ is NOT rebuilt from source: its compile-time deps on
-          # liquibase.validate.* / liquibase.metadata.* (Pro-only classes living in
-          # the core/ subtree by design) don't exist in upstream main-SNAPSHOT.
-          EXTRA_NO_AM=$(echo "$EXTRA_MAVEN_ARGS" | sed -E 's/(^| )-am( |$)/\1\2/g')
-          mvn -B clean package -DskipTests=true ${EXTRA_NO_AM} "-Dliquibase.version=main-SNAPSHOT"
+          #
+          # We KEEP -am so private siblings still get built locally (e.g.
+          # tools/liquibase-checks/phileas/ → ai.philterd:phileas-core, not published
+          # anywhere outside this monorepo). We EXCLUDE :liquibase-commercial from
+          # the reactor so pro/ is not source-compiled against upstream main-SNAPSHOT:
+          # its Pro-only deps on liquibase.validate.* / liquibase.metadata.* (live in
+          # the core/ subtree by design) don't exist in upstream main. pro/ is
+          # resolved as a pre-built JAR from GitHub Packages instead.
+          EXTRA_FIXED=$(echo "$EXTRA_MAVEN_ARGS" | sed -E 's/(-pl :[^ ]+)/\1,!:liquibase-commercial/')
+          mvn -B clean package -DskipTests=true ${EXTRA_FIXED} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

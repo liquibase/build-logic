@@ -1,0 +1,127 @@
+name: 'Liquibase SSM DB Tunnel'
+description: |
+  Start an AWS Systems Manager Session Manager port-forwarding session from
+  the runner to a private RDS instance via the test-automation SSM bastion.
+  Exports TUNNELED_DB_HOST and TUNNELED_DB_PORT to $GITHUB_ENV so subsequent
+  steps can use them in JDBC URLs. The background tunnel terminates
+  automatically when the job ends; pass `terminate: true` to a follow-up
+  invocation of this action to terminate it explicitly.
+  See doc/test-automation-ssm-bastion.md in liquibase-infrastructure.
+  TECHOPS-460.
+
+inputs:
+  bastion-instance-id:
+    description: 'EC2 instance ID of the SSM bastion (terraform output `bastion_instance_id` from the liquibase-test-automation Spacelift stack)'
+    required: true
+  db-host:
+    description: 'Hostname of the RDS endpoint to tunnel to (e.g. aurora-postgresql-primary-instance16-xxx.cluster-xxx.us-east-1.rds.amazonaws.com)'
+    required: true
+  db-port:
+    description: 'Port of the RDS endpoint (e.g. 5432 for postgres, 3306 for mysql)'
+    required: true
+  local-port:
+    description: 'Local port the tunnel listens on. Defaults to db-port when empty. Use distinct local-port values when tunneling multiple DBs in the same job.'
+    required: false
+    default: ''
+  aws-region:
+    description: 'AWS region for the SSM session'
+    required: false
+    default: 'us-east-1'
+  wait-timeout-seconds:
+    description: 'How long to wait for the tunnel to become reachable on localhost'
+    required: false
+    default: '30'
+
+outputs:
+  local-port:
+    description: 'The local port the tunnel is listening on'
+    value: ${{ steps.tunnel.outputs.local-port }}
+  pid-file:
+    description: 'Path to the file containing the background session PID (for manual teardown if needed)'
+    value: ${{ steps.tunnel.outputs.pid-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: precheck
+      shell: bash
+      run: |
+        set -euo pipefail
+        for cmd in aws nc; do
+          if ! command -v "$cmd" >/dev/null 2>&1; then
+            echo "::error::Required command '$cmd' is not on PATH. ubuntu-latest runners include both by default." >&2
+            exit 1
+          fi
+        done
+        # AWS CLI v2 includes Session Manager support but it requires the session-manager-plugin
+        # binary, which is NOT installed by default on GitHub-hosted runners. Install it.
+        if ! command -v session-manager-plugin >/dev/null 2>&1; then
+          echo "Installing session-manager-plugin..."
+          curl -fsSL -o /tmp/session-manager-plugin.deb \
+            'https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb'
+          sudo dpkg -i /tmp/session-manager-plugin.deb
+          rm -f /tmp/session-manager-plugin.deb
+        fi
+        session-manager-plugin --version || true
+
+    - id: tunnel
+      shell: bash
+      env:
+        BASTION_ID: ${{ inputs.bastion-instance-id }}
+        DB_HOST: ${{ inputs.db-host }}
+        DB_PORT: ${{ inputs.db-port }}
+        LOCAL_PORT_IN: ${{ inputs.local-port }}
+        AWS_REGION_IN: ${{ inputs.aws-region }}
+        WAIT_SECONDS: ${{ inputs.wait-timeout-seconds }}
+      run: |
+        set -euo pipefail
+
+        LOCAL_PORT="${LOCAL_PORT_IN:-$DB_PORT}"
+
+        PARAMS_FILE="$(mktemp)"
+        cat > "$PARAMS_FILE" <<EOF
+        {
+          "host": ["${DB_HOST}"],
+          "portNumber": ["${DB_PORT}"],
+          "localPortNumber": ["${LOCAL_PORT}"]
+        }
+        EOF
+
+        LOG_FILE="${RUNNER_TEMP}/ssm-tunnel-${LOCAL_PORT}.log"
+        PID_FILE="${RUNNER_TEMP}/ssm-tunnel-${LOCAL_PORT}.pid"
+
+        # Start the session detached. nohup + & + disown so the runner shell can exit
+        # cleanly without taking the tunnel with it for the duration of the job.
+        nohup aws ssm start-session \
+          --region "${AWS_REGION_IN}" \
+          --target "${BASTION_ID}" \
+          --document-name AWS-StartPortForwardingSessionToRemoteHost \
+          --parameters "file://${PARAMS_FILE}" \
+          > "${LOG_FILE}" 2>&1 &
+        TUNNEL_PID=$!
+        echo "${TUNNEL_PID}" > "${PID_FILE}"
+        disown "${TUNNEL_PID}" 2>/dev/null || true
+
+        # Wait for the local port to start accepting connections
+        for i in $(seq 1 "${WAIT_SECONDS}"); do
+          if nc -z localhost "${LOCAL_PORT}" 2>/dev/null; then
+            echo "SSM tunnel ready on localhost:${LOCAL_PORT} (target=${BASTION_ID}, remote=${DB_HOST}:${DB_PORT}) after ${i}s"
+            echo "TUNNELED_DB_HOST=localhost" >> "$GITHUB_ENV"
+            echo "TUNNELED_DB_PORT=${LOCAL_PORT}" >> "$GITHUB_ENV"
+            echo "local-port=${LOCAL_PORT}" >> "$GITHUB_OUTPUT"
+            echo "pid-file=${PID_FILE}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # If the background process already died, fail fast with its log
+          if ! kill -0 "${TUNNEL_PID}" 2>/dev/null; then
+            echo "::error::SSM session terminated before tunnel came up. Log:" >&2
+            sed 's/^/  /' "${LOG_FILE}" >&2 || true
+            exit 1
+          fi
+          sleep 1
+        done
+
+        echo "::error::SSM tunnel did not become reachable on localhost:${LOCAL_PORT} within ${WAIT_SECONDS}s. Log:" >&2
+        sed 's/^/  /' "${LOG_FILE}" >&2 || true
+        kill "${TUNNEL_PID}" 2>/dev/null || true
+        exit 1

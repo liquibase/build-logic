@@ -109,14 +109,14 @@ jobs:
       resources_id: ${{ steps.create_infra.outputs.resources_id }} # Used to reference the resources created in the ephemeral infra
     steps:
       - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
         id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53 # v3.0.1
         with:
           secret-ids: |
             ,/vault/liquibase
@@ -124,7 +124,7 @@ jobs:
 
       - name: Get GitHub App token
         id: get-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
           private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
@@ -139,19 +139,19 @@ jobs:
           token: ${{ steps.get-token.outputs.token }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: "1.5.7"
           terraform_wrapper: false
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: ${{ env.AWS_DEV_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1
 
       - name: Install spacectl
-        uses: spacelift-io/setup-spacectl@d0e2c81467c31a68af60db5b1f9f1f54f79cab96 # v2.0.0
+        uses: spacelift-io/setup-spacectl@e92035013ee29ed401c9d35772b3ab2f4c8d12cd # v2.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}
@@ -183,7 +183,7 @@ jobs:
 
       - name: Upload Terraform state as artifact
         if: ${{ inputs.deploy && always()}}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: terraform-state
           path: test-automation-ephemeral/stack/terraform.tfstate

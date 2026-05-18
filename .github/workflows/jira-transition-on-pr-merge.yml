@@ -30,7 +30,7 @@ on:
         description: "(no-op) Retained for caller-side compatibility — workflow is disabled."
         required: false
         type: string
-        default: "TECHOPS,SECURE,LSI,INT,CSOL,LAI,PD,DAT,DEVX,ITOPS"
+        default: "TECHOPS,SECURE,NTT,LSI,INT,CSOL,LAI,PD,DAT,DEVX,ITOPS"
       target_status:
         description: "(no-op) Retained for caller-side compatibility — workflow is disabled."
         required: false

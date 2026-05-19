@@ -200,7 +200,41 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
           AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
           LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
-        run: mvn -B clean package -DskipTests=true "-Dliquibase.version=main-SNAPSHOT"
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+        run: |
+          # Guard (coderabbit): the 2-stage flow below assumes the caller scopes
+          # the build to a single extension + its reactor siblings via `-pl :<mod> -am`.
+          # If extraMavenArgs is empty (the input's default), stage 2 would degrade
+          # into a full-reactor build with -Dliquibase.version=main-SNAPSHOT, which
+          # is exactly the SECURE-127 failure mode this PR fixes. Fail fast instead.
+          if [[ " $EXTRA_MAVEN_ARGS " != *" -pl "* || " $EXTRA_MAVEN_ARGS " != *" -am "* ]]; then
+            echo "::error::Nightly builds must pass extraMavenArgs in the form '-pl :<module> -am' (SECURE-127). Got: '${EXTRA_MAVEN_ARGS}'"
+            exit 1
+          fi
+
+          # SECURE-127: nightly is a consumer-style build (pre-migration model),
+          # implemented as 2 stages:
+          #
+          # Stage 1 — install all in-tree sibling artifacts to ~/.m2 at their native
+          # 5.2.0-SNAPSHOT version. No liquibase.version override here, so pro/
+          # compiles cleanly against in-tree liquibase-core (which has the Pro-only
+          # liquibase.validate.* / liquibase.metadata.* classes by design). Ensures
+          # private siblings like tools/liquibase-checks/phileas/ (ai.philterd:phileas-
+          # core, not published anywhere outside this monorepo) are installed.
+          mvn -B install -DskipTests=true ${EXTRA_MAVEN_ARGS}
+
+          # Stage 2 — re-compile only the target extension against upstream
+          # main-SNAPSHOT, the actual forward-compat check. Strip -am so reactor
+          # siblings are NOT rebuilt; their resolution falls back to:
+          #   - liquibase-core:main-SNAPSHOT       → upstream's GitHub Packages
+          #   - liquibase-commercial:main-SNAPSHOT → liquibase-pro's GitHub Packages
+          #                                          (published every main push via
+          #                                          the branch-named SNAPSHOT convention)
+          #   - private siblings (phileas-core etc.) → ~/.m2 from stage 1
+          # pro/ is NOT source-compiled against upstream main, avoiding the Pro-only-
+          # class compile error that was the original SECURE-127 root cause.
+          EXTRA_NO_AM=$(echo "$EXTRA_MAVEN_ARGS" | sed -E 's/(^| )-am( |$)/\1\2/g')
+          mvn -B clean package -DskipTests=true ${EXTRA_NO_AM} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

@@ -1,0 +1,211 @@
+name: 'Liquibase SSM DB Tunnel'
+description: |
+  Start an AWS Systems Manager Session Manager port-forwarding session from
+  the runner to a private RDS instance via the test-automation SSM bastion.
+  Exports TUNNELED_DB_HOST and TUNNELED_DB_PORT to $GITHUB_ENV so subsequent
+  steps can use them in JDBC URLs. The background tunnel terminates
+  automatically when the job ends.
+  See doc/test-automation-ssm-bastion.md in liquibase-infrastructure.
+  TECHOPS-460.
+
+inputs:
+  bastion-instance-id:
+    description: 'EC2 instance ID of the SSM bastion (terraform output `bastion_instance_id` from the liquibase-test-automation Spacelift stack)'
+    required: true
+  db-host:
+    description: 'Hostname of the RDS endpoint to tunnel to (e.g. aurora-postgresql-primary-instance16-xxx.cluster-xxx.us-east-1.rds.amazonaws.com)'
+    required: true
+  db-port:
+    description: 'Port of the RDS endpoint (e.g. 5432 for postgres, 3306 for mysql)'
+    required: true
+  local-port:
+    description: 'Local port the tunnel listens on. Defaults to db-port when empty. Use distinct local-port values when tunneling multiple DBs in the same job.'
+    required: false
+    default: ''
+  aws-region:
+    description: 'AWS region for the SSM session'
+    required: false
+    default: 'us-east-1'
+  wait-timeout-seconds:
+    description: 'How long to wait for the tunnel to become reachable on localhost'
+    required: false
+    default: '30'
+  session-manager-plugin-version:
+    description: 'AWS session-manager-plugin version to install. Must be 1.2.707.0 or later (the AWS-documented minimum that supports GPG signature verification). Pinned for supply-chain integrity.'
+    required: false
+    default: '1.2.707.0'
+
+outputs:
+  local-port:
+    description: 'The local port the tunnel is listening on'
+    value: ${{ steps.tunnel.outputs.local-port }}
+  pid-file:
+    description: 'Path to the file containing the background session PID (for manual teardown if needed)'
+    value: ${{ steps.tunnel.outputs.pid-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: precheck
+      shell: bash
+      env:
+        PLUGIN_VERSION: ${{ inputs.session-manager-plugin-version }}
+      run: |
+        set -euo pipefail
+
+        # Validate the version input before it goes into a download URL
+        if [[ ! "${PLUGIN_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Invalid session-manager-plugin-version '${PLUGIN_VERSION}'. Expected N.N.N.N." >&2
+          exit 1
+        fi
+
+        for cmd in aws nc gpg sha256sum; do
+          if ! command -v "$cmd" >/dev/null 2>&1; then
+            echo "::error::Required command '$cmd' is not on PATH." >&2
+            exit 1
+          fi
+        done
+
+        # AWS CLI v2 ships with Session Manager support but the session-manager-plugin
+        # binary is not bundled. Install a pinned version and verify its GPG signature
+        # against the AWS-published key before invoking dpkg. Per AWS docs:
+        # https://docs.aws.amazon.com/systems-manager/latest/userguide/install-plugin-linux-verify-signature.html
+        if ! command -v session-manager-plugin >/dev/null 2>&1; then
+          WORK_DIR="$(mktemp -d)"
+          trap 'rm -rf "$WORK_DIR"' EXIT
+          BASE_URL="https://s3.amazonaws.com/session-manager-downloads/plugin/${PLUGIN_VERSION}/ubuntu_64bit"
+
+          echo "Downloading session-manager-plugin ${PLUGIN_VERSION}..."
+          curl -fsSL -o "$WORK_DIR/session-manager-plugin.deb"     "$BASE_URL/session-manager-plugin.deb"
+          curl -fsSL -o "$WORK_DIR/session-manager-plugin.deb.sig" "$BASE_URL/session-manager-plugin.deb.sig"
+
+          # AWS Systems Manager Session Manager Plugin Linux Signer Key (fingerprint
+          # 7959 6371 24CE 093A D501 D47A 2C4D 4AFF 6F67 57EE, created 2025-01-22).
+          # Source: docs URL above. Pinned inline; never fetched from network.
+          cat > "$WORK_DIR/aws-ssm-plugin.gpg" <<'PUBKEY'
+        -----BEGIN PGP PUBLIC KEY BLOCK-----
+
+        mFIEZ5ERQxMIKoZIzj0DAQcCAwQjuZy+IjFoYg57sLTGhF3aZLBaGpzB+gY6j7Ix
+        P7NqbpXyjVj8a+dy79gSd64OEaMxUb7vw/jug+CfRXwVGRMNtIBBV1MgU1NNIFNl
+        c3Npb24gTWFuYWdlciA8c2Vzc2lvbi1tYW5hZ2VyLXBsdWdpbi1zaWduZXJAYW1h
+        em9uLmNvbT4gKEFXUyBTeXN0ZW1zIE1hbmFnZXIgU2Vzc2lvbiBNYW5hZ2VyIFBs
+        dWdpbiBMaW51eCBTaWduZXIgS2V5KYkBAAQQEwgAqAUCZ5ERQ4EcQVdTIFNTTSBT
+        ZXNzaW9uIE1hbmFnZXIgPHNlc3Npb24tbWFuYWdlci1wbHVnaW4tc2lnbmVyQGFt
+        YXpvbi5jb20+IChBV1MgU3lzdGVtcyBNYW5hZ2VyIFNlc3Npb24gTWFuYWdlciBQ
+        bHVnaW4gTGludXggU2lnbmVyIEtleSkWIQR5WWNxJM4JOtUB1HosTUr/b2dX7gIe
+        AwIbAwIVCAAKCRAsTUr/b2dX7rO1AQCa1kig3lQ78W/QHGU76uHx3XAyv0tfpE9U
+        oQBCIwFLSgEA3PDHt3lZ+s6m9JLGJsy+Cp5ZFzpiF6RgluR/2gA861M=
+        =2DQm
+        -----END PGP PUBLIC KEY BLOCK-----
+        PUBKEY
+
+          # Import into an ephemeral keyring so we never touch the runner's default GPG state
+          export GNUPGHOME="$WORK_DIR/gnupg"
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          gpg --import "$WORK_DIR/aws-ssm-plugin.gpg" 2>&1
+
+          # Fail if the imported key's fingerprint does not match the AWS-documented value
+          EXPECTED_FPR="79596371 24CE093A D501D47A 2C4D4AFF 6F6757EE"
+          ACTUAL_FPR="$(gpg --fingerprint --with-colons 2C4D4AFF6F6757EE 2>/dev/null | awk -F: '/^fpr:/ {print $10; exit}')"
+          # The colon output is unspaced; normalize both sides to compare
+          ACTUAL_FPR_NORM="$(echo "$ACTUAL_FPR" | tr -d ' ')"
+          EXPECTED_FPR_NORM="$(echo "$EXPECTED_FPR" | tr -d ' ')"
+          if [ "$ACTUAL_FPR_NORM" != "$EXPECTED_FPR_NORM" ]; then
+            echo "::error::Imported AWS signing key fingerprint mismatch. expected=$EXPECTED_FPR_NORM actual=$ACTUAL_FPR_NORM" >&2
+            exit 1
+          fi
+          echo "AWS signing key fingerprint verified: $ACTUAL_FPR_NORM"
+
+          # Verify the signature. gpg returns 0 only on GOOD signature.
+          if ! gpg --verify "$WORK_DIR/session-manager-plugin.deb.sig" "$WORK_DIR/session-manager-plugin.deb" 2>&1; then
+            echo "::error::GPG signature verification FAILED for session-manager-plugin.deb. Refusing to install." >&2
+            exit 1
+          fi
+          echo "GPG signature verified for session-manager-plugin ${PLUGIN_VERSION}"
+
+          sudo dpkg -i "$WORK_DIR/session-manager-plugin.deb"
+        fi
+        session-manager-plugin --version || true
+
+    - id: tunnel
+      shell: bash
+      env:
+        BASTION_ID: ${{ inputs.bastion-instance-id }}
+        DB_HOST: ${{ inputs.db-host }}
+        DB_PORT: ${{ inputs.db-port }}
+        LOCAL_PORT_IN: ${{ inputs.local-port }}
+        AWS_REGION_IN: ${{ inputs.aws-region }}
+        WAIT_SECONDS: ${{ inputs.wait-timeout-seconds }}
+      run: |
+        set -euo pipefail
+
+        # Validate every input against a strict allowlist before it touches a
+        # shell-expanded context. Defense-in-depth even though inputs come
+        # from the caller workflow (which is itself a trusted boundary).
+        # Required by CodeQL rule actions/envvar-injection.
+        validate() {
+          local name="$1" value="$2" pattern="$3"
+          if [[ ! "$value" =~ $pattern ]]; then
+            echo "::error::Input '$name' value does not match required pattern $pattern" >&2
+            exit 1
+          fi
+        }
+        validate bastion-instance-id  "${BASTION_ID}"      '^i-[0-9a-f]{8,17}$'
+        validate db-host              "${DB_HOST}"         '^[A-Za-z0-9.-]{1,253}$'
+        validate db-port              "${DB_PORT}"         '^[0-9]{1,5}$'
+        validate aws-region           "${AWS_REGION_IN}"   '^[a-z]{2}-[a-z]+-[0-9]+$'
+        validate wait-timeout-seconds "${WAIT_SECONDS}"    '^[0-9]{1,4}$'
+        if [ -n "${LOCAL_PORT_IN}" ]; then
+          validate local-port         "${LOCAL_PORT_IN}"   '^[0-9]{1,5}$'
+        fi
+
+        LOCAL_PORT="${LOCAL_PORT_IN:-$DB_PORT}"
+
+        PARAMS_FILE="$(mktemp)"
+        cat > "$PARAMS_FILE" <<EOF
+        {
+          "host": ["${DB_HOST}"],
+          "portNumber": ["${DB_PORT}"],
+          "localPortNumber": ["${LOCAL_PORT}"]
+        }
+        EOF
+
+        LOG_FILE="${RUNNER_TEMP}/ssm-tunnel-${LOCAL_PORT}.log"
+        PID_FILE="${RUNNER_TEMP}/ssm-tunnel-${LOCAL_PORT}.pid"
+
+        # Start the session detached. nohup + & + disown so the runner shell can exit
+        # cleanly without taking the tunnel with it for the duration of the job.
+        nohup aws ssm start-session \
+          --region "${AWS_REGION_IN}" \
+          --target "${BASTION_ID}" \
+          --document-name AWS-StartPortForwardingSessionToRemoteHost \
+          --parameters "file://${PARAMS_FILE}" \
+          > "${LOG_FILE}" 2>&1 &
+        TUNNEL_PID=$!
+        echo "${TUNNEL_PID}" > "${PID_FILE}"
+        disown "${TUNNEL_PID}" 2>/dev/null || true
+
+        # Wait for the local port to start accepting connections
+        for i in $(seq 1 "${WAIT_SECONDS}"); do
+          if nc -z localhost "${LOCAL_PORT}" 2>/dev/null; then
+            echo "SSM tunnel ready on localhost:${LOCAL_PORT} (target=${BASTION_ID}, remote=${DB_HOST}:${DB_PORT}) after ${i}s"
+            echo "TUNNELED_DB_HOST=localhost" >> "$GITHUB_ENV"
+            echo "TUNNELED_DB_PORT=${LOCAL_PORT}" >> "$GITHUB_ENV"
+            echo "local-port=${LOCAL_PORT}" >> "$GITHUB_OUTPUT"
+            echo "pid-file=${PID_FILE}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # If the background process already died, fail fast with its log
+          if ! kill -0 "${TUNNEL_PID}" 2>/dev/null; then
+            echo "::error::SSM session terminated before tunnel came up. Log:" >&2
+            sed 's/^/  /' "${LOG_FILE}" >&2 || true
+            exit 1
+          fi
+          sleep 1
+        done
+
+        echo "::error::SSM tunnel did not become reachable on localhost:${LOCAL_PORT} within ${WAIT_SECONDS}s. Log:" >&2
+        sed 's/^/  /' "${LOG_FILE}" >&2 || true
+        kill "${TUNNEL_PID}" 2>/dev/null || true
+        exit 1

@@ -202,14 +202,12 @@ jobs:
           LIQUIBASE_AZURE_STORAGE_ACCOUNT: ${{ env.LIQUIBASE_AZURE_STORAGE_ACCOUNT }}
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
         run: |
-          # Guard (coderabbit): the 2-stage flow below assumes the caller scopes
-          # the build to a single extension + its reactor siblings via `-pl :<mod> -am`.
-          # If extraMavenArgs is empty (the input's default), stage 2 would degrade
-          # into a full-reactor build with -Dliquibase.version=main-SNAPSHOT, which
-          # is exactly the SECURE-127 failure mode this PR fixes. Fail fast instead.
-          if [[ " $EXTRA_MAVEN_ARGS " != *" -pl "* || " $EXTRA_MAVEN_ARGS " != *" -am "* ]]; then
-            echo "::error::Nightly builds must pass extraMavenArgs in the form '-pl :<module> -am' (SECURE-127). Got: '${EXTRA_MAVEN_ARGS}'"
-            exit 1
+          # On multi-module reactors, require -pl :<mod> -am to scope stage 2 to one extension.
+          if [ -f pom.xml ] && grep -q '<modules>' pom.xml; then
+            if [[ " $EXTRA_MAVEN_ARGS " != *" -pl "* || " $EXTRA_MAVEN_ARGS " != *" -am "* ]]; then
+              echo "::error::Multi-module nightly builds must pass extraMavenArgs in the form '-pl :<module> -am'. Got: '${EXTRA_MAVEN_ARGS}'"
+              exit 1
+            fi
           fi
 
           # SECURE-127: nightly is a consumer-style build (pre-migration model),

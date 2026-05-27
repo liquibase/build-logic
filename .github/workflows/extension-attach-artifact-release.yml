@@ -539,10 +539,18 @@ jobs:
           gpg -K
           version=$RELEASE_VERSION
           echo "Signing artifacts for version: $version"
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-javadoc.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-sources.jar
+          # Discover every JAR Maven produced — mirrors upload_asset.sh exclusion list;
+          # keep both in sync when adding exclusion patterns.
+          shopt -s nullglob
+          for jar in "$REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}"*.jar; do
+            case "$(basename "$jar")" in
+              *-tests.jar|*-test-sources.jar|original-*.jar|*.jar.original) continue ;;
+            esac
+            "$REPO_ROOT/.github/sign_artifact.sh" "$jar"
+          done
+          shopt -u nullglob
+          # Sign the POM explicitly — it is not a *.jar but must always be signed.
+          "$REPO_ROOT/.github/sign_artifact.sh" "$REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom"
 
       - name: Sign Files for Draft Release (dry-run)
         if: ${{ inputs.dry_run == true }}
@@ -553,10 +561,18 @@ jobs:
           gpg -K
           version=$RELEASE_VERSION
           echo "Signing artifacts for version: $version"
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-javadoc.jar
-          $REPO_ROOT/.github/sign_artifact.sh $REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}-sources.jar
+          # Intentionally identical to the publish path above — keep in sync.
+          # Exclusion patterns mirror upload_asset.sh; see that file for rationale.
+          shopt -s nullglob
+          for jar in "$REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}"*.jar; do
+            case "$(basename "$jar")" in
+              *-tests.jar|*-test-sources.jar|original-*.jar|*.jar.original) continue ;;
+            esac
+            "$REPO_ROOT/.github/sign_artifact.sh" "$jar"
+          done
+          shopt -u nullglob
+          # Sign the POM explicitly — it is not a *.jar but must always be signed.
+          "$REPO_ROOT/.github/sign_artifact.sh" "$REPO_ROOT/$ARTIFACT_PATH/target/$artifact_id-${version}.pom"
 
       - name: Set draft release title
         if: ${{ inputs.dry_run == false }}

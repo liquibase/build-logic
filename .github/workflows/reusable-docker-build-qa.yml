@@ -178,10 +178,12 @@ jobs:
                 BASE_VERSION="${BASH_REMATCH[1]}"
                 RC_NUMBER="${BASH_REMATCH[2]}"
                 LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.tar.gz"
-                # RC artifacts live under releases/rc/ — this must match the
-                # post-trigger download step below. See the download-after-trigger
-                # step for the symmetric path.
-                S3_URL="s3://repo.liquibase.com/releases/rc/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
+                # Secure RC artifacts live under non-releases/secure/ — this is
+                # where publish-to-s3.yml in liquibase-pro writes them and where
+                # every live 5.1.x and 5.2.x RC actually sits today. Community
+                # RCs use releases/rc/; do not conflate the two prefixes. This
+                # path must match the post-trigger download step below.
+                S3_URL="s3://repo.liquibase.com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
                 echo "Using RC S3 path: $S3_URL"
               else
                 # Regular production version
@@ -345,7 +347,7 @@ jobs:
               BASE_VERSION="${BASH_REMATCH[1]}"
               RC_NUMBER="${BASH_REMATCH[2]}"
               LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.tar.gz"
-              S3_URL="s3://repo.liquibase.com/releases/rc/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
+              S3_URL="s3://repo.liquibase.com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
             else
               LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.zip"
               S3_URL="s3://repo.liquibase.com/releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"

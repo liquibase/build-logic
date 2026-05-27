@@ -208,12 +208,14 @@ jobs:
                 exit 1
               else
                 echo "Liquibase-Secure build not found in S3."
-                # If secure_version is provided, don't trigger workflow - the build should exist
+                # If secure_version is provided, the build MUST exist at the expected
+                # path. Do not fall back to the last main artifact — that produced
+                # docker images tagged as an RC but containing a months-old build
+                # (TECHOPS-542). Fail loudly so the release pipeline cannot ship a
+                # stale image with a fresh tag.
                 if [[ -n "$SECURE_VERSION" ]]; then
                   echo "ERROR: secure_version specified but build not found in S3. Build should already exist for version $SECURE_VERSION"
-                  echo "trigger_liquibase_secure_workflow=false" >> "$GITHUB_OUTPUT"
-                  echo "build_ready=false" >> "$GITHUB_OUTPUT"
-                  echo "use_fallback=true" >> "$GITHUB_OUTPUT"
+                  exit 1
                 else
                   echo "Branch-based build not found. Will trigger workflow to create it..."
                   echo "trigger_liquibase_secure_workflow=true" >> "$GITHUB_OUTPUT"

@@ -428,6 +428,33 @@ jobs:
             mvn -B test -P "$MAVEN_PROFILES"
           fi
 
+      - name: Pre-resolve main-SNAPSHOT dependencies (SECURE-139/140 race-tolerant)
+        if: ${{ inputs.nightly }}
+        shell: bash
+        env:
+          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
+          MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
+        run: |
+          # SECURE-139/140: the nightly test job re-resolves liquibase-commercial and
+          # liquibase-extension-testing :main-SNAPSHOT from GitHub Packages independently
+          # of the build job, and can land in a publish/cleanup race window where the
+          # SNAPSHOT metadata points at a timestamp whose .jar is briefly absent (a
+          # concurrent liquibase-pro main build is re-publishing/cleaning SNAPSHOTs).
+          # Maven does not retry a 404-absent artifact, so resolve the dependency closure
+          # up front with bounded retries to let a transient miss settle; the test step
+          # then runs with --no-snapshot-updates to consume what we just fetched without
+          # re-racing. Gated to nightly so the common per-PR test path is unaffected.
+          for attempt in 1 2 3 4 5; do
+            if mvn -B -P "$MAVEN_PROFILES" $EXTRA_MAVEN_ARGS "-Dliquibase.version=main-SNAPSHOT" dependency:resolve; then
+              echo "main-SNAPSHOT dependencies resolved on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Resolve attempt ${attempt} failed (likely SNAPSHOT publish/cleanup race); retrying in 20s..."
+            sleep 20
+          done
+          echo "main-SNAPSHOT dependency resolution still failing after 5 attempts."
+          exit 1
+
       - name: Run Tests
         if: ${{ inputs.nightly }}
         shell: bash
@@ -440,10 +467,13 @@ jobs:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
           MAVEN_PROFILES: ${{ inputs.mavenProfiles }}
         run: |
+          # -nsu (--no-snapshot-updates): consume the main-SNAPSHOT artifacts the
+          # pre-resolve step just fetched into ~/.m2 instead of re-checking GitHub
+          # Packages for a newer timestamp (which is what hit the SECURE-139/140 race).
           if [ -n "$EXTRA_MAVEN_ARGS" ]; then
-            mvn -B test -P "$MAVEN_PROFILES" $EXTRA_MAVEN_ARGS "-Dliquibase.version=main-SNAPSHOT"
+            mvn -B test -P "$MAVEN_PROFILES" $EXTRA_MAVEN_ARGS "-Dliquibase.version=main-SNAPSHOT" -nsu
           else
-            mvn -B test -P "$MAVEN_PROFILES" "-Dliquibase.version=main-SNAPSHOT"
+            mvn -B test -P "$MAVEN_PROFILES" "-Dliquibase.version=main-SNAPSHOT" -nsu
           fi
 
       - name: Notify Slack on Build Failure

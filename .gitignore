@@ -1,2 +1,7 @@
 .idea
 .DS_Store
+
+# Local-only regression fixtures for upload_asset.sh. Kept on disk as a dev
+# aid for maintainers touching the release upload/sign discovery globs, but
+# not shipped with the repo. Recreate from spec scenarios if missing.
+.github/test/

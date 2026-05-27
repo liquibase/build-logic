@@ -7,22 +7,22 @@
 
 set -euo pipefail
 
-if [[ -z "$GITHUB_TOKEN" ]]; then
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   echo "Set the GITHUB_TOKEN env variable."
   exit 1
 fi
 
-if [[ -z "$ASSET_NAME_PREFIX" ]]; then
+if [[ -z "${ASSET_NAME_PREFIX:-}" ]]; then
   echo "Set the ASSET_NAME_PREFIX env variable."
   exit 1
 fi
 
-if [[ -z "$ASSET_DIR" ]]; then
+if [[ -z "${ASSET_DIR:-}" ]]; then
   echo "Set the ASSET_DIR env variable."
   exit 1
 fi
 
-VERSION=$1
+VERSION="${1:-}"
 if [[ -z "$VERSION" ]]; then
   echo "Set the VERSION parameter."
   exit 1

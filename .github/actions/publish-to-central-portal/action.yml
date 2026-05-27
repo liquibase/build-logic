@@ -52,10 +52,20 @@ runs:
         for jar_file in *-"${VERSION}".jar; do
           [ -f "$jar_file" ] || continue
 
-          # Skip sources, javadoc, and fat JARs
+          # Skip sources, javadoc, and fat JARs.
+          #
+          # NOTE: -full/-fat classifier JARs are intentionally excluded here even
+          # though .github/upload_asset.sh and the Sign step in
+          # extension-attach-artifact-release.yml now publish them to GitHub
+          # Releases. Sonatype Central rejects shaded/fat JARs by policy
+          # (uber-jars violate the "single primary artifact" rule), so they
+          # must NOT be deployed to Maven Central. Do not "fix" this skip
+          # by aligning it with the upload/sign discovery globs — the two
+          # destinations have different rules on purpose.
           if [[ "$jar_file" =~ -sources\.jar$ ]] || \
              [[ "$jar_file" =~ -javadoc\.jar$ ]] || \
-             [[ "$jar_file" == *"-full"* ]]; then
+             [[ "$jar_file" == *"-full"* ]] || \
+             [[ "$jar_file" == *"-fat"* ]]; then
             continue
           fi
 

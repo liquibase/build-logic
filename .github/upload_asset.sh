@@ -98,8 +98,14 @@ for jar in "${JARS[@]}"; do
 done
 
 # Upload the POM and its sidecars explicitly — POM lives alongside JARs but is
-# not itself a *.jar, so it is handled separately.
+# not itself a *.jar, so it is handled separately. The POM is REQUIRED: a
+# release without its POM is unusable, so fail fast if Maven did not produce
+# one. Sidecars remain optional (same tolerance rule as the JAR sidecars).
 POM="$ASSET_DIR/${ASSET_NAME_PREFIX}${VERSION}.pom"
+if [[ ! -f "$POM" ]]; then
+  echo "::error::Required POM not found: $(basename "$POM") — aborting."
+  exit 1
+fi
 upload_one "$POM"
 for ext in "${SIDECARS[@]}"; do
   upload_one "${POM}${ext}"

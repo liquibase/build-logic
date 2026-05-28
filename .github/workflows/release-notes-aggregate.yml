@@ -129,23 +129,53 @@ jobs:
           path: release-notes-output/
           retention-days: 30
 
-      - name: Append to GitHub Release body
+      - name: Append (or replace) aggregated section in GitHub Release body
         if: inputs.dry_run == false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          existing=$(gh release view "$RELEASE_TAG" --json body --jq '.body' 2>/dev/null || echo "")
-          generated=$(cat release-notes-output/release-notes.md)
+          # Idempotent: wrap the aggregated section in HTML comment markers so
+          # re-runs replace the previous section rather than appending a duplicate.
+          # First run on a release: appends the marked block (preserving any
+          # existing Release Drafter content above with a `---` separator).
+          # Re-run on the same release (re-publish / workflow re-run / mixed
+          # auto+manual dispatch): finds the marker block and replaces it in
+          # place. Existing content outside the markers is untouched.
 
-          if [[ -n "$existing" ]]; then
-            new_body="${existing}"$'\n\n---\n\n'"${generated}"
-          else
-            new_body="${generated}"
-          fi
+          existing_file=$(mktemp)
+          generated_file=release-notes-output/release-notes.md
+          out_file=$(mktemp)
 
-          tmp=$(mktemp)
-          printf '%s' "$new_body" > "$tmp"
-          gh release edit "$RELEASE_TAG" --notes-file "$tmp"
-          rm -f "$tmp"
+          gh release view "$RELEASE_TAG" --json body --jq '.body' > "$existing_file" 2>/dev/null || true
 
-          echo "::notice::Release $RELEASE_TAG body updated with aggregated Jira release notes."
+          EXISTING_FILE="$existing_file" GENERATED_FILE="$generated_file" python3 <<'PY' > "$out_file"
+          import os, re, sys
+
+          START = "<!-- jira-release-notes:start -->"
+          END = "<!-- jira-release-notes:end -->"
+
+          with open(os.environ["EXISTING_FILE"]) as f:
+              existing = f.read()
+          with open(os.environ["GENERATED_FILE"]) as f:
+              generated = f.read().strip()
+
+          block = f"{START}\n\n{generated}\n\n{END}"
+
+          if START in existing and END in existing:
+              # Replace the existing marker block in place.
+              pattern = re.compile(re.escape(START) + r".*?" + re.escape(END), re.DOTALL)
+              new = pattern.sub(block, existing, count=1)
+          elif existing.strip():
+              # First run on this release; preserve existing body and append below a separator.
+              new = existing.rstrip() + "\n\n---\n\n" + block
+          else:
+              # Empty release body; just write the marked block.
+              new = block
+
+          sys.stdout.write(new)
+          PY
+
+          gh release edit "$RELEASE_TAG" --notes-file "$out_file"
+          rm -f "$existing_file" "$out_file"
+
+          echo "::notice::Release $RELEASE_TAG body updated with aggregated Jira release notes (idempotent — replaced existing section if present)."

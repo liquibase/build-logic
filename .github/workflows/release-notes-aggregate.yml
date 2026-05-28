@@ -79,6 +79,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install Python dependencies
+        run: pip install --quiet requests python-dotenv
+
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@v4
         with:

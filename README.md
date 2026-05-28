@@ -136,6 +136,7 @@ Please review the below table of reusable workflows and their descriptions:
 | `pro-extension-build-for-liquibase.yml` | Builds and tests Pro extensions specifically for Liquibase                                                              |
 | `pro-extension-test.yml`                | Same as OS job, but with additional Pro-only vars such as License Key                                                   |
 | `publish-for-liquibase.yml`             | Publishes extensions for Liquibase consumption                                                                          |
+| `release-notes-aggregate.yml`           | Aggregates `## Release note` H2 blocks from Done Jira tickets in a Fix Version and renders the release notes (preview-only on dry-run, or appends to the GitHub Release body on publish) |
 | `slack-notification.yml`                | Sends notifications to Slack when tests fail                                                                            |
 | `sonar-scan.yml`                        | Sonar code coverage scan for PRs and pushes (auto-detects context)                                                      |
 | `sonar-coverage-merge.yml`              | Merges unit/integration test coverage (JaCoCo) and runs Sonar scan for liquibase/liquibase-pro                          |
@@ -266,6 +267,90 @@ build-logic/scripts/vulnerability-scanning/extract-nested-deps.sh \
   --source="./path/to/tarball.tar.gz" \
   --scope=python-only
 ```
+
+## Release Notes Aggregation
+
+The `release-notes-aggregate.yml` workflow walks every Done Jira ticket in a Fix Version, extracts the `## Release note` H2 block from each ticket's description, and renders a paste-ready markdown release notes block plus a seven-bucket completeness report. Logic lives in `scripts/release-notes/` (Python CLI, stdlib only, 70 pytest tests). Per [TECHOPS-498](https://datical.atlassian.net/browse/TECHOPS-498).
+
+Today's callers: [`liquibase/liquibase`](https://github.com/liquibase/liquibase/blob/main/.github/workflows/release-notes-aggregate.yml) (Community), [`liquibase/liquibase-pro`](https://github.com/liquibase/liquibase-pro/blob/main/.github/workflows/release-notes-aggregate.yml) (Secure). Future repos (NTT, Platform, MCP) adopt by pasting the ~85-line caller and swapping the product prefix.
+
+### Operating modes
+
+| Mode | Trigger | Output | Use case |
+|------|---------|--------|----------|
+| **Dry-run preview** | `workflow_dispatch` with `dry_run=true` (default) | Step summary + downloadable `release-notes` artifact | Release manager previews before publishing. GitHub Release body untouched. |
+| **Publish** | `release: [published]` auto-trigger, **or** manual dispatch with `dry_run=false` + `release_tag` | Step summary + artifact + appended to the GitHub Release body | Production. Existing Release Drafter content is preserved with a `---` separator. |
+
+### Usage
+
+**Manual preview (recommended starting point):**
+
+```yaml
+jobs:
+  aggregate:
+    uses: liquibase/build-logic/.github/workflows/release-notes-aggregate.yml@main
+    with:
+      version: "Community 5.0.4"   # or Secure / Platform / MCP X.Y.Z
+      dry_run: true
+    secrets: inherit
+```
+
+**Auto-fire on release publish (publishes to release body):**
+
+```yaml
+on:
+  release:
+    types: [published]
+
+jobs:
+  derive:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.compute.outputs.version }}
+    steps:
+      - id: compute
+        env:
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          stripped="${EVENT_TAG#v}"
+          echo "version=Community ${stripped}" >> "$GITHUB_OUTPUT"
+
+  aggregate:
+    needs: derive
+    uses: liquibase/build-logic/.github/workflows/release-notes-aggregate.yml@main
+    with:
+      version: ${{ needs.derive.outputs.version }}
+      dry_run: false
+      release_tag: ${{ github.event.release.tag_name }}
+    secrets: inherit
+```
+
+Swap `Community` for `Secure`, `Platform`, or `MCP Changelog` when adopting in another product repo.
+
+### Inputs
+
+| Input | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `version` | string | yes | - | Jira Fix Version name (e.g. `Community 5.0.4`, `Secure 5.2.0`, `Platform 1.0.0`, `MCP Changelog 1.0.0`) |
+| `dry_run` | boolean | no | `true` | If `true`: preview only in step summary + artifact, GitHub Release body untouched. If `false`: also append notes to the release body (requires `release_tag`). |
+| `release_tag` | string | no | `""` | GitHub Release tag to update when `dry_run=false` (e.g. `v5.0.4`). Required when publishing, ignored on dry runs. |
+| `build_logic_ref` | string | no | `main` | Ref of `liquibase/build-logic` to check out for the script. Pin to a tag in production callers for stable behaviour. |
+
+### Auth
+
+Same OIDC pattern as every other `jira-*` workflow in this repo: GitHub OIDC token → assumes org-level role `LIQUIBASE_VAULT_OIDC_ROLE_ARN` → pulls `,/vault/liquibase` from AWS Secrets Manager → sets `JIRA_USER` + `JIRA_API_TOKEN`. Callers just say `secrets: inherit`.
+
+### Convention dependency
+
+The aggregator reads `## Release note` H2 blocks from each ticket's description. Engineers fill that in per the convention from [TECHOPS-479](https://datical.atlassian.net/browse/TECHOPS-479). Tickets without an H2 are flagged in the completeness report (not silently dropped). The `skipReleaseNotes` label from [TECHOPS-478](https://datical.atlassian.net/browse/TECHOPS-478) is honoured as an opt-out.
+
+### Completeness invariant
+
+Every run prints a seven-bucket report; the three mutually-exclusive count buckets satisfy `with_note + skipped + flagged == total_done`. The script asserts this in code and the report renderer fails loudly if it doesn't hold.
+
+### Security
+
+Every user-controllable input (`inputs.version`, `inputs.release_tag`, event payload fields) is consumed via env vars in `run:` blocks. Never interpolated directly into shell. Follows the [GitHub workflow-injection guide](https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/).
 
 ## Requirements
 

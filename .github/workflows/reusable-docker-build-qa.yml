@@ -181,8 +181,9 @@ jobs:
                 # Secure RC artifacts live under non-releases/secure/ — this is
                 # where publish-to-s3.yml in liquibase-pro writes them and where
                 # every live 5.1.x and 5.2.x RC actually sits today. Community
-                # RCs use releases/rc/; do not conflate the two prefixes. This
-                # path must match the post-trigger download step below.
+                # does not publish RCs to S3 at all (see TECHOPS-367), so this
+                # branch is Secure-only. This path must match the post-trigger
+                # download step below.
                 S3_URL="s3://repo.liquibase.com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
                 echo "Using RC S3 path: $S3_URL"
               else

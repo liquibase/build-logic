@@ -237,7 +237,7 @@ jobs:
           spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
 
       - name: Destroy ephemeral infra
-        continue-on-error: true
+        id: destroy_infra
         env:
           STACK_ID: ${{ inputs.stack_id }}
           TF_VAR_stack_id: ${{ inputs.stack_id }}
@@ -247,7 +247,28 @@ jobs:
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/infra
         run: |
-          spacectl stack task --id "${STACK_ID}" --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve" || true
+          # Retry the infra destroy to absorb transient AWS API throttling and
+          # SG dependency-ordering races (a security group can't be deleted
+          # until the RDS instance referencing it is fully gone). We intentionally
+          # do NOT swallow a final failure (no `|| true`, no continue-on-error):
+          # if the AWS resources are not actually destroyed we must let this step
+          # fail so the Spacelift stack is kept and its state survives for a
+          # retry. Deleting the stack after a failed destroy is what strands the
+          # surviving RDS instances as untracked orphans (TECHOPS-523).
+          attempts=3
+          for i in $(seq 1 "$attempts"); do
+            echo "::group::terraform destroy attempt $i/$attempts"
+            if spacectl stack task --id "${STACK_ID}" --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve"; then
+              echo "::endgroup::"
+              echo "Ephemeral infra destroyed successfully on attempt $i"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::terraform destroy attempt $i/$attempts failed; retrying after backoff"
+            sleep 30
+          done
+          echo "::error::terraform destroy failed after $attempts attempts. Keeping Spacelift stack '${STACK_ID}' so its Terraform state is preserved for a retry. Investigate before the stack is removed to avoid orphaned RDS resources."
+          exit 1
 
       - name: Download Terraform state
         if: ${{ inputs.destroy && always()}}
@@ -257,7 +278,11 @@ jobs:
           path: test-automation-ephemeral/stack
 
       - name: Destroy ephemeral stack
-        if: ${{ inputs.destroy && always()}}
+        # Only delete the Spacelift stack object when the AWS resource destroy
+        # actually succeeded. If the infra destroy failed we keep the stack (and
+        # its Terraform state) so the destroy can be retried; deleting it here
+        # would strand the surviving RDS resources as orphans (TECHOPS-523).
+        if: ${{ inputs.destroy && steps.destroy_infra.outcome == 'success' }}
         working-directory: test-automation-ephemeral/stack
         run: |
           terraform destroy -auto-approve -var "run_id=$GH_RUN_ID" -var "run_repo=$GH_REPOSITORY"

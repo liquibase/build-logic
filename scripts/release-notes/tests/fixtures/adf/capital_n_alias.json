@@ -1,0 +1,15 @@
+{
+  "type": "doc",
+  "version": 1,
+  "content": [
+    {
+      "type": "heading",
+      "attrs": {"level": 2},
+      "content": [{"type": "text", "text": "Release Note"}]
+    },
+    {
+      "type": "paragraph",
+      "content": [{"type": "text", "text": "Capital N alias body text."}]
+    }
+  ]
+}

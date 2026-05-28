@@ -1,0 +1,148 @@
+name: "Release notes: aggregate from Jira"
+
+# Reusable workflow that aggregates `## Release note` H2 blocks from every
+# Done Jira ticket in a Fix Version, renders a markdown report with a
+# seven-bucket completeness summary, and optionally appends it to the
+# GitHub Release body in the calling repository.
+#
+# Logic lives at scripts/release-notes/aggregate_release_notes.py in this
+# repo. Stdlib only, no requirements.txt. Callers in liquibase/liquibase,
+# liquibase/liquibase-pro, etc. invoke this workflow via `uses:` and pass
+# the Jira Fix Version name. This workflow checks out build-logic, runs
+# the script, and renders results.
+#
+# Operating modes:
+#   workflow_dispatch (manual)        Caller defaults dry_run to true,
+#                                     preview-only in step summary.
+#   release: [published]              Caller passes release_tag and
+#                                     dry_run=false, the release body
+#                                     gets aggregated notes appended.
+#
+# Per TECHOPS-498. Extracted from liquibase-infrastructure PR #3751.
+#
+# Security: every user-controllable input (inputs.version, inputs.release_tag)
+# is consumed via env vars in run: blocks, never interpolated directly into
+# shell. See the workflow-injection guide:
+# https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Jira Fix Version name (e.g. 'Community 5.0.4', 'Secure 5.2.0', 'Platform 1.0.0', 'MCP Changelog 1.0.0')"
+        required: true
+        type: string
+      dry_run:
+        description: "If true: preview only in step summary + artifact, GitHub Release body untouched. If false: also append notes to the release body (requires release_tag)."
+        required: false
+        type: boolean
+        default: true
+      release_tag:
+        description: "GitHub Release tag to update when dry_run=false. Required when dry_run=false. Ignored when dry_run=true."
+        required: false
+        type: string
+        default: ""
+      build_logic_ref:
+        description: "Ref of liquibase/build-logic to check out for the script (default: main). Pin to a tag in production callers."
+        required: false
+        type: string
+        default: "main"
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Validate inputs
+        run: |
+          if [[ "$DRY_RUN" == "false" && -z "$RELEASE_TAG" ]]; then
+            echo "::error::dry_run=false requires release_tag to be provided"
+            exit 1
+          fi
+
+      - name: Check out build-logic (for the aggregator script)
+        uses: actions/checkout@v4
+        with:
+          repository: liquibase/build-logic
+          ref: ${{ inputs.build_logic_ref }}
+          path: build-logic
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get Jira credentials from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Run aggregator
+        env:
+          JIRA_BASE_URL: https://datical.atlassian.net
+          JIRA_EMAIL: ${{ env.JIRA_USER }}
+          JIRA_API_TOKEN: ${{ env.JIRA_API_TOKEN }}
+        run: |
+          mkdir -p release-notes-output
+          python build-logic/scripts/release-notes/aggregate_release_notes.py \
+            --version "$VERSION" \
+            > release-notes-output/release-notes.md
+
+      - name: Render preview in step summary
+        run: |
+          {
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "# Release notes preview — $VERSION"
+              echo ""
+              echo "> _Dry run. The GitHub Release body was NOT updated. Uncheck \`dry_run\` to publish._"
+            else
+              echo "# Release notes published — $VERSION"
+              echo ""
+              echo "> Appended to release \`$RELEASE_TAG\` in \`$GITHUB_REPOSITORY\`."
+            fi
+            echo ""
+            cat release-notes-output/release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes-output/
+          retention-days: 30
+
+      - name: Append to GitHub Release body
+        if: inputs.dry_run == false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh release view "$RELEASE_TAG" --json body --jq '.body' 2>/dev/null || echo "")
+          generated=$(cat release-notes-output/release-notes.md)
+
+          if [[ -n "$existing" ]]; then
+            new_body="${existing}"$'\n\n---\n\n'"${generated}"
+          else
+            new_body="${generated}"
+          fi
+
+          tmp=$(mktemp)
+          printf '%s' "$new_body" > "$tmp"
+          gh release edit "$RELEASE_TAG" --notes-file "$tmp"
+          rm -f "$tmp"
+
+          echo "::notice::Release $RELEASE_TAG body updated with aggregated Jira release notes."

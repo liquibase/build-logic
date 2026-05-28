@@ -1,0 +1,45 @@
+{
+  "type": "doc",
+  "version": 1,
+  "content": [
+    {
+      "type": "heading",
+      "attrs": {"level": 2},
+      "content": [{"type": "text", "text": "Release note"}]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "bold",
+          "marks": [{"type": "strong"}]
+        },
+        {"type": "text", "text": " "},
+        {
+          "type": "text",
+          "text": "italic",
+          "marks": [{"type": "em"}]
+        },
+        {"type": "text", "text": " "},
+        {
+          "type": "text",
+          "text": "code",
+          "marks": [{"type": "code"}]
+        },
+        {"type": "text", "text": " "},
+        {
+          "type": "text",
+          "text": "link text",
+          "marks": [{"type": "link", "attrs": {"href": "https://example.com"}}]
+        },
+        {"type": "text", "text": " "},
+        {
+          "type": "text",
+          "text": "bold-italic",
+          "marks": [{"type": "strong"}, {"type": "em"}]
+        }
+      ]
+    }
+  ]
+}

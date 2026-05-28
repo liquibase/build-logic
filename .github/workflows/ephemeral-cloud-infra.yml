@@ -286,3 +286,18 @@ jobs:
         working-directory: test-automation-ephemeral/stack
         run: |
           terraform destroy -auto-approve -var "run_id=$GH_RUN_ID" -var "run_repo=$GH_REPOSITORY"
+
+      - name: Notify Slack on teardown failure
+        # Alert the team the moment a teardown fails, instead of waiting for
+        # GuardDuty to flag the surviving publicly-accessible RDS. The Spacelift
+        # stack is kept (state preserved) so the destroy can be retried (TECHOPS-523).
+        if: ${{ inputs.destroy && failure() && steps.destroy_infra.outcome == 'failure' }}
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
+        env:
+          SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
+          SLACK_COLOR: danger
+          SLACK_TITLE: "Ephemeral teardown failed — possible orphaned RDS"
+          SLACK_MESSAGE: |
+            terraform destroy failed for stack `${{ inputs.stack_id }}` (${{ github.repository }}).
+            The Spacelift stack was kept so its state survives for a retry — please investigate and clean up to avoid orphaned, publicly-accessible RDS (TECHOPS-523).
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

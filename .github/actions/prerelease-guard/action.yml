@@ -1,0 +1,71 @@
+name: Prerelease Guard
+description: >
+  Classify a release tag/version as GA / RC / preview and emit the channel-skip
+  flags products use to keep pre-release builds off public channels (e.g. the
+  :latest tag and public registries). TECHOPS-580: centralizes the
+  -rc / -preview skip logic that was previously duplicated inline in each
+  product's release workflow, so previews never reach public channels regardless
+  of product. Handles both grammars in use: `-rc.N` / `-preview.N` (MCP) and
+  `-RCn` (Secure), case-insensitively.
+
+inputs:
+  tag:
+    description: 'Release tag or version string (e.g. 1.0.0, 5.2.0-RC8, 1.0.0-preview.1)'
+    required: true
+
+outputs:
+  is_prerelease:
+    description: 'true if the tag is any pre-release (rc/preview/beta/alpha/snapshot)'
+    value: ${{ steps.classify.outputs.is_prerelease }}
+  is_rc:
+    description: 'true if the tag is a release candidate (-rc / -RC)'
+    value: ${{ steps.classify.outputs.is_rc }}
+  is_preview:
+    description: 'true if the tag is a preview (-preview)'
+    value: ${{ steps.classify.outputs.is_preview }}
+  publish_latest:
+    description: 'true when it is safe to publish the :latest tag (GA only)'
+    value: ${{ steps.classify.outputs.publish_latest }}
+  publish_registry:
+    description: 'true when it is safe to publish to public registries (skipped for previews; RCs are exercised)'
+    value: ${{ steps.classify.outputs.publish_registry }}
+
+runs:
+  using: composite
+  steps:
+    - id: classify
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+      run: |
+        set -euo pipefail
+        shopt -s nocasematch  # match -RC (Secure) and -rc (MCP) alike
+
+        is_rc=false
+        is_preview=false
+        is_prerelease=false
+        case "$TAG" in
+          *-rc*) is_rc=true ;;
+        esac
+        case "$TAG" in
+          *-preview*) is_preview=true ;;
+        esac
+        case "$TAG" in
+          *-rc*|*-preview*|*-beta*|*-alpha*|*-snapshot*) is_prerelease=true ;;
+        esac
+
+        # :latest is GA-only. Public registries skip previews but DO publish RCs,
+        # so the RC fire-drill exercises the full registry path before GA.
+        publish_latest=true
+        publish_registry=true
+        [[ "$is_prerelease" == true ]] && publish_latest=false
+        [[ "$is_preview" == true ]] && publish_registry=false
+
+        {
+          echo "is_rc=$is_rc"
+          echo "is_preview=$is_preview"
+          echo "is_prerelease=$is_prerelease"
+          echo "publish_latest=$publish_latest"
+          echo "publish_registry=$publish_registry"
+        } >> "$GITHUB_OUTPUT"
+        echo "Classified '$TAG': prerelease=$is_prerelease rc=$is_rc preview=$is_preview publish_latest=$publish_latest publish_registry=$publish_registry"

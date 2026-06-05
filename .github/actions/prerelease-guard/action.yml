@@ -15,7 +15,7 @@ inputs:
 
 outputs:
   is_prerelease:
-    description: 'true if the tag is any pre-release (rc/preview/beta/alpha/snapshot)'
+    description: 'true if the tag is any pre-release (rc/preview/beta/alpha/snapshot/ea)'
     value: ${{ steps.classify.outputs.is_prerelease }}
   is_rc:
     description: 'true if the tag is a release candidate (-rc / -RC)'
@@ -51,7 +51,7 @@ runs:
           *-preview*) is_preview=true ;;
         esac
         case "$TAG" in
-          *-rc*|*-preview*|*-beta*|*-alpha*|*-snapshot*) is_prerelease=true ;;
+          *-rc*|*-preview*|*-beta*|*-alpha*|*-snapshot*|*-ea*) is_prerelease=true ;;
         esac
 
         # :latest is GA-only. Public registries skip previews but DO publish RCs,

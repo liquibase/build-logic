@@ -26,9 +26,10 @@ on:
         required: true
         type: string
       branch_name:
-        description: 'Liquibase branch to build from (workflow_dispatch input)'
-        required: true
+        description: 'Liquibase branch to build from, for Community branch-based QA builds. Optional: Secure callers download a pre-built artifact via secure_version and leave this unset.'
+        required: false
         type: string
+        default: ''
       secure_version:
         description: 'Explicit Secure version for RC/production S3 downloads, e.g. 5.0.0-RC10'
         required: false

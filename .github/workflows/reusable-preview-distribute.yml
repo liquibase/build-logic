@@ -13,8 +13,8 @@ name: Reusable Preview Distribute
 # Security model (see liquibase-infrastructure/cloudflare/preview_distribute.tf):
 #   - R2 object key = an unguessable random short code; the product/customer live
 #     in object metadata, not the URL.
-#   - The Worker enforces per-request expiry (410 once expired) and emits an
-#     audit log line per download (Logpush -> liquibase-preview-logs).
+#   - The Worker enforces per-request expiry (410 once expired) and writes an
+#     audit record per download to the LOGS R2 bucket (liquibase-preview-logs).
 #   - build-logic is PUBLIC: this file references secret NAMES only; values are
 #     resolved at runtime in the (private) caller's context via `secrets: inherit`.
 #
@@ -86,6 +86,7 @@ jobs:
       - name: Validate inputs
         # Runs BEFORE any credential step. Nothing sensitive is logged here.
         env:
+          PRODUCT: ${{ inputs.product }}
           VERSION: ${{ inputs.version }}
           CUSTOMERS: ${{ inputs.customers }}
           DAYS: ${{ inputs.expires-days }}
@@ -93,12 +94,18 @@ jobs:
         run: |
           set -euo pipefail
 
+          if ! [[ "$PRODUCT" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            echo "::error::product must be a lowercase slug (alphanumerics and hyphens), got: '$PRODUCT'"
+            exit 1
+          fi
+
           if ! [[ "$VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9.+_-]*$ ]]; then
             echo "::error::version must be path-safe (alphanumerics and . + _ - only), got: '$VERSION'"
             exit 1
           fi
           # Guard against distributing a GA build through the preview channel.
-          if ! [[ "$VERSION" =~ ([Rr][Cc]|[Pp]review|[Bb]eta|[Aa]lpha|SNAPSHOT|[Ee][Aa]) ]]; then
+          # Case-insensitive, matching the shared prerelease-guard classifier.
+          if ! [[ "${VERSION,,}" =~ (rc|preview|beta|alpha|snapshot|ea) ]]; then
             echo "::warning::version '$VERSION' does not look like a pre-release (no rc/preview/beta/alpha marker). Continuing, but double-check you are not leaking a GA build."
           fi
 
@@ -127,7 +134,7 @@ jobs:
             exit 1
           fi
 
-          echo "Inputs validated: product=${{ inputs.product }} version=$VERSION customers=$CUSTOMERS expires-days=$DAYS"
+          echo "Inputs validated: product=$PRODUCT version=$VERSION customers=$CUSTOMERS expires-days=$DAYS"
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -171,7 +178,15 @@ jobs:
           VERIFY: ${{ inputs.verify-checksum }}
         run: |
           set -euo pipefail
-          FILENAME="${ARTIFACT_FILENAME:-$(basename "$ARTIFACT_S3_URI")}"
+          # Force a bare filename so dist/$FILENAME can't be escaped (path traversal).
+          FILENAME="$(basename -- "${ARTIFACT_FILENAME:-$ARTIFACT_S3_URI}")"
+          case "$FILENAME" in
+            "" | */* | *\\*) echo "::error::artifact-filename must be a bare filename (no path separators)."; exit 1 ;;
+          esac
+          if [[ "$FILENAME" == *$'\n'* ]]; then
+            echo "::error::artifact-filename must not contain newlines."
+            exit 1
+          fi
           mkdir -p dist
 
           # Fail loudly if the source artifact is missing — never silently ship a
@@ -215,6 +230,7 @@ jobs:
           ARTIFACT: ${{ steps.artifact.outputs.path }}
           FILENAME: ${{ steps.artifact.outputs.filename }}
           CUSTOMERS: ${{ inputs.customers }}
+          RUN_ID: ${{ github.run_id }}
           # R2 creds (scoped to the previews bucket) from vault. Used ONLY for the
           # put-object below; AWS_SESSION_TOKEN is cleared so the SDK doesn't mix
           # the OIDC STS session with the R2 access key.
@@ -230,12 +246,11 @@ jobs:
           fi
 
           EXPIRES_AT=$(date -u -d "+${DAYS} days" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v "+${DAYS}d" +"%Y-%m-%dT%H:%M:%SZ")
-          CSV="preview-urls-${PRODUCT}-v${VERSION}-${{ github.run_id }}.csv"
+          CSV="preview-urls-${PRODUCT}-v${VERSION}-${RUN_ID}.csv"
           MD="preview-urls-summary.md"
           echo "customer,url,expires_at" > "$CSV"
           : > "$MD"
           COUNT=0
-          TICK=$(printf '\x60\x60\x60')  # ``` markdown code fence (avoids literal backticks in single quotes)
 
           IFS=',' read -ra LIST <<< "$CUSTOMERS"
           for cust in "${LIST[@]}"; do
@@ -269,14 +284,10 @@ jobs:
 
             URL="https://preview.liquibase.com/${CODE}"
 
-            # URLs go ONLY into the CSV artifact and the collapsible summary — never to stdout.
+            # The full URL goes ONLY into the downloadable CSV artifact — never the
+            # run summary or stdout. The summary shows the short code only.
             printf '%s,%s,%s\n' "$cust" "$URL" "$EXPIRES_AT" >> "$CSV"
-            {
-              printf '<details><summary><strong>%s</strong> — expires <code>%s</code></summary>\n\n' "$cust" "$EXPIRES_AT"
-              printf '%s\n%s\n%s\n\n' "$TICK" "$URL" "$TICK"
-              printf '<sub>revoke: short code <code>%s</code></sub>\n\n' "$CODE"
-              printf '</details>\n\n'
-            } >> "$MD"
+            printf '<strong>%s</strong> — expires <code>%s</code> — short code <code>%s</code>\n\n' "$cust" "$EXPIRES_AT" "$CODE" >> "$MD"
             COUNT=$((COUNT + 1))
           done
 
@@ -298,32 +309,39 @@ jobs:
       - name: Step summary
         env:
           MD: ${{ steps.distribute.outputs.md }}
+          PRODUCT: ${{ inputs.product }}
+          VERSION: ${{ inputs.version }}
+          COUNT: ${{ steps.distribute.outputs.count }}
+          ART_FILENAME: ${{ steps.artifact.outputs.filename }}
+          ART_SIZE: ${{ steps.artifact.outputs.size }}
+          EXPIRES_AT: ${{ steps.distribute.outputs.expires_at }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           {
-            echo "## 🧪 Preview Distribution — \`${{ inputs.product }}\` \`${{ inputs.version }}\`"
+            echo "## 🧪 Preview Distribution — \`$PRODUCT\` \`$VERSION\`"
             echo ""
             echo "| | |"
             echo "|---|---|"
-            echo "| Product | \`${{ inputs.product }}\` |"
-            echo "| Version | \`${{ inputs.version }}\` |"
-            echo "| Customers | **${{ steps.distribute.outputs.count }}** |"
-            echo "| Artifact | \`${{ steps.artifact.outputs.filename }}\` (${{ steps.artifact.outputs.size }}) |"
-            echo "| Links expire at | \`${{ steps.distribute.outputs.expires_at }}\` |"
+            echo "| Product | \`$PRODUCT\` |"
+            echo "| Version | \`$VERSION\` |"
+            echo "| Customers | **$COUNT** |"
+            echo "| Artifact | \`$ART_FILENAME\` ($ART_SIZE) |"
+            echo "| Links expire at | \`$EXPIRES_AT\` |"
             echo ""
-            echo "### 🔗 Per-customer download links"
+            echo "### 🔗 Per-customer (short codes — links are in the CSV)"
             echo ""
-            echo "Click a customer to reveal their link. Send one link per customer — never share across customers."
+            echo "The summary lists short codes only; the actual download links live in the CSV artifact below. Send one link per customer — never share across customers."
             echo ""
             cat "$MD"
-            echo "> ⚠️ **Treat links as sensitive.** This summary is visible to org members with access to this repo's Actions runs. Each link grants download access until the expiry above; every download is recorded in the preview audit log."
+            echo "> ⚠️ **Links are sensitive.** Each grants download access until the expiry above; every download is recorded in the preview audit log."
             echo ""
-            echo "### 📥 CSV"
+            echo "### 📥 CSV (the download links)"
             echo ""
-            echo "Machine-readable form: workflow artifact \`preview-urls-${{ inputs.product }}-${{ inputs.version }}-${{ github.run_id }}\` (\`customer,url,expires_at\`, retained 30 days)."
+            echo "Workflow artifact \`preview-urls-${PRODUCT}-${VERSION}-${RUN_ID}\` (\`customer,url,expires_at\`, retained 30 days)."
             echo ""
             echo "### 🛟 Revoke a customer's access early"
             echo ""
-            echo "Delete the customer's object from the previews bucket (short code shown under each link, or the last path segment of their URL):"
+            echo "Delete the customer's object from the previews bucket (short code shown above, or the last path segment of their URL):"
             echo ""
             echo "\`\`\`bash"
             echo "aws s3api delete-object --endpoint-url \"\$CLOUDFLARE_R2_MCP_PREVIEWS_ENDPOINT\" \\"

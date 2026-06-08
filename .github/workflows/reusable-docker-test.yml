@@ -96,17 +96,31 @@ jobs:
           docker run --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" --name $CONTAINER_NAME -d \
             -v $(pwd)/build-logic/"$TEST_FIXTURES_PATH":/liquibase/changelog \
             "liquibase/liquibase:$IMAGE_TAG" init start-h2
-          sleep 30
-          if docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q "true"; then
-            if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "$LOG_STRING"; then
-              echo "The log contains the string: $LOG_STRING"
-            else
-              echo "The log does not contain the string: $LOG_STRING"
-              exit 1
+          # Poll for the H2 startup log instead of a fixed `sleep 30`. The startup
+          # message can take longer than a hard-coded wait on slower/busier runners
+          # (notably macOS Colima), which caused intermittent failures where the
+          # container was running but the log line had not appeared yet.
+          # Wait up to 90s, checking every 3s; fail fast if the container exits.
+          TIMEOUT=90
+          INTERVAL=3
+          ELAPSED=0
+          while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+            if ! docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q "true"; then
+              echo "Error: Container $CONTAINER_NAME is not running."
+              docker logs "$CONTAINER_NAME" 2>&1 || true
+              exit 2
             fi
-          else
-            echo "Error: Container $CONTAINER_NAME is not running."
-            exit 2
+            if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "$LOG_STRING"; then
+              echo "The log contains the string: $LOG_STRING (after ${ELAPSED}s)"
+              break
+            fi
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+          if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+            echo "The log does not contain the string after ${TIMEOUT}s: $LOG_STRING"
+            docker logs "$CONTAINER_NAME" 2>&1 || true
+            exit 1
           fi
 
       - name: Test liquibase version

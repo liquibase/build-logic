@@ -101,7 +101,11 @@ jobs:
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
           # https://github.com/fossas/fossa-cli/tree/master/docs/references/subcommands/test
-          fossa test -p "$REPO_NAME" 2>&1 | tee test.out
+          # --timeout caps how long we poll FOSSA's backend for issue-scan results.
+          # Default is 3600s (1h); when FOSSA's scan service stalls, that wastes a full
+          # hour of runner time per PR before failing. A healthy scan returns in minutes,
+          # so 1200s (20m) leaves ample headroom while failing fast on a backend stall.
+          fossa test -p "$REPO_NAME" --timeout 1200 2>&1 | tee test.out
           FILE="test.out"
           if [ -f "$FILE" ]; then
               if grep -q "Test passed" "$FILE"; then

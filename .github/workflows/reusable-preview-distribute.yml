@@ -1,0 +1,350 @@
+name: Reusable Preview Distribute
+
+# TECHOPS-580: product-agnostic early-access distribution of a pre-release (RC /
+# preview) build to a controlled set of customers.
+#
+# Contract: this workflow NEVER builds. It consumes an artifact that the calling
+# product has ALREADY published/staged to S3 (artifact-s3-uri), verifies its
+# checksum, then for each customer mints a private, time-limited download link
+# served by the preview.liquibase.com Cloudflare Worker out of the shared
+# liquibase-mcp-previews R2 bucket. Output is a CSV of links + a sanitized run
+# summary. Full URLs and credentials are never written to the run log.
+#
+# Security model (see liquibase-infrastructure/cloudflare/preview_distribute.tf):
+#   - R2 object key = an unguessable random short code; the product/customer live
+#     in object metadata, not the URL.
+#   - The Worker enforces per-request expiry (410 once expired) and writes an
+#     audit record per download to the LOGS R2 bucket (liquibase-preview-logs).
+#   - build-logic is PUBLIC: this file references secret NAMES only; values are
+#     resolved at runtime in the (private) caller's context via `secrets: inherit`.
+#
+# Callers MUST gate the dispatching job behind a protected GitHub environment
+# with required reviewers — this workflow cannot restrict who triggers it.
+
+on:
+  workflow_call:
+    inputs:
+      product:
+        description: 'Product slug, used in metadata + audit (e.g. secure, mcp-changelog-server)'
+        required: true
+        type: string
+      version:
+        description: 'Pre-release version (e.g. 5.2.0-RC8 or 1.0.0-rc.1)'
+        required: true
+        type: string
+      artifact-s3-uri:
+        description: 'Full s3:// URI of the already-published RC artifact to distribute'
+        required: true
+        type: string
+      s3-read-role-arn-vault-key:
+        description: 'Name of the /vault/liquibase key holding the OIDC role ARN to assume for reading artifact-s3-uri (e.g. AWS_PROD_GITHUB_OIDC_ROLE_ARN_LIQUIBASE_PRO)'
+        required: true
+        type: string
+      customers:
+        description: 'Comma-separated customer slugs (e.g. acme,globex)'
+        required: true
+        type: string
+      artifact-filename:
+        description: 'Filename presented to the customer (Content-Disposition). Defaults to the basename of artifact-s3-uri.'
+        required: false
+        type: string
+        default: ''
+      content-type:
+        description: 'Content-Type served to the customer'
+        required: false
+        type: string
+        default: 'application/octet-stream'
+      expires-days:
+        description: 'Link TTL in days (1-365)'
+        required: false
+        type: number
+        default: 7
+      verify-checksum:
+        description: 'Require and verify a <artifact>.sha256 sibling before distributing'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: preview-distribute-${{ inputs.product }}-${{ inputs.version }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+env:
+  # Shared previews bucket (Cloudflare R2). Historical name kept to avoid an R2
+  # destroy/recreate — it holds previews for ALL products; product is metadata.
+  R2_BUCKET: liquibase-mcp-previews
+
+jobs:
+  distribute:
+    name: Distribute preview (${{ inputs.product }} ${{ inputs.version }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate inputs
+        # Runs BEFORE any credential step. Nothing sensitive is logged here.
+        env:
+          PRODUCT: ${{ inputs.product }}
+          VERSION: ${{ inputs.version }}
+          CUSTOMERS: ${{ inputs.customers }}
+          DAYS: ${{ inputs.expires-days }}
+          ARTIFACT_S3_URI: ${{ inputs.artifact-s3-uri }}
+        run: |
+          set -euo pipefail
+
+          if ! [[ "$PRODUCT" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            echo "::error::product must be a lowercase slug (alphanumerics and hyphens), got: '$PRODUCT'"
+            exit 1
+          fi
+
+          if ! [[ "$VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9.+_-]*$ ]]; then
+            echo "::error::version must be path-safe (alphanumerics and . + _ - only), got: '$VERSION'"
+            exit 1
+          fi
+          # Guard against distributing a GA build through the preview channel.
+          # Case-insensitive, matching the shared prerelease-guard classifier.
+          if ! [[ "${VERSION,,}" =~ (rc|preview|beta|alpha|snapshot|ea) ]]; then
+            echo "::warning::version '$VERSION' does not look like a pre-release (no rc/preview/beta/alpha marker). Continuing, but double-check you are not leaking a GA build."
+          fi
+
+          if ! [[ "$ARTIFACT_S3_URI" =~ ^s3://[a-z0-9.-]+/.+ ]]; then
+            echo "::error::artifact-s3-uri must be a full s3://bucket/key URI, got: '$ARTIFACT_S3_URI'"
+            exit 1
+          fi
+
+          if [[ -z "${CUSTOMERS// /}" ]]; then
+            echo "::error::customers must not be empty or whitespace-only"
+            exit 1
+          fi
+          # Each slug lands in audit metadata and the revoke snippet — keep it tight.
+          IFS=',' read -ra SLUGS <<< "$CUSTOMERS"
+          for cust in "${SLUGS[@]}"; do
+            cust="${cust#"${cust%%[![:space:]]*}"}"
+            cust="${cust%"${cust##*[![:space:]]}"}"
+            if ! [[ "$cust" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+              echo "::error::customer slug '$cust' must be lowercase alphanumeric/hyphens only (e.g. acme, globex, initech-corp)"
+              exit 1
+            fi
+          done
+
+          if ! [[ "$DAYS" =~ ^[0-9]+$ ]] || [ "$DAYS" -lt 1 ] || [ "$DAYS" -gt 365 ]; then
+            echo "::error::expires-days must be between 1 and 365 (got: '$DAYS')"
+            exit 1
+          fi
+
+          echo "Inputs validated: product=$PRODUCT version=$VERSION customers=$CUSTOMERS expires-days=$DAYS"
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Resolve S3 read role ARN
+        id: role
+        # ARNs are not secret. Indirect-expand the caller-named vault key (now an
+        # env var) to get the role ARN, avoiding dynamic context indexing in `with`.
+        env:
+          ROLE_KEY: ${{ inputs.s3-read-role-arn-vault-key }}
+        run: |
+          set -euo pipefail
+          ROLE_ARN="${!ROLE_KEY:-}"
+          if [[ -z "$ROLE_ARN" ]]; then
+            echo "::error::vault key '$ROLE_KEY' not found in /vault/liquibase — cannot assume an S3 read role."
+            exit 1
+          fi
+          echo "arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials for S3 artifact read
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ steps.role.outputs.arn }}
+          aws-region: us-east-1
+
+      - name: Download + verify artifact
+        id: artifact
+        env:
+          ARTIFACT_S3_URI: ${{ inputs.artifact-s3-uri }}
+          ARTIFACT_FILENAME: ${{ inputs.artifact-filename }}
+          VERIFY: ${{ inputs.verify-checksum }}
+        run: |
+          set -euo pipefail
+          # Force a bare filename so dist/$FILENAME can't be escaped (path traversal).
+          FILENAME="$(basename -- "${ARTIFACT_FILENAME:-$ARTIFACT_S3_URI}")"
+          case "$FILENAME" in
+            "" | */* | *\\*) echo "::error::artifact-filename must be a bare filename (no path separators)."; exit 1 ;;
+          esac
+          if [[ "$FILENAME" == *$'\n'* ]]; then
+            echo "::error::artifact-filename must not contain newlines."
+            exit 1
+          fi
+          mkdir -p dist
+
+          # Fail loudly if the source artifact is missing — never silently ship a
+          # stale or wrong build (TECHOPS-542 lesson).
+          if ! aws s3 cp "$ARTIFACT_S3_URI" "dist/$FILENAME"; then
+            echo "::error::artifact not found / not readable at $ARTIFACT_S3_URI. The RC build must be published before distribution."
+            exit 1
+          fi
+
+          if [[ "$VERIFY" == "true" ]]; then
+            if ! aws s3 cp "${ARTIFACT_S3_URI}.sha256" "dist/${FILENAME}.sha256"; then
+              echo "::error::verify-checksum is enabled but ${ARTIFACT_S3_URI}.sha256 is missing. Publish the checksum alongside the artifact, or set verify-checksum: false."
+              exit 1
+            fi
+            EXPECTED=$(awk '{print $1}' "dist/${FILENAME}.sha256")
+            ACTUAL=$(sha256sum "dist/$FILENAME" | awk '{print $1}')
+            if [[ -z "$EXPECTED" || "$EXPECTED" != "$ACTUAL" ]]; then
+              echo "::error::checksum mismatch for $FILENAME (expected '$EXPECTED', got '$ACTUAL'). Refusing to distribute a tampered/corrupt artifact."
+              exit 1
+            fi
+            echo "Checksum verified for $FILENAME."
+          else
+            echo "::warning::checksum verification skipped (verify-checksum: false)."
+          fi
+
+          SIZE=$(stat -c%s "dist/$FILENAME" | numfmt --to=iec)
+          {
+            echo "filename=$FILENAME"
+            echo "path=dist/$FILENAME"
+            echo "size=$SIZE"
+          } >> "$GITHUB_OUTPUT"
+          echo "Artifact ready: $FILENAME ($SIZE)"
+
+      - name: Mint per-customer preview links
+        id: distribute
+        env:
+          PRODUCT: ${{ inputs.product }}
+          VERSION: ${{ inputs.version }}
+          DAYS: ${{ inputs.expires-days }}
+          CONTENT_TYPE: ${{ inputs.content-type }}
+          ARTIFACT: ${{ steps.artifact.outputs.path }}
+          FILENAME: ${{ steps.artifact.outputs.filename }}
+          CUSTOMERS: ${{ inputs.customers }}
+          RUN_ID: ${{ github.run_id }}
+          # R2 creds (scoped to the previews bucket) from vault. Used ONLY for the
+          # put-object below; AWS_SESSION_TOKEN is cleared so the SDK doesn't mix
+          # the OIDC STS session with the R2 access key.
+          R2_AKID: ${{ env.CLOUDFLARE_R2_MCP_PREVIEWS_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_MCP_PREVIEWS_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ env.CLOUDFLARE_R2_MCP_PREVIEWS_ENDPOINT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$R2_AKID" || -z "$R2_SECRET" || -z "$R2_ENDPOINT" ]]; then
+            echo "::error::CLOUDFLARE_R2_MCP_PREVIEWS_{ACCESS_KEY_ID,SECRET_ACCESS_KEY,ENDPOINT} missing from /vault/liquibase. See the manual bootstrap in liquibase-infrastructure/cloudflare/preview_distribute.tf."
+            exit 1
+          fi
+
+          EXPIRES_AT=$(date -u -d "+${DAYS} days" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v "+${DAYS}d" +"%Y-%m-%dT%H:%M:%SZ")
+          CSV="preview-urls-${PRODUCT}-v${VERSION}-${RUN_ID}.csv"
+          MD="preview-urls-summary.md"
+          echo "customer,url,expires_at" > "$CSV"
+          : > "$MD"
+          COUNT=0
+
+          IFS=',' read -ra LIST <<< "$CUSTOMERS"
+          for cust in "${LIST[@]}"; do
+            cust="${cust#"${cust%%[![:space:]]*}"}"
+            cust="${cust%"${cust##*[![:space:]]}"}"
+            [[ -z "$cust" ]] && continue
+
+            # 16 hex chars (64 bits) of randomness — unguessable R2 key + URL slug.
+            CODE=$(head -c 8 /dev/urandom | xxd -p)
+
+            # Values passed via env (jq reads them with env.*) so the filter holds
+            # no shell-expandable $vars.
+            META=$(
+              M_CUSTOMER="$cust" M_PRODUCT="$PRODUCT" M_VERSION="$VERSION" \
+              M_EXPIRES="$EXPIRES_AT" M_FILENAME="$FILENAME" \
+              jq -n '{customer:env.M_CUSTOMER, product:env.M_PRODUCT, version:env.M_VERSION, "expires-at":env.M_EXPIRES, filename:env.M_FILENAME}'
+            )
+
+            # Upload to R2 under the scoped R2 key; metadata drives the Worker.
+            AWS_ACCESS_KEY_ID="$R2_AKID" \
+            AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            AWS_SESSION_TOKEN="" \
+            AWS_DEFAULT_REGION=auto \
+            aws s3api put-object \
+              --endpoint-url "$R2_ENDPOINT" \
+              --bucket "$R2_BUCKET" \
+              --key "$CODE" \
+              --body "$ARTIFACT" \
+              --content-type "$CONTENT_TYPE" \
+              --metadata "$META" >/dev/null
+
+            URL="https://preview.liquibase.com/${CODE}"
+
+            # The full URL goes ONLY into the downloadable CSV artifact — never the
+            # run summary or stdout. The summary shows the short code only.
+            printf '%s,%s,%s\n' "$cust" "$URL" "$EXPIRES_AT" >> "$CSV"
+            printf '<strong>%s</strong> — expires <code>%s</code> — short code <code>%s</code>\n\n' "$cust" "$EXPIRES_AT" "$CODE" >> "$MD"
+            COUNT=$((COUNT + 1))
+          done
+
+          {
+            echo "csv=$CSV"
+            echo "md=$MD"
+            echo "count=$COUNT"
+            echo "expires_at=$EXPIRES_AT"
+          } >> "$GITHUB_OUTPUT"
+          echo "Distributed to $COUNT customer(s)."
+
+      - name: Upload CSV artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: preview-urls-${{ inputs.product }}-${{ inputs.version }}-${{ github.run_id }}
+          path: ${{ steps.distribute.outputs.csv }}
+          retention-days: 30
+
+      - name: Step summary
+        env:
+          MD: ${{ steps.distribute.outputs.md }}
+          PRODUCT: ${{ inputs.product }}
+          VERSION: ${{ inputs.version }}
+          COUNT: ${{ steps.distribute.outputs.count }}
+          ART_FILENAME: ${{ steps.artifact.outputs.filename }}
+          ART_SIZE: ${{ steps.artifact.outputs.size }}
+          EXPIRES_AT: ${{ steps.distribute.outputs.expires_at }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          {
+            echo "## 🧪 Preview Distribution — \`$PRODUCT\` \`$VERSION\`"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Product | \`$PRODUCT\` |"
+            echo "| Version | \`$VERSION\` |"
+            echo "| Customers | **$COUNT** |"
+            echo "| Artifact | \`$ART_FILENAME\` ($ART_SIZE) |"
+            echo "| Links expire at | \`$EXPIRES_AT\` |"
+            echo ""
+            echo "### 🔗 Per-customer (short codes — links are in the CSV)"
+            echo ""
+            echo "The summary lists short codes only; the actual download links live in the CSV artifact below. Send one link per customer — never share across customers."
+            echo ""
+            cat "$MD"
+            echo "> ⚠️ **Links are sensitive.** Each grants download access until the expiry above; every download is recorded in the preview audit log."
+            echo ""
+            echo "### 📥 CSV (the download links)"
+            echo ""
+            echo "Workflow artifact \`preview-urls-${PRODUCT}-${VERSION}-${RUN_ID}\` (\`customer,url,expires_at\`, retained 30 days)."
+            echo ""
+            echo "### 🛟 Revoke a customer's access early"
+            echo ""
+            echo "Delete the customer's object from the previews bucket (short code shown above, or the last path segment of their URL):"
+            echo ""
+            echo "\`\`\`bash"
+            echo "aws s3api delete-object --endpoint-url \"\$CLOUDFLARE_R2_MCP_PREVIEWS_ENDPOINT\" \\"
+            echo "  --bucket liquibase-mcp-previews --key <short-code>"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"

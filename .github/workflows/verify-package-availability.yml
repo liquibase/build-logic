@@ -23,7 +23,7 @@ jobs:
       branch_exists: ${{ steps.check-placeholder-branch.outputs.branch_exists }}
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: liquibase/liquibase
 
@@ -66,7 +66,7 @@ jobs:
           echo "Latest SDKMAN version: $SDKMAN_OSS_VERSION"
 
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: liquibase/liquibase
 
@@ -100,7 +100,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Send Slack Notification
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ>"
@@ -133,7 +133,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Get Latest GitHub Version
         id: oss-latest-version
@@ -144,7 +144,7 @@ jobs:
           echo "Using GitHub latest version: $LATEST_OSS_VERSION"
 
       - name: Configure AWS credentials for S3 access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1
@@ -204,7 +204,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Send Slack Notification
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ> "
@@ -238,7 +238,7 @@ jobs:
         uses: ./.github/actions/setup-aws-vault
 
       - name: Send Slack Notification
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: ${{ steps.set-slack-details.outputs.status_color }}
           SLACK_MESSAGE: "View details on GitHub Actions: ${{ steps.set-slack-details.outputs.status_message }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U040C8J8143> <@U04P39MS2SW> <@UHHJ6UAEQ> "

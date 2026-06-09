@@ -57,13 +57,18 @@ on:
       expires-days:
         description: 'Link TTL in days (1-365)'
         required: false
-        type: number
-        default: 7
+        # type: string (not number) so a caller can forward a workflow_dispatch
+        # input — always a string at runtime — without GitHub rejecting the
+        # reusable-workflow call. Validated numerically in "Validate inputs" below.
+        type: string
+        default: '7'
       verify-checksum:
         description: 'Require and verify a <artifact>.sha256 sibling before distributing'
         required: false
-        type: boolean
-        default: true
+        # type: string (not boolean) for the same reason as expires-days — keep
+        # forwarded workflow_dispatch values valid. Compared as "true" below.
+        type: string
+        default: 'true'
 
 permissions:
   id-token: write

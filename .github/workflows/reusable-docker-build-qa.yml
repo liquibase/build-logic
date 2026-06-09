@@ -323,7 +323,13 @@ jobs:
         if: ${{ inputs.build_type == 'secure' && steps.download-artifact.outputs.trigger_liquibase_secure_workflow == 'true' && steps.download-artifact.outputs.use_fallback != 'true' }}
         id: trigger-liquibase-secure-release
         continue-on-error: true
-        uses: ./.github/actions/dispatch-and-wait
+        # Full repo path, not ./ — this reusable workflow runs in the CALLER's
+        # checkout (actions/checkout above pulls the caller repo into the
+        # workspace), so a ./ local-action reference resolves against the caller
+        # and the dispatch-and-wait action (which lives here in build-logic) is
+        # not found. Reference it by owner/repo path so it resolves regardless
+        # of which repo called the workflow.
+        uses: liquibase/build-logic/.github/actions/dispatch-and-wait@main
         with:
           workflow: secure-release-to-s3.yml
           repo: liquibase/liquibase-pro

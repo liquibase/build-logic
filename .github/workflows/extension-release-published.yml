@@ -46,6 +46,7 @@ permissions:
   pull-requests: write
   packages: write
   id-token: write
+  actions: read # required by "Get build-logic ref" to read referenced_workflows via the Actions API
 
 jobs:
   maven-release:
@@ -111,8 +112,10 @@ jobs:
         run: |
           # In reusable workflows, github.workflow_sha resolves to the caller's SHA.
           # Query the API to find the actual ref/SHA of this reusable workflow.
+          # `|| true` so a transient API failure falls back to main instead of
+          # aborting the step (run: uses `bash -eo pipefail`).
           REF=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --jq '.referenced_workflows[] | select(.path | startswith("liquibase/build-logic/.github/workflows/extension-release-published")) | .ref')
+            --jq '.referenced_workflows[] | select(.path | startswith("liquibase/build-logic/.github/workflows/extension-release-published")) | .ref' || true)
           echo "ref=${REF:-refs/heads/main}" >> $GITHUB_OUTPUT
 
       - name: Checkout build-logic

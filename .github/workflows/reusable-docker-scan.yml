@@ -333,12 +333,13 @@ jobs:
   # ============================================
   # SLACK FAILURE NOTIFICATION
   # Outermost owner for scan alerts — covers build-ghcr, vulnerability-scan,
-  # and scout. Uses always() to fire even when scout is skipped (scout_enabled=false).
-  # The nested reusable-vulnerability-scan call passes nested:true above, so its
-  # scheduled auto-notify is suppressed and THIS job owns the alert (no double-post, D4).
+  # scout, and cleanup-ghcr. Uses always() to fire even when scout is skipped
+  # (scout_enabled=false). The nested reusable-vulnerability-scan call passes
+  # nested:true above, so its scheduled auto-notify is suppressed and THIS job
+  # owns the alert (no double-post, D4).
   # ============================================
   notify:
-    needs: [build-ghcr, vulnerability-scan, scout]
+    needs: [build-ghcr, vulnerability-scan, scout, cleanup-ghcr]
     if: ${{ always() && contains(needs.*.result, 'failure') && inputs.slack_webhook_env_var != '' }}
     runs-on: ubuntu-22.04
     permissions:
@@ -362,15 +363,18 @@ jobs:
         env:
           WEBHOOK_ENV_VAR: ${{ inputs.slack_webhook_env_var }}
         run: |
-          if [ -z "${{ env[inputs.slack_webhook_env_var] }}" ]; then
+          # Resolve via shell indirection — a dynamic env[...] template lookup is caller-controlled (CodeQL code-injection)
+          WEBHOOK_VALUE="${!WEBHOOK_ENV_VAR}"
+          if [ -z "$WEBHOOK_VALUE" ]; then
             echo "::error::Slack webhook env $WEBHOOK_ENV_VAR resolved empty — check /vault/liquibase contains this key"
             exit 1
           fi
+          echo "RESOLVED_SLACK_WEBHOOK=$WEBHOOK_VALUE" >> "$GITHUB_ENV"
 
       - name: Notify Slack on failure
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
         env:
-          SLACK_WEBHOOK: ${{ env[inputs.slack_webhook_env_var] }}
+          SLACK_WEBHOOK: ${{ env.RESOLVED_SLACK_WEBHOOK }}
           SLACK_COLOR: failure
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ Docker scan failed on ${{ github.ref_name }} (${{ github.sha }})"
           SLACK_MESSAGE: "View run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

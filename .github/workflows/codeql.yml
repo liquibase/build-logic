@@ -61,11 +61,11 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
     - name: Configure AWS credentials for vault access
       if: matrix.language == 'java'
-      uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
       with:
         role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
         aws-region: us-east-1
@@ -73,7 +73,7 @@ jobs:
     - name: Get secrets from vault
       if: matrix.language == 'java'
       id: vault-secrets
-      uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+      uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53 # v3.0.1
       with:
         secret-ids: |
           ,/vault/liquibase
@@ -98,7 +98,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+      uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ steps.set-build-mode.outputs.buildMode }}
@@ -127,7 +127,7 @@ jobs:
     # look for dependencies in maven
     - name: Set up Maven settings.xml
       if: matrix.language == 'java'
-      uses: liquibase/build-logic/.github/actions/setup-maven-settings@2660ba32055efd3301bcf624a3d60ca8b11cc482 # main
+      uses: liquibase/build-logic/.github/actions/setup-maven-settings@a220b5f9914de6995d944c33587da54d24088d64 # main
       with:
         gpm-token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
 
@@ -142,6 +142,6 @@ jobs:
         ${BUILD_COMMAND}
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+      uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
       with:
         category: "/language:${{matrix.language}}"

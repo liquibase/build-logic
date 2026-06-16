@@ -329,7 +329,7 @@ jobs:
         # and the dispatch-and-wait action (which lives here in build-logic) is
         # not found. Reference it by owner/repo path so it resolves regardless
         # of which repo called the workflow.
-        uses: liquibase/build-logic/.github/actions/dispatch-and-wait@main
+        uses: liquibase/build-logic/.github/actions/dispatch-and-wait@a220b5f9914de6995d944c33587da54d24088d64 # main
         with:
           workflow: secure-release-to-s3.yml
           repo: liquibase/liquibase-pro

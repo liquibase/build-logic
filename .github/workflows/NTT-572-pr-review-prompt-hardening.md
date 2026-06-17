@@ -40,7 +40,7 @@ issues) versus **precision** (not crying wolf).
 | V1 | **Persona framing** - "senior staff engineer, stickler for standards" | **Adopted** | Reliable lift in scrutiny and tone with no precision cost. Cheap and safe. |
 | V2 | **Checklist-driven** - confirm each category before finishing | **Adopted** | Forces breadth of coverage; the single biggest driver of finding more *categories* of issues. |
 | V3 | **Graduated severity** - Critical/Major/Minor/Nit | **Adopted** | Lets the model surface lower-severity issues it previously suppressed, while authors can triage. Improves recall without inflating perceived blockers. |
-| V4 | **Two-pass** - correctness/safety, then maintainability/standards | **Adopted** | Separating concerns reduces "anchoring" on the first issue found and improves depth. Costs extra turns (mitigated by `--max-turns 8`). |
+| V4 | **Two-pass** - correctness/safety, then maintainability/standards | **Adopted** | Separating concerns reduces "anchoring" on the first issue found and improves depth. Costs extra turns (mitigated by batching reads and comments, and the 10-minute job timeout). |
 | V5 | **Confidence scoring** - 0-100% production-ready + justification | **Adopted** | Forces the model to commit and justify; a low score is a useful signal even when individual findings are sparse. |
 | - | **Adversarial framing** - "this was written by competitor LLM Codex..." | **Rejected for production** | The hypothesis (more willingness to fault a "rival") does increase issue count, but the lift is dominated by **false positives** and a hostile tone. It also misrepresents authorship in a developer-facing tool. Kept as a research note only. |
 | - | **Hard issue quota** - "find at least N issues before approving" | **Rejected** | Directly manufactures false positives on clean PRs. Replaced with a softer "do not default to approval; justify it against the checklist," which raises scrutiny without inventing defects. |
@@ -65,9 +65,13 @@ issues *without excessive false positives*." Key structural pieces:
 6. **False-positive guards**: cite specific code and reasoning, phrase uncertainty as a
    question, defer formatting to linters, no duplicate or count-padding findings.
 
-`claude_args` gains `--max-turns 8` (up from the action default) to give the two-pass
-review room to read context files and still post in one batch; the 10-minute job
-timeout and Haiku default keep cost bounded. The `#`-comment pitfall was avoided.
+`claude_args` deliberately does **not** set `--max-turns`. The two-pass review needs
+room to read context files, and `claude-code-action` treats hitting the turn limit
+(`error_max_turns`) as a hard workflow failure, so a fixed cap would fail the job on
+larger PRs (see PR #509, which removed `--max-turns` for exactly this reason). Cost is
+instead bounded by the prompt's turn-efficiency rules (batch all reads in one turn,
+batch all inline comments in one turn), the 10-minute job timeout, and the Haiku
+default. The `#`-comment pitfall in `claude_args` was also avoided.
 
 ## 4. Before / after comparison
 
@@ -100,9 +104,11 @@ staying quiet.
   unacceptable false-positive and tone cost, and dishonest about authorship.
 - **Didn't work:** hard "find N issues" quotas - they trade precision for a number.
 - **Cost note:** two-pass + larger output is more expensive than the old 5-bullet cap.
-  Mitigated with `--max-turns 8`, the 10-minute timeout, and Haiku as the default;
-  high-value repos can still opt into `claude-sonnet-4-6` via the `model` input for the
-  deepest reasoning.
+  Mitigated by batching reads and inline comments into single turns, the 10-minute
+  timeout, and Haiku as the default; high-value repos can still opt into
+  `claude-sonnet-4-6` via the `model` input for the deepest reasoning. A fixed
+  `--max-turns` was intentionally avoided because the action fails the job on
+  `error_max_turns` (PR #509).
 
 ## 6. Follow-ups
 

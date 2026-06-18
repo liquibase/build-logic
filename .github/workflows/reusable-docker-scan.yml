@@ -205,6 +205,22 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME_DECODED }}
           password: ${{ env.DOCKERHUB_TOKEN }}
 
+      - name: Install Docker Scout CLI (pinned)
+        env:
+          SCOUT_VERSION: v1.21.0
+        run: |
+          # Install the Scout CLI plugin directly instead of via docker/scout-action.
+          # The action downloads its binary UNAUTHENTICATED from the api.github.com
+          # release-asset API, which is rate-limited to 60 req/hr per shared runner
+          # egress IP and returns HTTP 403 once exhausted (TECHOPS-661). The official
+          # install.sh fetches from the github.com browser-download path
+          # (objects.githubusercontent.com) and resolves the pinned tag via github.com
+          # — never api.github.com — so it does not consume that limit. Pinning the
+          # version also skips install.sh's `latest` redirect lookup.
+          curl -sSfL "https://raw.githubusercontent.com/docker/scout-cli/${SCOUT_VERSION}/install.sh" \
+            | sh -s -- "${SCOUT_VERSION}"
+          docker scout version
+
       - name: Download VEX files for Scout
         if: inputs.vex_enabled
         run: |
@@ -228,34 +244,32 @@ jobs:
             | awk '{s+=$1} END{print s+0}')
           echo "VEX files copied to ./vex/: $count file(s), $total total statement(s)"
 
-      - name: Docker Scout (with VEX)
-        if: inputs.vex_enabled
-        uses: docker/scout-action@8910519cee8ac046f3ee99686b0dc6654d5ba1a7 # v1.20.3
-        with:
-          command: cves
-          image: "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag || github.sha }}"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          write-comment: true
-          sarif-file: "scout-results.sarif"
-          summary: true
-          exit-code: true
-          only-severities: "critical,high"
-          vex-location: ./vex
-          only-vex-affected: true
-          vex-author: "Liquibase Security Team"
-
-      - name: Docker Scout (without VEX)
-        if: ${{ !inputs.vex_enabled }}
-        uses: docker/scout-action@8910519cee8ac046f3ee99686b0dc6654d5ba1a7 # v1.20.3
-        with:
-          command: cves
-          image: "${{ inputs.image_name }}${{ inputs.suffix }}:${{ inputs.ghcr_tag || github.sha }}"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          write-comment: true
-          sarif-file: "scout-results.sarif"
-          summary: true
-          exit-code: true
-          only-severities: "critical,high"
+      # Replaces docker/scout-action (TECHOPS-661): invoke the Scout CLI directly so
+      # the binary used is the one installed above (browser-download path), never the
+      # action's unauthenticated api.github.com download that 403s. continue-on-error
+      # keeps a Scout 403 — or the TECHOPS-630 server-side VEX panic, which still has
+      # no client-side fix — from hard-failing CI; Trivy (vulnerability-scan job) is
+      # the gating scanner. Dropped vs the action: write-comment (PR comment) and the
+      # GitHub step summary, which have no `docker scout cves` CLI equivalent.
+      - name: Docker Scout (SARIF)
+        continue-on-error: true
+        env:
+          VEX_ENABLED: ${{ inputs.vex_enabled }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          SUFFIX: ${{ inputs.suffix }}
+          GHCR_TAG: ${{ inputs.ghcr_tag || github.sha }}
+        run: |
+          SCOUT_ARGS=(
+            --format sarif
+            --output scout-results.sarif
+            --only-severity critical,high
+            --exit-code
+          )
+          if [[ "$VEX_ENABLED" == "true" ]]; then
+            SCOUT_ARGS+=(--vex-location ./vex --only-vex-affected --vex-author "Liquibase Security Team")
+          fi
+          docker scout cves "${SCOUT_ARGS[@]}" \
+            "${IMAGE_NAME}${SUFFIX}:${GHCR_TAG}"
 
       - name: Docker Scout JSON output
         if: always()
@@ -268,7 +282,7 @@ jobs:
           SCOUT_ARGS=(
             --format json
             --output scout-results.json
-            --only-severities critical,high
+            --only-severity critical,high
           )
           if [[ "$VEX_ENABLED" == "true" ]]; then
             SCOUT_ARGS+=(--vex-location ./vex --only-vex-affected --vex-author "Liquibase Security Team")
@@ -285,7 +299,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload Scout scan results to GitHub Security tab
-        if: always()
+        if: ${{ always() && hashFiles('scout-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@b1bff81932f5cdfc8695c7752dcee935dcd061c8 # v4.33.0
         with:
           sarif_file: "scout-results.sarif"

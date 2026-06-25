@@ -256,16 +256,24 @@ jobs:
           # retry. Deleting the stack after a failed destroy is what strands the
           # surviving RDS instances as untracked orphans (TECHOPS-523).
           attempts=3
+          # Cap each attempt so a hung `spacectl stack task --tail` (a stalled
+          # log stream) can't burn the whole job without ever retrying. 30m is
+          # well above a normal RDS teardown, so it only trips on a real hang.
+          attempt_timeout=30m
           for i in $(seq 1 "$attempts"); do
             echo "::group::terraform destroy attempt $i/$attempts"
-            if spacectl stack task --id "${STACK_ID}" --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve"; then
+            if timeout "$attempt_timeout" spacectl stack task --id "${STACK_ID}" --tail "terraform destroy -refresh=false -parallelism=10 -auto-approve"; then
               echo "::endgroup::"
               echo "Ephemeral infra destroyed successfully on attempt $i"
               exit 0
             fi
             echo "::endgroup::"
-            echo "::warning::terraform destroy attempt $i/$attempts failed; retrying after backoff"
-            sleep 30
+            # Skip the wait after the final attempt: we're about to fail anyway.
+            if [ "$i" -lt "$attempts" ]; then
+              backoff=$((30 * i))
+              echo "::warning::terraform destroy attempt $i/$attempts failed; retrying in ${backoff}s"
+              sleep "$backoff"
+            fi
           done
           echo "::error::terraform destroy failed after $attempts attempts. Keeping Spacelift stack '${STACK_ID}' so its Terraform state is preserved for a retry. Investigate before the stack is removed to avoid orphaned RDS resources."
           exit 1

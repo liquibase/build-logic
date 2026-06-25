@@ -26,9 +26,10 @@ on:
         required: true
         type: string
       branch_name:
-        description: 'Liquibase branch to build from (workflow_dispatch input)'
-        required: true
+        description: 'Liquibase branch to build from, for Community branch-based QA builds. Optional: Secure callers download a pre-built artifact via secure_version and leave this unset.'
+        required: false
         type: string
+        default: ''
       secure_version:
         description: 'Explicit Secure version for RC/production S3 downloads, e.g. 5.0.0-RC10'
         required: false
@@ -178,10 +179,13 @@ jobs:
                 BASE_VERSION="${BASH_REMATCH[1]}"
                 RC_NUMBER="${BASH_REMATCH[2]}"
                 LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.tar.gz"
-                # RC artifacts live under releases/rc/ — this must match the
-                # post-trigger download step below. See the download-after-trigger
-                # step for the symmetric path.
-                S3_URL="s3://repo.liquibase.com/releases/rc/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
+                # Secure RC artifacts live under non-releases/secure/ — this is
+                # where publish-to-s3.yml in liquibase-pro writes them and where
+                # every live 5.1.x and 5.2.x RC actually sits today. Community
+                # does not publish RCs to S3 at all (see TECHOPS-367), so this
+                # branch is Secure-only. This path must match the post-trigger
+                # download step below.
+                S3_URL="s3://repo.liquibase.com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
                 echo "Using RC S3 path: $S3_URL"
               else
                 # Regular production version
@@ -208,12 +212,14 @@ jobs:
                 exit 1
               else
                 echo "Liquibase-Secure build not found in S3."
-                # If secure_version is provided, don't trigger workflow - the build should exist
+                # If secure_version is provided, the build MUST exist at the expected
+                # path. Do not fall back to the last main artifact — that produced
+                # docker images tagged as an RC but containing a months-old build
+                # (TECHOPS-542). Fail loudly so the release pipeline cannot ship a
+                # stale image with a fresh tag.
                 if [[ -n "$SECURE_VERSION" ]]; then
                   echo "ERROR: secure_version specified but build not found in S3. Build should already exist for version $SECURE_VERSION"
-                  echo "trigger_liquibase_secure_workflow=false" >> "$GITHUB_OUTPUT"
-                  echo "build_ready=false" >> "$GITHUB_OUTPUT"
-                  echo "use_fallback=true" >> "$GITHUB_OUTPUT"
+                  exit 1
                 else
                   echo "Branch-based build not found. Will trigger workflow to create it..."
                   echo "trigger_liquibase_secure_workflow=true" >> "$GITHUB_OUTPUT"
@@ -317,7 +323,13 @@ jobs:
         if: ${{ inputs.build_type == 'secure' && steps.download-artifact.outputs.trigger_liquibase_secure_workflow == 'true' && steps.download-artifact.outputs.use_fallback != 'true' }}
         id: trigger-liquibase-secure-release
         continue-on-error: true
-        uses: ./.github/actions/dispatch-and-wait
+        # Full repo path, not ./ — this reusable workflow runs in the CALLER's
+        # checkout (actions/checkout above pulls the caller repo into the
+        # workspace), so a ./ local-action reference resolves against the caller
+        # and the dispatch-and-wait action (which lives here in build-logic) is
+        # not found. Reference it by owner/repo path so it resolves regardless
+        # of which repo called the workflow.
+        uses: liquibase/build-logic/.github/actions/dispatch-and-wait@a220b5f9914de6995d944c33587da54d24088d64 # main
         with:
           workflow: secure-release-to-s3.yml
           repo: liquibase/liquibase-pro
@@ -343,7 +355,7 @@ jobs:
               BASE_VERSION="${BASH_REMATCH[1]}"
               RC_NUMBER="${BASH_REMATCH[2]}"
               LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.tar.gz"
-              S3_URL="s3://repo.liquibase.com/releases/rc/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
+              S3_URL="s3://repo.liquibase.com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
             else
               LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.zip"
               S3_URL="s3://repo.liquibase.com/releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"

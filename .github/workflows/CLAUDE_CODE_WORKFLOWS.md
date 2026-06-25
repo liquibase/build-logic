@@ -54,11 +54,16 @@ jobs:
 | `claude-sonnet-4-6` | $3/MTok | $15/MTok | Complex repos needing deeper analysis |
 
 **What it does:**
-- Reviews code changes in the PR
-- Checks for code quality and best practices
-- Identifies potential bugs or issues
-- Evaluates performance and security concerns
-- Comments on the PR with constructive feedback
+- Reviews code changes in the PR with a rigorous senior-reviewer persona (see the
+  [NTT-572 prompt hardening write-up](./NTT-572-pr-review-prompt-hardening.md))
+- Runs a two-pass review: pass 1 for correctness and safety, pass 2 for
+  maintainability and repo standards (CLAUDE.md)
+- Works through an explicit checklist (correctness, error handling, security, tests,
+  API/contract stability, concurrency/resources, repo standards)
+- Labels every finding by severity: `[Critical]` / `[Major]` / `[Minor]` / `[Nit]`
+- Ends each review with a 0-100% production-readiness confidence score and justification
+- Does not default to "LGTM"; it must justify approval against the checklist
+- Applies false-positive guards so added rigor does not flood PRs with noise
 
 ### 2. `claude.yml` - @claude Mention Handler
 

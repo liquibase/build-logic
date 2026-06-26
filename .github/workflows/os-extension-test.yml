@@ -249,14 +249,14 @@ jobs:
         shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS}
+        run: mvn -B test-compile failsafe:integration-test failsafe:verify -P 'coverage' ${EXTRA_MAVEN_ARGS}
 
       - name: Run Integration Tests
         if: ${{ inputs.nightly && inputs.runIntegrationTests }}
         shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
+        run: mvn -B test-compile failsafe:integration-test failsafe:verify -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

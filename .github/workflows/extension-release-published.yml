@@ -46,7 +46,12 @@ permissions:
   pull-requests: write
   packages: write
   id-token: write
-  actions: read # required by "Get build-logic ref" to read referenced_workflows via the Actions API
+  # NOTE: do not declare `actions: read` here. Extension caller workflows grant
+  # only contents/pull-requests/packages/id-token, which caps this reusable
+  # workflow at `actions: none`. Declaring `actions: read` makes the caller fail
+  # at startup ("requesting 'actions: read', but is only allowed 'actions: none'").
+  # The "Get build-logic ref" step degrades gracefully (falls back to main) when
+  # it cannot read the Actions API, so the permission is not required.
 
 jobs:
   maven-release:
@@ -112,8 +117,9 @@ jobs:
         run: |
           # In reusable workflows, github.workflow_sha resolves to the caller's SHA.
           # Query the API to find the actual ref/SHA of this reusable workflow.
-          # `|| true` so a transient API failure falls back to main instead of
-          # aborting the step (run: uses `bash -eo pipefail`).
+          # `|| true` so a failed query (transient error, or 403 when the caller
+          # did not grant actions:read) falls back to main instead of aborting the
+          # step (run: uses `bash -eo pipefail`).
           REF=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --jq '.referenced_workflows[] | select(.path | startswith("liquibase/build-logic/.github/workflows/extension-release-published")) | .ref' || true)
           echo "ref=${REF:-refs/heads/main}" >> $GITHUB_OUTPUT

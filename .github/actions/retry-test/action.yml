@@ -1,0 +1,129 @@
+name: 'Retry test command'
+description: >-
+  Run a test command with a bounded retry so transient CI failures self-heal
+  without firing false-negative alerts. The command is retried up to
+  `max-attempts` times; only after the final attempt fails does the step exit
+  non-zero. Designed for whole-suite test runs (e.g. Spock specs under a JUnit
+  Platform @Suite) where per-test rerun is not available.
+
+# SECURITY: user-controllable values (test selectors, DB coordinates, secrets)
+# must be passed via the named inputs below, NOT interpolated into `command`.
+# Each input is mapped 1:1 to an environment variable that the command then
+# references as a quoted shell variable (e.g. -Dtest="$TEST_CLASSES"). Because
+# the values travel as discrete inputs/env vars and are never spliced into the
+# command string, this follows GitHub's script-injection hardening guidance and
+# is safe even if a value contains shell metacharacters or newlines.
+
+inputs:
+  command:
+    description: >-
+      The command to run, as a shell snippet. Keep it STATIC (no ${{ }} of
+      untrusted data) and reference the values via the exported variables below,
+      e.g. `mvn -Dtest="$TEST_CLASSES" -DdbUrl="$DB_URL" test`.
+    required: true
+  max-attempts:
+    description: 'Maximum number of attempts before the step fails.'
+    required: false
+    default: '2'
+  target:
+    description: 'Human-readable label of the test target, logged on retry (e.g. "postgresql-13").'
+    required: false
+    default: ''
+  working-directory:
+    description: 'Directory to run the command in.'
+    required: false
+    default: '.'
+  # --- value slots (all optional; exported as env vars for the command) ---
+  test-classes:
+    description: 'Exported as $TEST_CLASSES.'
+    required: false
+    default: ''
+  commercial-version:
+    description: 'Exported as $COMMERCIAL_VERSION.'
+    required: false
+    default: ''
+  community-version:
+    description: 'Exported as $COMMUNITY_VERSION.'
+    required: false
+    default: ''
+  use-pro-artifacts:
+    description: 'Exported as $USE_PRO_ARTIFACTS.'
+    required: false
+    default: ''
+  db-name:
+    description: 'Exported as $DB_NAME.'
+    required: false
+    default: ''
+  db-version:
+    description: 'Exported as $DB_VERSION.'
+    required: false
+    default: ''
+  db-username:
+    description: 'Exported as $DB_USERNAME.'
+    required: false
+    default: ''
+  db-password:
+    description: 'Exported as $DB_PASSWORD.'
+    required: false
+    default: ''
+  db-url:
+    description: 'Exported as $DB_URL.'
+    required: false
+    default: ''
+  maven-opts:
+    description: 'Exported as $MAVEN_OPTS (e.g. resolved profile/version flags).'
+    required: false
+    default: ''
+  jdk-java-options:
+    description: 'Exported as $JDK_JAVA_OPTIONS (applied to the JVM for the command).'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run with retry${{ inputs.target != '' && format(' — {0}', inputs.target) || '' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        # Inputs mapped 1:1 to env vars. GitHub passes each input as a discrete
+        # value, so a metacharacter/newline in any of these cannot break out into
+        # the command — they are only ever referenced as quoted shell variables.
+        RETRY_COMMAND: ${{ inputs.command }}
+        RETRY_MAX_ATTEMPTS: ${{ inputs.max-attempts }}
+        RETRY_TARGET: ${{ inputs.target }}
+        TEST_CLASSES: ${{ inputs.test-classes }}
+        COMMERCIAL_VERSION: ${{ inputs.commercial-version }}
+        COMMUNITY_VERSION: ${{ inputs.community-version }}
+        USE_PRO_ARTIFACTS: ${{ inputs.use-pro-artifacts }}
+        DB_NAME: ${{ inputs.db-name }}
+        DB_VERSION: ${{ inputs.db-version }}
+        DB_USERNAME: ${{ inputs.db-username }}
+        DB_PASSWORD: ${{ inputs.db-password }}
+        DB_URL: ${{ inputs.db-url }}
+        MAVEN_OPTS: ${{ inputs.maven-opts }}
+        JDK_JAVA_OPTIONS: ${{ inputs.jdk-java-options }}
+      run: |
+        set -uo pipefail
+
+        if ! [[ "$RETRY_MAX_ATTEMPTS" =~ ^[1-9][0-9]*$ ]]; then
+          echo "::error::retry-test: max-attempts must be a positive integer, got '$RETRY_MAX_ATTEMPTS'"
+          exit 1
+        fi
+
+        for _attempt in $(seq 1 "$RETRY_MAX_ATTEMPTS"); do
+          # Run the command in a child shell. It inherits the exported value vars
+          # above and references them as quoted shell variables. `if` exempts this
+          # from set -e so a failed attempt falls through to the retry branch.
+          if bash -c "$RETRY_COMMAND"; then
+            exit 0
+          elif [ "$_attempt" -lt "$RETRY_MAX_ATTEMPTS" ]; then
+            # Print the (possibly user-controlled) target on a plain echo, never
+            # inside a ::workflow-command:: — a CR/LF in it cannot inject commands.
+            echo "Failed test target: ${RETRY_TARGET} (attempt ${_attempt} of ${RETRY_MAX_ATTEMPTS})"
+            echo "::warning::Test attempt ${_attempt} failed, retrying..."
+          fi
+        done
+
+        echo "::error::All ${RETRY_MAX_ATTEMPTS} attempts failed for target: ${RETRY_TARGET}"
+        exit 1

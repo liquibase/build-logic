@@ -33,7 +33,18 @@ inputs:
     description: 'Directory to run the command in.'
     required: false
     default: '.'
+  pre-command:
+    description: >-
+      Optional command run ONCE before the retry loop (e.g. a `mvn
+      dependency:tree` diagnostic). Its failure never fails the step. Keep it
+      static and reference values via the exported variables below.
+    required: false
+    default: ''
   # --- value slots (all optional; exported as env vars for the command) ---
+  pro-license-key:
+    description: 'Exported as $LIQUIBASE_PRO_LICENSE_KEY (Liquibase reads this from the environment).'
+    required: false
+    default: ''
   test-classes:
     description: 'Exported as $TEST_CLASSES.'
     required: false
@@ -90,8 +101,10 @@ runs:
         # value, so a metacharacter/newline in any of these cannot break out into
         # the command — they are only ever referenced as quoted shell variables.
         RETRY_COMMAND: ${{ inputs.command }}
+        RETRY_PRE_COMMAND: ${{ inputs.pre-command }}
         RETRY_MAX_ATTEMPTS: ${{ inputs.max-attempts }}
         RETRY_TARGET: ${{ inputs.target }}
+        LIQUIBASE_PRO_LICENSE_KEY: ${{ inputs.pro-license-key }}
         TEST_CLASSES: ${{ inputs.test-classes }}
         COMMERCIAL_VERSION: ${{ inputs.commercial-version }}
         COMMUNITY_VERSION: ${{ inputs.community-version }}
@@ -109,6 +122,11 @@ runs:
         if ! [[ "$RETRY_MAX_ATTEMPTS" =~ ^[1-9][0-9]*$ ]]; then
           echo "::error::retry-test: max-attempts must be a positive integer, got '$RETRY_MAX_ATTEMPTS'"
           exit 1
+        fi
+
+        # Optional one-time diagnostic (e.g. dependency:tree); never fails the step.
+        if [ -n "$RETRY_PRE_COMMAND" ]; then
+          bash -c "$RETRY_PRE_COMMAND" || true
         fi
 
         for _attempt in $(seq 1 "$RETRY_MAX_ATTEMPTS"); do

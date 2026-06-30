@@ -17,7 +17,8 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  issues: read
+  # write (not read) so the workflow can collapse its own prior review comments as outdated
+  issues: write
   id-token: write
   # Required for CI integration tools (mcp__github_ci__*)
   # These allow Claude to check workflow runs, job statuses, and test results
@@ -52,6 +53,28 @@ jobs:
           secret-ids: |
             ,/vault/liquibase
           parse-json-secrets: true
+
+      # A review is posted on every push, so a busy PR accumulates a stack of stale
+      # reviews. Collapse the prior claude[bot] comments as OUTDATED before posting the
+      # new one, leaving only the latest expanded. Collapsed, not deleted, so the
+      # history stays auditable.
+      - name: Collapse stale Claude review comments
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh api --paginate "repos/$REPO/issues/$PR/comments" \
+            --jq '.[] | select(.user.login == "claude[bot]") | .node_id' |
+          while read -r node_id; do
+            [ -z "$node_id" ] && continue
+            gh api graphql -f subjectId="$node_id" -f query='
+              mutation($subjectId: ID!) {
+                minimizeComment(input: {subjectId: $subjectId, classifier: OUTDATED}) {
+                  minimizedComment { isMinimized }
+                }
+              }' || echo "::warning::Could not collapse comment $node_id (already minimized?)"
+          done
 
       - name: Run Claude Code Review
         id: claude-review

@@ -17,8 +17,9 @@ description: >-
 inputs:
   command:
     description: >-
-      The command to run, as a shell snippet. Keep it STATIC (no ${{ }} of
-      untrusted data) and reference the values via the exported variables below,
+      The command to run, as a shell snippet. Keep it STATIC (no GitHub Actions
+      expression interpolation of untrusted data) and reference the values via
+      the exported variables below,
       e.g. `mvn -Dtest="$TEST_CLASSES" -DdbUrl="$DB_URL" test`.
     required: true
   max-attempts:

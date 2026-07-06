@@ -92,14 +92,14 @@ jobs:
 
     steps:
       - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Get secrets from vault
         id: vault-secrets-liquibase
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53 # v3.0.1
         with:
           secret-ids: |
             ,/vault/liquibase
@@ -107,7 +107,7 @@ jobs:
 
       - name: Configure AWS credentials for Liquibase-Secure builds
         if: ${{ inputs.build_type == 'secure' }}
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_LIQUIBASE_PRO }}
           aws-region: us-east-1
@@ -115,7 +115,7 @@ jobs:
       - name: Get GitHub App token for Liquibase-Secure workflow trigger
         if: ${{ inputs.build_type == 'secure' }}
         id: get-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ env.LIQUIBASE_GITHUB_APP_ID }}
           private-key: ${{ env.LIQUIBASE_GITHUB_APP_PRIVATE_KEY }}
@@ -125,7 +125,7 @@ jobs:
           permission-actions: write
 
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install jq
         run: |
@@ -329,7 +329,7 @@ jobs:
         # and the dispatch-and-wait action (which lives here in build-logic) is
         # not found. Reference it by owner/repo path so it resolves regardless
         # of which repo called the workflow.
-        uses: liquibase/build-logic/.github/actions/dispatch-and-wait@a220b5f9914de6995d944c33587da54d24088d64 # main
+        uses: liquibase/build-logic/.github/actions/dispatch-and-wait@39a2f8419c891bdb2a08a78b02f6a2c1bc8ae59e # main
         with:
           workflow: secure-release-to-s3.yml
           repo: liquibase/liquibase-pro
@@ -633,15 +633,15 @@ jobs:
 
       - name: Set up Docker Buildx
         if: ${{ steps.validate-build.outcome == 'success' }}
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Set up QEMU
         if: ${{ steps.validate-build.outcome == 'success' }}
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
 
       - name: Log in to internal Nexus Docker Registry
         if: ${{ steps.validate-build.outcome == 'success' && inputs.push_nexus }}
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           registry: ${{ env.REPO_URL }}
           username: ${{ env.REPO_USER }}
@@ -649,7 +649,7 @@ jobs:
 
       - name: Login to GHCR
         if: ${{ steps.validate-build.outcome == 'success' && inputs.push_ghcr }}
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -657,7 +657,7 @@ jobs:
 
       - name: Build and push Docker image
         if: ${{ steps.validate-build.outcome == 'success' }}
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         env:
           BUILD_CONTEXT: ${{ inputs.build_context }}
         with:

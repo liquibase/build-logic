@@ -207,7 +207,10 @@ jobs:
 
       - name: Install Docker Scout CLI (pinned)
         env:
-          SCOUT_VERSION: v1.21.0
+          # v1.23.1+ is required: it discards the empty VEX document the Scout
+          # platform serves for org-scoped scans instead of panicking on it
+          # (TECHOPS-630, docker/scout-cli#231).
+          SCOUT_VERSION: v1.23.1
         run: |
           # Install the Scout CLI plugin directly instead of via docker/scout-action.
           # The action downloads its binary UNAUTHENTICATED from the api.github.com
@@ -247,9 +250,9 @@ jobs:
       # Replaces docker/scout-action (TECHOPS-661): invoke the Scout CLI directly so
       # the binary used is the one installed above (browser-download path), never the
       # action's unauthenticated api.github.com download that 403s. continue-on-error
-      # keeps a Scout 403 — or the TECHOPS-630 server-side VEX panic, which still has
-      # no client-side fix — from hard-failing CI; Trivy (vulnerability-scan job) is
-      # the gating scanner. Dropped vs the action: write-comment (PR comment) and the
+      # keeps a Scout 403 from hard-failing CI; Trivy (vulnerability-scan job) is
+      # the gating scanner. (The TECHOPS-630 server-side VEX panic is fixed by the
+      # v1.23.1 pin above.) Dropped vs the action: write-comment (PR comment) and the
       # GitHub step summary, which have no `docker scout cves` CLI equivalent.
       - name: Docker Scout (SARIF)
         continue-on-error: true

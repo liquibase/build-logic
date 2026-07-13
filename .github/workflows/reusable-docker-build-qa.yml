@@ -166,6 +166,10 @@ jobs:
           LIQUIBOT_PAT_GPM_ACCESS: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
           HAS_WORKFLOW_RUN: ${{ steps.get-workflow-run.outputs.has_workflow_run }}
           WORKFLOW_RUN_ID: ${{ steps.get-workflow-run.outputs.workflow_run_id }}
+          # TECHOPS-818: RC/non-releases reads are non-public (TECHOPS-397) so must use the R2 S3 API.
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
           if [[ "$BUILD_TYPE" == "secure" ]]; then
             echo "Downloading Liquibase Secure build from S3..."
@@ -185,29 +189,29 @@ jobs:
                 # does not publish RCs to S3 at all (see TECHOPS-367), so this
                 # branch is Secure-only. This path must match the post-trigger
                 # download step below.
-                S3_URL="s3://repo.liquibase.com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
+                S3_URL="s3://repo-liquibase-com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
                 echo "Using RC S3 path: $S3_URL"
               else
                 # Regular production version
                 LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.zip"
-                S3_URL="s3://repo.liquibase.com/releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
+                S3_URL="s3://repo-liquibase-com/releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
                 echo "Using production S3 path: $S3_URL"
               fi
             else
               echo "Using branch-based build: $BRANCH_NAME"
               # Original branch-based logic
               LIQUIBASE_SECURE_ZIP="liquibase-secure-${BRANCH_NAME}.zip"
-              S3_URL="s3://repo.liquibase.com/releases/secure/${BRANCH_NAME}/$LIQUIBASE_SECURE_ZIP"
+              S3_URL="s3://repo-liquibase-com/releases/secure/${BRANCH_NAME}/$LIQUIBASE_SECURE_ZIP"
             fi
 
             echo "Downloading from S3: $S3_URL"
 
             # Try to download from S3 first
-            if ! aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" 2>/dev/null; then
+            if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" --endpoint-url "$R2_ENDPOINT" 2>/dev/null; then
               echo "Failed to download liquibase-secure build from S3. File may not exist yet."
 
               # Check if it's a 403/404 error (file doesn't exist)
-              if aws s3 ls "$S3_URL" >/dev/null 2>&1; then
+              if AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws s3 ls "$S3_URL" --endpoint-url "$R2_ENDPOINT" >/dev/null 2>&1; then
                 echo "File exists but access denied. Check permissions."
                 exit 1
               else
@@ -346,6 +350,9 @@ jobs:
         env:
           SECURE_VERSION: ${{ inputs.secure_version }}
           BRANCH_NAME: ${{ inputs.branch_name }}
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
           # Determine S3 path based on whether secure_version is provided (same logic as initial download)
           if [[ -n "$SECURE_VERSION" ]]; then
@@ -355,19 +362,19 @@ jobs:
               BASE_VERSION="${BASH_REMATCH[1]}"
               RC_NUMBER="${BASH_REMATCH[2]}"
               LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.tar.gz"
-              S3_URL="s3://repo.liquibase.com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
+              S3_URL="s3://repo-liquibase-com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
             else
               LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.zip"
-              S3_URL="s3://repo.liquibase.com/releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
+              S3_URL="s3://repo-liquibase-com/releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
             fi
           else
             LIQUIBASE_SECURE_ZIP="liquibase-secure-${BRANCH_NAME}.zip"
-            S3_URL="s3://repo.liquibase.com/releases/secure/${BRANCH_NAME}/$LIQUIBASE_SECURE_ZIP"
+            S3_URL="s3://repo-liquibase-com/releases/secure/${BRANCH_NAME}/$LIQUIBASE_SECURE_ZIP"
           fi
 
           echo "Downloading Liquibase Secure build from S3 after workflow completion..."
 
-          if ! aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP"; then
+          if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" --endpoint-url "$R2_ENDPOINT"; then
             echo "Failed to download Liquibase Secure build even after workflow completion"
             echo "Will use fallback build from branch source instead"
             echo "build_ready=false" >> "$GITHUB_OUTPUT"

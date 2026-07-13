@@ -181,6 +181,12 @@ jobs:
           ARTIFACT_S3_URI: ${{ inputs.artifact-s3-uri }}
           ARTIFACT_FILENAME: ${{ inputs.artifact-filename }}
           VERIFY: ${{ inputs.verify-checksum }}
+          # TECHOPS-818: RC artifacts now live in R2 (repo-liquibase-com), so read the
+          # source over the R2 S3 API instead of the assume-role S3 read above (which
+          # is left in place but unused). Callers pass an s3://repo-liquibase-com/... URI.
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
           set -euo pipefail
           # Force a bare filename so dist/$FILENAME can't be escaped (path traversal).
@@ -196,13 +202,13 @@ jobs:
 
           # Fail loudly if the source artifact is missing — never silently ship a
           # stale or wrong build (TECHOPS-542 lesson).
-          if ! aws s3 cp "$ARTIFACT_S3_URI" "dist/$FILENAME"; then
+          if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws s3 cp "$ARTIFACT_S3_URI" "dist/$FILENAME" --endpoint-url "$R2_ENDPOINT"; then
             echo "::error::artifact not found / not readable at $ARTIFACT_S3_URI. The RC build must be published before distribution."
             exit 1
           fi
 
           if [[ "$VERIFY" == "true" ]]; then
-            if ! aws s3 cp "${ARTIFACT_S3_URI}.sha256" "dist/${FILENAME}.sha256"; then
+            if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws s3 cp "${ARTIFACT_S3_URI}.sha256" "dist/${FILENAME}.sha256" --endpoint-url "$R2_ENDPOINT"; then
               echo "::error::verify-checksum is enabled but ${ARTIFACT_S3_URI}.sha256 is missing. Publish the checksum alongside the artifact, or set verify-checksum: false."
               exit 1
             fi

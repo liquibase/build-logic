@@ -129,12 +129,6 @@ jobs:
       PACKAGE_AVAILABLE_RPM: ${{ matrix.package_type == 'rpm' && steps.check-package.outputs.package_available || '' }}
       LATEST_OSS_VERSION: ${{ steps.oss-latest-version.outputs.oss_latest_version }}
     steps:
-      - name: Setup AWS Vault
-        uses: ./.github/actions/setup-aws-vault
-
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
       - name: Get Latest GitHub Version
         id: oss-latest-version
         run: |
@@ -143,25 +137,22 @@ jobs:
           echo "oss_latest_version=$LATEST_OSS_VERSION" >> $GITHUB_OUTPUT
           echo "Using GitHub latest version: $LATEST_OSS_VERSION"
 
-      - name: Configure AWS credentials for S3 access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
-          aws-region: us-east-1
-
+      # TECHOPS-818: repo.liquibase.com is served from Cloudflare R2 and the S3 origin
+      # is retired, so availability is verified via the public URL customers actually
+      # hit — no AWS creds / vault setup needed. These packages are public.
       - name: Check ${{ matrix.package_type }} package availability
         id: check-package
+        env:
+          LATEST_VERSION: ${{ steps.oss-latest-version.outputs.oss_latest_version }}
+          PACKAGE_TYPE: ${{ matrix.package_type }}
+          PATH_TEMPLATE: ${{ matrix.s3_path_template }}
         run: |
-          LATEST_VERSION="${{ steps.oss-latest-version.outputs.oss_latest_version }}"
-          PACKAGE_TYPE="${{ matrix.package_type }}"
           echo "Checking for ${PACKAGE_TYPE^^} package version: $LATEST_VERSION"
 
-          PACKAGE_PATH=$(printf "${{ matrix.s3_path_template }}" "$LATEST_VERSION")
+          # PATH_TEMPLATE carries a %s placeholder for the version (from the job matrix).
+          PACKAGE_PATH="${PATH_TEMPLATE//%s/$LATEST_VERSION}"
           PACKAGE_AVAILABLE=false
 
-          # TECHOPS-818: repo.liquibase.com is served from Cloudflare R2 and the S3
-          # origin is retired, so verify via the public URL customers actually hit.
-          # These packages are public, so no S3-API creds are needed here.
           PACKAGE_URL="https://repo.liquibase.com/$PACKAGE_PATH"
           if curl --output /dev/null --silent --head --fail "$PACKAGE_URL"; then
             PACKAGE_AVAILABLE=true
@@ -172,7 +163,6 @@ jobs:
 
           echo "package_available=$PACKAGE_AVAILABLE" >> $GITHUB_OUTPUT
 
-          # Throw error if package is not available
           if [ "$PACKAGE_AVAILABLE" = "false" ]; then
             echo "::error::${PACKAGE_TYPE^^} package v$LATEST_VERSION is not yet available at repo.liquibase.com"
             exit 1

@@ -182,11 +182,14 @@ jobs:
           ARTIFACT_FILENAME: ${{ inputs.artifact-filename }}
           VERIFY: ${{ inputs.verify-checksum }}
           # TECHOPS-818: RC artifacts now live in R2 (repo-liquibase-com), so read the
-          # source over the R2 S3 API instead of the assume-role S3 read above (which
-          # is left in place but unused). Callers pass an s3://repo-liquibase-com/... URI.
+          # source over the R2 S3 API. Callers pass an s3://repo-liquibase-com/... URI.
+          # AWS_DEFAULT_REGION is set explicitly so this read is self-contained and does
+          # not depend on the (now-legacy) assume-role step above — R2 ignores the region
+          # but the aws CLI requires one.
           R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_DEFAULT_REGION: auto
         run: |
           set -euo pipefail
           # Force a bare filename so dist/$FILENAME can't be escaped (path traversal).

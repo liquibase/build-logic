@@ -96,6 +96,7 @@ jobs:
             Automated changes by GitHub Actions.
           branch: version-bump-after-release
           delete-branch: true
+          labels: sdou
 
       - name: Save Release files
         if: always()

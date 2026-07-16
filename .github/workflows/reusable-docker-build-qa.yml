@@ -207,11 +207,11 @@ jobs:
             echo "Downloading from S3: $S3_URL"
 
             # Try to download from S3 first
-            if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" --endpoint-url "$R2_ENDPOINT" 2>/dev/null; then
+            if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" AWS_SESSION_TOKEN="" aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" --endpoint-url "$R2_ENDPOINT" 2>/dev/null; then
               echo "Failed to download liquibase-secure build from S3. File may not exist yet."
 
               # Check if it's a 403/404 error (file doesn't exist)
-              if AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws s3 ls "$S3_URL" --endpoint-url "$R2_ENDPOINT" >/dev/null 2>&1; then
+              if AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" AWS_SESSION_TOKEN="" aws s3 ls "$S3_URL" --endpoint-url "$R2_ENDPOINT" >/dev/null 2>&1; then
                 echo "File exists but access denied. Check permissions."
                 exit 1
               else
@@ -374,7 +374,7 @@ jobs:
 
           echo "Downloading Liquibase Secure build from S3 after workflow completion..."
 
-          if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" --endpoint-url "$R2_ENDPOINT"; then
+          if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" AWS_SESSION_TOKEN="" aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" --endpoint-url "$R2_ENDPOINT"; then
             echo "Failed to download Liquibase Secure build even after workflow completion"
             echo "Will use fallback build from branch source instead"
             echo "build_ready=false" >> "$GITHUB_OUTPUT"

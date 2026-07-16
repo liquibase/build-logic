@@ -230,33 +230,24 @@ jobs:
       # module then builds, which is both wasteful and (for liquibase-pro)
       # crashes the pro/ test fork on a half-built reactor (DAT-22961).
       # Mirrors the existing `shell: bash` declarations in pro-extension-test.yml.
+      # Single `mvn verify` runs unit tests and (via failsafe:verify) enforces
+      # integration-test results, so IT failures actually fail the build. ITs
+      # are gated by -DskipITs, driven off runIntegrationTests. Running the full
+      # lifecycle (rather than binding failsafe goals directly) keeps any
+      # pre-/post-integration-test phase bindings an extension may add working.
       - name: Run Tests
         if: ${{ !inputs.nightly }}
         shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS}
+        run: mvn -B verify -P 'coverage' -DskipITs=${{ !inputs.runIntegrationTests }} ${EXTRA_MAVEN_ARGS}
 
       - name: Run Tests
         if: ${{ inputs.nightly }}
         shell: bash
         env:
           EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
-
-      - name: Run Integration Tests
-        if: ${{ !inputs.nightly && inputs.runIntegrationTests }}
-        shell: bash
-        env:
-          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS}
-
-      - name: Run Integration Tests
-        if: ${{ inputs.nightly && inputs.runIntegrationTests }}
-        shell: bash
-        env:
-          EXTRA_MAVEN_ARGS: ${{ inputs.extraMavenArgs }}
-        run: mvn -B integration-test -P 'coverage' ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
+        run: mvn -B verify -P 'coverage' -DskipITs=${{ !inputs.runIntegrationTests }} ${EXTRA_MAVEN_ARGS} "-Dliquibase.version=main-SNAPSHOT"
 
       - name: Notify Slack on Build Failure
         if: ${{ failure() && inputs.nightly }}

@@ -895,9 +895,12 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag || format('v{0}', inputs.version) }}
           DOWNLOAD_BASE_URL: ${{ inputs.download_base_url }}
           WEB_URL: https://package.liquibase.com/downloads/oss/sdkman/
-          # TECHOPS-818: upload to R2 (repo-liquibase-com). ⚠️ SDKMAN downloads via
-          # WEB_URL (package.liquibase.com) — confirm that host is served from this R2
-          # bucket before cutover, or the SDKMAN release URL will 404.
+          # TECHOPS-818: upload to R2 (repo-liquibase-com). SDKMAN downloads via WEB_URL
+          # (package.liquibase.com), a Scarf gateway fronting repo.liquibase.com, which is
+          # already served from Cloudflare R2 (DAT-22830). The object path (sdkman/oss/<zip>)
+          # and WEB_URL are unchanged by this migration — only the bucket name changed
+          # (repo.liquibase.com → repo-liquibase-com) — so the existing Scarf route keeps
+          # resolving to the same public URL. Verified against the live Scarf rules.
           S3_BUCKET: s3://repo-liquibase-com/sdkman/oss/
           R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}

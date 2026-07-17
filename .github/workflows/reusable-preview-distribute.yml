@@ -141,6 +141,28 @@ jobs:
 
           echo "Inputs validated: product=$PRODUCT version=$VERSION customers=$CUSTOMERS expires-days=$DAYS"
 
+      - name: Configure AWS credentials for devops vault access
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.DEVOPS_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Load Cloudflare R2 credentials from devops vault
+        # TECHOPS-818: the R2 S3-API creds (used to pull the RC artifact below) live
+        # in /vault/devops (single source of truth, shared with analytics-config);
+        # the previews put-object creds (CLOUDFLARE_R2_MCP_PREVIEWS_*) and everything
+        # else stay in /vault/liquibase, read below. Pull ONLY the 3 R2 keys, masked.
+        run: |
+          set -euo pipefail
+          JSON=$(aws secretsmanager get-secret-value --secret-id /vault/devops --region us-east-1 --query SecretString --output text)
+          for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY; do
+            v=$(printf '%s' "$JSON" | jq -r --arg k "$k" '.[$k] // ""')
+            if [ -z "$v" ] || [ "$v" = "null" ]; then echo "::error::$k missing from /vault/devops"; exit 1; fi
+            echo "::add-mask::$v"
+            echo "$k=$v" >> "$GITHUB_ENV"
+          done
+          echo "Loaded CLOUDFLARE_ACCOUNT_ID + R2 access/secret keys from /vault/devops."
+
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:

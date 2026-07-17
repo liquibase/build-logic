@@ -115,6 +115,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'
     strategy:
+      # Check deb and rpm independently: a failure in one leg must not cancel the other,
+      # and both legs' outputs must reach the downstream notify-* jobs (github/build-logic#653).
+      fail-fast: false
       matrix:
         package_type: [deb, rpm]
         include:
@@ -129,12 +132,6 @@ jobs:
       PACKAGE_AVAILABLE_RPM: ${{ matrix.package_type == 'rpm' && steps.check-package.outputs.package_available || '' }}
       LATEST_OSS_VERSION: ${{ steps.oss-latest-version.outputs.oss_latest_version }}
     steps:
-      - name: Setup AWS Vault
-        uses: ./.github/actions/setup-aws-vault
-
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
       - name: Get Latest GitHub Version
         id: oss-latest-version
         run: |
@@ -143,42 +140,37 @@ jobs:
           echo "oss_latest_version=$LATEST_OSS_VERSION" >> $GITHUB_OUTPUT
           echo "Using GitHub latest version: $LATEST_OSS_VERSION"
 
-      - name: Configure AWS credentials for S3 access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
-          aws-region: us-east-1
-
-      - name: Check ${{ matrix.package_type }} package availability in S3
+      # TECHOPS-818: repo.liquibase.com is served from Cloudflare R2 and the S3 origin
+      # is retired, so availability is verified via the public URL customers actually
+      # hit — no AWS creds / vault setup needed. These packages are public.
+      - name: Check ${{ matrix.package_type }} package availability
         id: check-package
+        env:
+          LATEST_VERSION: ${{ steps.oss-latest-version.outputs.oss_latest_version }}
+          PACKAGE_TYPE: ${{ matrix.package_type }}
+          PATH_TEMPLATE: ${{ matrix.s3_path_template }}
         run: |
-          LATEST_VERSION="${{ steps.oss-latest-version.outputs.oss_latest_version }}"
-          PACKAGE_TYPE="${{ matrix.package_type }}"
           echo "Checking for ${PACKAGE_TYPE^^} package version: $LATEST_VERSION"
-          
-          # Generate the S3 path using the template
-          PACKAGE_S3_PATH=$(printf "${{ matrix.s3_path_template }}" "$LATEST_VERSION")
+
+          # PATH_TEMPLATE carries a %s placeholder for the version (from the job matrix).
+          PACKAGE_PATH="${PATH_TEMPLATE//%s/$LATEST_VERSION}"
           PACKAGE_AVAILABLE=false
-          
-          if aws s3 ls "s3://repo.liquibase.com/$PACKAGE_S3_PATH" > /dev/null 2>&1; then
+
+          PACKAGE_URL="https://repo.liquibase.com/$PACKAGE_PATH"
+          # --location: repo.liquibase.com is served from Cloudflare R2 and may 3xx to a
+          # CDN/managed domain; without -L a redirect passes --fail (exit 0) and would
+          # falsely report the package available even if the final URL 404s.
+          if curl --output /dev/null --silent --head --fail --location "$PACKAGE_URL"; then
             PACKAGE_AVAILABLE=true
-            echo "${PACKAGE_TYPE^^} package v$LATEST_VERSION is available in S3 at $PACKAGE_S3_PATH"
+            echo "${PACKAGE_TYPE^^} package v$LATEST_VERSION is available at $PACKAGE_URL"
           else
-            echo "${PACKAGE_TYPE^^} package v$LATEST_VERSION is not yet available in S3"
-            
-            # Also check the public URL as fallback
-            PACKAGE_URL="https://repo.liquibase.com/$PACKAGE_S3_PATH"
-            if curl --output /dev/null --silent --head --fail "$PACKAGE_URL"; then
-              PACKAGE_AVAILABLE=true
-              echo "${PACKAGE_TYPE^^} package v$LATEST_VERSION is available at public URL $PACKAGE_URL"
-            fi
+            echo "${PACKAGE_TYPE^^} package v$LATEST_VERSION is not yet available at $PACKAGE_URL"
           fi
-          
+
           echo "package_available=$PACKAGE_AVAILABLE" >> $GITHUB_OUTPUT
-          
-          # Throw error if package is not available
+
           if [ "$PACKAGE_AVAILABLE" = "false" ]; then
-            echo "::error::${PACKAGE_TYPE^^} package v$LATEST_VERSION is not yet available in S3"
+            echo "::error::${PACKAGE_TYPE^^} package v$LATEST_VERSION is not yet available at repo.liquibase.com"
             exit 1
           fi
 

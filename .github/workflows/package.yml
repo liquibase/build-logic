@@ -291,6 +291,11 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           GPG_PASS: ${{ env.GPG_PASSPHRASE }}
+          # TECHOPS-818: R2 S3-API creds (endpoint from CLOUDFLARE_ACCOUNT_ID). These
+          # come from the /vault/liquibase get-secrets step earlier in the job.
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
           # Debug: List available GPG keys
           echo "Available GPG keys:"
@@ -305,7 +310,17 @@ jobs:
           echo "$GPG_PASS" > "$TEMP_PASSPHRASE_FILE"
           chmod 600 "$TEMP_PASSPHRASE_FILE"
 
-          deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --bucket repo.liquibase.com --visibility=nil $PWD/.github/target/$PACKAGE_NAME-$VERSION.deb
+          # TECHOPS-818: publish apt to R2 (repo-liquibase-com) over the S3 API.
+          # deb-s3 reads AWS_ACCESS_KEY_ID/SECRET from env and honors --endpoint /
+          # --s3-region. deb-s3 does a read-modify-write of the apt indexes (Packages/
+          # Release) — VALIDATE against R2 on a dry/RC run before relying on it.
+          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
+          # env; R2 rejects a request carrying a session token, and deb-s3
+          # (aws-sdk-ruby) reads it from env, so drop it (and the legacy alias)
+          # before publishing. The dry-run deb step is separate and keeps the token.
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --endpoint "$R2_ENDPOINT" --s3-region auto --bucket repo-liquibase-com --visibility=nil $PWD/.github/target/$PACKAGE_NAME-$VERSION.deb
 
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
@@ -435,24 +450,14 @@ jobs:
           echo "Checking RPM signature with query:"
           rpm -qip "$RPM_FILENAME" | grep -i signature || echo "No signature info in package header"
 
-      - name: Invalidate CloudFront cache
-        if: ${{ inputs.dry_run == false }}
-        continue-on-error: true
-        run: |
-          # Get CloudFront distribution ID for repo.liquibase.com
-          DISTRIBUTION_ID=$(aws cloudfront list-distributions \
-            --query "DistributionList.Items[?Aliases.Items[?@=='repo.liquibase.com']].Id" \
-            --output text)
-
-          if [ -n "$DISTRIBUTION_ID" ]; then
-            echo "Invalidating CloudFront cache for distribution: $DISTRIBUTION_ID"
-            aws cloudfront create-invalidation \
-              --distribution-id "$DISTRIBUTION_ID" \
-              --paths "/dists/stable/*"
-            echo "CloudFront cache invalidation created for /dists/stable/*"
-          else
-            echo "Warning: Could not find CloudFront distribution for repo.liquibase.com"
-          fi
+      # TECHOPS-818: the CloudFront invalidation was removed. repo.liquibase.com is
+      # served from Cloudflare R2 (CloudFront decommissioned, DAT-22896), so there is
+      # no distribution to invalidate. Metadata freshness now comes from writing
+      # directly to R2 — the frozen apt/yum metadata was caused by Sippy lazy-copy
+      # (never refreshing existing keys), not the CDN. If the Cloudflare edge ever
+      # holds metadata too long post-cutover, fix it with a cache rule on the
+      # dists/** + yum/** paths in liquibase-infrastructure/cloudflare, not a
+      # per-publish purge here.
 
       - name: Convert deb to rpm
         continue-on-error: true
@@ -577,6 +582,11 @@ jobs:
         env:
           RPM_FILENAME: ${{ env.RPM_FILENAME }}
           GPG_PASS: ${{ env.GPG_PASSPHRASE }}
+          # TECHOPS-818: R2 S3-API creds (endpoint from CLOUDFLARE_ACCOUNT_ID) from
+          # the /vault/liquibase get-secrets step earlier in the job.
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
           sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
 
@@ -628,14 +638,37 @@ jobs:
           # Create YUM repository directory structure
           mkdir -p yum/noarch
 
-          # Download existing RPMs from S3 (excluding the current version to avoid conflicts)
-          echo "Downloading existing RPMs from S3..."
-          aws s3 ls s3://repo.liquibase.com/yum/noarch/ | grep -E '\.rpm$' | awk '{print $4}' | while read rpm; do
+          # Download existing RPMs from R2 (excluding the current version to avoid conflicts).
+          # TECHOPS-818: yum repo now lives in R2 (repo-liquibase-com) — read-modify-write
+          # of the yum metadata over the S3 API.
+          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
+          # env; R2 rejects a request carrying a session token, so drop it (and the
+          # legacy alias) for every R2 S3-API call in this step. The dry-run S3 step
+          # is separate and keeps the token. (same fix as analytics-config#33)
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+          echo "Downloading existing RPMs from R2..."
+          # Capture the listing first: piping `aws s3 ls` straight into `while` masks an ls
+          # failure (the pipeline's exit status is `while`'s), which would leave yum/noarch/
+          # empty and make the later `sync --delete` wipe the live repo. Capture + count, and
+          # download in the current shell (here-string, not a pipe subshell) so EXPECTED_RPMS
+          # survives for the pre-delete guard below.
+          if ! RAW_LS=$(AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+              aws s3 ls s3://repo-liquibase-com/yum/noarch/ --endpoint-url "$R2_ENDPOINT"); then
+            echo "ERROR: failed to list existing RPMs from R2; aborting before the destructive sync --delete."
+            exit 1
+          fi
+          # An empty listing (new/empty repo) is legitimate; grep returning no matches is fine.
+          REMOTE_RPMS=$(printf '%s\n' "$RAW_LS" | grep -E '\.rpm$' | awk '{print $4}' || true)
+          EXPECTED_RPMS=0
+          while read -r rpm; do
+            [ -z "$rpm" ] && continue
             # Skip if it's the same version we're uploading
             if [[ "$rpm" != "$RPM_FILENAME" ]]; then
-              aws s3 cp "s3://repo.liquibase.com/yum/noarch/$rpm" yum/noarch/
+              AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+                aws s3 cp "s3://repo-liquibase-com/yum/noarch/$rpm" yum/noarch/ --endpoint-url "$R2_ENDPOINT"
+              EXPECTED_RPMS=$((EXPECTED_RPMS + 1))
             fi
-          done
+          done <<< "$REMOTE_RPMS"
 
           # Copy the signed RPM to the repository directory
           echo "Copying signed RPM to repository..."
@@ -661,9 +694,23 @@ jobs:
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASS" --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
 
-          # Upload to S3
-          echo "Uploading repository to S3..."
-          aws s3 sync yum s3://repo.liquibase.com/yum --delete
+          # Guard the destructive `sync --delete`: every pre-existing remote RPM must be present
+          # locally, otherwise an incomplete download above would make --delete remove live RPMs
+          # from the bucket. Abort rather than publish a repo that drops packages.
+          DOWNLOADED_RPMS=$(find yum/noarch -maxdepth 1 -name '*.rpm' ! -name "$RPM_FILENAME" | wc -l | tr -d ' ')
+          if [ "$DOWNLOADED_RPMS" -ne "$EXPECTED_RPMS" ]; then
+            echo "ERROR: expected $EXPECTED_RPMS existing RPMs from R2 but only $DOWNLOADED_RPMS are present locally;"
+            echo "refusing 'sync --delete' to avoid removing live RPMs from the yum repo."
+            exit 1
+          fi
+          echo "Verified $DOWNLOADED_RPMS/$EXPECTED_RPMS existing RPMs present locally; safe to sync --delete."
+
+          # Upload to R2. --checksum-algorithm CRC32: newer aws-cli defaults to a CRC64NVME
+          # checksum that R2 rejects (same fix as analytics-config#33). `sync --delete` removes
+          # remote keys not present locally (guarded above).
+          echo "Uploading repository to R2..."
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 sync yum s3://repo-liquibase-com/yum --delete --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
 
           echo "✓ RPM repository updated successfully"
 
@@ -858,7 +905,16 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag || format('v{0}', inputs.version) }}
           DOWNLOAD_BASE_URL: ${{ inputs.download_base_url }}
           WEB_URL: https://package.liquibase.com/downloads/oss/sdkman/
-          S3_BUCKET: s3://repo.liquibase.com/sdkman/oss/
+          # TECHOPS-818: upload to R2 (repo-liquibase-com). SDKMAN downloads via WEB_URL
+          # (package.liquibase.com), a Scarf gateway fronting repo.liquibase.com, which is
+          # already served from Cloudflare R2 (DAT-22830). The object path (sdkman/oss/<zip>)
+          # and WEB_URL are unchanged by this migration — only the bucket name changed
+          # (repo.liquibase.com → repo-liquibase-com) — so the existing Scarf route keeps
+          # resolving to the same public URL. Verified against the live Scarf rules.
+          S3_BUCKET: s3://repo-liquibase-com/sdkman/oss/
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
           set -e  # Exit on any error
 
@@ -872,9 +928,15 @@ jobs:
           mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
           mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
           zip -r $ZIP_FILENAME ./liquibase-$VERSION
-          # Upload the release to S3
-          aws s3 cp $ZIP_FILENAME $S3_BUCKET
-          echo "Uploaded $ZIP_FILENAME to s3"
+          # Upload the release to R2. --checksum-algorithm CRC32: newer aws-cli defaults to a
+          # CRC64NVME checksum that R2 rejects (same fix as analytics-config#33).
+          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job env;
+          # R2 rejects a request carrying a session token, so drop it (and the legacy
+          # alias). The dry-run S3 step is separate and keeps the token.
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp $ZIP_FILENAME $S3_BUCKET --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+          echo "Uploaded $ZIP_FILENAME to R2"
 
           # Send the release to SDKMAN
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \

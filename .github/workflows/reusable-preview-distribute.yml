@@ -205,13 +205,13 @@ jobs:
 
           # Fail loudly if the source artifact is missing — never silently ship a
           # stale or wrong build (TECHOPS-542 lesson).
-          if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" AWS_SESSION_TOKEN="" aws s3 cp "$ARTIFACT_S3_URI" "dist/$FILENAME" --endpoint-url "$R2_ENDPOINT"; then
+          if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" env -u AWS_SESSION_TOKEN -u AWS_SECURITY_TOKEN aws s3 cp "$ARTIFACT_S3_URI" "dist/$FILENAME" --endpoint-url "$R2_ENDPOINT"; then
             echo "::error::artifact not found / not readable at $ARTIFACT_S3_URI. The RC build must be published before distribution."
             exit 1
           fi
 
           if [[ "$VERIFY" == "true" ]]; then
-            if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" AWS_SESSION_TOKEN="" aws s3 cp "${ARTIFACT_S3_URI}.sha256" "dist/${FILENAME}.sha256" --endpoint-url "$R2_ENDPOINT"; then
+            if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" env -u AWS_SESSION_TOKEN -u AWS_SECURITY_TOKEN aws s3 cp "${ARTIFACT_S3_URI}.sha256" "dist/${FILENAME}.sha256" --endpoint-url "$R2_ENDPOINT"; then
               echo "::error::verify-checksum is enabled but ${ARTIFACT_S3_URI}.sha256 is missing. Publish the checksum alongside the artifact, or set verify-checksum: false."
               exit 1
             fi
@@ -246,8 +246,9 @@ jobs:
           CUSTOMERS: ${{ inputs.customers }}
           RUN_ID: ${{ github.run_id }}
           # R2 creds (scoped to the previews bucket) from vault. Used ONLY for the
-          # put-object below; AWS_SESSION_TOKEN is cleared so the SDK doesn't mix
-          # the OIDC STS session with the R2 access key.
+          # put-object below; AWS_SESSION_TOKEN/AWS_SECURITY_TOKEN are unset (not
+          # just blanked) so the SDK doesn't mix the OIDC STS session with the R2
+          # access key — R2 rejects a request that carries a session token.
           R2_AKID: ${{ env.CLOUDFLARE_R2_MCP_PREVIEWS_ACCESS_KEY_ID }}
           R2_SECRET: ${{ env.CLOUDFLARE_R2_MCP_PREVIEWS_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ env.CLOUDFLARE_R2_MCP_PREVIEWS_ENDPOINT }}
@@ -286,8 +287,8 @@ jobs:
             # Upload to R2 under the scoped R2 key; metadata drives the Worker.
             AWS_ACCESS_KEY_ID="$R2_AKID" \
             AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            AWS_SESSION_TOKEN="" \
             AWS_DEFAULT_REGION=auto \
+            env -u AWS_SESSION_TOKEN -u AWS_SECURITY_TOKEN \
             aws s3api put-object \
               --endpoint-url "$R2_ENDPOINT" \
               --bucket "$R2_BUCKET" \

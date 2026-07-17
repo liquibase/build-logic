@@ -314,6 +314,11 @@ jobs:
           # deb-s3 reads AWS_ACCESS_KEY_ID/SECRET from env and honors --endpoint /
           # --s3-region. deb-s3 does a read-modify-write of the apt indexes (Packages/
           # Release) — VALIDATE against R2 on a dry/RC run before relying on it.
+          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
+          # env; R2 rejects a request carrying a session token, and deb-s3
+          # (aws-sdk-ruby) reads it from env, so drop it (and the legacy alias)
+          # before publishing. The dry-run deb step is separate and keeps the token.
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
             deb-s3 upload --preserve-versions --sign "$ACTUAL_KEY_ID" --gpg-options "\-\-pinentry-mode loopback \-\-batch \-\-passphrase\-file $TEMP_PASSPHRASE_FILE \-\-yes \-\-quiet" --endpoint "$R2_ENDPOINT" --s3-region auto --bucket repo-liquibase-com --visibility=nil $PWD/.github/target/$PACKAGE_NAME-$VERSION.deb
 
@@ -636,6 +641,11 @@ jobs:
           # Download existing RPMs from R2 (excluding the current version to avoid conflicts).
           # TECHOPS-818: yum repo now lives in R2 (repo-liquibase-com) — read-modify-write
           # of the yum metadata over the S3 API.
+          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
+          # env; R2 rejects a request carrying a session token, so drop it (and the
+          # legacy alias) for every R2 S3-API call in this step. The dry-run S3 step
+          # is separate and keeps the token. (same fix as analytics-config#33)
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
           echo "Downloading existing RPMs from R2..."
           # Capture the listing first: piping `aws s3 ls` straight into `while` masks an ls
           # failure (the pipeline's exit status is `while`'s), which would leave yum/noarch/
@@ -920,6 +930,10 @@ jobs:
           zip -r $ZIP_FILENAME ./liquibase-$VERSION
           # Upload the release to R2. --checksum-algorithm CRC32: newer aws-cli defaults to a
           # CRC64NVME checksum that R2 rejects (same fix as analytics-config#33).
+          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job env;
+          # R2 rejects a request carrying a session token, so drop it (and the legacy
+          # alias). The dry-run S3 step is separate and keeps the token.
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
             aws s3 cp $ZIP_FILENAME $S3_BUCKET --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
           echo "Uploaded $ZIP_FILENAME to R2"

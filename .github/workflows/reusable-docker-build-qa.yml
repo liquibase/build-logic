@@ -206,12 +206,15 @@ jobs:
 
             echo "Downloading from S3: $S3_URL"
 
-            # Try to download from S3 first
-            if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" AWS_SESSION_TOKEN="" aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" --endpoint-url "$R2_ENDPOINT" 2>/dev/null; then
-              echo "Failed to download liquibase-secure build from S3. File may not exist yet."
+            # Try to download from R2 first. AWS_SESSION_TOKEN/AWS_SECURITY_TOKEN
+            # are unset (not blanked) — configure-aws-credentials exports the OIDC
+            # session token, and R2 rejects a request that carries one alongside
+            # the long-lived R2 keys.
+            if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" env -u AWS_SESSION_TOKEN -u AWS_SECURITY_TOKEN aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" --endpoint-url "$R2_ENDPOINT" 2>/dev/null; then
+              echo "Failed to download liquibase-secure build from R2. File may not exist yet."
 
               # Check if it's a 403/404 error (file doesn't exist)
-              if AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" AWS_SESSION_TOKEN="" aws s3 ls "$S3_URL" --endpoint-url "$R2_ENDPOINT" >/dev/null 2>&1; then
+              if AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" env -u AWS_SESSION_TOKEN -u AWS_SECURITY_TOKEN aws s3 ls "$S3_URL" --endpoint-url "$R2_ENDPOINT" >/dev/null 2>&1; then
                 echo "File exists but access denied. Check permissions."
                 exit 1
               else
@@ -225,15 +228,21 @@ jobs:
                   echo "ERROR: secure_version specified but build not found in S3. Build should already exist for version $SECURE_VERSION"
                   exit 1
                 else
-                  echo "Branch-based build not found. Will trigger workflow to create it..."
-                  echo "trigger_liquibase_secure_workflow=true" >> "$GITHUB_OUTPUT"
+                  # On-demand secure build via secure-release-to-s3.yml is retired
+                  # (TECHOPS-818: secure publishing moved to R2 and that workflow
+                  # was deleted). Branch-based secure QA now falls back explicitly
+                  # to a branch-source Dockerfile build — logged here so the
+                  # substitution is visible, not silent (per the TECHOPS-542 note).
+                  # The versioned-release path above still fails loudly when a
+                  # secure_version build is missing, so no stale RC can ship.
+                  echo "Branch-based secure build not found in R2 and on-demand build is retired (TECHOPS-818)."
+                  echo "Falling back to a branch-source Dockerfile build for branch ${BRANCH_NAME}."
                   echo "build_ready=false" >> "$GITHUB_OUTPUT"
-                  echo "use_fallback=false" >> "$GITHUB_OUTPUT"
+                  echo "use_fallback=true" >> "$GITHUB_OUTPUT"
                 fi
               fi
             else
-              echo "Successfully downloaded Liquibase-Secure build from S3"
-              echo "trigger_liquibase_secure_workflow=false" >> "$GITHUB_OUTPUT"
+              echo "Successfully downloaded Liquibase-Secure build from R2"
               echo "build_ready=true" >> "$GITHUB_OUTPUT"
               echo "use_fallback=false" >> "$GITHUB_OUTPUT"
 
@@ -323,108 +332,22 @@ jobs:
             ls -la liquibase-build/
           fi
 
-      - name: Trigger Liquibase Secure Release Workflow
-        if: ${{ inputs.build_type == 'secure' && steps.download-artifact.outputs.trigger_liquibase_secure_workflow == 'true' && steps.download-artifact.outputs.use_fallback != 'true' }}
-        id: trigger-liquibase-secure-release
-        continue-on-error: true
-        # Full repo path, not ./ — this reusable workflow runs in the CALLER's
-        # checkout (actions/checkout above pulls the caller repo into the
-        # workspace), so a ./ local-action reference resolves against the caller
-        # and the dispatch-and-wait action (which lives here in build-logic) is
-        # not found. Reference it by owner/repo path so it resolves regardless
-        # of which repo called the workflow.
-        uses: liquibase/build-logic/.github/actions/dispatch-and-wait@a220b5f9914de6995d944c33587da54d24088d64 # main
-        with:
-          workflow: secure-release-to-s3.yml
-          repo: liquibase/liquibase-pro
-          ref: ${{ inputs.branch_name }}
-          inputs: '{"version": "${{ inputs.branch_name }}"}'
-          wait: 'true'
-          timeout: 60m
-          interval: 10m
-          gh-token: ${{ steps.get-token.outputs.token }}
-
-      - name: Download Liquibase Secure build from S3 after workflow completion
-        if: ${{ inputs.build_type == 'secure' && steps.download-artifact.outputs.trigger_liquibase_secure_workflow == 'true' && steps.download-artifact.outputs.use_fallback != 'true' }}
-        id: download-after-trigger
-        env:
-          SECURE_VERSION: ${{ inputs.secure_version }}
-          BRANCH_NAME: ${{ inputs.branch_name }}
-          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
-          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
-        run: |
-          # Determine S3 path based on whether secure_version is provided (same logic as initial download)
-          if [[ -n "$SECURE_VERSION" ]]; then
-            echo "Using secure_version: $SECURE_VERSION"
-            VERSION="$SECURE_VERSION"
-            if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-RC([0-9]+)$ ]]; then
-              BASE_VERSION="${BASH_REMATCH[1]}"
-              RC_NUMBER="${BASH_REMATCH[2]}"
-              LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.tar.gz"
-              S3_URL="s3://repo-liquibase-com/non-releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
-            else
-              LIQUIBASE_SECURE_ZIP="liquibase-secure-${VERSION}.zip"
-              S3_URL="s3://repo-liquibase-com/releases/secure/${VERSION}/${LIQUIBASE_SECURE_ZIP}"
-            fi
-          else
-            LIQUIBASE_SECURE_ZIP="liquibase-secure-${BRANCH_NAME}.zip"
-            S3_URL="s3://repo-liquibase-com/releases/secure/${BRANCH_NAME}/$LIQUIBASE_SECURE_ZIP"
-          fi
-
-          echo "Downloading Liquibase Secure build from S3 after workflow completion..."
-
-          if ! AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" AWS_SESSION_TOKEN="" aws s3 cp "$S3_URL" "$LIQUIBASE_SECURE_ZIP" --endpoint-url "$R2_ENDPOINT"; then
-            echo "Failed to download Liquibase Secure build even after workflow completion"
-            echo "Will use fallback build from branch source instead"
-            echo "build_ready=false" >> "$GITHUB_OUTPUT"
-            echo "use_fallback=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "Successfully downloaded Liquibase Secure build after workflow completion"
-
-          # Extract the liquibase Secure archive
-          mkdir -p liquibase-build
-          if [[ "$LIQUIBASE_SECURE_ZIP" == *.tar.gz ]]; then
-            tar -xzf "$LIQUIBASE_SECURE_ZIP" -C liquibase-build/
-            echo "Liquibase Secure build extracted from tar.gz to liquibase-build/"
-          else
-            unzip -qo "$LIQUIBASE_SECURE_ZIP" -d liquibase-build/
-            echo "Liquibase Secure build extracted from zip to liquibase-build/"
-          fi
-          echo "Contents of liquibase-build:"
-          ls -la liquibase-build/
-          echo "build_ready=true" >> "$GITHUB_OUTPUT"
-          echo "use_fallback=false" >> "$GITHUB_OUTPUT"
-
       - name: Validate and prepare liquibase build
         if: ${{ (inputs.build_type == 'Community' && (steps.download-artifact.outputs.build_ready == 'true' || steps.download-artifact.outputs.use_fallback == 'true')) || inputs.build_type == 'secure' }}
         id: validate-build
         env:
           BUILD_TYPE: ${{ inputs.build_type }}
           DOWNLOAD_USE_FALLBACK: ${{ steps.download-artifact.outputs.use_fallback }}
-          DOWNLOAD_AFTER_USE_FALLBACK: ${{ steps.download-after-trigger.outputs.use_fallback }}
-          DOWNLOAD_TRIGGERED: ${{ steps.download-artifact.outputs.trigger_liquibase_secure_workflow }}
-          TRIGGER_OUTCOME: ${{ steps.trigger-liquibase-secure-release.outcome }}
-          DOWNLOAD_BUILD_READY: ${{ steps.download-artifact.outputs.build_ready }}
-          DOWNLOAD_AFTER_BUILD_READY: ${{ steps.download-after-trigger.outputs.build_ready }}
         run: |
           # Determine build mode
           USE_FALLBACK="false"
           if [[ "$BUILD_TYPE" == "Community" && "$DOWNLOAD_USE_FALLBACK" == "true" ]]; then
             USE_FALLBACK="true"
           elif [[ "$BUILD_TYPE" == "secure" ]]; then
-            # Check for Secure fallback conditions
-            if [[ "$DOWNLOAD_USE_FALLBACK" == "true" ]] || [[ "$DOWNLOAD_AFTER_USE_FALLBACK" == "true" ]]; then
-              USE_FALLBACK="true"
-            # Check if Liquibase Secure workflow was triggered but failed
-            elif [[ "$DOWNLOAD_TRIGGERED" == "true" ]] && [[ "$TRIGGER_OUTCOME" == "failure" ]]; then
-              echo "Liquibase Secure workflow trigger failed, falling back to standard Dockerfile build"
-              USE_FALLBACK="true"
-            # Check if Liquibase Secure workflow succeeded but download still failed
-            elif [[ "$DOWNLOAD_TRIGGERED" == "true" ]] && [[ "$DOWNLOAD_BUILD_READY" != "true" ]] && [[ "$DOWNLOAD_AFTER_BUILD_READY" != "true" ]]; then
-              echo "Liquibase Secure workflow completed but build still not available, falling back to standard Dockerfile build"
+            # Secure QA uses the R2-published artifact. If it was missing,
+            # download-artifact already set use_fallback=true (on-demand build via
+            # secure-release-to-s3.yml is retired, TECHOPS-818), so honor that here.
+            if [[ "$DOWNLOAD_USE_FALLBACK" == "true" ]]; then
               USE_FALLBACK="true"
             fi
           fi
@@ -709,9 +632,6 @@ jobs:
           BUILD_TYPE: ${{ inputs.build_type }}
           VALIDATE_USE_FALLBACK: ${{ steps.validate-build.outputs.use_fallback_build }}
           DOWNLOAD_USE_FALLBACK: ${{ steps.download-artifact.outputs.use_fallback }}
-          DOWNLOAD_AFTER_USE_FALLBACK: ${{ steps.download-after-trigger.outputs.use_fallback }}
-          DOWNLOAD_TRIGGERED: ${{ steps.download-artifact.outputs.trigger_liquibase_secure_workflow }}
-          DOWNLOAD_AFTER_BUILD_READY: ${{ steps.download-after-trigger.outputs.build_ready }}
           JOB_STATUS: ${{ job.status }}
           IMAGE_TAG: ${{ steps.image-tag.outputs.image_tag }}
           REPO_URL: ${{ env.REPO_URL }}
@@ -725,7 +645,7 @@ jobs:
 
           # Determine if fallback was used
           USE_FALLBACK="false"
-          if [[ "$VALIDATE_USE_FALLBACK" == "true" ]] || [[ "$DOWNLOAD_USE_FALLBACK" == "true" ]] || [[ "$DOWNLOAD_AFTER_USE_FALLBACK" == "true" ]]; then
+          if [[ "$VALIDATE_USE_FALLBACK" == "true" ]] || [[ "$DOWNLOAD_USE_FALLBACK" == "true" ]]; then
             USE_FALLBACK="true"
           fi
 
@@ -735,21 +655,8 @@ jobs:
             echo "   - Used standard Dockerfile without modification"
             echo "   - Built directly from liquibase branch: ${BRANCH_NAME}"
           elif [[ "$BUILD_TYPE" == "secure" ]]; then
-            if [[ "$DOWNLOAD_TRIGGERED" == "true" ]]; then
-              echo "Build Mode: ARTIFACT-BASED (Secure workflow triggered)"
-              echo "   - S3 build was missing for branch ${BRANCH_NAME}"
-              echo "   - Automatically triggered pro-release-to-s3.yml workflow"
-              if [[ "$DOWNLOAD_AFTER_BUILD_READY" == "true" ]]; then
-                echo "   - Liquibase-Secure workflow completed successfully"
-                echo "   - Liquibase-Secure build downloaded and Docker image built"
-              else
-                echo "   - Liquibase-Secure workflow may have failed"
-                echo "   - Check: https://github.com/liquibase/liquibase-pro/actions/workflows/secure-release-to-s3.yml"
-              fi
-            else
-              echo "Build Mode: ARTIFACT-BASED (Direct S3 download)"
-              echo "   - Liquibase-Secure build downloaded from S3"
-            fi
+            echo "Build Mode: ARTIFACT-BASED (Direct R2 download)"
+            echo "   - Liquibase-Secure build downloaded from R2"
           else
             echo "Build Mode: ARTIFACT-BASED (GitHub artifact)"
             echo "   - Community build downloaded from GitHub workflow artifacts"

@@ -317,7 +317,8 @@ jobs:
               --key "$CODE" \
               --body "$ARTIFACT" \
               --content-type "$CONTENT_TYPE" \
-              --metadata "$META" >/dev/null
+              --metadata "$META" \
+              --checksum-algorithm CRC32 >/dev/null
 
             URL="https://preview.liquibase.com/${CODE}"
 

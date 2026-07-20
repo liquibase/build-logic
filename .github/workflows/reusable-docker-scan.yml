@@ -159,6 +159,12 @@ jobs:
       security-events: write
       pull-requests: write
       actions: read
+    env:
+      # v1.23.1+ is required: it discards the empty VEX document the Scout
+      # platform serves for org-scoped scans instead of panicking on it
+      # (TECHOPS-630, docker/scout-cli#231). Single source of truth for both the
+      # cache key and the install step below — bump here only.
+      SCOUT_VERSION: v1.23.1
 
     steps:
       - name: Checkout caller repository
@@ -213,15 +219,13 @@ jobs:
           key: scout-cli-${{ runner.os }}-${{ env.SCOUT_VERSION }}
 
       - name: Install Docker Scout CLI (pinned)
-        env:
-          # v1.23.1+ is required: it discards the empty VEX document the Scout
-          # platform serves for org-scoped scans instead of panicking on it
-          # (TECHOPS-630, docker/scout-cli#231).
-          SCOUT_VERSION: v1.23.1
         run: |
-          # Skip install if a cache hit restored a working plugin
-          if docker scout version >/dev/null 2>&1; then
-            echo "Scout CLI restored from cache"
+          # Skip install only if the cache restored the PINNED version. Checking
+          # merely that the plugin exists would trust a stale/poisoned cache and
+          # silently run the wrong Scout — the exact case TECHOPS-630 pinned
+          # v1.23.1+ to avoid.
+          if docker scout version 2>/dev/null | grep -q "${SCOUT_VERSION#v}"; then
+            echo "Scout CLI ${SCOUT_VERSION} restored from cache"
             docker scout version
             exit 0
           fi

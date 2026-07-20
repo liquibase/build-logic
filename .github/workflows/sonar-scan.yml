@@ -235,8 +235,32 @@ jobs:
             MVN_GOALS="package -DskipTests sonar:sonar"
           fi
 
-          mvn -B -Daws.region="us-east-1" -Dsonar.token=$SONAR_TOKEN \
-              -Dsonar.host.url=https://sonarcloud.io \
-              $PR_FLAGS $SONAR_PROPS \
-              -Dsonar.scm.revision=$SCM_REVISION \
-              $MVN_GOALS
+          # TECHOPS-888: the SonarCloud Compute Engine task intermittently
+          # finishes abnormally and CE-status polling returns
+          # `{"errors":[{"msg":"Project doesn't exist"}]}`, failing an
+          # otherwise-good analysis. Re-submission is idempotent and a plain
+          # re-run succeeds, so retry ONLY on that transient CE signature.
+          # Non-transient failures (bad key, real analysis errors) still fail
+          # on the first attempt so they are not masked.
+          run_sonar() {
+            mvn -B -Daws.region="us-east-1" -Dsonar.token=$SONAR_TOKEN \
+                -Dsonar.host.url=https://sonarcloud.io \
+                $PR_FLAGS $SONAR_PROPS \
+                -Dsonar.scm.revision=$SCM_REVISION \
+                $MVN_GOALS 2>&1 | tee sonar-output.log
+            return ${PIPESTATUS[0]}
+          }
+
+          max=3
+          for attempt in $(seq 1 $max); do
+            if run_sonar; then
+              exit 0
+            fi
+            if grep -qE "Project doesn't exist|CE Task finished abnormally" sonar-output.log && [ "$attempt" -lt "$max" ]; then
+              echo "Transient SonarCloud CE failure on attempt $attempt/$max (TECHOPS-888); retrying in 30s..."
+              sleep 30
+              continue
+            fi
+            echo "Sonar scan failed on attempt $attempt/$max (non-transient or retries exhausted)."
+            exit 1
+          done

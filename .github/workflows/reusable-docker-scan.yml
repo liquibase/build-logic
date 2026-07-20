@@ -159,6 +159,12 @@ jobs:
       security-events: write
       pull-requests: write
       actions: read
+    env:
+      # v1.23.1+ is required: it discards the empty VEX document the Scout
+      # platform serves for org-scoped scans instead of panicking on it
+      # (TECHOPS-630, docker/scout-cli#231). Single source of truth for both the
+      # cache key and the install step below — bump here only.
+      SCOUT_VERSION: v1.23.1
 
     steps:
       - name: Checkout caller repository
@@ -205,13 +211,25 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME_DECODED }}
           password: ${{ env.DOCKERHUB_TOKEN }}
 
+      - name: Restore Scout CLI cache
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          # install.sh installs the CLI plugin to ~/.docker/cli-plugins/docker-scout
+          path: ~/.docker/cli-plugins/docker-scout
+          key: scout-cli-${{ runner.os }}-${{ env.SCOUT_VERSION }}
+
       - name: Install Docker Scout CLI (pinned)
-        env:
-          # v1.23.1+ is required: it discards the empty VEX document the Scout
-          # platform serves for org-scoped scans instead of panicking on it
-          # (TECHOPS-630, docker/scout-cli#231).
-          SCOUT_VERSION: v1.23.1
         run: |
+          # Skip install only if the cache restored the PINNED version. Checking
+          # merely that the plugin exists would trust a stale/poisoned cache and
+          # silently run the wrong Scout — the exact case TECHOPS-630 pinned
+          # v1.23.1+ to avoid.
+          if docker scout version 2>/dev/null | grep -q "${SCOUT_VERSION#v}"; then
+            echo "Scout CLI ${SCOUT_VERSION} restored from cache"
+            docker scout version
+            exit 0
+          fi
+
           # Install the Scout CLI plugin directly instead of via docker/scout-action.
           # The action downloads its binary UNAUTHENTICATED from the api.github.com
           # release-asset API, which is rate-limited to 60 req/hr per shared runner
@@ -220,9 +238,21 @@ jobs:
           # (objects.githubusercontent.com) and resolves the pinned tag via github.com
           # — never api.github.com — so it does not consume that limit. Pinning the
           # version also skips install.sh's `latest` redirect lookup.
-          curl -sSfL "https://raw.githubusercontent.com/docker/scout-cli/${SCOUT_VERSION}/install.sh" \
-            | sh -s -- "${SCOUT_VERSION}"
-          docker scout version
+          # Wrap with retry (max 3 attempts) to handle transient network failures.
+          for attempt in 1 2 3; do
+            echo "Install attempt $attempt/3"
+            if curl -sSfL "https://raw.githubusercontent.com/docker/scout-cli/${SCOUT_VERSION}/install.sh" \
+              | sh -s -- "${SCOUT_VERSION}"; then
+              docker scout version
+              exit 0
+            fi
+            if [ $attempt -lt 3 ]; then
+              echo "Install failed, waiting 10s before retry..."
+              sleep 10
+            fi
+          done
+          echo "Scout CLI install failed after 3 attempts"
+          exit 1
 
       - name: Download VEX files for Scout
         if: inputs.vex_enabled
@@ -301,8 +331,18 @@ jobs:
           path: scout-results.json
           if-no-files-found: warn
 
+      # Unrolled 2-attempt retry so a transient GitHub 504 on this visibility-only upload doesn't fail the run / fire a false Slack alert (TECHOPS-843).
       - name: Upload Scout scan results to GitHub Security tab
+        id: upload-sarif
         if: ${{ always() && hashFiles('scout-results.sarif') != '' }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@b1bff81932f5cdfc8695c7752dcee935dcd061c8 # v4.33.0
+        with:
+          sarif_file: "scout-results.sarif"
+          category: "${{ inputs.image_name }}${{ inputs.suffix }}"
+
+      - name: Upload Scout scan results to GitHub Security tab (retry)
+        if: ${{ always() && hashFiles('scout-results.sarif') != '' && steps.upload-sarif.outcome == 'failure' }}
         uses: github/codeql-action/upload-sarif@b1bff81932f5cdfc8695c7752dcee935dcd061c8 # v4.33.0
         with:
           sarif_file: "scout-results.sarif"

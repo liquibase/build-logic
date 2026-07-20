@@ -210,7 +210,7 @@ jobs:
         with:
           # install.sh installs the CLI plugin to ~/.docker/cli-plugins/docker-scout
           path: ~/.docker/cli-plugins/docker-scout
-          key: scout-cli-${{ runner.os }}-v1.23.1
+          key: scout-cli-${{ runner.os }}-${{ env.SCOUT_VERSION }}
 
       - name: Install Docker Scout CLI (pinned)
         env:

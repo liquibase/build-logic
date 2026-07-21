@@ -155,13 +155,16 @@ jobs:
             VERSION_FLAG="-Dliquibase.version=${LIQUIBASE_BRANCH}-SNAPSHOT"
           fi
 
-          # TECHOPS-888: the SonarCloud Compute Engine task intermittently
-          # finishes abnormally and CE-status polling returns
-          # `{"errors":[{"msg":"Project doesn't exist"}]}`, failing an
-          # otherwise-good analysis. Re-submission is idempotent and a plain
-          # re-run succeeds, so retry ONLY on that transient CE signature.
-          # Non-transient failures (bad key, real analysis errors) still fail
-          # on the first attempt so they are not masked. This step only runs
+          # TECHOPS-888: SonarCloud intermittently fails an otherwise-good
+          # analysis two ways: (1) the Compute Engine task finishes abnormally
+          # and CE-status polling returns `Project doesn't exist`; (2) the
+          # scanner API returns a transient server-side 5xx (e.g.
+          # `HttpException: Error 504 ... Endpoint request timed out`, or a 500
+          # `An unexpected error occurred`). Both are transient and a plain
+          # re-run succeeds, so retry on those signatures only. Non-transient
+          # failures (bad key, real analysis errors, quality-gate) are 4xx /
+          # non-5xx and still fail on the first attempt so they are not masked.
+          # This step only runs
           # `sonar:sonar` (coverage is already merged above), so each retry
           # simply re-submits the same analysis.
           #
@@ -190,8 +193,8 @@ jobs:
             if run_sonar; then
               exit 0
             fi
-            if grep -qE "Project doesn't exist|CE Task finished abnormally" "$SONAR_LOG" && [ "$attempt" -lt "$max" ]; then
-              echo "Transient SonarCloud CE failure on attempt $attempt/$max (TECHOPS-888); retrying in 30s..."
+            if grep -qE "Project doesn't exist|CE Task finished abnormally|HttpException: Error 5[0-9][0-9]|Endpoint request timed out|An unexpected error occurred" "$SONAR_LOG" && [ "$attempt" -lt "$max" ]; then
+              echo "Transient SonarCloud failure on attempt $attempt/$max (TECHOPS-888); retrying in 30s..."
               sleep 30
               continue
             fi

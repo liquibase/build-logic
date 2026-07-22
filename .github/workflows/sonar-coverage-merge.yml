@@ -155,20 +155,21 @@ jobs:
             VERSION_FLAG="-Dliquibase.version=${LIQUIBASE_BRANCH}-SNAPSHOT"
           fi
 
-          # TECHOPS-888: the SonarCloud Compute Engine task intermittently
-          # finishes abnormally and CE-status polling returns
-          # `{"errors":[{"msg":"Project doesn't exist"}]}`, failing an
-          # otherwise-good analysis. Re-submission is idempotent and a plain
-          # re-run succeeds, so retry ONLY on that transient CE signature.
-          # Non-transient failures (bad key, real analysis errors) still fail
-          # on the first attempt so they are not masked. This step only runs
-          # `sonar:sonar` (coverage is already merged above), so each retry
-          # simply re-submits the same analysis.
+          # TECHOPS-888: SonarCloud analysis intermittently fails for transient
+          # server-side reasons (CE task "Project doesn't exist"; 5xx / gateway
+          # timeouts from the scanner API during SonarCloud load or outages).
+          # Matching specific error strings proved fragile (each new signature
+          # slipped through), so retry the whole analysis on ANY failure up to
+          # `max` attempts with backoff. Re-submission is idempotent. A genuine
+          # failure (bad key, real analysis error, quality-gate) simply fails
+          # again and goes red after the final attempt — retries never mask a
+          # real failure, they only cost extra time on one. A sustained
+          # SonarCloud outage will still fail the build; retry only rides out
+          # brief blips.
           #
           # NOTE: run_sonar must always be called from a condition (if/&&/||)
           # so `set -e` is suppressed inside the function body and execution
           # reaches `return ${PIPESTATUS[0]}` (Maven's exit, not tee's).
-          SONAR_LOG="${RUNNER_TEMP:-/tmp}/sonar-output.log"
           run_sonar() {
             mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
               $VERSION_FLAG \
@@ -181,7 +182,7 @@ jobs:
               -Dsonar.organization=$REPO_OWNER \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.scm.provider=git \
-              -Daws.region=us-east-1 2>&1 | tee "$SONAR_LOG"
+              -Daws.region=us-east-1
             return ${PIPESTATUS[0]}
           }
 
@@ -190,11 +191,11 @@ jobs:
             if run_sonar; then
               exit 0
             fi
-            if grep -qE "Project doesn't exist|CE Task finished abnormally" "$SONAR_LOG" && [ "$attempt" -lt "$max" ]; then
-              echo "Transient SonarCloud CE failure on attempt $attempt/$max (TECHOPS-888); retrying in 30s..."
+            if [ "$attempt" -lt "$max" ]; then
+              echo "SonarCloud analysis failed on attempt $attempt/$max (TECHOPS-888); retrying in 30s..."
               sleep 30
               continue
             fi
-            echo "Sonar scan failed on attempt $attempt/$max (non-transient or retries exhausted)."
+            echo "SonarCloud analysis failed after $max attempts."
             exit 1
           done

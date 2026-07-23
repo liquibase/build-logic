@@ -39,7 +39,7 @@ on:
         description: "Specify the artifact ID to be used in the release"
         required: false
         default: ""
-        type: string  
+        type: string
       combineJars:
         description: "Specify it if you want to combine jars into one"
         required: false
@@ -271,12 +271,16 @@ jobs:
       artifact_version: ${{needs.build-multi-architecture.outputs.artifact_version}}
 
   attach-to-release:
-    if: ${{ always() && !contains(needs.*.result, 'failure') }}
+    # Only run for pushes/dispatches, or PRs that actually merged - a closed-without-merge PR (e.g. Dependabot's PR rejected/superseded) has nothing to release.
+    if: ${{ always() && !contains(needs.*.result, 'failure') && (github.event_name != 'pull_request' || github.event.pull_request.merged == true) }}
     name: Attach Artifact to Release
     needs: [build-multi-architecture, combineJars]
     runs-on: ubuntu-latest
     concurrency:
-      group: attach-artifact-${{ github.ref }}
+      # Scoped to the repo, not github.ref: for pull_request events github.ref is refs/pull/<N>/merge, which differs per PR,
+      # so it never serialized concurrent PR merges against the single shared draft release (see TECHOPS-830).
+      group: attach-artifact-release-${{ github.repository }}
+      cancel-in-progress: false
     steps:
       - run: sleep 30
         if: ${{ inputs.dry_run == false }}

@@ -225,14 +225,25 @@ jobs:
           # under <basedir>/target/. That breaks `sonar.tests` path resolution:
           # a relative path like `src/test/groovy` becomes
           # `<basedir>/target/src/test/groovy`, which doesn't exist
-          # (PR 3666 Round 22 cassandra symptom). Run `sonar:sonar` standalone
-          # for multi-module callers; preserve `package -DskipTests sonar:sonar`
+          # (PR 3666 Round 22 cassandra symptom). Run the sonar goal standalone
+          # for multi-module callers; preserve `package -DskipTests <sonar goal>`
           # for single-module (artifactPath: ".") callers since their workflow
           # has not done a prior install. (DAT-22961.)
+          #
+          # The goal is fully qualified instead of the `sonar:sonar` prefix:
+          # prefix resolution only worked through a legacy
+          # org.codehaus.mojo:sonar-maven-plugin relocation entry in Maven
+          # Central's group metadata, which Central dropped on 2026-07-24 —
+          # breaking every consumer whose pom does not declare the plugin
+          # ("No plugin found for prefix 'sonar'"). Left unversioned on
+          # purpose: repos that pin the version via <pluginManagement> keep
+          # their pin; others resolve the latest release, matching the old
+          # prefix behavior.
+          SONAR_GOAL="org.sonarsource.scanner.maven:sonar-maven-plugin:sonar"
           if [ "$INPUT_ARTIFACT_PATH" != "." ]; then
-            MVN_GOALS="sonar:sonar"
+            MVN_GOALS="$SONAR_GOAL"
           else
-            MVN_GOALS="package -DskipTests sonar:sonar"
+            MVN_GOALS="package -DskipTests $SONAR_GOAL"
           fi
 
           # TECHOPS-888: SonarCloud analysis intermittently fails for transient
@@ -261,13 +272,13 @@ jobs:
 
           max=3
           for attempt in $(seq 1 $max); do
-            # Attempt 1 builds (single-module uses `package ... sonar:sonar`);
+            # Attempt 1 builds (single-module uses `package ... <sonar goal>`);
             # the failure occurs after build+upload, so retries only need to
             # re-submit analysis. Re-running `package` would re-invoke
             # maven-shade-plugin and break sonar.tests path resolution (see
-            # above), so retries run `sonar:sonar` only against the target/
+            # above), so retries run the sonar goal only against the target/
             # already produced by attempt 1.
-            [ "$attempt" -gt 1 ] && MVN_GOALS="sonar:sonar"
+            [ "$attempt" -gt 1 ] && MVN_GOALS="$SONAR_GOAL"
             if run_sonar; then
               exit 0
             fi

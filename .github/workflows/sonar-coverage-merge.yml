@@ -170,8 +170,14 @@ jobs:
           # NOTE: run_sonar must always be called from a condition (if/&&/||)
           # so `set -e` is suppressed inside the function body and execution
           # reaches `return ${PIPESTATUS[0]}` (Maven's exit, not tee's).
+          # Fully qualified instead of the `sonar:sonar` prefix: prefix
+          # resolution only worked through a legacy org.codehaus.mojo
+          # relocation entry in Maven Central's group metadata, dropped on
+          # 2026-07-24 ("No plugin found for prefix 'sonar'"). Unversioned so
+          # the consuming repo's <pluginManagement> pin (or its active `sonar`
+          # profile) still controls the version.
           run_sonar() {
-            mvn -B sonar:sonar -P 'sonar,!run-proguard' -DskipTests \
+            mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -P 'sonar,!run-proguard' -DskipTests \
               $VERSION_FLAG \
               $MAVEN_ARGS \
               -Dsonar.scm.revision=$SCM_REVISION \

@@ -281,6 +281,7 @@ jobs:
       # so it never serialized concurrent PR merges against the single shared draft release (see TECHOPS-830).
       group: attach-artifact-release-${{ github.repository }}
       cancel-in-progress: false
+      queue: max
     steps:
       - run: sleep 30
         if: ${{ inputs.dry_run == false }}

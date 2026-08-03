@@ -63,6 +63,12 @@ on:
       total_vulnerabilities:
         description: 'Count reported by Trivy'
         value: ${{ jobs.vulnerability-scan.outputs.total_vulnerabilities }}
+      unassessed_cves:
+        description: 'Comma-separated HIGH/CRITICAL CVE IDs absent from liquibase-pro vex/assessments.yaml (TECHOPS-997)'
+        value: ${{ jobs.vulnerability-scan.outputs.unassessed_cves }}
+      unassessed_cve_count:
+        description: 'Number of unassessed HIGH/CRITICAL CVEs (TECHOPS-997)'
+        value: ${{ jobs.vulnerability-scan.outputs.unassessed_cve_count }}
 
 jobs:
   # ============================================
@@ -443,13 +449,79 @@ jobs:
             echo "$DELIM"
           } >> "$GITHUB_OUTPUT"
 
+      # TECHOPS-997: classify the failure before alerting. The previous payload was a
+      # fixed title plus a run link, so every alert looked identical — a genuinely new
+      # CVE, a repeat of a CVE already awaiting assessment, and a transient GHCR/SARIF
+      # failure were indistinguishable without opening the run. Reading the CVE gate's
+      # own outputs makes each post self-describing.
+      #
+      # Every value reaches the shell through env: (never inlined into run:), and the
+      # only externally-influenced field is the ref name, which is emitted as data.
+      - name: Compose alert body
+        id: body
+        env:
+          SCAN_STATUS: ${{ needs.vulnerability-scan.outputs.scan_status }}
+          TOTAL_VULNS: ${{ needs.vulnerability-scan.outputs.total_vulnerabilities }}
+          UNASSESSED_CVES: ${{ needs.vulnerability-scan.outputs.unassessed_cves }}
+          UNASSESSED_COUNT: ${{ needs.vulnerability-scan.outputs.unassessed_cve_count }}
+          RESULT_BUILD: ${{ needs.build-ghcr.result }}
+          RESULT_SCAN: ${{ needs.vulnerability-scan.result }}
+          RESULT_SCOUT: ${{ needs.scout.result }}
+          RESULT_CLEANUP: ${{ needs.cleanup-ghcr.result }}
+          IMAGE: ${{ inputs.image_name }}${{ inputs.suffix }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+
+          failed=""
+          for pair in "build:${RESULT_BUILD}" "scan:${RESULT_SCAN}" \
+                      "scout:${RESULT_SCOUT}" "cleanup:${RESULT_CLEANUP}"; do
+            [ "${pair##*:}" = "failure" ] && failed="${failed}${failed:+, }${pair%%:*}"
+          done
+          : "${failed:=unknown}"
+
+          # detail/hint stay single-line: a literal newline inside these assignments
+          # would terminate the enclosing YAML block scalar.
+          if [ "${UNASSESSED_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+            # A real, not-yet-assessed finding — the only case that needs a human.
+            reason="${UNASSESSED_COUNT} unassessed HIGH/CRITICAL CVE(s)"
+            detail="*Unassessed:* ${UNASSESSED_CVES}"
+            hint="*Next step:* assess in \`liquibase-pro/vex/assessments.yaml\` — an auto-assessment PR is opened only for pushes to \`main\`."
+          elif [ "${SCAN_STATUS:-}" = "fail" ]; then
+            # Gate tripped but nothing is unassessed: assessments.yaml could not be
+            # reached/parsed, or fail_on_vulnerabilities fired without CVE dispatch.
+            reason="CVE gate failed on ${TOTAL_VULNS:-0} HIGH/CRITICAL finding(s)"
+            detail="No unassessed CVEs were identified."
+            hint="Check the \`Run CVE diff\` step — a failed assessments.yaml fetch fails closed by design."
+          else
+            # Nothing wrong with the image; the pipeline around it broke.
+            reason="infrastructure failure in: ${failed}"
+            detail="CVE gate reported no finding failure (scan_status=\`${SCAN_STATUS:-n/a}\`, findings=\`${TOTAL_VULNS:-0}\`)."
+            hint="Failed job(s): ${failed}. Likely transient — re-run before triaging."
+          fi
+
+          DELIM="BODY_EOF_${RANDOM}${RANDOM}"
+          {
+            echo "title=❌ ${IMAGE} scan failed on ${REF_NAME} — ${reason}"
+            echo "message<<$DELIM"
+            echo "*Image:* \`${IMAGE}\`  *Ref:* \`${REF_NAME}\` (${EVENT_NAME})"
+            echo "$detail"
+            echo "$hint"
+            echo "<${RUN_URL}|View run>"
+            echo "$DELIM"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Alert reason: ${reason}"
+
       - name: Notify Slack on failure
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
         env:
           SLACK_WEBHOOK: ${{ steps.webhook.outputs.url }}
           SLACK_COLOR: failure
-          SLACK_TITLE: "❌ ${{ github.repository }} ❌ Docker scan failed on ${{ github.ref_name }} (${{ github.sha }})"
-          SLACK_MESSAGE: "View run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          SLACK_TITLE: ${{ steps.body.outputs.title }}
+          SLACK_MESSAGE: ${{ steps.body.outputs.message }}
           SLACK_USERNAME: liquibot
           SLACK_ICON_EMOJI: ":whale:"
           SLACK_FOOTER: "${{ github.repository }}"

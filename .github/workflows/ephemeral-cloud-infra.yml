@@ -95,6 +95,11 @@ on:
         description: "The stack ID to destroy"
         required: false
         type: string
+      state_run_id:
+        description: "For a cross-run destroy (destroy in a different run than the deploy, e.g. a scheduled reaper): the github.run_id of the deploy run whose terraform-state artifact should be restored. Defaults to the current run, preserving the usual same-run deploy+destroy behaviour."
+        required: false
+        type: string
+        default: ""
     outputs:
       stack_id:
         description: "The stack ID of the ephemeral cloud infrastructure"
@@ -106,6 +111,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  actions: read # download-artifact needs this to restore state from another run (cross-run destroy)
 
 jobs:
   ephemeral-cloud-infra:
@@ -298,6 +304,10 @@ jobs:
         with:
           name: terraform-state
           path: test-automation-ephemeral/stack
+          # For a cross-run destroy the state artifact lives in the deploy run;
+          # pull it from there. Defaults to the current run (same-run destroy).
+          run-id: ${{ inputs.state_run_id || github.run_id }}
+          github-token: ${{ github.token }}
 
       - name: Destroy ephemeral stack
         # Only delete the Spacelift stack object when the AWS resource destroy

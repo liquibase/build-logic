@@ -51,6 +51,11 @@ on:
         required: false
         type: boolean
         default: false
+      aws_postgresql_iam_demo:
+        description: "TECHOPS-993: also trust the LiquibaseDeveloper SSO role on the IAM-auth Postgres connect role, so a human presenter can AssumeRole for Secure demos. No effect unless aws_postgresql_iam is also true."
+        required: false
+        type: boolean
+        default: false
       aws_oracle:
         description: "Deploy or destroy the aws_oracle infrastructure"
         required: false
@@ -210,6 +215,7 @@ jobs:
           INPUT_SNOWFLAKE_EXT: ${{ inputs.snowflake_ext }}
           INPUT_AWS_POSTGRESQL: ${{ inputs.aws_postgresql }}
           INPUT_AWS_POSTGRESQL_IAM: ${{ inputs.aws_postgresql_iam }}
+          INPUT_AWS_POSTGRESQL_IAM_DEMO: ${{ inputs.aws_postgresql_iam_demo }}
           INPUT_AWS_ORACLE: ${{ inputs.aws_oracle }}
           INPUT_AWS_MARIADB: ${{ inputs.aws_mariadb }}
           INPUT_AWS_AURORA_MYSQL: ${{ inputs.aws_aurora_mysql }}
@@ -229,6 +235,7 @@ jobs:
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_ext "$INPUT_SNOWFLAKE_EXT"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql "$INPUT_AWS_POSTGRESQL"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql_iam "$INPUT_AWS_POSTGRESQL_IAM"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_postgresql_iam_demo "$INPUT_AWS_POSTGRESQL_IAM_DEMO"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle "$INPUT_AWS_ORACLE"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mariadb "$INPUT_AWS_MARIADB"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql "$INPUT_AWS_AURORA_MYSQL"

@@ -52,7 +52,7 @@ on:
         type: boolean
         default: false
       aws_postgresql_iam_demo:
-        description: "TECHOPS-993: also trust the LiquibaseDeveloper SSO role on the IAM-auth Postgres connect role, so a human presenter can AssumeRole for Secure demos. No effect unless aws_postgresql_iam is also true."
+        description: "Also trust the LiquibaseDeveloper SSO role on the IAM-auth Postgres connect role, so a human presenter can AssumeRole for Secure demos. No effect unless aws_postgresql_iam is also true."
         required: false
         type: boolean
         default: false

@@ -56,6 +56,11 @@ on:
         required: false
         type: boolean
         default: false
+      aws_postgresql_iam_demo_expiry:
+        description: "Unix epoch (seconds) stamped as the IAM-auth Postgres demo-expiry tag. Terraform-managed so an autodeploy re-apply cannot strip it. No effect unless aws_postgresql_iam_demo is true."
+        required: false
+        type: string
+        default: ""
       aws_oracle:
         description: "Deploy or destroy the aws_oracle infrastructure"
         required: false
@@ -222,6 +227,7 @@ jobs:
           INPUT_AWS_POSTGRESQL: ${{ inputs.aws_postgresql }}
           INPUT_AWS_POSTGRESQL_IAM: ${{ inputs.aws_postgresql_iam }}
           INPUT_AWS_POSTGRESQL_IAM_DEMO: ${{ inputs.aws_postgresql_iam_demo }}
+          INPUT_AWS_POSTGRESQL_IAM_DEMO_EXPIRY: ${{ inputs.aws_postgresql_iam_demo_expiry }}
           INPUT_AWS_ORACLE: ${{ inputs.aws_oracle }}
           INPUT_AWS_MARIADB: ${{ inputs.aws_mariadb }}
           INPUT_AWS_AURORA_MYSQL: ${{ inputs.aws_aurora_mysql }}
@@ -242,6 +248,7 @@ jobs:
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql "$INPUT_AWS_POSTGRESQL"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql_iam "$INPUT_AWS_POSTGRESQL_IAM"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_postgresql_iam_demo "$INPUT_AWS_POSTGRESQL_IAM_DEMO"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_postgresql_iam_demo_expiry "$INPUT_AWS_POSTGRESQL_IAM_DEMO_EXPIRY"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle "$INPUT_AWS_ORACLE"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mariadb "$INPUT_AWS_MARIADB"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql "$INPUT_AWS_AURORA_MYSQL"
@@ -328,7 +335,10 @@ jobs:
         if: ${{ inputs.destroy && steps.destroy_infra.outcome == 'success' }}
         working-directory: test-automation-ephemeral/stack
         run: |
-          terraform destroy -auto-approve -var "run_id=$GH_RUN_ID" -var "run_repo=$GH_REPOSITORY"
+          # On a cross-run destroy the restored state belongs to state_run_id, so
+          # pass that run id (not the reaper's) to keep the run_id var in sync with
+          # the state being destroyed. Falls back to the current run for same-run.
+          terraform destroy -auto-approve -var "run_id=${{ inputs.state_run_id || github.run_id }}" -var "run_repo=$GH_REPOSITORY"
 
       - name: Notify Slack on teardown failure
         # Alert the team the moment a teardown fails, instead of waiting for

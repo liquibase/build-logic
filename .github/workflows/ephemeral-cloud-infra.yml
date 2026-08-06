@@ -334,11 +334,13 @@ jobs:
         # would strand the surviving RDS resources as orphans (TECHOPS-523).
         if: ${{ inputs.destroy && steps.destroy_infra.outcome == 'success' }}
         working-directory: test-automation-ephemeral/stack
+        env:
+          STATE_RUN_ID: ${{ inputs.state_run_id }}
         run: |
           # On a cross-run destroy the restored state belongs to state_run_id, so
           # pass that run id (not the reaper's) to keep the run_id var in sync with
           # the state being destroyed. Falls back to the current run for same-run.
-          terraform destroy -auto-approve -var "run_id=${{ inputs.state_run_id || github.run_id }}" -var "run_repo=$GH_REPOSITORY"
+          terraform destroy -auto-approve -var "run_id=${STATE_RUN_ID:-$GH_RUN_ID}" -var "run_repo=$GH_REPOSITORY"
 
       - name: Notify Slack on teardown failure
         # Alert the team the moment a teardown fails, instead of waiting for

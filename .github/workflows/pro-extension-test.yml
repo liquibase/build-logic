@@ -676,7 +676,7 @@ jobs:
             /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar
             /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar
             /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom
-          # Consumed by publish-for-liquibase.yml; 5 days leaves room to re-run publishing.
+          # Not consumed inside build-logic; 5 days lets a caller repo pick it up in the same run.
           retention-days: 5
 
   cleanup-individual-artifacts:

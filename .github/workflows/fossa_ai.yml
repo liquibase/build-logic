@@ -155,3 +155,4 @@ jobs:
         with:
           name: fossa-3party-license-report
           path: fossa-3party-license-report.html
+          retention-days: 5

@@ -148,12 +148,15 @@ jobs:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
             ${{ inputs.artifactPath }}/target/*
+          # Job handoff only: downloaded again by unit-test in this same run.
+          retention-days: 1
 
       - name: Save Event File
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: Event File
           path: ${{ github.event_path }}
+          retention-days: 1
 
   unit-test:
     strategy:
@@ -278,6 +281,7 @@ jobs:
             **/target/surefire-reports
             **/target/failsafe-reports
             **/target/site/jacoco/jacoco.xml
+          retention-days: 5
 
   sonar-pr:
     if: ${{ !inputs.skipSonar && !inputs.nightly }}

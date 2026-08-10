@@ -310,6 +310,8 @@ jobs:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.normalize-os.outputs.platform }}-${{ steps.get-artifact-version.outputs.artifact_version }}-artifacts
           path: |
             ${{ inputs.artifactPath }}/target/*
+          # Job handoff only: downloaded again by unit-test and combineJars in this same run.
+          retention-days: 1
 
       - name: Save Event File
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -317,6 +319,7 @@ jobs:
         with:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-${{ steps.normalize-os.outputs.platform }}-${{ steps.get-artifact-version.outputs.artifact_version }}-events
           path: ${{ github.event_path }}
+          retention-days: 1
 
       - name: Save Artifacts for Ubuntu Latest to be used for GPM publishing
         if: contains(matrix.os, 'ubuntu')
@@ -325,6 +328,7 @@ jobs:
           name: ${{ env.PROJECT_ARTIFACT_NAME }}-artifacts
           path: |
             target/*
+          retention-days: 1
 
   unit-test:
     strategy:
@@ -522,6 +526,7 @@ jobs:
           path: |
             **/target/surefire-reports
             **/target/site/jacoco/jacoco.xml
+          retention-days: 5
 
   combineJars:
     needs: [build, unit-test]
@@ -671,6 +676,8 @@ jobs:
             /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-sources.jar
             /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}-javadoc.jar
             /tmp/combined/${{ env.PROJECT_ARTIFACT_NAME }}-${{needs.build.outputs.artifact_version}}.pom
+          # Not consumed inside build-logic; 5 days lets a caller repo pick it up in the same run.
+          retention-days: 5
 
   cleanup-individual-artifacts:
     needs: [build, combineJars]

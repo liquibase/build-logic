@@ -295,6 +295,35 @@ jobs:
           fi
           spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
 
+      # TECHOPS-1019: destroy-only preflight. The RDS destroy below targets
+      # inputs.stack_id (via Spacelift), while "Destroy ephemeral stack" targets whatever
+      # the S3 state selected in "Terraform Init" (keyed by state_run_id) holds. Confirm
+      # they are the SAME stack before destroying anything, and detect the "nothing was
+      # ever provisioned" case (a deploy cancelled before apply leaves an empty state):
+      #   * no ephemeral_stack_id in state -> nothing to tear down; skip both destroys, so
+      #     a cancelled-before-creation run does not raise a false teardown alert;
+      #   * present but != inputs.stack_id -> mismatched stack_id/state_run_id; fail rather
+      #     than tear down the wrong stack.
+      - name: Verify destroy target
+        id: verify_state
+        if: ${{ inputs.destroy }}
+        working-directory: test-automation-ephemeral/stack
+        env:
+          STACK_ID: ${{ inputs.stack_id }}
+        run: |
+          STATE_STACK="$(terraform output -raw ephemeral_stack_id 2>/dev/null || true)"
+          if [ -z "${STATE_STACK}" ]; then
+            echo "::warning::No ephemeral_stack_id in the selected state — nothing was provisioned (deploy likely cancelled before apply). Skipping teardown."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -n "${STACK_ID}" ] && [ "${STATE_STACK}" != "${STACK_ID}" ]; then
+            echo "::error::Selected state targets stack '${STATE_STACK}' but the stack_id input is '${STACK_ID}'. Refusing to destroy, to avoid tearing down the wrong stack (mismatched stack_id/state_run_id)."
+            exit 1
+          fi
+          echo "Destroy target confirmed: ${STATE_STACK}"
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
       - name: Destroy ephemeral infra
         id: destroy_infra
         env:
@@ -303,7 +332,9 @@ jobs:
           SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}
           SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
           SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
-        if: ${{ inputs.destroy }}
+        # Skipped when the preflight found no provisioned stack (empty state), so a
+        # cancelled-before-creation run is a clean no-op rather than a failed destroy.
+        if: ${{ inputs.destroy && steps.verify_state.outputs.present == 'true' }}
         working-directory: test-automation-ephemeral/infra
         run: |
           # Retry the infra destroy to absorb transient AWS API throttling and
@@ -373,7 +404,6 @@ jobs:
           SLACK_COLOR: danger
           SLACK_TITLE: "Ephemeral teardown failed — possible orphaned resources"
           SLACK_MESSAGE: |
-            terraform destroy failed for stack `${{ inputs.stack_id }}` (${{ github.repository }}).
+            Ephemeral teardown failed for stack `${{ inputs.stack_id }}` (${{ github.repository }}).
             State is preserved for a retry — please investigate and clean up to avoid orphaned resources: publicly-accessible RDS (TECHOPS-523) and/or the ephemeral IAM role + Spacelift stack (TECHOPS-1019).
-            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

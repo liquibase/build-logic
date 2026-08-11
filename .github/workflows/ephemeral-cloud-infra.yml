@@ -101,7 +101,7 @@ on:
         required: false
         type: string
       state_run_id:
-        description: "For a cross-run destroy (destroy in a different run than the deploy, e.g. a scheduled reaper): the github.run_id of the deploy run whose terraform-state artifact should be restored. Defaults to the current run, preserving the usual same-run deploy+destroy behaviour."
+        description: "For a cross-run destroy (destroy in a different run than the deploy, e.g. a scheduled reaper): the github.run_id of the deploy run whose Terraform state (in S3, key test-automation-ephemeral/stack/<run_id>.tfstate) should be targeted. Defaults to the current run, preserving the usual same-run deploy+destroy behaviour."
         required: false
         type: string
         default: ""
@@ -116,11 +116,16 @@ on:
 permissions:
   contents: read
   id-token: write
-  actions: read # download-artifact needs this to restore state from another run (cross-run destroy)
+  # TECHOPS-1019: actions: read is no longer needed — cross-run destroy now reads
+  # state from S3 by key (state_run_id), not by downloading another run's artifact.
 
 jobs:
   ephemeral-cloud-infra:
-    name: ${{ inputs.action}} Ephemeral Cloud Infrastructure
+    # `inputs.action` was never declared under workflow_call.inputs, so it rendered empty
+    # (actionlint flagged it). Dropping it is name-preserving — GitHub trimmed the leading
+    # space, so the job already displayed as "Ephemeral Cloud Infrastructure" — which keeps
+    # required status checks in every calling repo intact.
+    name: Ephemeral Cloud Infrastructure
     runs-on: ubuntu-latest
     env:
       GH_RUN_ID: ${{ github.run_id }}
@@ -182,7 +187,37 @@ jobs:
       - name: Terraform Init
         working-directory: test-automation-ephemeral/stack
         id: init
-        run: terraform init
+        env:
+          STATE_BUCKET: liquibase-dev-test-automation-ephemeral-tfstate
+          STATE_RUN_ID: ${{ inputs.state_run_id }}
+        run: |
+          # TECHOPS-1019: keep this config's state in S3, keyed per run, instead of
+          # shipping terraform.tfstate between the deploy and destroy legs as an artifact.
+          # A deploy cancelled before the upload used to leave the destroy leg with no
+          # state; it then imported only spacelift_stack.stack and destroyed just that,
+          # stranding the ephemeral IAM role (PowerUserAccess) + AWS integration with no
+          # reaper to reclaim them. Durable state means destroy reads the FULL state and
+          # tears down every resource.
+          #
+          # The backend is written here, not committed to the module, because this job
+          # checks out liquibase-infrastructure@main: a committed backend would break
+          # every ephemeral run in the window before this workflow change also landed.
+          # The bucket is created in liquibase-infrastructure (dev-account s3.tf) and must
+          # exist first (see merge order in the PR).
+          #
+          # key: per run, so a run's deploy and destroy share state; a cross-run destroy
+          # (the demo reaper) passes state_run_id to target that run's state. No lock
+          # table / use_lockfile: TF 1.5.7 predates S3-native locking, and each run owns a
+          # unique key that is never written concurrently.
+          cat > backend.tf <<'HCL'
+          terraform {
+            backend "s3" {}
+          }
+          HCL
+          terraform init \
+            -backend-config="bucket=${STATE_BUCKET}" \
+            -backend-config="key=test-automation-ephemeral/stack/${STATE_RUN_ID:-$GH_RUN_ID}.tfstate" \
+            -backend-config="region=us-east-1"
 
       - name: Create ephemeral stack
         id: create_stack
@@ -202,12 +237,9 @@ jobs:
           echo "Ephemeral stack created with ID: $CREATE_STACK_ID"
           echo "stack_id=$CREATE_STACK_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Upload Terraform state as artifact
-        if: ${{ inputs.deploy && always()}}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: terraform-state
-          path: test-automation-ephemeral/stack/terraform.tfstate
+      # TECHOPS-1019: the Terraform state artifact is gone — state now lives in S3
+      # (see "Terraform Init"), so there is nothing to upload and no artifact for the
+      # destroy leg to depend on.
 
       - name: Create ephemeral infra
         id: create_infra
@@ -305,27 +337,11 @@ jobs:
           echo "::error::terraform destroy failed after $attempts attempts. Keeping Spacelift stack '${STACK_ID}' so its Terraform state is preserved for a retry. Investigate before the stack is removed to avoid orphaned RDS resources."
           exit 1
 
-      # Same-run destroy (every existing caller): download from the current run
-      # via the Actions runtime API, exactly as before. No github-token, so it
-      # does NOT require actions: read on the caller's token.
-      - name: Download Terraform state (same-run destroy)
-        if: ${{ inputs.destroy && always() && inputs.state_run_id == '' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: terraform-state
-          path: test-automation-ephemeral/stack
-
-      # Cross-run destroy (e.g. the demo reaper): the state artifact lives in the
-      # deploy run, so pull it from there via the REST API. This path needs
-      # actions: read on the token; only callers that set state_run_id opt in.
-      - name: Download Terraform state (cross-run destroy)
-        if: ${{ inputs.destroy && always() && inputs.state_run_id != '' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: terraform-state
-          path: test-automation-ephemeral/stack
-          run-id: ${{ inputs.state_run_id }}
-          github-token: ${{ github.token }}
+      # TECHOPS-1019: no artifact download. "Terraform Init" above already pointed this
+      # config at its S3 state (keyed by state_run_id for a cross-run reaper destroy,
+      # else this run), so "Destroy ephemeral stack" reads the full state directly —
+      # both the same-run and cross-run download steps are gone, along with the
+      # actions: read requirement the cross-run one imposed.
 
       - name: Destroy ephemeral stack
         # Only delete the Spacelift stack object when the AWS resource destroy
@@ -343,16 +359,21 @@ jobs:
           terraform destroy -auto-approve -var "run_id=${STATE_RUN_ID:-$GH_RUN_ID}" -var "run_repo=$GH_REPOSITORY"
 
       - name: Notify Slack on teardown failure
-        # Alert the team the moment a teardown fails, instead of waiting for
-        # GuardDuty to flag the surviving publicly-accessible RDS. The Spacelift
-        # stack is kept (state preserved) so the destroy can be retried (TECHOPS-523).
-        if: ${{ inputs.destroy && failure() && steps.destroy_infra.outcome == 'failure' }}
+        # Alert on ANY teardown failure in the destroy leg, not just the infra
+        # (RDS) destroy (TECHOPS-1019). The stack destroy — which removes the
+        # ephemeral IAM role (PowerUserAccess) + AWS integration — can also fail
+        # (e.g. a Spacelift/S3-state error), and that must be announced too, or an
+        # admin-grade role is left live with nothing to reclaim it. State is kept
+        # for a retry either way, so the alert covers orphaned RDS (TECHOPS-523)
+        # and orphaned stack/role alike.
+        if: ${{ inputs.destroy && failure() }}
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
         env:
           SLACK_WEBHOOK: ${{ env.EPHEMERAL_DANGLING_RESOURCES_SLACK_WEBHOOK }}
           SLACK_COLOR: danger
-          SLACK_TITLE: "Ephemeral teardown failed — possible orphaned RDS"
+          SLACK_TITLE: "Ephemeral teardown failed — possible orphaned resources"
           SLACK_MESSAGE: |
             terraform destroy failed for stack `${{ inputs.stack_id }}` (${{ github.repository }}).
-            The Spacelift stack was kept so its state survives for a retry — please investigate and clean up to avoid orphaned, publicly-accessible RDS (TECHOPS-523).
+            State is preserved for a retry — please investigate and clean up to avoid orphaned resources: publicly-accessible RDS (TECHOPS-523) and/or the ephemeral IAM role + Spacelift stack (TECHOPS-1019).
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

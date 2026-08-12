@@ -298,10 +298,14 @@ jobs:
       # TECHOPS-1019: destroy-only preflight. The RDS destroy below targets
       # inputs.stack_id (via Spacelift), while "Destroy ephemeral stack" targets whatever
       # the S3 state selected in "Terraform Init" (keyed by state_run_id) holds. Confirm
-      # they are the SAME stack before destroying anything, and detect the "nothing was
-      # ever provisioned" case (a deploy cancelled before apply leaves an empty state):
-      #   * no ephemeral_stack_id in state -> nothing to tear down; skip both destroys, so
-      #     a cancelled-before-creation run does not raise a false teardown alert;
+      # they are the SAME stack before destroying anything, and distinguish the two
+      # empty-state cases so a missing state is never a silent no-op:
+      #   * empty state + NO stack_id (same-run destroy) -> a deploy cancelled before apply
+      #     provisioned nothing; skip both destroys so it raises no false teardown alert;
+      #   * empty state + stack_id set (a targeted destroy, e.g. the scheduled reaper) ->
+      #     the state SHOULD exist, so an empty one is an anomaly (wrong/legacy state_run_id,
+      #     or a deploy whose state predates the S3 backend); fail rather than green-skip a
+      #     real orphan;
       #   * present but != inputs.stack_id -> mismatched stack_id/state_run_id; fail rather
       #     than tear down the wrong stack.
       - name: Verify destroy target
@@ -311,17 +315,31 @@ jobs:
         env:
           STACK_ID: ${{ inputs.stack_id }}
         run: |
+          # Presence is read from `terraform state list`, not `terraform output`: a deploy
+          # cancelled mid-apply can persist resources (the Spacelift stack, the ephemeral
+          # IAM role) before Terraform writes the root outputs, so `terraform output` would
+          # read empty and we would skip teardown and strand them; state list still sees them.
+          RESOURCES="$(terraform state list 2>/dev/null || true)"
           STATE_STACK="$(terraform output -raw ephemeral_stack_id 2>/dev/null || true)"
-          if [ -z "${STATE_STACK}" ]; then
-            echo "::warning::No ephemeral_stack_id in the selected state — nothing was provisioned (deploy likely cancelled before apply). Skipping teardown."
+          if [ -z "${RESOURCES}" ]; then
+            if [ -n "${STACK_ID}" ]; then
+              # A targeted destroy (stack_id set, e.g. the scheduled reaper that only ever
+              # passes a stack whose RDS it just listed) expects the state to exist. An empty
+              # one is an anomaly (wrong/legacy state_run_id, or a deploy whose state predates
+              # the S3 backend and shipped as an artifact), not a cancelled-before-apply
+              # deploy. Fail loudly rather than green-skip a real orphan.
+              echo "::error::stack_id '${STACK_ID}' was requested but the selected Terraform state has no resources. This is an anomaly (missing or legacy state_run_id, or pre-S3 artifact state), not a cancelled-before-apply deploy. Refusing to no-op so a real orphan is not left un-reaped."
+              exit 1
+            fi
+            echo "::warning::Selected state has no resources — nothing was provisioned (deploy likely cancelled before apply). Skipping teardown."
             echo "present=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ -n "${STACK_ID}" ] && [ "${STATE_STACK}" != "${STACK_ID}" ]; then
+          if [ -n "${STACK_ID}" ] && [ -n "${STATE_STACK}" ] && [ "${STATE_STACK}" != "${STACK_ID}" ]; then
             echo "::error::Selected state targets stack '${STATE_STACK}' but the stack_id input is '${STACK_ID}'. Refusing to destroy, to avoid tearing down the wrong stack (mismatched stack_id/state_run_id)."
             exit 1
           fi
-          echo "Destroy target confirmed: ${STATE_STACK}"
+          echo "Destroy target confirmed: $(printf '%s\n' "${RESOURCES}" | grep -c . | tr -d ' ') resource(s) in state, stack '${STATE_STACK:-<output not yet written>}'."
           echo "present=true" >> "$GITHUB_OUTPUT"
 
       - name: Destroy ephemeral infra

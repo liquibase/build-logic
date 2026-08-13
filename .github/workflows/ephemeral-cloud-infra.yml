@@ -311,7 +311,15 @@ jobs:
       #     instance today. The job is then failed in "Fail on destroy-state anomaly", so the
       #     missing state is never a green no-op.
       #   * present but != inputs.stack_id -> mismatched stack_id/state_run_id; fail before
-      #     destroying anything, rather than tear down the wrong stack.
+      #     destroying anything, rather than tear down the wrong stack;
+      #   * present but carrying NO stack identity at all (no ephemeral_stack_id output and
+      #     no spacelift_stack.stack in state) -> reachable, because spacelift_aws_integration
+      #     does not depend on spacelift_stack, so a cancelled apply can persist the
+      #     integration alone. On a cross-run destroy that state cannot be matched to
+      #     inputs.stack_id, so treat it as an anomaly rather than terraform destroy an
+      #     unverified target. On a same-run destroy there is nothing to verify: the state key
+      #     IS this run's id, so the state can only be this run's own deploy, and destroying
+      #     it is both safe and the whole point (otherwise that integration is stranded).
       #
       # The discriminator is state_run_id, NOT stack_id: stack_id does not identify a
       # targeted destroy. aws-weekly.yml and snowflake.yml destroy in the same run with
@@ -370,6 +378,19 @@ jobs:
             # genuinely nothing to tear down. Skip quietly rather than firing a teardown
             # alert (stack_id alone does not mean a stack exists: see the note above).
             echo "::warning::This run's Terraform state has no managed resources: nothing was provisioned (deploy likely cancelled before apply). Skipping teardown."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A cross-run state with resources but no stack identity cannot be matched to
+          # STACK_ID, and a wrong state_run_id would then have "Destroy ephemeral infra"
+          # tear down one environment's RDS while "Destroy ephemeral stack" tore down
+          # another's resources. Refuse the unverified terraform destroy, but still let the
+          # RDS destroy run (it needs only stack_id), then fail via the anomaly path. Not
+          # applied to a same-run destroy: there the state key is this run's own id, so the
+          # state cannot belong to another environment and there is nothing to verify.
+          if [ -n "${STATE_RUN_ID}" ] && [ -z "${STATE_STACK}" ]; then
+            echo "::error::state_run_id '${STATE_RUN_ID}' selected a state with ${MANAGED} managed resource(s) but no stack identity (no ephemeral_stack_id output and no spacelift_stack.stack in state), so it cannot be confirmed to belong to stack '${STACK_ID}'. Destroying that stack's RDS via Spacelift anyway, but refusing to terraform destroy an unverified state."
+            echo "anomaly=true" >> "$GITHUB_OUTPUT"
             echo "present=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -464,7 +485,7 @@ jobs:
           STACK_ID: ${{ inputs.stack_id }}
           STATE_RUN_ID: ${{ inputs.state_run_id }}
         run: |
-          echo "::error::Destroy ran for stack '${STACK_ID}' but state_run_id '${STATE_RUN_ID}' has an empty Terraform state. The Spacelift-side destroy was attempted, but no state-tracked resources (the ephemeral IAM role with PowerUserAccess, the AWS integration, the stack object) could be torn down. Verify state_run_id and clean up manually if they still exist."
+          echo "::error::Destroy ran for stack '${STACK_ID}' but the Terraform state selected by state_run_id '${STATE_RUN_ID}' was unusable: it is either empty or carries no stack identity to confirm it belongs to that stack. The Spacelift-side RDS destroy was attempted, but no state-tracked resources (the ephemeral IAM role with PowerUserAccess, the AWS integration, the stack object) were torn down. Verify state_run_id and clean up manually if they still exist."
           exit 1
 
       - name: Notify Slack on teardown failure

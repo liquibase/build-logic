@@ -47,7 +47,7 @@ jobs:
 
       - name: Run Claude Test Quality Review
         id: claude-test-review
-        uses: anthropics/claude-code-action@64c7a0ef71df67b14cb4471f4d9c8565c61042bf # v1.0.66
+        uses: anthropics/claude-code-action@239e3a730883eeb5c53db12b0fc9573b3024b126 # v1.0.191
         with:
           anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
           track_progress: true

@@ -300,23 +300,34 @@ jobs:
       # the S3 state selected in "Terraform Init" (keyed by state_run_id) holds. Confirm
       # they are the SAME stack before destroying anything, and distinguish the two
       # empty-state cases so a missing state is never a silent no-op:
-      #   * empty state + NO stack_id (same-run destroy) -> a deploy cancelled before apply
-      #     provisioned nothing; skip both destroys so it raises no false teardown alert;
-      #   * empty state + stack_id set (a targeted destroy, e.g. the scheduled reaper) ->
-      #     the state SHOULD exist, so an empty one is an anomaly (wrong/legacy state_run_id,
-      #     or a deploy whose state predates the S3 backend). Flag it (anomaly=true) and let
-      #     the RDS destroy below still run, since it needs only stack_id and no Terraform
-      #     state, and `main` reclaims that publicly-accessible instance today. The job is
-      #     then failed in "Fail on destroy-state anomaly", so the missing state is never a
-      #     green no-op.
+      #   * empty state + NO state_run_id (a same-run destroy) -> the deploy in THIS run
+      #     provisioned nothing (cancelled before apply); skip both destroys so it raises
+      #     no false teardown alert;
+      #   * empty state + state_run_id set (a cross-run/targeted destroy, i.e. the scheduled
+      #     reaper) -> that run's state SHOULD exist, so an empty one is an anomaly (wrong
+      #     or legacy state_run_id, or a deploy whose state predates the S3 backend). Flag it
+      #     (anomaly=true) and let the RDS destroy below still run, since it needs only
+      #     stack_id and no Terraform state, and `main` reclaims that publicly-accessible
+      #     instance today. The job is then failed in "Fail on destroy-state anomaly", so the
+      #     missing state is never a green no-op.
       #   * present but != inputs.stack_id -> mismatched stack_id/state_run_id; fail before
       #     destroying anything, rather than tear down the wrong stack.
+      #
+      # The discriminator is state_run_id, NOT stack_id: stack_id does not identify a
+      # targeted destroy. aws-weekly.yml and snowflake.yml destroy in the same run with
+      # `if: always()` and pass a stack_id that .github/actions/get-stack-id RECONSTRUCTS
+      # from the run id, so it is non-empty even when the deploy never created anything.
+      # Keying the anomaly on stack_id would make every cancelled deploy in those two
+      # workflows a red job plus an orphaned-resources alert, which is the exact case this
+      # preflight exists to make a clean no-op, and would bury the reaper's real anomaly in
+      # routine noise. Only the reaper passes state_run_id.
       - name: Verify destroy target
         id: verify-state
         if: ${{ inputs.destroy }}
         working-directory: test-automation-ephemeral/stack
         env:
           STACK_ID: ${{ inputs.stack_id }}
+          STATE_RUN_ID: ${{ inputs.state_run_id }}
         run: |
           # One `terraform show -json` read rather than `state list` + `output -raw`:
           #   * a FAILED read (corrupt state, S3/credentials error) must not be mistaken
@@ -343,19 +354,22 @@ jobs:
               (.values.root_module.resources[]? | select(.address == "spacelift_stack.stack") | .values.id?)
             ] | map(select(. != null and . != "")) | first // ""')"
           if [ "${MANAGED}" -eq 0 ]; then
-            if [ -n "${STACK_ID}" ]; then
-              # A targeted destroy (stack_id set, e.g. the scheduled reaper that only ever
-              # passes a stack whose RDS it just listed) expects the state to exist. An empty
-              # one is an anomaly (wrong/legacy state_run_id, or a deploy whose state predates
+            if [ -n "${STATE_RUN_ID}" ]; then
+              # A cross-run destroy (the scheduled reaper, which only ever targets a stack
+              # whose RDS it just listed) expects that run's state to exist. An empty one is
+              # an anomaly (wrong or legacy state_run_id, or a deploy whose state predates
               # the S3 backend and shipped as an artifact), not a cancelled-before-apply
               # deploy. Flag it and exit 0 so the RDS destroy below is not skipped along
               # with it: the job is failed afterwards, once that teardown has run.
-              echo "::error::stack_id '${STACK_ID}' was requested but the selected Terraform state has no managed resources. This is an anomaly (missing or legacy state_run_id, or pre-S3 artifact state), not a cancelled-before-apply deploy. Destroying the RDS via Spacelift anyway, then failing this job so the missing state is investigated."
+              echo "::error::state_run_id '${STATE_RUN_ID}' was requested but its Terraform state has no managed resources. This is an anomaly (wrong or legacy state_run_id, or pre-S3 artifact state), not a cancelled-before-apply deploy. Destroying the RDS for stack '${STACK_ID}' via Spacelift anyway, then failing this job so the missing state is investigated."
               echo "anomaly=true" >> "$GITHUB_OUTPUT"
               echo "present=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "::warning::Selected state has no managed resources: nothing was provisioned (deploy likely cancelled before apply). Skipping teardown."
+            # Same-run destroy: this run's own deploy provisioned nothing, so there is
+            # genuinely nothing to tear down. Skip quietly rather than firing a teardown
+            # alert (stack_id alone does not mean a stack exists: see the note above).
+            echo "::warning::This run's Terraform state has no managed resources: nothing was provisioned (deploy likely cancelled before apply). Skipping teardown."
             echo "present=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -438,7 +452,7 @@ jobs:
           terraform destroy -auto-approve -var "run_id=${STATE_RUN_ID:-$GH_RUN_ID}" -var "run_repo=$GH_REPOSITORY"
 
       - name: Fail on destroy-state anomaly
-        # The preflight found stack_id set but no managed resources in the selected
+        # The preflight found state_run_id set but no managed resources in that run's
         # state. It deliberately did not abort there, because aborting would have
         # skipped "Destroy ephemeral infra" too (an `if:` without always()/failure()
         # carries an implicit success()), leaving the publicly-accessible RDS that
@@ -448,8 +462,9 @@ jobs:
         if: ${{ !cancelled() && steps.verify-state.outputs.anomaly == 'true' }}
         env:
           STACK_ID: ${{ inputs.stack_id }}
+          STATE_RUN_ID: ${{ inputs.state_run_id }}
         run: |
-          echo "::error::Destroy ran for stack '${STACK_ID}' with an empty Terraform state. The Spacelift-side destroy was attempted, but no state-tracked resources (the ephemeral IAM role with PowerUserAccess, the AWS integration, the stack object) could be torn down. Check state_run_id and clean up manually if they still exist."
+          echo "::error::Destroy ran for stack '${STACK_ID}' but state_run_id '${STATE_RUN_ID}' has an empty Terraform state. The Spacelift-side destroy was attempted, but no state-tracked resources (the ephemeral IAM role with PowerUserAccess, the AWS integration, the stack object) could be torn down. Verify state_run_id and clean up manually if they still exist."
           exit 1
 
       - name: Notify Slack on teardown failure

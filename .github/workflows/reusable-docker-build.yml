@@ -107,7 +107,37 @@ on:
         type: string
         default: 'false'
       cosign_identity_regexp:
-        description: 'Regexp for cosign --certificate-identity-regexp'
+        description: >-
+          Regexp matching the certificate SAN identity of signatures this workflow produces. Used
+          to verify every signature before reporting it successful, and the value consumers should
+          pass to `cosign verify --certificate-identity-regexp`.
+
+          Keyless signing records the workflow that PERFORMS the signing, which is this reusable
+          workflow in liquibase/build-logic, NOT the calling repository. A caller that passes its
+          own repo path here will not match: verified against the published 5.2.2 image, the SAN is
+          https://github.com/liquibase/build-logic/.github/workflows/reusable-docker-build.yml@refs/heads/main
+          The default is this workflow's own identity and is almost always what you want; the
+          trailing @.* keeps it correct when a caller pins a build-logic branch.
+          Pass an empty string to skip verification.
+        required: false
+        type: string
+        default: '^https://github\.com/liquibase/build-logic/\.github/workflows/reusable-docker-build\.yml@.*'
+      fail_job_on_signing_failure:
+        description: >-
+          When true (default), a registry left without a verifiable signature after retries fails
+          this job. Set false only when the caller reads unsigned_repos and enforces it in a job of
+          its own: signing failures then keep this job green so the caller's release can still
+          publish, and the failure travels out via unsigned_repos instead. The default is the safe
+          one on purpose, so a caller cannot silently inherit "publishes an unsigned image and stays
+          green" by upgrading this workflow.
+        required: false
+        type: boolean
+        default: true
+      resign_workflow:
+        description: >-
+          Optional name of the caller's sign-only dispatch workflow (e.g. docker-sign.yml), used in
+          the remediation message when a registry is left unsigned. Re-running a release workflow is
+          never the remediation: it rebuilds and republishes a different digest, leaving registries split.
         required: false
         type: string
         default: ''
@@ -146,7 +176,7 @@ on:
         description: 'Comma-separated list of all tags pushed'
         value: ${{ jobs.build.outputs.tags }}
       unsigned_repos:
-        description: 'Comma-separated repos whose cosign signing failed after retries; empty when every enabled registry was signed. Signing failures do not fail this workflow, so callers that want a hard signal should gate on this output in a job nothing else depends on.'
+        description: 'Comma-separated repos left without a verifiable signature after retries; empty when every enabled registry was signed AND its signature verified. Only meaningful to callers that set fail_job_on_signing_failure: false, which keeps this job green so a release can still publish; those callers should enforce this output in a job nothing else depends on.'
         value: ${{ jobs.build.outputs.unsigned_repos }}
 
 jobs:
@@ -205,24 +235,56 @@ jobs:
           # token request seconds after buildx pushed successfully with the same
           # login. Every `cosign sign` call below goes through this wrapper so a
           # single denial cannot decide whether a published image ends up signed.
+          #
+          # Scope of the retry: all attempts reuse the credential established by the
+          # docker/login-action steps above and a fresh OIDC token per `cosign sign`.
+          # That covers a transient denial or a rate-limited token endpoint, which is
+          # the observed failure. It does NOT recover a credential that has been
+          # revoked or has expired for the whole job: those fail all three attempts
+          # identically and surface through unsigned_repos.
+          #
+          # Each attempt signs and then verifies. `cosign sign` exiting 0 is not
+          # evidence that a signature is retrievable, and the 5.2.2 symptom was an
+          # image with zero referrers, so verification is what makes "signed" a
+          # checked fact rather than an exit code.
+          #
+          # The heredoc below is quoted, so the wrapper reads COSIGN_IDENTITY_REGEXP
+          # from the environment when it runs, not when it is written. Each signing
+          # step passes it in its own env: block alongside the repo it signs.
           cat > "${RUNNER_TEMP}/cosign-sign-retry.sh" <<'SCRIPT'
           #!/usr/bin/env bash
           set -uo pipefail
           REF="$1"
           MAX_ATTEMPTS=3
+          IDENTITY_REGEXP="${COSIGN_IDENTITY_REGEXP:-}"
+
+          verify() {
+            if [ -z "$IDENTITY_REGEXP" ]; then
+              echo "::warning::cosign_identity_regexp is empty; skipping signature verification for ${REF}"
+              return 0
+            fi
+            cosign verify \
+              --certificate-identity-regexp "$IDENTITY_REGEXP" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$REF"
+          }
+
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             echo "Signing ${REF} (attempt ${attempt}/${MAX_ATTEMPTS})"
             if cosign sign --yes "$REF"; then
-              echo "Signed ${REF}"
-              exit 0
+              if verify; then
+                echo "Signed and verified ${REF}"
+                exit 0
+              fi
+              echo "::warning::cosign sign succeeded but the signature for ${REF} did not verify on attempt ${attempt}/${MAX_ATTEMPTS}"
             fi
             if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
               delay=$((attempt * 15))
-              echo "::warning::cosign sign failed for ${REF} on attempt ${attempt}/${MAX_ATTEMPTS}; retrying in ${delay}s"
+              echo "::warning::signing ${REF} failed on attempt ${attempt}/${MAX_ATTEMPTS}; retrying in ${delay}s"
               sleep "$delay"
             fi
           done
-          echo "cosign sign failed for ${REF} after ${MAX_ATTEMPTS} attempts"
+          echo "no verifiable signature for ${REF} after ${MAX_ATTEMPTS} attempts"
           exit 1
           SCRIPT
           chmod +x "${RUNNER_TEMP}/cosign-sign-retry.sh"
@@ -383,17 +445,17 @@ jobs:
             org.opencontainers.image.documentation=https://docs.liquibase.com
 
       # Cosign keyless signing — Secure images only (3 registries, each conditional)
-      # Cosign keyless signing uses the OIDC token identity automatically — no
-      # --certificate-identity-regexp flag here (that flag belongs to `cosign verify`).
-      # The cosign_identity_regexp input documents the identity regexp consumers
-      # should use when verifying signatures produced by this workflow.
+      # `cosign sign` takes the OIDC token identity automatically; the wrapper then
+      # runs `cosign verify` with cosign_identity_regexp, whose default is this
+      # workflow's own SAN identity. Keyless signing records the workflow that signs
+      # (this file in liquibase/build-logic), not the calling repo, so that default
+      # is also the value consumers need for `cosign verify`.
       #
       # Each registry signs independently (continue-on-error) so one registry's
-      # failure cannot skip the registries after it, and so a signing blip cannot
-      # fail this job: the caller gates its release publish on this job's result,
-      # and images that are already pushed and public should not lose their release
-      # over a token denial. "Check signing outcome" below records what was left
-      # unsigned, annotates it as an error, and exports it via unsigned_repos.
+      # failure cannot skip the registries after it. "Check signing outcome" below
+      # records what was left unsigned, annotates it as an error, and exports it via
+      # unsigned_repos; whether an unsigned registry also fails this job is the
+      # caller's call via fail_job_on_signing_failure (default: yes).
       - name: Sign Docker Hub Image with Cosign
         id: sign-dockerhub
         continue-on-error: true
@@ -401,6 +463,7 @@ jobs:
         env:
           DOCKERHUB_REPO: ${{ inputs.dockerhub_repo }}
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
         run: |
           "${RUNNER_TEMP}/cosign-sign-retry.sh" "${DOCKERHUB_REPO}@${IMAGE_DIGEST}"
 
@@ -411,6 +474,7 @@ jobs:
         env:
           GHCR_REPO: ${{ inputs.ghcr_repo }}
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
         run: |
           "${RUNNER_TEMP}/cosign-sign-retry.sh" "${GHCR_REPO}@${IMAGE_DIGEST}"
 
@@ -421,6 +485,7 @@ jobs:
         env:
           ECR_REPO: ${{ inputs.ecr_repo }}
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
         run: |
           "${RUNNER_TEMP}/cosign-sign-retry.sh" "${ECR_REPO}@${IMAGE_DIGEST}"
 
@@ -431,6 +496,7 @@ jobs:
         env:
           DRY_RUN_REPO: ${{ steps.resolve-dry-run-repo.outputs.repo }}
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
         run: |
           "${RUNNER_TEMP}/cosign-sign-retry.sh" "${DRY_RUN_REPO}@${IMAGE_DIGEST}"
 
@@ -445,10 +511,14 @@ jobs:
           GHCR_OUTCOME: ${{ steps.sign-ghcr.outcome }}
           ECR_OUTCOME: ${{ steps.sign-ecr.outcome }}
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          FAIL_ON_SIGNING_FAILURE: ${{ inputs.fail_job_on_signing_failure }}
+          RESIGN_WORKFLOW: ${{ inputs.resign_workflow }}
         run: |
-          # Exits 0 by design: the images are already pushed, and failing here would
-          # take the caller's release publish down with it. The unsigned_repos output
-          # carries the failure out so the caller can go red after publishing.
+          # Records which repos lack a verifiable signature and exports them as
+          # unsigned_repos. Whether that also fails this job is the caller's choice
+          # (fail_job_on_signing_failure): failing here is safe by default, and a
+          # caller that has built its own gate turns it off so an already-pushed
+          # public image does not lose its release over a token denial.
           UNSIGNED=""
           record() {
             [ "$2" = "failure" ] || return 0
@@ -472,11 +542,38 @@ jobs:
             echo "| ${ECR_REPO} | ${ECR_OUTCOME} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ -n "$UNSIGNED" ]; then
-            echo "::error::Pushed but UNSIGNED after retries: ${UNSIGNED} (digest ${IMAGE_DIGEST}). cosign verify will fail for these repos until they are signed. Re-run this release to sign them."
+          if [ -z "$UNSIGNED" ]; then
+            echo "Every enabled registry has a verifiable signature for ${IMAGE_DIGEST}."
             exit 0
           fi
-          echo "Every enabled registry signed ${IMAGE_DIGEST}."
+
+          # The remediation is deliberately NOT "re-run the release". A re-run rebuilds
+          # from source and pushes a new digest, so the registries that already signed
+          # keep the old one and the release ends up split across registries, which is
+          # exactly how liquibase/liquibase-secure 5.2.2 ended up serving 8fe090bf on
+          # Docker Hub and 38317e19 on GHCR/ECR. Sign the digest that is already
+          # published instead.
+          if [ -n "$RESIGN_WORKFLOW" ]; then
+            REMEDIATION="Run ${RESIGN_WORKFLOW} with digest ${IMAGE_DIGEST} to sign the published image."
+          else
+            REMEDIATION="Sign the published digest directly: cosign sign --yes <repo>@${IMAGE_DIGEST} for each repo listed above."
+          fi
+          echo "::error::Pushed but has no verifiable signature after retries: ${UNSIGNED} (digest ${IMAGE_DIGEST}). cosign verify will fail for these repos until they are signed. Do NOT re-run the release: it rebuilds and republishes a different digest, leaving registries split. ${REMEDIATION}"
+
+          {
+            echo ""
+            echo "**Unsigned:** \`${UNSIGNED}\`"
+            echo ""
+            echo "${REMEDIATION}"
+            echo ""
+            echo "Do NOT re-run the release to fix this: it rebuilds and republishes a different digest, splitting the registries."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$FAIL_ON_SIGNING_FAILURE" = "true" ]; then
+            exit 1
+          fi
+          # Caller enforces unsigned_repos itself; stay green so its release still publishes.
+          exit 0
 
   # ============================================
   # SLACK FAILURE NOTIFICATION
@@ -540,8 +637,11 @@ jobs:
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
         env:
           SLACK_WEBHOOK: ${{ steps.webhook.outputs.url }}
-          SLACK_COLOR: ${{ needs.build.result != 'success' && 'failure' || 'warning' }}
-          SLACK_TITLE: "${{ needs.build.result != 'success' && format('❌ {0} ❌ Docker build failed on {1} ({2})', github.repository, github.ref_name, github.sha) || format('⚠️ {0} ⚠️ Docker image pushed but NOT signed on {1}', github.repository, github.ref_name) }}"
+          # An unsigned public image is a failure, not a warning: it is published,
+          # pullable, and cosign verify does not pass on it. Colouring it 'warning'
+          # under-calls the severity for whoever reads the channel.
+          SLACK_COLOR: failure
+          SLACK_TITLE: "${{ needs.build.result != 'success' && format('❌ {0} ❌ Docker build failed on {1} ({2})', github.repository, github.ref_name, github.sha) || format('❌ {0} ❌ Docker image pushed but NOT SIGNED on {1}', github.repository, github.ref_name) }}"
           SLACK_MESSAGE: "${{ needs.build.result != 'success' && format('View run: {0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) || format('cosign signing failed after retries for: {0}. These images are public and unverifiable until re-signed. View run: {1}/{2}/actions/runs/{3}', needs.build.outputs.unsigned_repos, github.server_url, github.repository, github.run_id) }}"
           SLACK_USERNAME: liquibot
           SLACK_ICON_EMOJI: ":whale:"

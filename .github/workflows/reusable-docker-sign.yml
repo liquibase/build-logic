@@ -1,0 +1,351 @@
+name: Reusable Docker Sign
+
+# Signs an ALREADY PUBLISHED image digest with cosign. It does not build, push,
+# commit, or tag anything.
+#
+# Why this exists: when signing fails during a release, the tempting remediation
+# is to re-run the release workflow. That rebuilds from source and publishes a
+# NEW digest, so the registries that already signed keep serving the old one and
+# the release ends up split across registries. That is how liquibase-secure 5.2.2
+# came to serve sha256:8fe090bf on Docker Hub and sha256:38317e19 on GHCR/ECR for
+# 5.2.2, 5.2 and latest. This workflow signs the digest that is already public,
+# so the fix converges instead of forking.
+#
+# Re-running this workflow is safe: a digest that already has a verifiable
+# signature is skipped, and cosign signatures are additive.
+
+on:
+  workflow_call:
+    inputs:
+      image_digest:
+        description: 'Published image digest to sign, e.g. sha256:8fe090bf... Must already exist in every registry selected below.'
+        required: true
+        type: string
+      version:
+        description: 'Release version the digest belongs to. Used only in logs and the job summary.'
+        required: false
+        type: string
+        default: ''
+      dockerhub_repo:
+        description: 'Full Docker Hub repo, e.g. liquibase/liquibase-secure'
+        required: false
+        type: string
+        default: ''
+      ghcr_repo:
+        description: 'Full GHCR repo, e.g. ghcr.io/liquibase/liquibase-secure'
+        required: false
+        type: string
+        default: ''
+      ecr_repo:
+        description: 'Full ECR Public repo, e.g. public.ecr.aws/liquibase/liquibase-secure'
+        required: false
+        type: string
+        default: ''
+      sign_dockerhub:
+        description: 'Sign the Docker Hub repo'
+        required: false
+        type: boolean
+        default: true
+      sign_ghcr:
+        description: 'Sign the GHCR repo'
+        required: false
+        type: boolean
+        default: true
+      sign_ecr:
+        description: 'Sign the ECR Public repo'
+        required: false
+        type: boolean
+        default: true
+      cosign_identity_regexp:
+        description: >-
+          Regexp matching the certificate SAN identity of signatures this workflow produces, used to
+          verify each one before reporting success.
+
+          Keyless signing records the workflow that performs the signing, so signatures made here
+          carry THIS file's identity, which differs from the one reusable-docker-build.yml produces
+          during a release. Consumers who verify with a single regexp therefore need one that covers
+          both workflows, e.g.
+          ^https://github\.com/liquibase/build-logic/\.github/workflows/reusable-docker-(build|sign)\.yml@.*
+        required: false
+        type: string
+        default: '^https://github\.com/liquibase/build-logic/\.github/workflows/reusable-docker-sign\.yml@.*'
+      slack_webhook_env_var:
+        description: 'Vault env-var name holding the Slack webhook URL for failure alerts. Pass an empty string to disable notifications.'
+        required: false
+        type: string
+        default: 'DOCKER_SLACK_WEBHOOK_URL'
+    outputs:
+      signed_repos:
+        description: 'Comma-separated repos that have a verifiable signature for the digest after this run'
+        value: ${{ jobs.sign.outputs.signed_repos }}
+      unsigned_repos:
+        description: 'Comma-separated repos still lacking a verifiable signature. Empty on success; this workflow fails when it is non-empty.'
+        value: ${{ jobs.sign.outputs.unsigned_repos }}
+
+jobs:
+  sign:
+    name: Sign published digest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      signed_repos: ${{ steps.sign.outputs.signed_repos }}
+      unsigned_repos: ${{ steps.sign.outputs.unsigned_repos }}
+
+    steps:
+      # Reject anything that is not a well-formed digest before it reaches a shell
+      # or a registry: this workflow's whole contract is "sign exactly this digest",
+      # and a tag or a typo here would either sign the wrong image or fail obscurely.
+      - name: Validate inputs
+        env:
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          DOCKERHUB_REPO: ${{ inputs.dockerhub_repo }}
+          GHCR_REPO: ${{ inputs.ghcr_repo }}
+          ECR_REPO: ${{ inputs.ecr_repo }}
+          SIGN_DOCKERHUB: ${{ inputs.sign_dockerhub }}
+          SIGN_GHCR: ${{ inputs.sign_ghcr }}
+          SIGN_ECR: ${{ inputs.sign_ecr }}
+        run: |
+          if ! printf '%s' "$IMAGE_DIGEST" | grep -qE '^sha256:[0-9a-f]{64}$'; then
+            echo "::error::image_digest must be sha256 followed by 64 lowercase hex characters, got '${IMAGE_DIGEST}'. Pass the published digest, not a tag."
+            exit 1
+          fi
+
+          SELECTED=0
+          if [ "$SIGN_DOCKERHUB" = "true" ] && [ -n "$DOCKERHUB_REPO" ]; then SELECTED=$((SELECTED + 1)); fi
+          if [ "$SIGN_GHCR" = "true" ] && [ -n "$GHCR_REPO" ]; then SELECTED=$((SELECTED + 1)); fi
+          if [ "$SIGN_ECR" = "true" ] && [ -n "$ECR_REPO" ]; then SELECTED=$((SELECTED + 1)); fi
+          if [ "$SELECTED" -eq 0 ]; then
+            echo "::error::No registry selected. Enable at least one sign_* input and pass its repo."
+            exit 1
+          fi
+          echo "Signing ${IMAGE_DIGEST} across ${SELECTED} registry/registries."
+
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Decode DOCKERHUB_USERNAME
+        if: ${{ inputs.sign_dockerhub && inputs.dockerhub_repo != '' }}
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
+        run: |
+          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d | tr -d '\r\n')
+          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      # Used only to confirm the digest exists in each registry before signing it.
+      # `docker manifest inspect` would be the obvious choice but is still flagged
+      # experimental in the Docker CLI; imagetools is the supported equivalent and
+      # reads multi-arch indexes, which these images are.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Configure AWS credentials for PROD ECR
+        id: configure-aws-credentials-prod
+        if: ${{ inputs.sign_ecr && inputs.ecr_repo != '' }}
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
+          aws-region: us-east-1
+          output-credentials: true
+
+      - name: Login to Docker Hub
+        if: ${{ inputs.sign_dockerhub && inputs.dockerhub_repo != '' }}
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME_DECODED }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        if: ${{ inputs.sign_ghcr && inputs.ghcr_repo != '' }}
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ECR Registry (public)
+        if: ${{ inputs.sign_ecr && inputs.ecr_repo != '' }}
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        env:
+          AWS_REGION: us-east-1
+        with:
+          registry: public.ecr.aws
+          username: ${{ steps.configure-aws-credentials-prod.outputs.aws_access_key_id }}
+          password: ${{ steps.configure-aws-credentials-prod.outputs.aws_secret_access_key }}
+
+      # Mirrors the retry wrapper in reusable-docker-build.yml: registry token
+      # issuance denies requests transiently (ghcr.io answered `DENIED: denied` to
+      # cosign's pull-scope token request seconds after a successful push), and a
+      # `cosign sign` exit code alone is not evidence that a signature is
+      # retrievable, so each attempt signs and then verifies.
+      #
+      # Scope of the retry: every attempt reuses the credential from the login
+      # steps above with a fresh OIDC token per `cosign sign`. That covers a
+      # transient denial or a rate-limited token endpoint; it does not recover a
+      # credential revoked or expired for the whole job.
+      - name: Sign and verify each registry
+        id: sign
+        env:
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          DOCKERHUB_REPO: ${{ inputs.dockerhub_repo }}
+          GHCR_REPO: ${{ inputs.ghcr_repo }}
+          ECR_REPO: ${{ inputs.ecr_repo }}
+          SIGN_DOCKERHUB: ${{ inputs.sign_dockerhub }}
+          SIGN_GHCR: ${{ inputs.sign_ghcr }}
+          SIGN_ECR: ${{ inputs.sign_ecr }}
+          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
+          LB_VERSION: ${{ inputs.version }}
+        run: |
+          set -uo pipefail
+          MAX_ATTEMPTS=3
+          SIGNED=""
+          UNSIGNED=""
+
+          verify() {
+            cosign verify \
+              --certificate-identity-regexp "$COSIGN_IDENTITY_REGEXP" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$1"
+          }
+
+          # Each registry is handled independently so one registry's denial cannot
+          # stop the others from being signed: the failure mode this workflow exists
+          # to clean up in the first place.
+          sign_repo() {
+            REPO="$1"
+            REF="${REPO}@${IMAGE_DIGEST}"
+
+            if ! docker buildx imagetools inspect "$REF" >/dev/null 2>&1; then
+              echo "::error::${REF} does not exist. This workflow signs an already published digest; it never pushes one."
+              UNSIGNED="${UNSIGNED:+${UNSIGNED},}${REPO}"
+              return 0
+            fi
+
+            if verify "$REF" >/dev/null 2>&1; then
+              echo "${REF} already has a verifiable signature; nothing to do."
+              SIGNED="${SIGNED:+${SIGNED},}${REPO}"
+              return 0
+            fi
+
+            for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+              echo "Signing ${REF} (attempt ${attempt}/${MAX_ATTEMPTS})"
+              if cosign sign --yes "$REF"; then
+                if verify "$REF"; then
+                  echo "Signed and verified ${REF}"
+                  SIGNED="${SIGNED:+${SIGNED},}${REPO}"
+                  return 0
+                fi
+                echo "::warning::cosign sign succeeded but the signature for ${REF} did not verify on attempt ${attempt}/${MAX_ATTEMPTS}"
+              fi
+              if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+                delay=$((attempt * 15))
+                echo "::warning::signing ${REF} failed on attempt ${attempt}/${MAX_ATTEMPTS}; retrying in ${delay}s"
+                sleep "$delay"
+              fi
+            done
+            echo "::error::No verifiable signature for ${REF} after ${MAX_ATTEMPTS} attempts."
+            UNSIGNED="${UNSIGNED:+${UNSIGNED},}${REPO}"
+          }
+
+          if [ "$SIGN_DOCKERHUB" = "true" ] && [ -n "$DOCKERHUB_REPO" ]; then sign_repo "$DOCKERHUB_REPO"; fi
+          if [ "$SIGN_GHCR" = "true" ] && [ -n "$GHCR_REPO" ]; then sign_repo "$GHCR_REPO"; fi
+          if [ "$SIGN_ECR" = "true" ] && [ -n "$ECR_REPO" ]; then sign_repo "$ECR_REPO"; fi
+
+          echo "signed_repos=${SIGNED}" >> "$GITHUB_OUTPUT"
+          echo "unsigned_repos=${UNSIGNED}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Cosign sign-only run"
+            echo ""
+            echo "Version: \`${LB_VERSION:-n/a}\`"
+            echo ""
+            echo "Digest: \`${IMAGE_DIGEST}\`"
+            echo ""
+            echo "| Repo | Result |"
+            echo "| --- | --- |"
+            for r in ${SIGNED//,/ }; do echo "| ${r} | signed |"; done
+            for r in ${UNSIGNED//,/ }; do echo "| ${r} | UNSIGNED |"; done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Signing is this workflow's only job, so an unsigned registry is a plain
+          # failure: there is no release riding on this run to protect.
+          if [ -n "$UNSIGNED" ]; then
+            echo "::error::Still unsigned: ${UNSIGNED} (digest ${IMAGE_DIGEST})."
+            exit 1
+          fi
+          echo "All selected registries have a verifiable signature for ${IMAGE_DIGEST}."
+
+  notify:
+    needs: [sign]
+    if: ${{ failure() && inputs.slack_webhook_env_var != '' }}
+    continue-on-error: true
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get secrets from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Resolve Slack webhook
+        id: webhook
+        env:
+          WEBHOOK_ENV_VAR: ${{ inputs.slack_webhook_env_var }}
+        run: |
+          # The var name is caller-controlled: validate name and value shape, and pass the
+          # webhook as a step output (random-delimiter heredoc): never into GITHUB_ENV.
+          if ! printf '%s' "$WEBHOOK_ENV_VAR" | grep -qE '^[A-Z][A-Z0-9_]{0,127}$'; then
+            echo "::error::Invalid slack_webhook_env_var name: $WEBHOOK_ENV_VAR"
+            exit 1
+          fi
+          WEBHOOK_VALUE="${!WEBHOOK_ENV_VAR}"
+          if [ -z "$WEBHOOK_VALUE" ]; then
+            echo "::error::Slack webhook env $WEBHOOK_ENV_VAR resolved empty: check /vault/liquibase contains this key"
+            exit 1
+          fi
+          if ! printf '%s' "$WEBHOOK_VALUE" | grep -qE '^https://hooks\.slack\.com/[A-Za-z0-9/_+-]+$'; then
+            echo "::error::$WEBHOOK_ENV_VAR does not look like a Slack webhook URL"
+            exit 1
+          fi
+          DELIM="WEBHOOK_EOF_${RANDOM}${RANDOM}"
+          {
+            echo "url<<$DELIM"
+            echo "$WEBHOOK_VALUE"
+            echo "$DELIM"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
+        env:
+          SLACK_WEBHOOK: ${{ steps.webhook.outputs.url }}
+          SLACK_COLOR: failure
+          SLACK_TITLE: "❌ ${{ github.repository }} ❌ cosign sign-only run failed for ${{ inputs.version }}"
+          SLACK_MESSAGE: "Digest ${{ inputs.image_digest }} still lacks a verifiable signature on: ${{ needs.sign.outputs.unsigned_repos }}. View run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          SLACK_USERNAME: liquibot
+          SLACK_ICON_EMOJI: ":whale:"
+          SLACK_FOOTER: "${{ github.repository }}"

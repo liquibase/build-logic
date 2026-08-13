@@ -142,7 +142,7 @@ jobs:
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
           decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d | tr -d '\r\n')
-          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
+          node -e "const core=require('@actions/core'); core.exportVariable('DOCKERHUB_USERNAME_DECODED', process.argv[1]);" "$decoded_username"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1

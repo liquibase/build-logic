@@ -215,10 +215,21 @@ jobs:
           MAX_ATTEMPTS=3
           SIGNED=""
           UNSIGNED=""
+          IDENTITY_REGEXP="${COSIGN_IDENTITY_REGEXP:-}"
+
+          # An empty regexp means the caller opted out of verification. Without this
+          # guard cosign verify can never pass, so a signature that landed correctly
+          # would burn every retry and then be reported UNSIGNED. Matches the guard in
+          # reusable-docker-build.yml.
+          verification_enabled() { [ -n "$IDENTITY_REGEXP" ]; }
 
           verify() {
+            if ! verification_enabled; then
+              echo "::warning::cosign_identity_regexp is empty; skipping signature verification for $1"
+              return 0
+            fi
             cosign verify \
-              --certificate-identity-regexp "$COSIGN_IDENTITY_REGEXP" \
+              --certificate-identity-regexp "$IDENTITY_REGEXP" \
               --certificate-oidc-issuer https://token.actions.githubusercontent.com \
               "$1"
           }
@@ -236,7 +247,10 @@ jobs:
               return 0
             fi
 
-            if verify "$REF" >/dev/null 2>&1; then
+            # Asks verification_enabled first: with verification off, verify() reporting
+            # success is not evidence a signature exists, so skipping here would leave
+            # the digest unsigned while claiming it was already done.
+            if verification_enabled && verify "$REF" >/dev/null 2>&1; then
               echo "${REF} already has a verifiable signature; nothing to do."
               SIGNED="${SIGNED:+${SIGNED},}${REPO}"
               return 0

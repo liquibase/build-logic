@@ -513,6 +513,7 @@ jobs:
           IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
           FAIL_ON_SIGNING_FAILURE: ${{ inputs.fail_job_on_signing_failure }}
           RESIGN_WORKFLOW: ${{ inputs.resign_workflow }}
+          LB_VERSION: ${{ inputs.version }}
         run: |
           # Records which repos lack a verifiable signature and exports them as
           # unsigned_repos. Whether that also fails this job is the caller's choice
@@ -554,7 +555,8 @@ jobs:
           # Docker Hub and 38317e19 on GHCR/ECR. Sign the digest that is already
           # published instead.
           if [ -n "$RESIGN_WORKFLOW" ]; then
-            REMEDIATION="Run ${RESIGN_WORKFLOW} with digest ${IMAGE_DIGEST} to sign the published image."
+            # Names every input the dispatch requires, so the message can be followed as-is.
+            REMEDIATION="Run ${RESIGN_WORKFLOW} with version ${LB_VERSION} and digest ${IMAGE_DIGEST} to sign the published image."
           else
             REMEDIATION="Sign the published digest directly: cosign sign --yes <repo>@${IMAGE_DIGEST} for each repo listed above."
           fi

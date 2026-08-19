@@ -157,6 +157,18 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      # TECHOPS-1095: the Azure apt mirror on GitHub-hosted runners intermittently
+      # stalls forever (apt-get update sat silent for 19+ minutes, twice, during the
+      # yum repo restore). Cap every apt fetch and swap the Azure mirror for
+      # archive.ubuntu.com so a flaky mirror fails fast instead of wedging the job.
+      - name: Harden apt against flaky mirrors
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' | sudo tee /etc/apt/apt.conf.d/99-liquibase-timeouts > /dev/null
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+          if compgen -G "/etc/apt/sources.list.d/*.list" > /dev/null; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/*.list
+          fi
+
       - name: Set up Java
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:

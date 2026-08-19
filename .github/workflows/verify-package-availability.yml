@@ -174,6 +174,101 @@ jobs:
             exit 1
           fi
 
+  # TECHOPS-1095 / TECHOPS-1096: the availability check above only asks whether one
+  # package object returns 200. It never fetches repository metadata, never verifies a
+  # signature and never installs anything, so both repositories were left unusable with
+  # every check green: yum 404ing on repodata/repomd.xml, and a non-release build
+  # outranking every real version in the apt index. These jobs run the documented
+  # install instructions instead, which is the only thing that proves a customer can
+  # install. They also fail if a signing-key change leaves clients unable to verify.
+  smoke-test-apt:
+    name: apt install (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' || github.event_name == 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["debian:12", "ubuntu:24.04"]
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Install prerequisites
+        run: |
+          set -eu
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y -qq curl gnupg ca-certificates
+
+      - name: Configure the repository exactly as the docs instruct
+        # https://docs.liquibase.com/start/install/liquibase-linux-debian-ubuntu.html
+        run: |
+          set -eu
+          curl -fsSL https://repo.liquibase.com/liquibase.asc \
+            | gpg --dearmor > /usr/share/keyrings/liquibase-keyring.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/liquibase-keyring.gpg] https://package.liquibase.com stable main" \
+            > /etc/apt/sources.list.d/liquibase.list
+
+      - name: apt-get update must verify the repository signature
+        # Fails with NO_PUBKEY if the metadata is signed by a key clients do not have,
+        # which is what a signing-key rotation does to every existing install.
+        run: apt-get update
+
+      - name: Candidate version must be a real release
+        run: |
+          set -eu
+          for pkg in liquibase liquibase-secure; do
+            CAND=$(apt-cache policy "$pkg" | awk '/Candidate:/{print $2}')
+            echo "$pkg candidate: $CAND"
+            case "$CAND" in
+              [0-9]*) ;;
+              *)
+                echo "::error::$pkg candidate '$CAND' is not a numeric release: a non-release build is outranking every real version and dpkg will refuse it (TECHOPS-1096)."
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Install the latest release
+        run: |
+          set -eu
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get install -y -qq liquibase-secure
+          dpkg -s liquibase-secure | grep -E '^(Package|Version|Status):'
+          test -x /usr/bin/liquibase || { echo "::error::liquibase-secure installed but /usr/bin/liquibase is missing."; exit 1; }
+
+  smoke-test-yum:
+    name: dnf install (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' || github.event_name == 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["almalinux:9", "rockylinux:9"]
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Configure the repository exactly as the docs instruct
+        # https://docs.liquibase.com/start/install/liquibase-linux-redhat-centos.html
+        run: |
+          set -eu
+          curl -fsSLo /etc/yum.repos.d/liquibase.repo https://package.liquibase.com/repo-liquibase-com.repo
+          rpm --import https://repo.liquibase.com/liquibase.asc
+
+      - name: Repository metadata must be fetchable
+        # This is the check that TECHOPS-1095 needed: repodata/repomd.xml was 404 while
+        # its detached signature and every RPM still served fine.
+        run: dnf -y --disablerepo="*" --enablerepo="liquibase-*" makecache
+
+      - name: Install the latest release with gpgcheck enabled
+        # The repo file sets gpgcheck=1 and points gpgkey at liquibase.asc, so this also
+        # proves dnf can still resolve the signing key after a rotation.
+        run: |
+          set -eu
+          dnf -y install liquibase-secure
+          rpm -q liquibase-secure
+          rpm -qi liquibase-secure | grep -i signature || true
+          test -x /usr/bin/liquibase || { echo "::error::liquibase-secure installed but /usr/bin/liquibase is missing."; exit 1; }
+
   notify-debian:
     needs: [check-deb-and-rpm-package-availability]
     if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run')

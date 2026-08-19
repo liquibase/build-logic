@@ -799,13 +799,20 @@ jobs:
       # the upload step tolerates errors and nothing ever checked the public result.
       # This gate re-downloads the published metadata over public HTTPS and fails the
       # workflow when the yum repo is not actually usable by dnf/yum clients.
-      - name: Verify yum repository availability on repo.liquibase.com
+      - name: Verify yum repository availability for dnf clients
         if: ${{ inputs.dry_run == false }}
         env:
           RPM_FILENAME: ${{ env.RPM_FILENAME }}
         run: |
           set -euo pipefail
-          BASE="https://repo.liquibase.com/yum/noarch"
+          # TECHOPS-1095: the documented baseurl (see repo-liquibase-com.repo) is
+          # package.liquibase.com, which 307-redirects to repo.liquibase.com. Checking
+          # only the origin host would miss a broken redirect and stay green while
+          # every dnf client fails. The client host is authoritative: it is the one
+          # that breaks installs, so it fails the step; the origin host keeps the
+          # coverage this gate already had.
+          CLIENT_BASE="https://package.liquibase.com/yum/noarch"
+          ORIGIN_BASE="https://repo.liquibase.com/yum/noarch"
 
           if [ ! -f yum/noarch/repodata/repomd.xml ]; then
             echo "::error::local yum/noarch/repodata/repomd.xml is missing, so the rpm upload step failed before publishing metadata. The public yum repo state is unknown; check the previous step's log."
@@ -813,31 +820,35 @@ jobs:
           fi
 
           verify_file() {
-            local rel="$1" attempt
+            local base="$1" rel="$2" attempt
             for attempt in 1 2 3 4 5; do
               # cache-buster query: the Cloudflare cache key includes the query string,
-              # so this always revalidates against the R2 origin
-              if curl -fsS --max-time 30 "$BASE/$rel?cb=$(date +%s%N)" -o /tmp/verify-download; then
+              # so this always revalidates against the R2 origin. --location follows
+              # the package.liquibase.com -> repo.liquibase.com redirect; without it a
+              # 3xx would pass --fail as a false success (see TECHOPS-818).
+              if curl -fsS --location --max-time 30 "$base/$rel?cb=$(date +%s%N)" -o /tmp/verify-download; then
                 if cmp -s /tmp/verify-download "yum/noarch/$rel"; then
-                  echo "✓ $rel is live and byte-identical to what was just published"
+                  echo "✓ $rel is live and byte-identical to what was just published ($base)"
                   return 0
                 fi
-                echo "attempt $attempt: $rel is fetchable but differs from the published copy; retrying in 15s..."
+                echo "attempt $attempt: $rel is fetchable but differs from the published copy ($base); retrying in 15s..."
               else
-                echo "attempt $attempt: $rel is not fetchable; retrying in 15s..."
+                echo "attempt $attempt: $rel is not fetchable ($base); retrying in 15s..."
               fi
               sleep 15
             done
-            echo "::error::$rel is not correctly served from repo.liquibase.com after upload: the yum repo is unusable for customers (see TECHOPS-1095)"
+            echo "::error::$rel is not correctly served from $base after upload: the yum repo is unusable for customers (see TECHOPS-1095)"
             return 1
           }
 
-          verify_file "repodata/repomd.xml"
-          verify_file "repodata/repomd.xml.asc"
+          verify_file "$CLIENT_BASE" "repodata/repomd.xml"
+          verify_file "$CLIENT_BASE" "repodata/repomd.xml.asc"
+          verify_file "$ORIGIN_BASE" "repodata/repomd.xml"
+          verify_file "$ORIGIN_BASE" "repodata/repomd.xml.asc"
 
           # every hashed metadata file referenced by the index must be fetchable too
           grep -oE 'href="repodata/[^"]+"' yum/noarch/repodata/repomd.xml | sed 's/^href="//; s/"$//' | while IFS= read -r href; do
-            if ! curl -fsSI --max-time 30 "$BASE/$href?cb=$(date +%s%N)" > /dev/null; then
+            if ! curl -fsSI --location --max-time 30 "$CLIENT_BASE/$href?cb=$(date +%s%N)" > /dev/null; then
               echo "::error::$href is referenced by repomd.xml but not fetchable: the yum repo is unusable for customers"
               exit 1
             fi
@@ -845,8 +856,8 @@ jobs:
           done
 
           # and the RPM this run just published
-          if ! curl -fsSI --max-time 30 "$BASE/$RPM_FILENAME?cb=$(date +%s%N)" > /dev/null; then
-            echo "::error::$RPM_FILENAME was published but is not fetchable from repo.liquibase.com"
+          if ! curl -fsSI --location --max-time 30 "$CLIENT_BASE/$RPM_FILENAME?cb=$(date +%s%N)" > /dev/null; then
+            echo "::error::$RPM_FILENAME was published but is not fetchable from $CLIENT_BASE"
             exit 1
           fi
           echo "✓ $RPM_FILENAME"

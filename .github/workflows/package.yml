@@ -189,12 +189,28 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      # TECHOPS-1095: the Azure apt mirror on GitHub-hosted runners intermittently
+      # stalls forever (apt-get update sat silent for 19+ minutes, twice, during the
+      # yum repo restore). Cap every apt fetch and swap the Azure mirror for
+      # archive.ubuntu.com so a flaky mirror fails fast instead of wedging the job.
+      - name: Harden apt against flaky mirrors
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' | sudo tee /etc/apt/apt.conf.d/99-liquibase-timeouts > /dev/null
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+          if compgen -G "/etc/apt/sources.list.d/*.list" > /dev/null; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/*.list
+          fi
+
       - name: Set up Java
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: "21"
           distribution: "temurin"
-          cache: "maven"
+          # TECHOPS-1095: build-logic itself has no pom.xml, and setup-java hard-fails
+          # when the maven cache glob matches nothing. Disabling the cache when this
+          # workflow is dispatched directly in build-logic keeps the emergency
+          # re-publish path (workflow_dispatch) usable; callers keep the cache.
+          cache: ${{ github.repository != 'liquibase/build-logic' && 'maven' || '' }}
 
       - name: Set up Maven
         uses: stCarolas/setup-maven@d6af6abeda15e98926a57b5aa970a96bb37f97d1 # v5
@@ -748,25 +764,149 @@ jobs:
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASS" --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
 
-          # Guard the destructive `sync --delete`: every pre-existing remote RPM must be present
-          # locally, otherwise an incomplete download above would make --delete remove live RPMs
-          # from the bucket. Abort rather than publish a repo that drops packages.
+          # Guard: every pre-existing remote RPM must be present locally, otherwise the
+          # metadata generated above would silently drop packages from the public index.
+          # Abort rather than publish a repo that loses packages.
           DOWNLOADED_RPMS=$(find yum/noarch -maxdepth 1 -name '*.rpm' ! -name "$RPM_FILENAME" | wc -l | tr -d ' ')
           if [ "$DOWNLOADED_RPMS" -ne "$EXPECTED_RPMS" ]; then
             echo "ERROR: expected $EXPECTED_RPMS existing RPMs from R2 but only $DOWNLOADED_RPMS are present locally;"
-            echo "refusing 'sync --delete' to avoid removing live RPMs from the yum repo."
+            echo "refusing to publish metadata that would drop live RPMs from the yum repo."
             exit 1
           fi
-          echo "Verified $DOWNLOADED_RPMS/$EXPECTED_RPMS existing RPMs present locally; safe to sync --delete."
+          echo "Verified $DOWNLOADED_RPMS/$EXPECTED_RPMS existing RPMs present locally."
 
-          # Upload to R2. --checksum-algorithm CRC32: newer aws-cli defaults to a CRC64NVME
-          # checksum that R2 rejects (same fix as analytics-config#33). `sync --delete` removes
-          # remote keys not present locally (guarded above).
-          echo "Uploading repository to R2..."
+          # TECHOPS-1095: never `aws s3 sync --delete` the yum tree. On 2026-08-12 that
+          # sync uploaded repodata/repomd.xml and then deleted it again within the same
+          # run (the R2 listing fed the sync comparator a phantom repomd.xml entry with
+          # no local counterpart, so --delete removed the index it had just published),
+          # which 404'd the repo for every dnf/yum client. Publish in an order that can
+          # never leave the repo without a valid index:
+          #   1. RPMs (never deleted here; yanking an RPM is a deliberate manual act)
+          #   2. new hashed metadata files (the index's targets go live first)
+          #   3. repomd.xml + repomd.xml.asc
+          #   4. prune stale hashed metadata by exact key, never touching repomd.xml*
+          # --checksum-algorithm CRC32: newer aws-cli defaults to a CRC64NVME checksum
+          # that R2 rejects (same fix as analytics-config#33).
+          echo "Uploading RPMs to R2..."
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            aws s3 sync yum s3://repo-liquibase-com/yum --delete --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+            aws s3 sync yum/noarch s3://repo-liquibase-com/yum/noarch --exclude "repodata/*" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+
+          echo "Uploading new repository metadata..."
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp yum/noarch/repodata s3://repo-liquibase-com/yum/noarch/repodata --recursive --exclude "repomd.xml" --exclude "repomd.xml.asc" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+          # signature first, then the index it signs: a repo_gpgcheck client that
+          # fetches the new index must find its matching signature already in place
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp yum/noarch/repodata/repomd.xml.asc s3://repo-liquibase-com/yum/noarch/repodata/repomd.xml.asc --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp yum/noarch/repodata/repomd.xml s3://repo-liquibase-com/yum/noarch/repodata/repomd.xml --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+
+          # Prune hashed metadata files that the new index no longer references,
+          # comparing exact keys from the JSON S3 API (not `aws s3 ls` text output,
+          # which hides oddball keys such as trailing whitespace). Only keys that look
+          # like createrepo hash files are deleted; anything unexpected is reported and
+          # left alone so it can be investigated.
+          echo "Pruning stale repository metadata from R2..."
+          # two assignments so a listing failure aborts the step instead of being
+          # masked by jq's exit status at the end of a pipe
+          REMOTE_META_JSON=$(AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3api list-objects-v2 --bucket repo-liquibase-com --prefix yum/noarch/repodata/ --endpoint-url "$R2_ENDPOINT" --output json --query 'Contents[].Key')
+          REMOTE_META=$(jq -r '.[]?' <<< "$REMOTE_META_JSON")
+          while IFS= read -r key; do
+            [ -z "$key" ] && continue
+            base="${key#yum/noarch/repodata/}"
+            if [ -e "yum/noarch/repodata/$base" ]; then
+              continue
+            fi
+            if [ "$base" = "repomd.xml" ] || [ "$base" = "repomd.xml.asc" ]; then
+              continue
+            fi
+            if printf '%s' "$base" | grep -qE '^[0-9a-f]{16,}-'; then
+              echo "Deleting stale metadata object: $base"
+              AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+                aws s3api delete-object --bucket repo-liquibase-com --key "$key" --endpoint-url "$R2_ENDPOINT"
+            else
+              echo "WARNING: leaving unexpected object in place: '$key'"
+            fi
+          done <<< "$REMOTE_META"
 
           echo "✓ RPM repository updated successfully"
+
+      # TECHOPS-1095: the 2026-08-12 loss of repodata/repomd.xml went unnoticed because
+      # the upload step tolerates errors and nothing ever checked the public result.
+      # This gate re-downloads the published metadata over public HTTPS and fails the
+      # workflow when the yum repo is not actually usable by dnf/yum clients.
+      - name: Verify yum repository availability for dnf clients
+        if: ${{ inputs.dry_run == false }}
+        env:
+          RPM_FILENAME: ${{ env.RPM_FILENAME }}
+        run: |
+          set -euo pipefail
+          # TECHOPS-1095: the documented baseurl (see repo-liquibase-com.repo) is
+          # package.liquibase.com, which 307-redirects to repo.liquibase.com. Checking
+          # only the origin host would miss a broken redirect and stay green while
+          # every dnf client fails. The client host is authoritative: it is the one
+          # that breaks installs, so it fails the step; the origin host keeps the
+          # coverage this gate already had.
+          CLIENT_BASE="https://package.liquibase.com/yum/noarch"
+          ORIGIN_BASE="https://repo.liquibase.com/yum/noarch"
+
+          if [ ! -f yum/noarch/repodata/repomd.xml ]; then
+            echo "::error::local yum/noarch/repodata/repomd.xml is missing, so the rpm upload step failed before publishing metadata. The public yum repo state is unknown; check the previous step's log."
+            exit 1
+          fi
+
+          verify_file() {
+            local base="$1" rel="$2" attempt
+            for attempt in 1 2 3 4 5; do
+              # cache-buster query: the Cloudflare cache key includes the query string,
+              # so this always revalidates against the R2 origin. --location follows
+              # the package.liquibase.com -> repo.liquibase.com redirect; without it a
+              # 3xx would pass --fail as a false success (see TECHOPS-818).
+              if curl -fsS --location --max-time 30 "$base/$rel?cb=$(date +%s%N)" -o /tmp/verify-download; then
+                if cmp -s /tmp/verify-download "yum/noarch/$rel"; then
+                  echo "✓ $rel is live and byte-identical to what was just published ($base)"
+                  return 0
+                fi
+                echo "attempt $attempt: $rel is fetchable but differs from the published copy ($base); retrying in 15s..."
+              else
+                echo "attempt $attempt: $rel is not fetchable ($base); retrying in 15s..."
+              fi
+              sleep 15
+            done
+            echo "::error::$rel is not correctly served from $base after upload: the yum repo is unusable for customers (see TECHOPS-1095)"
+            return 1
+          }
+
+          verify_file "$CLIENT_BASE" "repodata/repomd.xml"
+          verify_file "$CLIENT_BASE" "repodata/repomd.xml.asc"
+          verify_file "$ORIGIN_BASE" "repodata/repomd.xml"
+          verify_file "$ORIGIN_BASE" "repodata/repomd.xml.asc"
+
+          # every hashed metadata file referenced by the index must be fetchable too;
+          # process substitution keeps the loop in the main shell so exit 1 is direct,
+          # and an index that references nothing is an error of its own
+          HREF_COUNT=0
+          while IFS= read -r href; do
+            HREF_COUNT=$((HREF_COUNT + 1))
+            if ! curl -fsSI --location --max-time 30 "$CLIENT_BASE/$href?cb=$(date +%s%N)" > /dev/null; then
+              echo "::error::$href is referenced by repomd.xml but not fetchable: the yum repo is unusable for customers"
+              exit 1
+            fi
+            echo "✓ $href"
+          done < <(grep -oE 'href="repodata/[^"]+"' yum/noarch/repodata/repomd.xml | sed 's/^href="//; s/"$//' || true)
+          if [ "$HREF_COUNT" -eq 0 ]; then
+            echo "::error::repomd.xml references no metadata files; the generated index is invalid"
+            exit 1
+          fi
+
+          # and the RPM this run just published
+          if ! curl -fsSI --location --max-time 30 "$CLIENT_BASE/$RPM_FILENAME?cb=$(date +%s%N)" > /dev/null; then
+            echo "::error::$RPM_FILENAME was published but is not fetchable from $CLIENT_BASE"
+            exit 1
+          fi
+          echo "✓ $RPM_FILENAME"
+          echo "✓ yum repository verified: metadata and packages are publicly available"
 
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
         if: ${{ inputs.dry_run == true }}

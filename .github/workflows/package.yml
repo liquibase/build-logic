@@ -150,18 +150,21 @@ jobs:
       - name: Load Cloudflare R2 credentials from devops vault
         # TECHOPS-818: the R2 S3-API creds live in /vault/devops (single source of
         # truth, shared with analytics-config); every other secret stays in
-        # /vault/liquibase, read below. Pull ONLY the three R2 keys and mask them —
-        # least privilege, no bulk-import of the DevOps vault into this job.
+        # /vault/liquibase, read below. Pull ONLY the keys this job needs and mask
+        # them — least privilege, no bulk-import of the DevOps vault into this job.
+        # CLOUDFLARE_CACHE_PURGE_TOKEN (TECHOPS-1114) must be a token scoped to zone
+        # liquibase.com with only the Cache Purge permission — never the admin
+        # CLOUDFLARE_API_TOKEN, which has no business in release CI.
         run: |
           set -euo pipefail
           JSON=$(aws secretsmanager get-secret-value --secret-id /vault/devops --region us-east-1 --query SecretString --output text)
-          for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY; do
+          for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY CLOUDFLARE_CACHE_PURGE_TOKEN; do
             v=$(printf '%s' "$JSON" | jq -r --arg k "$k" '.[$k] // ""')
             if [ -z "$v" ] || [ "$v" = "null" ]; then echo "::error::$k missing from /vault/devops"; exit 1; fi
             echo "::add-mask::$v"
             echo "$k=$v" >> "$GITHUB_ENV"
           done
-          echo "Loaded CLOUDFLARE_ACCOUNT_ID + R2 access/secret keys from /vault/devops."
+          echo "Loaded CLOUDFLARE_ACCOUNT_ID, R2 access/secret keys and the cache-purge token from /vault/devops."
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -394,6 +397,103 @@ jobs:
 
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
+
+      # TECHOPS-1114: Cloudflare caches *.gz by default but not the extensionless
+      # index files, so after the deb-s3 upload above the edge keeps serving the
+      # previous Packages.gz against the freshly signed InRelease and every
+      # `apt update` fails with "File has unexpected size" until the cached entry
+      # expires (observed ~2h on 2026-08-20). Purge the apt metadata on both
+      # hostnames so clients converge in seconds instead.
+      - name: Purge Cloudflare cache of apt metadata
+        if: ${{ inputs.dry_run == false }}
+        env:
+          CF_PURGE_TOKEN: ${{ env.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+          # Zone id of liquibase.com; an identifier, not a secret.
+          CF_ZONE_ID: 73646b36f00f6fe22915ab757aba6f8c
+        run: |
+          set -euo pipefail
+          FILES=$(for host in repo.liquibase.com package.liquibase.com; do
+            echo "https://$host/dists/stable/InRelease"
+            echo "https://$host/dists/stable/Release"
+            echo "https://$host/dists/stable/Release.gpg"
+            for arch in amd64 i386 armhf all; do
+              echo "https://$host/dists/stable/main/binary-$arch/Packages"
+              echo "https://$host/dists/stable/main/binary-$arch/Packages.gz"
+            done
+          done | jq -R . | jq -s '{files: .}')
+          purged=""
+          for attempt in 1 2 3; do
+            if RESP=$(curl -fsS --max-time 30 -X POST \
+                 -H "Authorization: Bearer $CF_PURGE_TOKEN" \
+                 -H "Content-Type: application/json" \
+                 --data "$FILES" \
+                 "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache") \
+               && [ "$(printf '%s' "$RESP" | jq -r '.success')" = "true" ]; then
+              echo "✓ purged $(printf '%s' "$FILES" | jq '.files | length') apt metadata URLs from the Cloudflare cache"
+              purged=1
+              break
+            fi
+            echo "attempt $attempt: purge_cache call failed: $(printf '%s' "${RESP:-}" | jq -c '.errors // empty' 2>/dev/null || true); retrying in 10s..."
+            sleep 10
+          done
+          if [ -z "$purged" ]; then
+            echo "::error::Cloudflare cache purge failed, so the edge may keep serving stale apt metadata against the new InRelease and apt update will break for customers (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            exit 1
+          fi
+
+      # TECHOPS-1114: verify the apt repository exactly as apt fetches it: bare
+      # URLs, no cache-buster. The yum gate further down revalidates against origin
+      # via ?cb= query strings, which change the Cloudflare cache key, so a check
+      # like that can pass while every real client still gets a stale cached index.
+      # This step fails the release when the edge disagrees with the signed
+      # InRelease this run just published.
+      - name: Verify apt repository for apt clients
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          set -euo pipefail
+          verify_host() {
+            local base="$1" attempt arch f declared actual ok
+            for attempt in 1 2 3 4 5; do
+              ok=1
+              if ! curl -fsS --location --max-time 30 "$base/dists/stable/InRelease" -o /tmp/apt-inrelease; then
+                echo "attempt $attempt: InRelease is not fetchable from $base"
+                ok=""
+              else
+                for arch in amd64 i386 armhf all; do
+                  for f in "main/binary-$arch/Packages" "main/binary-$arch/Packages.gz"; do
+                    declared=$(awk -v f="$f" '/^SHA256:/{s=1;next} /^[A-Za-z-]/{s=0} s && $3==f {print $1}' /tmp/apt-inrelease)
+                    if [ -z "$declared" ]; then
+                      echo "attempt $attempt: $f is not listed in the InRelease served by $base"
+                      ok=""
+                      break 2
+                    fi
+                    if ! curl -fsS --location --max-time 30 "$base/dists/stable/$f" -o /tmp/apt-pkgfile; then
+                      echo "attempt $attempt: $f is not fetchable from $base"
+                      ok=""
+                      break 2
+                    fi
+                    actual=$(sha256sum /tmp/apt-pkgfile | cut -d' ' -f1)
+                    if [ "$actual" != "$declared" ]; then
+                      echo "attempt $attempt: $f from $base does not match InRelease (stale edge cache?): declared=$declared actual=$actual"
+                      ok=""
+                      break 2
+                    fi
+                  done
+                done
+              fi
+              if [ -n "$ok" ]; then
+                echo "✓ $base: every Packages/Packages.gz matches the signed InRelease at the edge"
+                return 0
+              fi
+              sleep 10
+            done
+            echo "::error::$base serves apt metadata that does not match InRelease after upload and purge: apt update is broken for customers (TECHOPS-1114)"
+            return 1
+          }
+          # package.liquibase.com is the host in the documented sources.list line,
+          # so it is authoritative; repo.liquibase.com keeps direct-origin coverage.
+          verify_host "https://package.liquibase.com"
+          verify_host "https://repo.liquibase.com"
 
       - name: Import GPG key for dry-run deb signing
         if: ${{ inputs.dry_run == true }}
@@ -832,6 +932,41 @@ jobs:
 
           echo "✓ RPM repository updated successfully"
 
+      # TECHOPS-1114: same stale-edge risk as apt for the yum index. The
+      # hash-prefixed metadata files get new names every publish, so only
+      # repomd.xml and its detached signature need purging.
+      - name: Purge Cloudflare cache of yum metadata
+        if: ${{ inputs.dry_run == false }}
+        env:
+          CF_PURGE_TOKEN: ${{ env.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+          # Zone id of liquibase.com; an identifier, not a secret.
+          CF_ZONE_ID: 73646b36f00f6fe22915ab757aba6f8c
+        run: |
+          set -euo pipefail
+          FILES=$(for host in repo.liquibase.com package.liquibase.com; do
+            echo "https://$host/yum/noarch/repodata/repomd.xml"
+            echo "https://$host/yum/noarch/repodata/repomd.xml.asc"
+          done | jq -R . | jq -s '{files: .}')
+          purged=""
+          for attempt in 1 2 3; do
+            if RESP=$(curl -fsS --max-time 30 -X POST \
+                 -H "Authorization: Bearer $CF_PURGE_TOKEN" \
+                 -H "Content-Type: application/json" \
+                 --data "$FILES" \
+                 "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache") \
+               && [ "$(printf '%s' "$RESP" | jq -r '.success')" = "true" ]; then
+              echo "✓ purged $(printf '%s' "$FILES" | jq '.files | length') yum metadata URLs from the Cloudflare cache"
+              purged=1
+              break
+            fi
+            echo "attempt $attempt: purge_cache call failed: $(printf '%s' "${RESP:-}" | jq -c '.errors // empty' 2>/dev/null || true); retrying in 10s..."
+            sleep 10
+          done
+          if [ -z "$purged" ]; then
+            echo "::error::Cloudflare cache purge failed, so the edge may keep serving a stale yum index (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            exit 1
+          fi
+
       # TECHOPS-1095: the 2026-08-12 loss of repodata/repomd.xml went unnoticed because
       # the upload step tolerates errors and nothing ever checked the public result.
       # This gate re-downloads the published metadata over public HTTPS and fails the
@@ -865,10 +1000,17 @@ jobs:
               # 3xx would pass --fail as a false success (see TECHOPS-818).
               if curl -fsS --location --max-time 30 "$base/$rel?cb=$(date +%s%N)" -o /tmp/verify-download; then
                 if cmp -s /tmp/verify-download "yum/noarch/$rel"; then
-                  echo "✓ $rel is live and byte-identical to what was just published ($base)"
-                  return 0
+                  # TECHOPS-1114: also fetch the bare URL clients actually use. The
+                  # ?cb= fetch above changes the Cloudflare cache key, so it can
+                  # pass while the edge still serves a stale cached index.
+                  if curl -fsS --location --max-time 30 "$base/$rel" -o /tmp/verify-bare && cmp -s /tmp/verify-bare "yum/noarch/$rel"; then
+                    echo "✓ $rel is live and byte-identical to what was just published, at origin and edge ($base)"
+                    return 0
+                  fi
+                  echo "attempt $attempt: $rel matches at origin but the edge serves a stale copy ($base); retrying in 15s..."
+                else
+                  echo "attempt $attempt: $rel is fetchable but differs from the published copy ($base); retrying in 15s..."
                 fi
-                echo "attempt $attempt: $rel is fetchable but differs from the published copy ($base); retrying in 15s..."
               else
                 echo "attempt $attempt: $rel is not fetchable ($base); retrying in 15s..."
               fi

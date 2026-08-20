@@ -102,9 +102,41 @@ permissions:
   actions: write # Required for workflow operations
 
 jobs:
+  # TECHOPS-1096: a run with dry_run=false and `version` set to a branch name published
+  # liquibase-secure "devopstest+reusable+workflows" straight to the production apt repo.
+  # apt sorts non-numeric versions above every real release, so it became the install
+  # candidate ahead of 5.2.2 and dpkg then refused the 653 MB download it forced on every
+  # customer ("version number does not start with digit"). Every job in this workflow
+  # publishes somewhere with `version`, so they all gate on this one.
+  validate-version:
+    name: Validate release version
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Fail on non-release version
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERSION:-}" ]; then
+            echo "::error::version input is empty; refusing to package."
+            exit 1
+          fi
+          if printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Version '$VERSION' accepted (dry_run=$DRY_RUN)."
+            exit 0
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::warning::version '$VERSION' is not a numeric release version. Allowed only because dry_run=true targets the dry-run buckets, never repo.liquibase.com."
+            exit 0
+          fi
+          echo "::error::refusing to publish version '$VERSION': a production release version must be numeric, like 4.23.0. apt ranks anything non-numeric above every real release and dpkg then refuses to install it (TECHOPS-1096). Re-run with dry_run=true if this is a test."
+          exit 1
+
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
+    needs: validate-version
     outputs:
       HOMEBREW_PR_NUMBER: ${{ steps.capture-pr.outputs.HOMEBREW_PR_NUMBER }}
       HOMEBREW_PR_URL: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
@@ -1245,6 +1277,7 @@ jobs:
           fi
 
   upload_windows_package:
+    needs: validate-version
     if: ${{ inputs.distribution == 'liquibase' }}
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@f7a85fe3cab9f1f2b923ee5b411428e5e5a99dc6 # main
     secrets: inherit
@@ -1266,6 +1299,7 @@ jobs:
   #    dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   upload_ansible_role:
+    needs: validate-version
     if: ${{ inputs.distribution == 'liquibase' }}
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@010ba49a98ae78e2f826ba8d6cc6d2925236d078 # main
     secrets: inherit
@@ -1275,6 +1309,7 @@ jobs:
       dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
 
   upload_secure_ansible_role:
+    needs: validate-version
     if: ${{ inputs.distribution == 'liquibase-secure' }}
     uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@21cb490554af2a686d1e09bc581503a6fabd2508 # main
     secrets: inherit

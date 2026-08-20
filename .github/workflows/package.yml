@@ -762,10 +762,12 @@ jobs:
           echo "Uploading new repository metadata..."
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
             aws s3 cp yum/noarch/repodata s3://repo-liquibase-com/yum/noarch/repodata --recursive --exclude "repomd.xml" --exclude "repomd.xml.asc" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
-          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            aws s3 cp yum/noarch/repodata/repomd.xml s3://repo-liquibase-com/yum/noarch/repodata/repomd.xml --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+          # signature first, then the index it signs: a repo_gpgcheck client that
+          # fetches the new index must find its matching signature already in place
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
             aws s3 cp yum/noarch/repodata/repomd.xml.asc s3://repo-liquibase-com/yum/noarch/repodata/repomd.xml.asc --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp yum/noarch/repodata/repomd.xml s3://repo-liquibase-com/yum/noarch/repodata/repomd.xml --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
 
           # Prune hashed metadata files that the new index no longer references,
           # comparing exact keys from the JSON S3 API (not `aws s3 ls` text output,
@@ -773,8 +775,11 @@ jobs:
           # like createrepo hash files are deleted; anything unexpected is reported and
           # left alone so it can be investigated.
           echo "Pruning stale repository metadata from R2..."
-          REMOTE_META=$(AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            aws s3api list-objects-v2 --bucket repo-liquibase-com --prefix yum/noarch/repodata/ --endpoint-url "$R2_ENDPOINT" --output json --query 'Contents[].Key' | jq -r '.[]?')
+          # two assignments so a listing failure aborts the step instead of being
+          # masked by jq's exit status at the end of a pipe
+          REMOTE_META_JSON=$(AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3api list-objects-v2 --bucket repo-liquibase-com --prefix yum/noarch/repodata/ --endpoint-url "$R2_ENDPOINT" --output json --query 'Contents[].Key')
+          REMOTE_META=$(jq -r '.[]?' <<< "$REMOTE_META_JSON")
           while IFS= read -r key; do
             [ -z "$key" ] && continue
             base="${key#yum/noarch/repodata/}"
@@ -846,14 +851,22 @@ jobs:
           verify_file "$ORIGIN_BASE" "repodata/repomd.xml"
           verify_file "$ORIGIN_BASE" "repodata/repomd.xml.asc"
 
-          # every hashed metadata file referenced by the index must be fetchable too
-          grep -oE 'href="repodata/[^"]+"' yum/noarch/repodata/repomd.xml | sed 's/^href="//; s/"$//' | while IFS= read -r href; do
+          # every hashed metadata file referenced by the index must be fetchable too;
+          # process substitution keeps the loop in the main shell so exit 1 is direct,
+          # and an index that references nothing is an error of its own
+          HREF_COUNT=0
+          while IFS= read -r href; do
+            HREF_COUNT=$((HREF_COUNT + 1))
             if ! curl -fsSI --location --max-time 30 "$CLIENT_BASE/$href?cb=$(date +%s%N)" > /dev/null; then
               echo "::error::$href is referenced by repomd.xml but not fetchable: the yum repo is unusable for customers"
               exit 1
             fi
             echo "✓ $href"
-          done
+          done < <(grep -oE 'href="repodata/[^"]+"' yum/noarch/repodata/repomd.xml | sed 's/^href="//; s/"$//' || true)
+          if [ "$HREF_COUNT" -eq 0 ]; then
+            echo "::error::repomd.xml references no metadata files; the generated index is invalid"
+            exit 1
+          fi
 
           # and the RPM this run just published
           if ! curl -fsSI --location --max-time 30 "$CLIENT_BASE/$RPM_FILENAME?cb=$(date +%s%N)" > /dev/null; then

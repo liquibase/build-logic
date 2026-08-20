@@ -1096,9 +1096,9 @@ jobs:
             echo "Using system createrepo instead"
             ln -sf $(which createrepo) /opt/createrepo
           else
-            echo "Installing createrepo from package manager as fallback"
-            sudo apt-get install -y createrepo
-            ln -sf $(which createrepo) /opt/createrepo
+            echo "Installing createrepo-c from package manager as fallback"
+            sudo apt-get install -y createrepo-c
+            ln -sf $(which createrepo_c) /opt/createrepo
           fi
 
           # Return to workspace root

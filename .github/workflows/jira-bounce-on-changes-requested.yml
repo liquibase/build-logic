@@ -1,0 +1,331 @@
+name: "Jira: Bounce ticket to Development on changes requested"
+
+# Reusable workflow. When a reviewer submits a "Changes requested" review on a
+# PR, this posts a comment on the linked Jira ticket(s) and — when it is
+# unambiguous which ticket the review is about — moves the ticket back to
+# Development.
+#
+# TECHOPS-1022. Implements the *changes-requested* half only; see
+# "Merge conflicts are NOT handled here" below.
+# ---
+# Caller pattern (in any repo):
+#
+#   name: "Jira: Bounce on changes requested"
+#   on:
+#     pull_request_review:
+#       types: [submitted]
+#   permissions:
+#     id-token: write
+#     contents: read
+#   jobs:
+#     bounce:
+#       uses: liquibase/build-logic/.github/workflows/jira-bounce-on-changes-requested.yml@main
+#       secrets: inherit
+# ---
+
+# Required org-level setup (one-time, shared with jira-set-fixversion-on-release):
+#   /vault/liquibase must contain
+#       JIRA_USER       — Jira account email
+#       JIRA_API_TOKEN  — token from id.atlassian.com
+#   The account needs Browse Issues + Transition Issues + Add Comments on every
+#   project in `project_keys`.
+
+on:
+  workflow_call:
+    inputs:
+      project_keys:
+        description: >-
+          Comma-separated Jira project keys to recognise in the PR title, branch
+          name and body. Deliberately narrow for the first rollout — NTT only, so
+          the blast radius of a misfire is one team's board. Widen deliberately,
+          one project at a time, after confirming the vault Jira account holds
+          TRANSITION_ISSUES + ADD_COMMENTS there. Projects on the `tight`
+          permission model (e.g. SECURE) scope those permissions to an owner
+          group, so they are not a safe assumption.
+        required: false
+        type: string
+        default: "NTT"
+      source_statuses:
+        description: "Only bounce a ticket that is currently in one of these statuses. This is the TECHOPS-421 guard — do not widen it without reading that ticket."
+        required: false
+        type: string
+        default: "Code Review,Ready for Test"
+      target_status:
+        description: "Status to move the ticket to. Matched against the *destination* of the available transitions, so it works via either the named transition or the global Move-to."
+        required: false
+        type: string
+        default: "Development"
+      comment_only:
+        description: "Post the comment but never transition. Use this if the team decides the auto-move is too blunt."
+        required: false
+        type: boolean
+        default: false
+      jira_base_url:
+        description: "Jira Cloud base URL."
+        required: false
+        type: string
+        default: "https://datical.atlassian.net"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  bounce:
+    runs-on: ubuntu-latest
+    # Cheap pre-filter so the vault steps don't even run for approvals and
+    # plain comments. The script re-checks, since this expression is only as
+    # trustworthy as the caller's `types:` filter.
+    if: github.event.review.state == 'changes_requested'
+    steps:
+      - name: Configure AWS credentials for vault access
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Get Jira service-account credentials from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53 # v3.0.1
+        with:
+          secret-ids: |
+            ,/vault/liquibase
+          parse-json-secrets: true
+
+      - name: Comment and bounce linked tickets
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PROJECT_KEYS: ${{ inputs.project_keys }}
+          SOURCE_STATUSES: ${{ inputs.source_statuses }}
+          TARGET_STATUS: ${{ inputs.target_status }}
+          COMMENT_ONLY: ${{ inputs.comment_only }}
+          JIRA_BASE_URL: ${{ inputs.jira_base_url }}
+          JIRA_EMAIL: ${{ env.JIRA_USER }}
+          JIRA_TOKEN: ${{ env.JIRA_API_TOKEN }}
+        with:
+          script: |
+            // ---- Event guard -----------------------------------------
+            const review = context.payload.review;
+            const pr = context.payload.pull_request;
+            if (!review || !pr) {
+              core.setFailed(
+                'No review/pull_request in the event payload. The caller must use ' +
+                '`on: pull_request_review: types: [submitted]`.'
+              );
+              return;
+            }
+            // Webhook payloads use lowercase review states; the REST API uses
+            // uppercase. Compare case-insensitively so this keeps working if
+            // the payload is ever sourced differently.
+            if ((review.state || '').toLowerCase() !== 'changes_requested') {
+              console.log(`Review state is '${review.state}', not 'changes_requested'. Nothing to do.`);
+              return;
+            }
+
+            // ---- Inputs ----------------------------------------------
+            const projectKeys = process.env.PROJECT_KEYS
+              .split(',').map(s => s.trim()).filter(Boolean);
+            const sourceStatuses = process.env.SOURCE_STATUSES
+              .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            const targetStatus = process.env.TARGET_STATUS.trim();
+            const commentOnly = process.env.COMMENT_ONLY === 'true';
+            const baseUrl = process.env.JIRA_BASE_URL.replace(/\/$/, '');
+            const email = process.env.JIRA_EMAIL;
+            const token = process.env.JIRA_TOKEN;
+
+            if (!email || !token) {
+              core.setFailed('JIRA_USER or JIRA_API_TOKEN not set in /vault/liquibase');
+              return;
+            }
+
+            const auth = `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`;
+            const headers = {
+              Authorization: auth,
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            };
+
+            // ---- Extract ticket keys ---------------------------------
+            // Same convention as jira-ticket-linker.yml: title, then branch
+            // name, then body. Unlike that workflow we collect EVERY match,
+            // not the first one — knowing a PR spans several tickets is what
+            // drives the no-transition decision below.
+            const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const keyRegex = new RegExp(
+              `\\b(?:${projectKeys.map(escapeRegex).join('|')})-\\d+\\b`,
+              'gi'
+            );
+            const keys = new Set();
+            for (const source of [pr.title, pr.head && pr.head.ref, pr.body]) {
+              const matches = (source || '').match(keyRegex);
+              if (matches) matches.forEach(k => keys.add(k.toUpperCase()));
+            }
+
+            if (keys.size === 0) {
+              console.log(
+                'No Jira ticket keys found in the PR title, branch name or body. Nothing to do.'
+              );
+              return;
+            }
+            console.log(`Referenced ticket(s): ${[...keys].sort().join(', ')}`);
+
+            // ---- Filter to tickets actually sitting in a source status ----
+            // This is both the TECHOPS-421 safety guard and the idempotency
+            // guard: a ticket already in Development is not eligible, so
+            // repeat reviews on the same PR are no-ops.
+            const eligible = [];
+            for (const key of [...keys].sort()) {
+              const resp = await fetch(
+                `${baseUrl}/rest/api/3/issue/${key}?fields=status`,
+                { headers }
+              );
+              if (!resp.ok) {
+                core.warning(
+                  `Could not read status of ${key}: ${resp.status} ${await resp.text()}`
+                );
+                continue;
+              }
+              const issue = await resp.json();
+              const status = issue.fields && issue.fields.status && issue.fields.status.name;
+              if (!status) {
+                core.warning(`${key}: no status in response; skipping.`);
+                continue;
+              }
+              if (!sourceStatuses.includes(status.toLowerCase())) {
+                console.log(
+                  `${key}: in '${status}', not one of [${process.env.SOURCE_STATUSES}] — skipping.`
+                );
+                continue;
+              }
+              eligible.push({ key, status });
+            }
+
+            if (eligible.length === 0) {
+              console.log('No referenced ticket is in a bounce-eligible status. Nothing to do.');
+              return;
+            }
+
+            // ---- Decide whether to transition ------------------------
+            // See safety note 2: one review must not drag several tickets
+            // backwards. Ambiguity downgrades to comment-only.
+            let doTransition = !commentOnly;
+            if (commentOnly) {
+              console.log('comment_only=true — commenting without transitioning.');
+            } else if (eligible.length > 1) {
+              doTransition = false;
+              core.warning(
+                `This PR references ${eligible.length} tickets currently awaiting review ` +
+                `(${eligible.map(e => e.key).join(', ')}). Commenting on each but ` +
+                `transitioning none — one review should not move several tickets. ` +
+                `Move the right one by hand.`
+              );
+            }
+
+            const prLink = pr.html_url;
+            const reviewer = (review.user && review.user.login) || 'a reviewer';
+            const moved = [];
+
+            for (const { key, status } of eligible) {
+              // ---- Transition ---------------------------------------
+              // Match on the transition's DESTINATION, not its name, so this
+              // works via either the named transition (e.g. "Request Changes"
+              // from Code Review) or the global "Move to Development".
+              let didMove = false;
+              if (doTransition) {
+                const trResp = await fetch(
+                  `${baseUrl}/rest/api/3/issue/${key}/transitions`,
+                  { headers }
+                );
+                if (!trResp.ok) {
+                  core.warning(
+                    `Could not list transitions for ${key}: ` +
+                    `${trResp.status} ${await trResp.text()}`
+                  );
+                } else {
+                  const { transitions = [] } = await trResp.json();
+                  const match = transitions.find(
+                    t => t.to && (t.to.name || '').toLowerCase() === targetStatus.toLowerCase()
+                  );
+                  if (!match) {
+                    core.warning(
+                      `${key}: no available transition to '${targetStatus}' from '${status}'. ` +
+                      `Available: ${transitions.map(t => `${t.name} → ${t.to && t.to.name}`).join('; ') || '(none)'}`
+                    );
+                  } else {
+                    const doResp = await fetch(
+                      `${baseUrl}/rest/api/3/issue/${key}/transitions`,
+                      {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ transition: { id: match.id } }),
+                      }
+                    );
+                    if (doResp.ok) {
+                      didMove = true;
+                      moved.push(key);
+                      console.log(`${key}: ${status} → ${targetStatus} (via '${match.name}')`);
+                    } else {
+                      core.warning(
+                        `${key}: transition to '${targetStatus}' failed: ` +
+                        `${doResp.status} ${await doResp.text()}`
+                      );
+                    }
+                  }
+                }
+              }
+
+              // ---- Comment ------------------------------------------
+              // Posted whether or not the move happened — the comment is the
+              // signal the ticket-watcher actually needs, and when the move is
+              // skipped it says why so nobody assumes the board is current.
+              let text = `🔁 ${reviewer} requested changes on ${prLink}. `;
+              if (didMove) {
+                text += `Moved back to ${targetStatus} (was ${status}).`;
+              } else if (commentOnly) {
+                text += `Ticket left in ${status} — please move it back to ${targetStatus} if the change is yours to make.`;
+              } else if (eligible.length > 1) {
+                text +=
+                  `That PR covers ${eligible.length} tickets awaiting review ` +
+                  `(${eligible.map(e => e.key).join(', ')}), so this ticket was left in ` +
+                  `${status} rather than moving all of them. Move it back to ` +
+                  `${targetStatus} if the review applies here.`;
+              } else {
+                text += `Ticket left in ${status} — the automatic move did not go through, see the workflow run.`;
+              }
+
+              const commentResp = await fetch(
+                `${baseUrl}/rest/api/3/issue/${key}/comment`,
+                {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({
+                    body: {
+                      type: 'doc',
+                      version: 1,
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+                    },
+                  }),
+                }
+              );
+              if (!commentResp.ok) {
+                core.warning(
+                  `Failed to comment on ${key}: ` +
+                  `${commentResp.status} ${await commentResp.text()}`
+                );
+              }
+            }
+
+            // ---- Run summary -----------------------------------------
+            try {
+              await core.summary
+                .addHeading('Changes requested — Jira bounce', 2)
+                .addRaw(
+                  `Reviewer: **${reviewer}** · PR: ${prLink}\n\n` +
+                  `Eligible ticket(s): ${eligible.map(e => `${e.key} (${e.status})`).join(', ')}\n\n` +
+                  (moved.length
+                    ? `Moved to ${targetStatus}: ${moved.join(', ')}\n`
+                    : `No ticket was transitioned.\n`)
+                )
+                .write();
+            } catch (e) {
+              core.warning(`Failed to write Step Summary: ${e.message}`);
+            }

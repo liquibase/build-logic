@@ -1337,25 +1337,37 @@ jobs:
           # continue-on-error, which is how SDKMAN sat on 5.0.2 from March (TECHOPS-1137).
           sdkman_api() {
             local method="$1" endpoint="$2" payload="$3" what="$4"
-            local attempt response http_code body
+            local attempt rc response http_code body
             for attempt in 1 2 3; do
+              rc=0
               response=$(curl -sS -w $'\n%{http_code}' --max-time 60 -X "$method" \
                 -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
                 -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
                 -H "Content-Type: application/json" \
                 -H "Accept: application/json" \
                 -d "$payload" \
-                "https://vendors.sdkman.io/$endpoint") || response=$'\n000'
+                "https://vendors.sdkman.io/$endpoint") || rc=$?
               http_code=$(printf '%s' "$response" | tail -n1)
               body=$(printf '%s' "$response" | sed '$d')
-              echo "SDKMAN $what response (HTTP $http_code): $body"
-              if [ -n "$http_code" ] && [ "$http_code" -lt 400 ]; then
-                return 0
+              if [ "$rc" -ne 0 ]; then
+                # curl never got an answer (DNS, TLS, timeout). It still writes 000 for
+                # %{http_code}, and `[ 000 -lt 400 ]` is a numeric test that passes, so
+                # accepting on the code alone would call a dead endpoint a success and put
+                # the silent-green failure of TECHOPS-1137 straight back. Require curl to
+                # have succeeded, then require a real 2xx/3xx.
+                echo "SDKMAN $what: curl failed (exit $rc, HTTP $http_code)"
+              else
+                echo "SDKMAN $what response (HTTP $http_code): $body"
+                if [[ "$http_code" =~ ^[23][0-9][0-9]$ ]]; then
+                  return 0
+                fi
               fi
-              echo "attempt $attempt: SDKMAN $what failed; retrying in 15s..."
-              sleep 15
+              if [ "$attempt" -lt 3 ]; then
+                echo "attempt $attempt: SDKMAN $what failed; retrying in 15s..."
+                sleep 15
+              fi
             done
-            echo "::error::Failed to $what on SDKMAN (HTTP $http_code): $body"
+            echo "::error::Failed to $what on SDKMAN (curl exit $rc, HTTP $http_code): $body"
             return 1
           }
 

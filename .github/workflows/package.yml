@@ -1315,9 +1315,15 @@ jobs:
           purge_zip || true
           resolved=""
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            code=$(curl -sS -o /tmp/sdkman-probe.zip -w '%{http_code}' -L --max-time 180 "$WEB_URL$ZIP_FILENAME" || echo 000)
+            # curl only creates the -o file once a transfer starts, so on a connect failure
+            # `wc -c` would die under `set -euo pipefail` and take the whole step down on
+            # attempt 1 instead of retrying. Truncating here also stops a partial body from
+            # a previous attempt being counted as this attempt's bytes.
+            : > /tmp/sdkman-probe.zip
+            rc=0
+            code=$(curl -sS -o /tmp/sdkman-probe.zip -w '%{http_code}' -L --max-time 180 "$WEB_URL$ZIP_FILENAME") || rc=$?
             got=$(wc -c < /tmp/sdkman-probe.zip | tr -d ' ')
-            if [ "$code" = "200" ] && [ "$got" = "$EXPECTED_BYTES" ]; then
+            if [ "$rc" -eq 0 ] && [ "$code" = "200" ] && [ "$got" = "$EXPECTED_BYTES" ]; then
               echo "✓ $WEB_URL$ZIP_FILENAME resolves at the edge ($got bytes)"
               resolved=1
               break
@@ -1358,7 +1364,9 @@ jobs:
                 echo "SDKMAN $what: curl failed (exit $rc, HTTP $http_code)"
               else
                 echo "SDKMAN $what response (HTTP $http_code): $body"
-                if [[ "$http_code" =~ ^[23][0-9][0-9]$ ]]; then
+                # 2xx only. These calls are sent without --location, so a 3xx means curl
+                # never followed the redirect and the release was not actually registered.
+                if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
                   return 0
                 fi
               fi

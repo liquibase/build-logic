@@ -1512,7 +1512,7 @@ jobs:
   upload_ansible_role:
     needs: validate-version
     if: ${{ inputs.distribution == 'liquibase' }}
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@b275f41745821e41c0e78dfc6db9ea68794e7927 # main
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@597c80909383def411d978f83857baf6cfc55cdd # main
     secrets: inherit
     with:
       version: ${{ inputs.version }}
@@ -1522,7 +1522,7 @@ jobs:
   upload_secure_ansible_role:
     needs: validate-version
     if: ${{ inputs.distribution == 'liquibase-secure' }}
-    uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@97d5d486cdd4d854cdf1fa3b04f5cfadda171093 # main
+    uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@ab4b873b63df315d57c93d243f11e3aff21bb9fa # main
     secrets: inherit
     with:
       version: ${{ inputs.version }}

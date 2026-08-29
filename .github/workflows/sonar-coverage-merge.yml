@@ -135,14 +135,18 @@ jobs:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           SCM_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
-          EVENT_NAME: ${{ github.event_name }}
           REF_NAME: ${{ github.ref_name }}
           REPO_OWNER: ${{ github.repository_owner }}
           MAVEN_ARGS: ${{ inputs.mavenArgs }}
           LIQUIBASE_BRANCH: ${{ inputs.liquibaseBranchName }}
         run: |
           SONAR_ARGS=""
-          if [ "$EVENT_NAME" = "pull_request" ]; then
+          # Keyed off the PR payload rather than EVENT_NAME, same as sonar-scan.yml does. Every consuming
+          # repo triggers on pull_request_target, not pull_request, so the old EVENT_NAME test never matched
+          # and every PR fell through to branch mode. github.ref_name is the base branch under
+          # pull_request_target, so each PR was analyzed as main, overwrote main's analysis, and then failed
+          # on main's quality gate.
+          if [ -n "$PR_NUMBER" ]; then
             SONAR_ARGS="-Dsonar.pullrequest.key=$PR_NUMBER"
             SONAR_ARGS="$SONAR_ARGS -Dsonar.pullrequest.branch=$PR_HEAD_REF"
             SONAR_ARGS="$SONAR_ARGS -Dsonar.pullrequest.base=$PR_BASE_REF"

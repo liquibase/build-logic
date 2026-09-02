@@ -792,14 +792,14 @@ jobs:
             cp src/createrepo_c /opt/createrepo
           elif command -v createrepo_c &> /dev/null; then
             echo "Using system createrepo_c instead"
-            ln -sf $(which createrepo_c) /opt/createrepo
+            ln -sf "$(command -v createrepo_c)" /opt/createrepo
           elif command -v createrepo &> /dev/null; then
             echo "Using system createrepo instead"
-            ln -sf $(which createrepo) /opt/createrepo
+            ln -sf "$(command -v createrepo)" /opt/createrepo
           else
             echo "Installing createrepo-c from package manager as fallback"
             sudo apt-get install -y createrepo-c
-            ln -sf $(which createrepo_c) /opt/createrepo
+            ln -sf "$(command -v createrepo_c)" /opt/createrepo
           fi
 
           # Return to workspace root
@@ -1091,14 +1091,14 @@ jobs:
             cp src/createrepo_c /opt/createrepo
           elif command -v createrepo_c &> /dev/null; then
             echo "Using system createrepo_c instead"
-            ln -sf $(which createrepo_c) /opt/createrepo
+            ln -sf "$(command -v createrepo_c)" /opt/createrepo
           elif command -v createrepo &> /dev/null; then
             echo "Using system createrepo instead"
-            ln -sf $(which createrepo) /opt/createrepo
+            ln -sf "$(command -v createrepo)" /opt/createrepo
           else
-            echo "Installing createrepo from package manager as fallback"
-            sudo apt-get install -y createrepo
-            ln -sf $(which createrepo) /opt/createrepo
+            echo "Installing createrepo-c from package manager as fallback"
+            sudo apt-get install -y createrepo-c
+            ln -sf "$(command -v createrepo_c)" /opt/createrepo
           fi
 
           # Return to workspace root
@@ -1233,7 +1233,6 @@ jobs:
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.distribution == 'liquibase' && inputs.dry_run == false }}
-        continue-on-error: true
         env:
           SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
           SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
@@ -1251,19 +1250,28 @@ jobs:
           R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          # TECHOPS-1137: WEB_URL 307-redirects to ORIGIN_URL, and it is ORIGIN_URL that
+          # Cloudflare caches, so both have to be purged and the gate below has to follow
+          # the redirect the way SDKMAN's resolver does.
+          ORIGIN_URL: https://repo.liquibase.com/sdkman/oss/
+          CF_PURGE_TOKEN: ${{ env.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+          # Zone id of liquibase.com; an identifier, not a secret.
+          CF_ZONE_ID: 73646b36f00f6fe22915ab757aba6f8c
         run: |
-          set -e  # Exit on any error
+          set -euo pipefail
 
           # Download the zip file for liquibase (community edition only)
-          wget -q -O liquibase-$VERSION.zip $DOWNLOAD_BASE_URL/$RELEASE_TAG/liquibase-$VERSION.zip
+          wget -q -O "liquibase-$VERSION.zip" "$DOWNLOAD_BASE_URL/$RELEASE_TAG/liquibase-$VERSION.zip"
           ZIP_FILENAME="liquibase-$VERSION.zip"
           SDKMAN_CANDIDATE="liquibase"
-          mkdir -p liquibase-$VERSION/bin/internal
-          unzip $ZIP_FILENAME -d liquibase-$VERSION
-          rm -rf $ZIP_FILENAME
-          mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
-          mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
-          zip -r $ZIP_FILENAME ./liquibase-$VERSION
+          mkdir -p "liquibase-$VERSION/bin/internal"
+          unzip "$ZIP_FILENAME" -d "liquibase-$VERSION"
+          rm -rf "$ZIP_FILENAME"
+          mv "./liquibase-$VERSION/liquibase" "./liquibase-$VERSION/bin/"
+          mv "./liquibase-$VERSION/liquibase.bat" "./liquibase-$VERSION/bin/"
+          zip -r "$ZIP_FILENAME" "./liquibase-$VERSION"
+          EXPECTED_BYTES=$(wc -c < "$ZIP_FILENAME" | tr -d ' ')
+
           # Upload the release to R2. --checksum-algorithm CRC32: newer aws-cli defaults to a
           # CRC64NVME checksum that R2 rejects (same fix as analytics-config#33).
           # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job env;
@@ -1271,58 +1279,119 @@ jobs:
           # alias). The dry-run S3 step is separate and keeps the token.
           unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            aws s3 cp $ZIP_FILENAME $S3_BUCKET --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
-          echo "Uploaded $ZIP_FILENAME to R2"
+            aws s3 cp "$ZIP_FILENAME" "$S3_BUCKET" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+          echo "Uploaded $ZIP_FILENAME to R2 ($EXPECTED_BYTES bytes)"
 
-          # Send the release to SDKMAN
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "'"$WEB_URL$ZIP_FILENAME"'"}' \
-          https://vendors.sdkman.io/release)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "SDKMAN release response: $RESPONSE_BODY"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            echo "ERROR: Failed to release to SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
+          # TECHOPS-1137: repo.liquibase.com answers a miss with `cache-control: max-age=3600`,
+          # so a single GET that lands before the object is visible pins a 404 at the edge for
+          # an hour. SDKMAN's /release endpoint resolves the download URL itself and rejects
+          # the release with HTTP 400 "URL cannot be resolved" when it hits that cached 404.
+          # That is what broke every OSS release from 5.0.3 on. Purge the entry, then refuse
+          # to call SDKMAN until the public URL really serves the bytes just uploaded.
+          # The probe has to be a plain GET: HEAD answers `cf-cache-status: DYNAMIC` here and
+          # so never sees the cached 404 a GET gets.
+          purge_zip() {
+            local files attempt resp
+            files=$(printf '%s\n%s\n' "$WEB_URL$ZIP_FILENAME" "$ORIGIN_URL$ZIP_FILENAME" | jq -R . | jq -s '{files: .}')
+            for attempt in 1 2 3; do
+              if resp=$(curl -fsS --max-time 30 -X POST \
+                   -H "Authorization: Bearer $CF_PURGE_TOKEN" \
+                   -H "Content-Type: application/json" \
+                   --data "$files" \
+                   "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache") \
+                 && [ "$(printf '%s' "$resp" | jq -r '.success')" = "true" ]; then
+                echo "✓ purged $ZIP_FILENAME from the Cloudflare cache on both hostnames"
+                return 0
+              fi
+              echo "attempt $attempt: purge_cache call failed: $(printf '%s' "${resp:-}" | jq -c '.errors // empty' 2>/dev/null || true); retrying in 10s..."
+              sleep 10
+            done
+            # Not fatal on its own: the resolvability gate below is the check that matters,
+            # and it fails the job if the edge is still wrong.
+            echo "::warning::Cloudflare cache purge failed for $ZIP_FILENAME. Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            return 1
+          }
+
+          purge_zip || true
+          resolved=""
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            # curl only creates the -o file once a transfer starts, so on a connect failure
+            # `wc -c` would die under `set -euo pipefail` and take the whole step down on
+            # attempt 1 instead of retrying. Truncating here also stops a partial body from
+            # a previous attempt being counted as this attempt's bytes.
+            : > /tmp/sdkman-probe.zip
+            rc=0
+            code=$(curl -sS -o /tmp/sdkman-probe.zip -w '%{http_code}' -L --max-time 180 "$WEB_URL$ZIP_FILENAME") || rc=$?
+            got=$(wc -c < /tmp/sdkman-probe.zip | tr -d ' ')
+            if [ "$rc" -eq 0 ] && [ "$code" = "200" ] && [ "$got" = "$EXPECTED_BYTES" ]; then
+              echo "✓ $WEB_URL$ZIP_FILENAME resolves at the edge ($got bytes)"
+              resolved=1
+              break
+            fi
+            echo "attempt $attempt: $WEB_URL$ZIP_FILENAME is not resolvable yet (http=$code, bytes=$got, expected $EXPECTED_BYTES); purging and retrying in 15s..."
+            sleep 15
+            purge_zip || true
+          done
+          rm -f /tmp/sdkman-probe.zip
+          if [ -z "$resolved" ]; then
+            echo "::error::$WEB_URL$ZIP_FILENAME does not serve the zip that was just uploaded, so SDKMAN would reject the release with 'URL cannot be resolved' (TECHOPS-1137). Check the R2 upload and CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
             exit 1
           fi
+
+          # The three vendor calls differ only in method, endpoint and payload. Retry each:
+          # a transient failure here used to be invisible because the whole step was
+          # continue-on-error, which is how SDKMAN sat on 5.0.2 from March (TECHOPS-1137).
+          sdkman_api() {
+            local method="$1" endpoint="$2" payload="$3" what="$4"
+            local attempt rc response http_code body
+            for attempt in 1 2 3; do
+              rc=0
+              response=$(curl -sS -w $'\n%{http_code}' --max-time 60 -X "$method" \
+                -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+                -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json" \
+                -d "$payload" \
+                "https://vendors.sdkman.io/$endpoint") || rc=$?
+              http_code=$(printf '%s' "$response" | tail -n1)
+              body=$(printf '%s' "$response" | sed '$d')
+              if [ "$rc" -ne 0 ]; then
+                # curl never got an answer (DNS, TLS, timeout). It still writes 000 for
+                # %{http_code}, and `[ 000 -lt 400 ]` is a numeric test that passes, so
+                # accepting on the code alone would call a dead endpoint a success and put
+                # the silent-green failure of TECHOPS-1137 straight back. Require curl to
+                # have succeeded, then require a real 2xx/3xx.
+                echo "SDKMAN $what: curl failed (exit $rc, HTTP $http_code)"
+              else
+                echo "SDKMAN $what response (HTTP $http_code): $body"
+                # 2xx only. These calls are sent without --location, so a 3xx means curl
+                # never followed the redirect and the release was not actually registered.
+                if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+                  return 0
+                fi
+              fi
+              if [ "$attempt" -lt 3 ]; then
+                echo "attempt $attempt: SDKMAN $what failed; retrying in 15s..."
+                sleep 15
+              fi
+            done
+            echo "::error::Failed to $what on SDKMAN (curl exit $rc, HTTP $http_code): $body"
+            return 1
+          }
+
+          sdkman_api POST release \
+            "$(jq -nc --arg c "$SDKMAN_CANDIDATE" --arg v "$VERSION" --arg u "$WEB_URL$ZIP_FILENAME" '{candidate:$c,version:$v,url:$u}')" \
+            "release $ZIP_FILENAME"
           echo "Sent $ZIP_FILENAME to SDKMAN"
 
-          # Set the default version for SDKMAN
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'"}' \
-          https://vendors.sdkman.io/default)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "SDKMAN default response: $RESPONSE_BODY"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            echo "ERROR: Failed to set default version in SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
-            exit 1
-          fi
+          sdkman_api PUT default \
+            "$(jq -nc --arg c "$SDKMAN_CANDIDATE" --arg v "$VERSION" '{candidate:$c,version:$v}')" \
+            "set $VERSION as the default version"
           echo "Set $ZIP_FILENAME as default version for SDKMAN"
 
-          # Announce the release to SDKMAN
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/'"$RELEASE_TAG"'"}' \
-          https://vendors.sdkman.io/announce/struct)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "SDKMAN announce response: $RESPONSE_BODY"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            echo "ERROR: Failed to announce to SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
-            exit 1
-          fi
+          sdkman_api POST announce/struct \
+            "$(jq -nc --arg c "$SDKMAN_CANDIDATE" --arg v "$VERSION" --arg u "https://github.com/liquibase/liquibase/releases/tag/$RELEASE_TAG" '{candidate:$c,version:$v,url:$u}')" \
+            "announce $VERSION"
           echo "Announced $ZIP_FILENAME to SDKMAN"
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
@@ -1443,7 +1512,7 @@ jobs:
   upload_ansible_role:
     needs: validate-version
     if: ${{ inputs.distribution == 'liquibase' }}
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@010ba49a98ae78e2f826ba8d6cc6d2925236d078 # main
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@597c80909383def411d978f83857baf6cfc55cdd # main
     secrets: inherit
     with:
       version: ${{ inputs.version }}
@@ -1453,7 +1522,7 @@ jobs:
   upload_secure_ansible_role:
     needs: validate-version
     if: ${{ inputs.distribution == 'liquibase-secure' }}
-    uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@21cb490554af2a686d1e09bc581503a6fabd2508 # main
+    uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@ab4b873b63df315d57c93d243f11e3aff21bb9fa # main
     secrets: inherit
     with:
       version: ${{ inputs.version }}

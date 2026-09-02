@@ -51,13 +51,38 @@ on:
         required: false
         type: boolean
         default: false
+      aws_mysql_iam:
+        description: "Deploy or destroy the IAM-auth aws_mysql infrastructure (TECHOPS-1017). RDS x MySQL corner of the AWS IAM matrix."
+        required: false
+        type: boolean
+        default: false
+      aws_aurora_postgres_iam:
+        description: "Deploy or destroy the IAM-auth aws_aurora_postgres infrastructure (TECHOPS-1017). Aurora x PostgreSQL corner of the AWS IAM matrix."
+        required: false
+        type: boolean
+        default: false
+      aws_aurora_mysql_iam:
+        description: "Deploy or destroy the IAM-auth aws_aurora_mysql infrastructure (TECHOPS-1017). Aurora x MySQL corner of the AWS IAM matrix."
+        required: false
+        type: boolean
+        default: false
+      rds_iam_demo:
+        description: "Also trust the LiquibaseDeveloper SSO role on the per-run rds-db:connect role of EVERY IAM-auth fixture this run enables, so a human presenter can AssumeRole for Secure demos and UAT. Engine-neutral successor to aws_postgresql_iam_demo (TECHOPS-1017); either input turns demo mode on."
+        required: false
+        type: boolean
+        default: false
+      rds_iam_demo_expiry:
+        description: "Unix epoch (seconds) stamped as the demo-expiry tag on every IAM-auth fixture this run enables. Terraform-managed so an autodeploy re-apply cannot strip it. Engine-neutral successor to aws_postgresql_iam_demo_expiry (TECHOPS-1017); takes precedence when both are set."
+        required: false
+        type: string
+        default: ""
       aws_postgresql_iam_demo:
-        description: "Also trust the LiquibaseDeveloper SSO role on the IAM-auth Postgres connect role, so a human presenter can AssumeRole for Secure demos. No effect unless aws_postgresql_iam is also true."
+        description: "DEPRECATED (TECHOPS-1017): use rds_iam_demo. Retained so existing callers keep working. Behaves identically to rds_iam_demo -- it turns demo mode on for whichever IAM fixtures the run enabled, not for Postgres alone."
         required: false
         type: boolean
         default: false
       aws_postgresql_iam_demo_expiry:
-        description: "Unix epoch (seconds) stamped as the IAM-auth Postgres demo-expiry tag. Terraform-managed so an autodeploy re-apply cannot strip it. No effect unless aws_postgresql_iam_demo is true."
+        description: "DEPRECATED (TECHOPS-1017): use rds_iam_demo_expiry, which takes precedence when both are set. Unix epoch (seconds) stamped as the demo-expiry tag."
         required: false
         type: string
         default: ""
@@ -184,6 +209,30 @@ jobs:
           SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
           SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
 
+      # test-automation-ephemeral/stack is the one root that runs terraform on the runner
+      # instead of inside Spacelift, so nothing injects credentials for the spacelift.io
+      # remote state backend it reads. spacectl cannot mint this token from an API key
+      # ("no account is currently selected"), so exchange the key for a JWT directly.
+      - name: Mint Spacelift state token
+        env:
+          SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}
+          SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
+          SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
+        run: |
+          set -euo pipefail
+          jwt=$(curl -sf -X POST "$SPACELIFT_API_KEY_ENDPOINT/graphql" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg id "$SPACELIFT_API_KEY_ID" --arg secret "$SPACELIFT_API_KEY_SECRET" \
+                  '{query:"mutation($id: ID!, $secret: String!){ apiKeyUser(id: $id, secret: $secret){ jwt } }",variables:{id:$id,secret:$secret}}')" \
+            | jq -r '.data.apiKeyUser.jwt')
+          if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then
+            echo "::error::Could not mint a Spacelift token from SPACELIFT_API_KEY_ID/SECRET. Without it the terraform_remote_state read of liquibase-tags fails with 'Required token could not be found' and neither the ephemeral stack nor its teardown can plan." >&2
+            exit 1
+          fi
+          echo "::add-mask::$jwt"
+          # Terraform reads credentials for a host from TF_TOKEN_<host with dots as underscores>.
+          echo "TF_TOKEN_spacelift_io=$jwt" >> "$GITHUB_ENV"
+
       - name: Terraform Init
         working-directory: test-automation-ephemeral/stack
         id: init
@@ -258,6 +307,11 @@ jobs:
           INPUT_SNOWFLAKE_EXT: ${{ inputs.snowflake_ext }}
           INPUT_AWS_POSTGRESQL: ${{ inputs.aws_postgresql }}
           INPUT_AWS_POSTGRESQL_IAM: ${{ inputs.aws_postgresql_iam }}
+          INPUT_AWS_MYSQL_IAM: ${{ inputs.aws_mysql_iam }}
+          INPUT_AWS_AURORA_POSTGRES_IAM: ${{ inputs.aws_aurora_postgres_iam }}
+          INPUT_AWS_AURORA_MYSQL_IAM: ${{ inputs.aws_aurora_mysql_iam }}
+          INPUT_RDS_IAM_DEMO: ${{ inputs.rds_iam_demo }}
+          INPUT_RDS_IAM_DEMO_EXPIRY: ${{ inputs.rds_iam_demo_expiry }}
           INPUT_AWS_POSTGRESQL_IAM_DEMO: ${{ inputs.aws_postgresql_iam_demo }}
           INPUT_AWS_POSTGRESQL_IAM_DEMO_EXPIRY: ${{ inputs.aws_postgresql_iam_demo_expiry }}
           INPUT_AWS_ORACLE: ${{ inputs.aws_oracle }}
@@ -279,6 +333,11 @@ jobs:
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_snowflake_ext "$INPUT_SNOWFLAKE_EXT"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql "$INPUT_AWS_POSTGRESQL"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_postgresql_iam "$INPUT_AWS_POSTGRESQL_IAM"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql_iam "$INPUT_AWS_MYSQL_IAM"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres_iam "$INPUT_AWS_AURORA_POSTGRES_IAM"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_mysql_iam "$INPUT_AWS_AURORA_MYSQL_IAM"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_rds_iam_demo "$INPUT_RDS_IAM_DEMO"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_rds_iam_demo_expiry "$INPUT_RDS_IAM_DEMO_EXPIRY"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_postgresql_iam_demo "$INPUT_AWS_POSTGRESQL_IAM_DEMO"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_postgresql_iam_demo_expiry "$INPUT_AWS_POSTGRESQL_IAM_DEMO_EXPIRY"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_oracle "$INPUT_AWS_ORACLE"

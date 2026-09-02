@@ -102,9 +102,41 @@ permissions:
   actions: write # Required for workflow operations
 
 jobs:
+  # TECHOPS-1096: a run with dry_run=false and `version` set to a branch name published
+  # liquibase-secure "devopstest+reusable+workflows" straight to the production apt repo.
+  # apt sorts non-numeric versions above every real release, so it became the install
+  # candidate ahead of 5.2.2 and dpkg then refused the 653 MB download it forced on every
+  # customer ("version number does not start with digit"). Every job in this workflow
+  # publishes somewhere with `version`, so they all gate on this one.
+  validate-version:
+    name: Validate release version
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Fail on non-release version
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERSION:-}" ]; then
+            echo "::error::version input is empty; refusing to package."
+            exit 1
+          fi
+          if printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Version '$VERSION' accepted (dry_run=$DRY_RUN)."
+            exit 0
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::warning::version '$VERSION' is not a numeric release version. Allowed only because dry_run=true targets the dry-run buckets, never repo.liquibase.com."
+            exit 0
+          fi
+          echo "::error::refusing to publish version '$VERSION': a production release version must be numeric, like 4.23.0. apt ranks anything non-numeric above every real release and dpkg then refuses to install it (TECHOPS-1096). Re-run with dry_run=true if this is a test."
+          exit 1
+
   upload_packages:
     name: Upload ${{ inputs.artifactId }} packages
     runs-on: ubuntu-22.04
+    needs: validate-version
     outputs:
       HOMEBREW_PR_NUMBER: ${{ steps.capture-pr.outputs.HOMEBREW_PR_NUMBER }}
       HOMEBREW_PR_URL: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
@@ -118,18 +150,21 @@ jobs:
       - name: Load Cloudflare R2 credentials from devops vault
         # TECHOPS-818: the R2 S3-API creds live in /vault/devops (single source of
         # truth, shared with analytics-config); every other secret stays in
-        # /vault/liquibase, read below. Pull ONLY the three R2 keys and mask them —
-        # least privilege, no bulk-import of the DevOps vault into this job.
+        # /vault/liquibase, read below. Pull ONLY the keys this job needs and mask
+        # them — least privilege, no bulk-import of the DevOps vault into this job.
+        # CLOUDFLARE_CACHE_PURGE_TOKEN (TECHOPS-1114) must be a token scoped to zone
+        # liquibase.com with only the Cache Purge permission — never the admin
+        # CLOUDFLARE_API_TOKEN, which has no business in release CI.
         run: |
           set -euo pipefail
           JSON=$(aws secretsmanager get-secret-value --secret-id /vault/devops --region us-east-1 --query SecretString --output text)
-          for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY; do
+          for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY CLOUDFLARE_CACHE_PURGE_TOKEN; do
             v=$(printf '%s' "$JSON" | jq -r --arg k "$k" '.[$k] // ""')
             if [ -z "$v" ] || [ "$v" = "null" ]; then echo "::error::$k missing from /vault/devops"; exit 1; fi
             echo "::add-mask::$v"
             echo "$k=$v" >> "$GITHUB_ENV"
           done
-          echo "Loaded CLOUDFLARE_ACCOUNT_ID + R2 access/secret keys from /vault/devops."
+          echo "Loaded CLOUDFLARE_ACCOUNT_ID, R2 access/secret keys and the cache-purge token from /vault/devops."
 
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -157,12 +192,28 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      # TECHOPS-1095: the Azure apt mirror on GitHub-hosted runners intermittently
+      # stalls forever (apt-get update sat silent for 19+ minutes, twice, during the
+      # yum repo restore). Cap every apt fetch and swap the Azure mirror for
+      # archive.ubuntu.com so a flaky mirror fails fast instead of wedging the job.
+      - name: Harden apt against flaky mirrors
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' | sudo tee /etc/apt/apt.conf.d/99-liquibase-timeouts > /dev/null
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+          if compgen -G "/etc/apt/sources.list.d/*.list" > /dev/null; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/*.list
+          fi
+
       - name: Set up Java
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: "21"
           distribution: "temurin"
-          cache: "maven"
+          # TECHOPS-1095: build-logic itself has no pom.xml, and setup-java hard-fails
+          # when the maven cache glob matches nothing. Disabling the cache when this
+          # workflow is dispatched directly in build-logic keeps the emergency
+          # re-publish path (workflow_dispatch) usable; callers keep the cache.
+          cache: ${{ github.repository != 'liquibase/build-logic' && 'maven' || '' }}
 
       - name: Set up Maven
         uses: stCarolas/setup-maven@d6af6abeda15e98926a57b5aa970a96bb37f97d1 # v5
@@ -346,6 +397,103 @@ jobs:
 
           # Securely clean up passphrase file
           rm -f "$TEMP_PASSPHRASE_FILE"
+
+      # TECHOPS-1114: Cloudflare caches *.gz by default but not the extensionless
+      # index files, so after the deb-s3 upload above the edge keeps serving the
+      # previous Packages.gz against the freshly signed InRelease and every
+      # `apt update` fails with "File has unexpected size" until the cached entry
+      # expires (observed ~2h on 2026-08-20). Purge the apt metadata on both
+      # hostnames so clients converge in seconds instead.
+      - name: Purge Cloudflare cache of apt metadata
+        if: ${{ inputs.dry_run == false }}
+        env:
+          CF_PURGE_TOKEN: ${{ env.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+          # Zone id of liquibase.com; an identifier, not a secret.
+          CF_ZONE_ID: 73646b36f00f6fe22915ab757aba6f8c
+        run: |
+          set -euo pipefail
+          FILES=$(for host in repo.liquibase.com package.liquibase.com; do
+            echo "https://$host/dists/stable/InRelease"
+            echo "https://$host/dists/stable/Release"
+            echo "https://$host/dists/stable/Release.gpg"
+            for arch in amd64 i386 armhf all; do
+              echo "https://$host/dists/stable/main/binary-$arch/Packages"
+              echo "https://$host/dists/stable/main/binary-$arch/Packages.gz"
+            done
+          done | jq -R . | jq -s '{files: .}')
+          purged=""
+          for attempt in 1 2 3; do
+            if RESP=$(curl -fsS --max-time 30 -X POST \
+                 -H "Authorization: Bearer $CF_PURGE_TOKEN" \
+                 -H "Content-Type: application/json" \
+                 --data "$FILES" \
+                 "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache") \
+               && [ "$(printf '%s' "$RESP" | jq -r '.success')" = "true" ]; then
+              echo "✓ purged $(printf '%s' "$FILES" | jq '.files | length') apt metadata URLs from the Cloudflare cache"
+              purged=1
+              break
+            fi
+            echo "attempt $attempt: purge_cache call failed: $(printf '%s' "${RESP:-}" | jq -c '.errors // empty' 2>/dev/null || true); retrying in 10s..."
+            sleep 10
+          done
+          if [ -z "$purged" ]; then
+            echo "::error::Cloudflare cache purge failed, so the edge may keep serving stale apt metadata against the new InRelease and apt update will break for customers (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            exit 1
+          fi
+
+      # TECHOPS-1114: verify the apt repository exactly as apt fetches it: bare
+      # URLs, no cache-buster. The yum gate further down revalidates against origin
+      # via ?cb= query strings, which change the Cloudflare cache key, so a check
+      # like that can pass while every real client still gets a stale cached index.
+      # This step fails the release when the edge disagrees with the signed
+      # InRelease this run just published.
+      - name: Verify apt repository for apt clients
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          set -euo pipefail
+          verify_host() {
+            local base="$1" attempt arch f declared actual ok
+            for attempt in 1 2 3 4 5; do
+              ok=1
+              if ! curl -fsS --location --max-time 30 "$base/dists/stable/InRelease" -o /tmp/apt-inrelease; then
+                echo "attempt $attempt: InRelease is not fetchable from $base"
+                ok=""
+              else
+                for arch in amd64 i386 armhf all; do
+                  for f in "main/binary-$arch/Packages" "main/binary-$arch/Packages.gz"; do
+                    declared=$(awk -v f="$f" '/^SHA256:/{s=1;next} /^[A-Za-z-]/{s=0} s && $3==f {print $1}' /tmp/apt-inrelease)
+                    if [ -z "$declared" ]; then
+                      echo "attempt $attempt: $f is not listed in the InRelease served by $base"
+                      ok=""
+                      break 2
+                    fi
+                    if ! curl -fsS --location --max-time 30 "$base/dists/stable/$f" -o /tmp/apt-pkgfile; then
+                      echo "attempt $attempt: $f is not fetchable from $base"
+                      ok=""
+                      break 2
+                    fi
+                    actual=$(sha256sum /tmp/apt-pkgfile | cut -d' ' -f1)
+                    if [ "$actual" != "$declared" ]; then
+                      echo "attempt $attempt: $f from $base does not match InRelease (stale edge cache?): declared=$declared actual=$actual"
+                      ok=""
+                      break 2
+                    fi
+                  done
+                done
+              fi
+              if [ -n "$ok" ]; then
+                echo "✓ $base: every Packages/Packages.gz matches the signed InRelease at the edge"
+                return 0
+              fi
+              sleep 10
+            done
+            echo "::error::$base serves apt metadata that does not match InRelease after upload and purge: apt update is broken for customers (TECHOPS-1114)"
+            return 1
+          }
+          # package.liquibase.com is the host in the documented sources.list line,
+          # so it is authoritative; repo.liquibase.com keeps direct-origin coverage.
+          verify_host "https://package.liquibase.com"
+          verify_host "https://repo.liquibase.com"
 
       - name: Import GPG key for dry-run deb signing
         if: ${{ inputs.dry_run == true }}
@@ -644,14 +792,14 @@ jobs:
             cp src/createrepo_c /opt/createrepo
           elif command -v createrepo_c &> /dev/null; then
             echo "Using system createrepo_c instead"
-            ln -sf $(which createrepo_c) /opt/createrepo
+            ln -sf "$(command -v createrepo_c)" /opt/createrepo
           elif command -v createrepo &> /dev/null; then
             echo "Using system createrepo instead"
-            ln -sf $(which createrepo) /opt/createrepo
+            ln -sf "$(command -v createrepo)" /opt/createrepo
           else
             echo "Installing createrepo-c from package manager as fallback"
             sudo apt-get install -y createrepo-c
-            ln -sf $(which createrepo_c) /opt/createrepo
+            ln -sf "$(command -v createrepo_c)" /opt/createrepo
           fi
 
           # Return to workspace root
@@ -716,25 +864,191 @@ jobs:
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASS" --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
 
-          # Guard the destructive `sync --delete`: every pre-existing remote RPM must be present
-          # locally, otherwise an incomplete download above would make --delete remove live RPMs
-          # from the bucket. Abort rather than publish a repo that drops packages.
+          # Guard: every pre-existing remote RPM must be present locally, otherwise the
+          # metadata generated above would silently drop packages from the public index.
+          # Abort rather than publish a repo that loses packages.
           DOWNLOADED_RPMS=$(find yum/noarch -maxdepth 1 -name '*.rpm' ! -name "$RPM_FILENAME" | wc -l | tr -d ' ')
           if [ "$DOWNLOADED_RPMS" -ne "$EXPECTED_RPMS" ]; then
             echo "ERROR: expected $EXPECTED_RPMS existing RPMs from R2 but only $DOWNLOADED_RPMS are present locally;"
-            echo "refusing 'sync --delete' to avoid removing live RPMs from the yum repo."
+            echo "refusing to publish metadata that would drop live RPMs from the yum repo."
             exit 1
           fi
-          echo "Verified $DOWNLOADED_RPMS/$EXPECTED_RPMS existing RPMs present locally; safe to sync --delete."
+          echo "Verified $DOWNLOADED_RPMS/$EXPECTED_RPMS existing RPMs present locally."
 
-          # Upload to R2. --checksum-algorithm CRC32: newer aws-cli defaults to a CRC64NVME
-          # checksum that R2 rejects (same fix as analytics-config#33). `sync --delete` removes
-          # remote keys not present locally (guarded above).
-          echo "Uploading repository to R2..."
+          # TECHOPS-1095: never `aws s3 sync --delete` the yum tree. On 2026-08-12 that
+          # sync uploaded repodata/repomd.xml and then deleted it again within the same
+          # run (the R2 listing fed the sync comparator a phantom repomd.xml entry with
+          # no local counterpart, so --delete removed the index it had just published),
+          # which 404'd the repo for every dnf/yum client. Publish in an order that can
+          # never leave the repo without a valid index:
+          #   1. RPMs (never deleted here; yanking an RPM is a deliberate manual act)
+          #   2. new hashed metadata files (the index's targets go live first)
+          #   3. repomd.xml + repomd.xml.asc
+          #   4. prune stale hashed metadata by exact key, never touching repomd.xml*
+          # --checksum-algorithm CRC32: newer aws-cli defaults to a CRC64NVME checksum
+          # that R2 rejects (same fix as analytics-config#33).
+          echo "Uploading RPMs to R2..."
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            aws s3 sync yum s3://repo-liquibase-com/yum --delete --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+            aws s3 sync yum/noarch s3://repo-liquibase-com/yum/noarch --exclude "repodata/*" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+
+          echo "Uploading new repository metadata..."
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp yum/noarch/repodata s3://repo-liquibase-com/yum/noarch/repodata --recursive --exclude "repomd.xml" --exclude "repomd.xml.asc" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+          # signature first, then the index it signs: a repo_gpgcheck client that
+          # fetches the new index must find its matching signature already in place
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp yum/noarch/repodata/repomd.xml.asc s3://repo-liquibase-com/yum/noarch/repodata/repomd.xml.asc --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp yum/noarch/repodata/repomd.xml s3://repo-liquibase-com/yum/noarch/repodata/repomd.xml --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+
+          # Prune hashed metadata files that the new index no longer references,
+          # comparing exact keys from the JSON S3 API (not `aws s3 ls` text output,
+          # which hides oddball keys such as trailing whitespace). Only keys that look
+          # like createrepo hash files are deleted; anything unexpected is reported and
+          # left alone so it can be investigated.
+          echo "Pruning stale repository metadata from R2..."
+          # two assignments so a listing failure aborts the step instead of being
+          # masked by jq's exit status at the end of a pipe
+          REMOTE_META_JSON=$(AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3api list-objects-v2 --bucket repo-liquibase-com --prefix yum/noarch/repodata/ --endpoint-url "$R2_ENDPOINT" --output json --query 'Contents[].Key')
+          REMOTE_META=$(jq -r '.[]?' <<< "$REMOTE_META_JSON")
+          while IFS= read -r key; do
+            [ -z "$key" ] && continue
+            base="${key#yum/noarch/repodata/}"
+            if [ -e "yum/noarch/repodata/$base" ]; then
+              continue
+            fi
+            if [ "$base" = "repomd.xml" ] || [ "$base" = "repomd.xml.asc" ]; then
+              continue
+            fi
+            if printf '%s' "$base" | grep -qE '^[0-9a-f]{16,}-'; then
+              echo "Deleting stale metadata object: $base"
+              AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+                aws s3api delete-object --bucket repo-liquibase-com --key "$key" --endpoint-url "$R2_ENDPOINT"
+            else
+              echo "WARNING: leaving unexpected object in place: '$key'"
+            fi
+          done <<< "$REMOTE_META"
 
           echo "✓ RPM repository updated successfully"
+
+      # TECHOPS-1114: same stale-edge risk as apt for the yum index. The
+      # hash-prefixed metadata files get new names every publish, so only
+      # repomd.xml and its detached signature need purging.
+      - name: Purge Cloudflare cache of yum metadata
+        if: ${{ inputs.dry_run == false }}
+        env:
+          CF_PURGE_TOKEN: ${{ env.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+          # Zone id of liquibase.com; an identifier, not a secret.
+          CF_ZONE_ID: 73646b36f00f6fe22915ab757aba6f8c
+        run: |
+          set -euo pipefail
+          FILES=$(for host in repo.liquibase.com package.liquibase.com; do
+            echo "https://$host/yum/noarch/repodata/repomd.xml"
+            echo "https://$host/yum/noarch/repodata/repomd.xml.asc"
+          done | jq -R . | jq -s '{files: .}')
+          purged=""
+          for attempt in 1 2 3; do
+            if RESP=$(curl -fsS --max-time 30 -X POST \
+                 -H "Authorization: Bearer $CF_PURGE_TOKEN" \
+                 -H "Content-Type: application/json" \
+                 --data "$FILES" \
+                 "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache") \
+               && [ "$(printf '%s' "$RESP" | jq -r '.success')" = "true" ]; then
+              echo "✓ purged $(printf '%s' "$FILES" | jq '.files | length') yum metadata URLs from the Cloudflare cache"
+              purged=1
+              break
+            fi
+            echo "attempt $attempt: purge_cache call failed: $(printf '%s' "${RESP:-}" | jq -c '.errors // empty' 2>/dev/null || true); retrying in 10s..."
+            sleep 10
+          done
+          if [ -z "$purged" ]; then
+            echo "::error::Cloudflare cache purge failed, so the edge may keep serving a stale yum index (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            exit 1
+          fi
+
+      # TECHOPS-1095: the 2026-08-12 loss of repodata/repomd.xml went unnoticed because
+      # the upload step tolerates errors and nothing ever checked the public result.
+      # This gate re-downloads the published metadata over public HTTPS and fails the
+      # workflow when the yum repo is not actually usable by dnf/yum clients.
+      - name: Verify yum repository availability for dnf clients
+        if: ${{ inputs.dry_run == false }}
+        env:
+          RPM_FILENAME: ${{ env.RPM_FILENAME }}
+        run: |
+          set -euo pipefail
+          # TECHOPS-1095: the documented baseurl (see repo-liquibase-com.repo) is
+          # package.liquibase.com, which 307-redirects to repo.liquibase.com. Checking
+          # only the origin host would miss a broken redirect and stay green while
+          # every dnf client fails. The client host is authoritative: it is the one
+          # that breaks installs, so it fails the step; the origin host keeps the
+          # coverage this gate already had.
+          CLIENT_BASE="https://package.liquibase.com/yum/noarch"
+          ORIGIN_BASE="https://repo.liquibase.com/yum/noarch"
+
+          if [ ! -f yum/noarch/repodata/repomd.xml ]; then
+            echo "::error::local yum/noarch/repodata/repomd.xml is missing, so the rpm upload step failed before publishing metadata. The public yum repo state is unknown; check the previous step's log."
+            exit 1
+          fi
+
+          verify_file() {
+            local base="$1" rel="$2" attempt
+            for attempt in 1 2 3 4 5; do
+              # cache-buster query: the Cloudflare cache key includes the query string,
+              # so this always revalidates against the R2 origin. --location follows
+              # the package.liquibase.com -> repo.liquibase.com redirect; without it a
+              # 3xx would pass --fail as a false success (see TECHOPS-818).
+              if curl -fsS --location --max-time 30 "$base/$rel?cb=$(date +%s%N)" -o /tmp/verify-download; then
+                if cmp -s /tmp/verify-download "yum/noarch/$rel"; then
+                  # TECHOPS-1114: also fetch the bare URL clients actually use. The
+                  # ?cb= fetch above changes the Cloudflare cache key, so it can
+                  # pass while the edge still serves a stale cached index.
+                  if curl -fsS --location --max-time 30 "$base/$rel" -o /tmp/verify-bare && cmp -s /tmp/verify-bare "yum/noarch/$rel"; then
+                    echo "✓ $rel is live and byte-identical to what was just published, at origin and edge ($base)"
+                    return 0
+                  fi
+                  echo "attempt $attempt: $rel matches at origin but the edge serves a stale copy ($base); retrying in 15s..."
+                else
+                  echo "attempt $attempt: $rel is fetchable but differs from the published copy ($base); retrying in 15s..."
+                fi
+              else
+                echo "attempt $attempt: $rel is not fetchable ($base); retrying in 15s..."
+              fi
+              sleep 15
+            done
+            echo "::error::$rel is not correctly served from $base after upload: the yum repo is unusable for customers (see TECHOPS-1095)"
+            return 1
+          }
+
+          verify_file "$CLIENT_BASE" "repodata/repomd.xml"
+          verify_file "$CLIENT_BASE" "repodata/repomd.xml.asc"
+          verify_file "$ORIGIN_BASE" "repodata/repomd.xml"
+          verify_file "$ORIGIN_BASE" "repodata/repomd.xml.asc"
+
+          # every hashed metadata file referenced by the index must be fetchable too;
+          # process substitution keeps the loop in the main shell so exit 1 is direct,
+          # and an index that references nothing is an error of its own
+          HREF_COUNT=0
+          while IFS= read -r href; do
+            HREF_COUNT=$((HREF_COUNT + 1))
+            if ! curl -fsSI --location --max-time 30 "$CLIENT_BASE/$href?cb=$(date +%s%N)" > /dev/null; then
+              echo "::error::$href is referenced by repomd.xml but not fetchable: the yum repo is unusable for customers"
+              exit 1
+            fi
+            echo "✓ $href"
+          done < <(grep -oE 'href="repodata/[^"]+"' yum/noarch/repodata/repomd.xml | sed 's/^href="//; s/"$//' || true)
+          if [ "$HREF_COUNT" -eq 0 ]; then
+            echo "::error::repomd.xml references no metadata files; the generated index is invalid"
+            exit 1
+          fi
+
+          # and the RPM this run just published
+          if ! curl -fsSI --location --max-time 30 "$CLIENT_BASE/$RPM_FILENAME?cb=$(date +%s%N)" > /dev/null; then
+            echo "::error::$RPM_FILENAME was published but is not fetchable from $CLIENT_BASE"
+            exit 1
+          fi
+          echo "✓ $RPM_FILENAME"
+          echo "✓ yum repository verified: metadata and packages are publicly available"
 
       - name: Upload ${{ inputs.artifactId }} dry-run rpm package
         if: ${{ inputs.dry_run == true }}
@@ -777,14 +1091,14 @@ jobs:
             cp src/createrepo_c /opt/createrepo
           elif command -v createrepo_c &> /dev/null; then
             echo "Using system createrepo_c instead"
-            ln -sf $(which createrepo_c) /opt/createrepo
+            ln -sf "$(command -v createrepo_c)" /opt/createrepo
           elif command -v createrepo &> /dev/null; then
             echo "Using system createrepo instead"
-            ln -sf $(which createrepo) /opt/createrepo
+            ln -sf "$(command -v createrepo)" /opt/createrepo
           else
-            echo "Installing createrepo from package manager as fallback"
-            sudo apt-get install -y createrepo
-            ln -sf $(which createrepo) /opt/createrepo
+            echo "Installing createrepo-c from package manager as fallback"
+            sudo apt-get install -y createrepo-c
+            ln -sf "$(command -v createrepo_c)" /opt/createrepo
           fi
 
           # Return to workspace root
@@ -919,7 +1233,6 @@ jobs:
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }}
         if: ${{ inputs.distribution == 'liquibase' && inputs.dry_run == false }}
-        continue-on-error: true
         env:
           SDKMAN_CONSUMER_KEY: ${{ env.SDKMAN_CONSUMER_KEY }}
           SDKMAN_CONSUMER_TOKEN: ${{ env.SDKMAN_CONSUMER_TOKEN }}
@@ -937,19 +1250,28 @@ jobs:
           R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          # TECHOPS-1137: WEB_URL 307-redirects to ORIGIN_URL, and it is ORIGIN_URL that
+          # Cloudflare caches, so both have to be purged and the gate below has to follow
+          # the redirect the way SDKMAN's resolver does.
+          ORIGIN_URL: https://repo.liquibase.com/sdkman/oss/
+          CF_PURGE_TOKEN: ${{ env.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+          # Zone id of liquibase.com; an identifier, not a secret.
+          CF_ZONE_ID: 73646b36f00f6fe22915ab757aba6f8c
         run: |
-          set -e  # Exit on any error
+          set -euo pipefail
 
           # Download the zip file for liquibase (community edition only)
-          wget -q -O liquibase-$VERSION.zip $DOWNLOAD_BASE_URL/$RELEASE_TAG/liquibase-$VERSION.zip
+          wget -q -O "liquibase-$VERSION.zip" "$DOWNLOAD_BASE_URL/$RELEASE_TAG/liquibase-$VERSION.zip"
           ZIP_FILENAME="liquibase-$VERSION.zip"
           SDKMAN_CANDIDATE="liquibase"
-          mkdir -p liquibase-$VERSION/bin/internal
-          unzip $ZIP_FILENAME -d liquibase-$VERSION
-          rm -rf $ZIP_FILENAME
-          mv ./liquibase-$VERSION/liquibase ./liquibase-$VERSION/bin/
-          mv ./liquibase-$VERSION/liquibase.bat ./liquibase-$VERSION/bin/
-          zip -r $ZIP_FILENAME ./liquibase-$VERSION
+          mkdir -p "liquibase-$VERSION/bin/internal"
+          unzip "$ZIP_FILENAME" -d "liquibase-$VERSION"
+          rm -rf "$ZIP_FILENAME"
+          mv "./liquibase-$VERSION/liquibase" "./liquibase-$VERSION/bin/"
+          mv "./liquibase-$VERSION/liquibase.bat" "./liquibase-$VERSION/bin/"
+          zip -r "$ZIP_FILENAME" "./liquibase-$VERSION"
+          EXPECTED_BYTES=$(wc -c < "$ZIP_FILENAME" | tr -d ' ')
+
           # Upload the release to R2. --checksum-algorithm CRC32: newer aws-cli defaults to a
           # CRC64NVME checksum that R2 rejects (same fix as analytics-config#33).
           # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job env;
@@ -957,58 +1279,119 @@ jobs:
           # alias). The dry-run S3 step is separate and keeps the token.
           unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            aws s3 cp $ZIP_FILENAME $S3_BUCKET --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
-          echo "Uploaded $ZIP_FILENAME to R2"
+            aws s3 cp "$ZIP_FILENAME" "$S3_BUCKET" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+          echo "Uploaded $ZIP_FILENAME to R2 ($EXPECTED_BYTES bytes)"
 
-          # Send the release to SDKMAN
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "'"$WEB_URL$ZIP_FILENAME"'"}' \
-          https://vendors.sdkman.io/release)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "SDKMAN release response: $RESPONSE_BODY"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            echo "ERROR: Failed to release to SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
+          # TECHOPS-1137: repo.liquibase.com answers a miss with `cache-control: max-age=3600`,
+          # so a single GET that lands before the object is visible pins a 404 at the edge for
+          # an hour. SDKMAN's /release endpoint resolves the download URL itself and rejects
+          # the release with HTTP 400 "URL cannot be resolved" when it hits that cached 404.
+          # That is what broke every OSS release from 5.0.3 on. Purge the entry, then refuse
+          # to call SDKMAN until the public URL really serves the bytes just uploaded.
+          # The probe has to be a plain GET: HEAD answers `cf-cache-status: DYNAMIC` here and
+          # so never sees the cached 404 a GET gets.
+          purge_zip() {
+            local files attempt resp
+            files=$(printf '%s\n%s\n' "$WEB_URL$ZIP_FILENAME" "$ORIGIN_URL$ZIP_FILENAME" | jq -R . | jq -s '{files: .}')
+            for attempt in 1 2 3; do
+              if resp=$(curl -fsS --max-time 30 -X POST \
+                   -H "Authorization: Bearer $CF_PURGE_TOKEN" \
+                   -H "Content-Type: application/json" \
+                   --data "$files" \
+                   "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache") \
+                 && [ "$(printf '%s' "$resp" | jq -r '.success')" = "true" ]; then
+                echo "✓ purged $ZIP_FILENAME from the Cloudflare cache on both hostnames"
+                return 0
+              fi
+              echo "attempt $attempt: purge_cache call failed: $(printf '%s' "${resp:-}" | jq -c '.errors // empty' 2>/dev/null || true); retrying in 10s..."
+              sleep 10
+            done
+            # Not fatal on its own: the resolvability gate below is the check that matters,
+            # and it fails the job if the edge is still wrong.
+            echo "::warning::Cloudflare cache purge failed for $ZIP_FILENAME. Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            return 1
+          }
+
+          purge_zip || true
+          resolved=""
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            # curl only creates the -o file once a transfer starts, so on a connect failure
+            # `wc -c` would die under `set -euo pipefail` and take the whole step down on
+            # attempt 1 instead of retrying. Truncating here also stops a partial body from
+            # a previous attempt being counted as this attempt's bytes.
+            : > /tmp/sdkman-probe.zip
+            rc=0
+            code=$(curl -sS -o /tmp/sdkman-probe.zip -w '%{http_code}' -L --max-time 180 "$WEB_URL$ZIP_FILENAME") || rc=$?
+            got=$(wc -c < /tmp/sdkman-probe.zip | tr -d ' ')
+            if [ "$rc" -eq 0 ] && [ "$code" = "200" ] && [ "$got" = "$EXPECTED_BYTES" ]; then
+              echo "✓ $WEB_URL$ZIP_FILENAME resolves at the edge ($got bytes)"
+              resolved=1
+              break
+            fi
+            echo "attempt $attempt: $WEB_URL$ZIP_FILENAME is not resolvable yet (http=$code, bytes=$got, expected $EXPECTED_BYTES); purging and retrying in 15s..."
+            sleep 15
+            purge_zip || true
+          done
+          rm -f /tmp/sdkman-probe.zip
+          if [ -z "$resolved" ]; then
+            echo "::error::$WEB_URL$ZIP_FILENAME does not serve the zip that was just uploaded, so SDKMAN would reject the release with 'URL cannot be resolved' (TECHOPS-1137). Check the R2 upload and CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
             exit 1
           fi
+
+          # The three vendor calls differ only in method, endpoint and payload. Retry each:
+          # a transient failure here used to be invisible because the whole step was
+          # continue-on-error, which is how SDKMAN sat on 5.0.2 from March (TECHOPS-1137).
+          sdkman_api() {
+            local method="$1" endpoint="$2" payload="$3" what="$4"
+            local attempt rc response http_code body
+            for attempt in 1 2 3; do
+              rc=0
+              response=$(curl -sS -w $'\n%{http_code}' --max-time 60 -X "$method" \
+                -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
+                -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json" \
+                -d "$payload" \
+                "https://vendors.sdkman.io/$endpoint") || rc=$?
+              http_code=$(printf '%s' "$response" | tail -n1)
+              body=$(printf '%s' "$response" | sed '$d')
+              if [ "$rc" -ne 0 ]; then
+                # curl never got an answer (DNS, TLS, timeout). It still writes 000 for
+                # %{http_code}, and `[ 000 -lt 400 ]` is a numeric test that passes, so
+                # accepting on the code alone would call a dead endpoint a success and put
+                # the silent-green failure of TECHOPS-1137 straight back. Require curl to
+                # have succeeded, then require a real 2xx/3xx.
+                echo "SDKMAN $what: curl failed (exit $rc, HTTP $http_code)"
+              else
+                echo "SDKMAN $what response (HTTP $http_code): $body"
+                # 2xx only. These calls are sent without --location, so a 3xx means curl
+                # never followed the redirect and the release was not actually registered.
+                if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+                  return 0
+                fi
+              fi
+              if [ "$attempt" -lt 3 ]; then
+                echo "attempt $attempt: SDKMAN $what failed; retrying in 15s..."
+                sleep 15
+              fi
+            done
+            echo "::error::Failed to $what on SDKMAN (curl exit $rc, HTTP $http_code): $body"
+            return 1
+          }
+
+          sdkman_api POST release \
+            "$(jq -nc --arg c "$SDKMAN_CANDIDATE" --arg v "$VERSION" --arg u "$WEB_URL$ZIP_FILENAME" '{candidate:$c,version:$v,url:$u}')" \
+            "release $ZIP_FILENAME"
           echo "Sent $ZIP_FILENAME to SDKMAN"
 
-          # Set the default version for SDKMAN
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'"}' \
-          https://vendors.sdkman.io/default)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "SDKMAN default response: $RESPONSE_BODY"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            echo "ERROR: Failed to set default version in SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
-            exit 1
-          fi
+          sdkman_api PUT default \
+            "$(jq -nc --arg c "$SDKMAN_CANDIDATE" --arg v "$VERSION" '{candidate:$c,version:$v}')" \
+            "set $VERSION as the default version"
           echo "Set $ZIP_FILENAME as default version for SDKMAN"
 
-          # Announce the release to SDKMAN
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-          -H "Consumer-Key: $SDKMAN_CONSUMER_KEY" \
-          -H "Consumer-Token: $SDKMAN_CONSUMER_TOKEN" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/json" \
-          -d '{"candidate": "'"$SDKMAN_CANDIDATE"'", "version": "'"$VERSION"'", "url": "https://github.com/liquibase/liquibase/releases/tag/'"$RELEASE_TAG"'"}' \
-          https://vendors.sdkman.io/announce/struct)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "SDKMAN announce response: $RESPONSE_BODY"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            echo "ERROR: Failed to announce to SDKMAN (HTTP $HTTP_CODE): $RESPONSE_BODY"
-            exit 1
-          fi
+          sdkman_api POST announce/struct \
+            "$(jq -nc --arg c "$SDKMAN_CANDIDATE" --arg v "$VERSION" --arg u "https://github.com/liquibase/liquibase/releases/tag/$RELEASE_TAG" '{candidate:$c,version:$v,url:$u}')" \
+            "announce $VERSION"
           echo "Announced $ZIP_FILENAME to SDKMAN"
 
       - name: Update SDKMAN version for ${{ inputs.artifactId }} dry-run
@@ -1105,6 +1488,7 @@ jobs:
           fi
 
   upload_windows_package:
+    needs: validate-version
     if: ${{ inputs.distribution == 'liquibase' }}
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@f7a85fe3cab9f1f2b923ee5b411428e5e5a99dc6 # main
     secrets: inherit
@@ -1126,8 +1510,9 @@ jobs:
   #    dry_run_zip_url: ${{ inputs.dry_run_zip_url }}
 
   upload_ansible_role:
+    needs: validate-version
     if: ${{ inputs.distribution == 'liquibase' }}
-    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@010ba49a98ae78e2f826ba8d6cc6d2925236d078 # main
+    uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@597c80909383def411d978f83857baf6cfc55cdd # main
     secrets: inherit
     with:
       version: ${{ inputs.version }}
@@ -1135,8 +1520,9 @@ jobs:
       dry_run_tar_gz_url: ${{ inputs.dry_run_tar_gz_url }}
 
   upload_secure_ansible_role:
+    needs: validate-version
     if: ${{ inputs.distribution == 'liquibase-secure' }}
-    uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@21cb490554af2a686d1e09bc581503a6fabd2508 # main
+    uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@ab4b873b63df315d57c93d243f11e3aff21bb9fa # main
     secrets: inherit
     with:
       version: ${{ inputs.version }}

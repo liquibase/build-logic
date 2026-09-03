@@ -24,6 +24,29 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      # This job checks out `pull_request.head.sha` and then loads /vault/liquibase
+      # into the job environment, after which `mvn clean install` runs the checked-out
+      # tree. A pom.xml is executable, so on a fork PR that is fork-controlled code
+      # running with every vault credential in scope.
+      #
+      # A `pull_request` event from a fork gets no secrets, so it cannot reach this.
+      # The way in is a caller triggered by `pull_request_target`, which is how
+      # liquibase-pro's build.yml calls this workflow today. Refuse that combination
+      # explicitly rather than relying on every caller to get its trigger right.
+      #
+      # This is a failing step, not a job-level `if:`. A skipped job reports Success
+      # and would satisfy a required check, which is the trap recorded on TECHOPS-1105.
+      # [TECHOPS-1222]
+      - name: Refuse fork refs
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [ -n "$HEAD_REPO" ] && [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::sonar-coverage-merge.yml was reached from a pull request opened from the fork '$HEAD_REPO'. This job builds the checked-out ref with vault credentials in the environment and must never run fork-controlled code. Run Sonar from a push-triggered workflow on the base repository instead."
+            exit 1
+          fi
+          echo "Head repo '${HEAD_REPO:-<not a pull request>}' is trusted; continuing."
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0

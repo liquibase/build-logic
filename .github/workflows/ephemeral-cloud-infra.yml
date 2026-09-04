@@ -209,6 +209,30 @@ jobs:
           SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
           SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
 
+      # test-automation-ephemeral/stack is the one root that runs terraform on the runner
+      # instead of inside Spacelift, so nothing injects credentials for the spacelift.io
+      # remote state backend it reads. spacectl cannot mint this token from an API key
+      # ("no account is currently selected"), so exchange the key for a JWT directly.
+      - name: Mint Spacelift state token
+        env:
+          SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}
+          SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
+          SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
+        run: |
+          set -euo pipefail
+          jwt=$(curl -sf -X POST "$SPACELIFT_API_KEY_ENDPOINT/graphql" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg id "$SPACELIFT_API_KEY_ID" --arg secret "$SPACELIFT_API_KEY_SECRET" \
+                  '{query:"mutation($id: ID!, $secret: String!){ apiKeyUser(id: $id, secret: $secret){ jwt } }",variables:{id:$id,secret:$secret}}')" \
+            | jq -r '.data.apiKeyUser.jwt')
+          if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then
+            echo "::error::Could not mint a Spacelift token from SPACELIFT_API_KEY_ID/SECRET. Without it the terraform_remote_state read of liquibase-tags fails with 'Required token could not be found' and neither the ephemeral stack nor its teardown can plan." >&2
+            exit 1
+          fi
+          echo "::add-mask::$jwt"
+          # Terraform reads credentials for a host from TF_TOKEN_<host with dots as underscores>.
+          echo "TF_TOKEN_spacelift_io=$jwt" >> "$GITHUB_ENV"
+
       - name: Terraform Init
         working-directory: test-automation-ephemeral/stack
         id: init

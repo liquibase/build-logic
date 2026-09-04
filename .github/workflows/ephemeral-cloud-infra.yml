@@ -564,7 +564,9 @@ jobs:
           SLACK_WEBHOOK: ${{ env.EPHEMERAL_DANGLING_RESOURCES_SLACK_WEBHOOK }}
           SLACK_COLOR: danger
           SLACK_TITLE: "Ephemeral teardown failed — possible orphaned resources"
+          # The run id, not the stack name: the name embeds a value the runner masks,
+          # and this action does not mask SLACK_MESSAGE.
           SLACK_MESSAGE: |
-            Ephemeral teardown failed for stack `${{ steps.verify-state.outputs.stack_id || inputs.stack_id }}` (${{ github.repository }}).
+            Ephemeral teardown failed for the ephemeral stack of run `${{ inputs.state_run_id || github.run_id }}` (${{ github.repository }}).
             State is preserved for a retry — please investigate and clean up to avoid orphaned resources: publicly-accessible RDS (TECHOPS-523) and/or the ephemeral IAM role + Spacelift stack (TECHOPS-1019).
             Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -420,6 +420,9 @@ jobs:
             [ .values.outputs.ephemeral_stack_id.value?,
               (.values.root_module.resources[]? | select(.address == "spacelift_stack.stack") | .values.id?)
             ] | map(select(. != null and . != "")) | first // ""')"
+          # stack_id arrives empty when the runner masks part of the stack name and drops
+          # the deploy job's output, so fall back to the id this run recorded in state.
+          echo "stack_id=${STACK_ID:-${STATE_STACK}}" >> "$GITHUB_OUTPUT"
           if [ "${MANAGED}" -eq 0 ]; then
             if [ -n "${STATE_RUN_ID}" ]; then
               # A cross-run destroy (the scheduled reaper, which only ever targets a stack
@@ -463,8 +466,8 @@ jobs:
       - name: Destroy ephemeral infra
         id: destroy_infra
         env:
-          STACK_ID: ${{ inputs.stack_id }}
-          TF_VAR_stack_id: ${{ inputs.stack_id }}
+          STACK_ID: ${{ steps.verify-state.outputs.stack_id }}
+          TF_VAR_stack_id: ${{ steps.verify-state.outputs.stack_id }}
           SPACELIFT_API_KEY_ENDPOINT: ${{ env.SPACELIFT_API_KEY_ENDPOINT }}
           SPACELIFT_API_KEY_ID: ${{ env.SPACELIFT_API_KEY_ID }}
           SPACELIFT_API_KEY_SECRET: ${{ env.SPACELIFT_API_KEY_SECRET }}
@@ -541,7 +544,7 @@ jobs:
         # fires the alert below, but only after the teardown that did not need state.
         if: ${{ !cancelled() && steps.verify-state.outputs.anomaly == 'true' }}
         env:
-          STACK_ID: ${{ inputs.stack_id }}
+          STACK_ID: ${{ steps.verify-state.outputs.stack_id || inputs.stack_id }}
           STATE_RUN_ID: ${{ inputs.state_run_id }}
         run: |
           echo "::error::Destroy ran for stack '${STACK_ID}' but the Terraform state selected by state_run_id '${STATE_RUN_ID}' was unusable: it is either empty or carries no stack identity to confirm it belongs to that stack. The Spacelift-side RDS destroy was attempted, but no state-tracked resources (the ephemeral IAM role with PowerUserAccess, the AWS integration, the stack object) were torn down. Verify state_run_id and clean up manually if they still exist."
@@ -562,6 +565,6 @@ jobs:
           SLACK_COLOR: danger
           SLACK_TITLE: "Ephemeral teardown failed — possible orphaned resources"
           SLACK_MESSAGE: |
-            Ephemeral teardown failed for stack `${{ inputs.stack_id }}` (${{ github.repository }}).
+            Ephemeral teardown failed for stack `${{ steps.verify-state.outputs.stack_id || inputs.stack_id }}` (${{ github.repository }}).
             State is preserved for a retry — please investigate and clean up to avoid orphaned resources: publicly-accessible RDS (TECHOPS-523) and/or the ephemeral IAM role + Spacelift stack (TECHOPS-1019).
             Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

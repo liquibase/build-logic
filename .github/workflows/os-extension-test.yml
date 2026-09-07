@@ -72,9 +72,12 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
 
+      # persist-credentials: false - this build does not use the git-persisted token,
+      # so dropping it removes an exfil path at no cost. Defense-in-depth behind the caller's environment gate.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
 
       - name: Set up JDK ${{ inputs.javaBuildVersion }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -182,9 +185,11 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
 
+      # persist-credentials: false - see build job above (PR-code checkout with secrets in scope).
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
 
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0

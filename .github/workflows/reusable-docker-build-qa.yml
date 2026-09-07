@@ -162,12 +162,22 @@ jobs:
         run: |
           # Get the latest successful workflow run for the specified branch.
           # main.yml replaced run-tests.yml as the producer of liquibase build artifacts
-          # at the TECHOPS-1222 cutover. main.yml only runs on `main`, so for any other
-          # branch this lookup finds nothing and the fallback below builds from branch
-          # source, which is the pre-existing behaviour when no run is found. Branch
-          # SNAPSHOTs now come from the maintainer-dispatched snapshot-branch.yml, whose
-          # runs are attributed to the dispatch ref rather than the target branch and so
-          # are not discoverable by this `?branch=` query.
+          # at the TECHOPS-1222 cutover.
+          #
+          # This narrows what resolves. run-tests.yml ran on every internal PR branch, so
+          # a feature branch usually did find a real build with a liquibase-zip-<branch>
+          # artifact attached. main.yml only ever runs on `main`, so for any other branch
+          # this lookup now finds nothing and the fallback below builds the image from
+          # branch source instead of the published zip. That fallback already existed and
+          # already ran whenever a branch had no successful build; it is just reached more
+          # often now.
+          #
+          # Acceptable because the only Community caller, build-qa-docker.yml, defaults
+          # liquibaseBranch to `main` and has only ever been dispatched from `main`.
+          # Branch SNAPSHOTs come from the maintainer-dispatched snapshot-branch.yml, whose
+          # runs are attributed to the dispatch ref rather than the target branch, so they
+          # are not discoverable by a `?branch=` query at all. If QA ever needs branch
+          # artifacts here, that needs a lookup by run id rather than by branch.
           WORKFLOW_RUN=$(curl -s \
             -H "Authorization: Bearer $LIQUIBOT_PAT_GPM_ACCESS" \
             -H "Accept: application/vnd.github.v3+json" \

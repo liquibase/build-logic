@@ -58,22 +58,29 @@ jobs:
       # reviews. Collapse the prior claude[bot] comments as OUTDATED before posting the
       # new one, leaving only the latest expanded. Collapsed, not deleted, so the
       # history stays auditable.
+      #
+      # Both endpoints are required: issues/{n}/comments returns only the PR-level
+      # summary comments, while the inline findings are review comments under
+      # pulls/{n}/comments. Collapsing just the former left every inline comment
+      # expanded forever - one PR reached 94 uncollapsed inline comments (TECHOPS-1074).
       - name: Collapse stale Claude review comments
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          gh api --paginate "repos/$REPO/issues/$PR/comments" \
-            --jq '.[] | select(.user.login == "claude[bot]") | .node_id' |
-          while read -r node_id; do
-            [ -z "$node_id" ] && continue
-            gh api graphql -f subjectId="$node_id" -f query='
-              mutation($subjectId: ID!) {
-                minimizeComment(input: {subjectId: $subjectId, classifier: OUTDATED}) {
-                  minimizedComment { isMinimized }
-                }
-              }' || echo "::warning::Could not collapse comment $node_id (already minimized?)"
+          for endpoint in "issues/$PR/comments" "pulls/$PR/comments"; do
+            gh api --paginate "repos/$REPO/$endpoint" \
+              --jq '.[] | select(.user.login == "claude[bot]") | .node_id' |
+            while read -r node_id; do
+              [ -z "$node_id" ] && continue
+              gh api graphql -f subjectId="$node_id" -f query='
+                mutation($subjectId: ID!) {
+                  minimizeComment(input: {subjectId: $subjectId, classifier: OUTDATED}) {
+                    minimizedComment { isMinimized }
+                  }
+                }' || echo "::warning::Could not collapse comment $node_id (already minimized?)"
+            done
           done
 
       - name: Run Claude Code Review
@@ -149,12 +156,17 @@ jobs:
               on exported APIs.
             - Logging/error messages that would hinder debugging a production incident.
 
-            CHECKLIST - before finishing, explicitly confirm you considered each of:
+            CHECKLIST - work through each of these internally before finishing:
             correctness, error handling, security, test coverage, public API/contract
-            stability, concurrency/resources, and repo standards (CLAUDE.md). If a
-            category genuinely has no issue, that is fine - do NOT manufacture one.
+            stability, concurrency/resources, and repo standards (CLAUDE.md). This is
+            a thinking aid, NOT output: do not write the checklist out, do not narrate
+            which categories passed, and do not add per-category confirmation lines or
+            checkmarks. If a category genuinely has no issue, that is fine - do NOT
+            manufacture one.
 
-            SEVERITY - label every finding with exactly one:
+            SEVERITY - label every finding with exactly one of the four labels
+            below. This list is CLOSED: never invent another label. There is no
+            [Positive], [Praise], [Info], [Note] or [Question] label.
             - [Critical] Bug or vulnerability that will break functionality, lose data,
               or expose a security hole. Must be fixed before merge.
             - [Major] Likely bug, missing error handling, or significant standards
@@ -173,11 +185,22 @@ jobs:
               this PR is production-ready and justify the score in one sentence.
             - Report up to 15 findings; if there are more, report the 15 most important
               and say how many were omitted.
-            - Do NOT default to approval. Only indicate the PR looks good when every
-              checklist category genuinely passes, and even then state the confidence
-              score and what you verified.
-            - If you find nothing above [Nit]: post "## Code Review\n\nNo blocking
-              issues found." followed by the checklist confirmation and confidence score.
+            - Do NOT default to approval: silence in a category must come from the
+              checklist genuinely passing, not from stopping early.
+            - If you find nothing above [Nit]: post exactly "## Code Review\n\nNo
+              blocking issues found." plus the Confidence line, and nothing else.
+
+            NO PRAISE (this is a review, not a report card):
+            - Every comment you post must report a defect or ask a question about a
+              possible defect. Nothing else earns a comment.
+            - Do NOT post praise, approval, acknowledgement, or "this is correct"
+              comments, inline or in the summary. Never open an inline comment with
+              [Positive] or any similar label.
+            - Do NOT add "Positive Findings", "Strengths", "What's good", "Well
+              done" or equivalent sections to the summary comment. A severity group
+              with no findings is omitted entirely - do not write "None" under it.
+            - Confirming that code is fine is what the Confidence line is for; it is
+              the only place approval belongs, and it stays one sentence.
 
             FALSE-POSITIVE GUARDS (protect precision - this matters as much as rigor):
             - Every finding must cite specific code and concrete reasoning. If you are

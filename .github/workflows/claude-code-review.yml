@@ -55,45 +55,73 @@ jobs:
           parse-json-secrets: true
 
       # A review is posted on every push, so a busy PR accumulates a stack of stale
-      # reviews. Collapse the prior claude[bot] comments as OUTDATED before posting the
-      # new one, leaving only the latest expanded. Collapsed, not deleted, so the
-      # history stays auditable.
+      # reviews. The prior comments are collected here but collapsed only after the
+      # new review succeeds: collapsing up front meant a failed or timed-out review
+      # left every earlier finding hidden with nothing to replace it. Collapsed, not
+      # deleted, so the history stays auditable.
       #
-      # Both endpoints are required: issues/{n}/comments returns only the PR-level
-      # summary comments, while the inline findings are review comments under
-      # pulls/{n}/comments. Collapsing just the former left every inline comment
-      # expanded forever - one PR reached 94 uncollapsed inline comments (TECHOPS-1074).
-      - name: Collapse stale Claude review comments
+      # Both comment kinds are covered - the summary is a PR-level comment, the
+      # findings are review comments on the diff. Collapsing only the former left
+      # inline comments expanded forever; one PR reached 94 of them (TECHOPS-1074).
+      #
+      # Filtered by content, not by author: the @claude mention handler and
+      # claude-test-review.yml post under the same claude[bot] identity and must be
+      # left alone. GraphQL (not REST) because only it exposes isMinimized, so
+      # already-collapsed comments are not re-minimized on every push.
+      - name: Collect stale Claude review comments
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          collapse() {
-            gh api --paginate "repos/$REPO/$1" --jq "$2" |
-            while read -r node_id; do
-              [ -z "$node_id" ] && continue
-              gh api graphql -f subjectId="$node_id" -f query='
-                mutation($subjectId: ID!) {
-                  minimizeComment(input: {subjectId: $subjectId, classifier: OUTDATED}) {
-                    minimizedComment { isMinimized }
+          owner=${REPO%%/*}
+          name=${REPO##*/}
+          stale="$RUNNER_TEMP/stale-comments.txt"
+          : > "$stale"
+
+          # PR-level summary. A finished review carries the "## Code Review" title;
+          # an interrupted run leaves the progress comment instead.
+          gh api graphql --paginate -f owner="$owner" -f name="$name" -F pr="$PR" -f query='
+            query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $pr) {
+                  comments(first: 100, after: $endCursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { id isMinimized author { login } body }
                   }
-                }' || echo "::warning::Could not collapse comment $node_id (already minimized?)"
-            done
-          }
+                }
+              }
+            }' --jq '
+              .data.repository.pullRequest.comments.nodes[]
+              | select((.author.login // "") | . == "claude" or . == "claude[bot]")
+              | select(.isMinimized | not)
+              | select(.body | test("## Code Review") or test("Claude Code is working"))
+              | .id' >> "$stale"
 
-          # PR-level summaries and the track_progress comment.
-          collapse "issues/$PR/comments" \
-            '.[] | select(.user.login == "claude[bot]") | .node_id'
+          # Inline findings, anchored on the severity label. [Positive] is included
+          # to clear comments left by reviews that ran before this prompt change.
+          gh api graphql --paginate -f owner="$owner" -f name="$name" -F pr="$PR" -f query='
+            query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $pr) {
+                  reviewThreads(first: 100, after: $endCursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      comments(first: 50) {
+                        nodes { id isMinimized author { login } body }
+                      }
+                    }
+                  }
+                }
+              }
+            }' --jq '
+              .data.repository.pullRequest.reviewThreads.nodes[].comments.nodes[]
+              | select((.author.login // "") | . == "claude" or . == "claude[bot]")
+              | select(.isMinimized | not)
+              | select(.body | test("^\\[(Critical|Major|Minor|Nit|Positive)\\]"))
+              | .id' >> "$stale"
 
-          # Inline findings. Anchored on the severity label because the @claude
-          # mention workflow posts under the same claude[bot] identity and its
-          # replies must not be collapsed. [Positive] is included to clear
-          # comments left by reviews that ran before this prompt change.
-          collapse "pulls/$PR/comments" \
-            '.[] | select(.user.login == "claude[bot]")
-                 | select(.body | test("^\\[(Critical|Major|Minor|Nit|Positive)\\]"))
-                 | .node_id'
+          echo "Collected $(wc -l < "$stale" | tr -d ' ') stale comment(s) to collapse."
 
       - name: Run Claude Code Review
         id: claude-review
@@ -229,3 +257,25 @@ jobs:
           claude_args: |
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
             --model ${{ inputs.model }}
+
+      # Runs only when the review above succeeded, so a failed run leaves the
+      # previous review expanded and readable.
+      - name: Collapse stale Claude review comments
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          stale="$RUNNER_TEMP/stale-comments.txt"
+          if [ ! -s "$stale" ]; then
+            echo "No stale comments to collapse."
+            exit 0
+          fi
+          while read -r node_id; do
+            [ -z "$node_id" ] && continue
+            gh api graphql -f subjectId="$node_id" -f query='
+              mutation($subjectId: ID!) {
+                minimizeComment(input: {subjectId: $subjectId, classifier: OUTDATED}) {
+                  minimizedComment { isMinimized }
+                }
+              }' || echo "::warning::Could not collapse comment $node_id"
+          done < "$stale"

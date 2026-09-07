@@ -68,9 +68,10 @@ jobs:
 - Ends each review with a 0-100% production-readiness confidence score and justification
 - Does not default to "LGTM"; it must justify approval against the checklist
 - Applies false-positive guards so added rigor does not flood PRs with noise
-- Collapses its own prior comments as OUTDATED before posting a new review - both the
-  PR-level summaries and the inline review comments - so a busy PR shows only the
-  latest review expanded
+- Collapses its own prior comments as OUTDATED once a new review has been posted -
+  both the PR-level summaries and the inline review comments - so a busy PR shows only
+  the latest review expanded. A failed or timed-out review leaves the previous one
+  visible
 
 ### 2. `claude.yml` - @claude Mention Handler
 

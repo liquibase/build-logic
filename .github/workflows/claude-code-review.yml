@@ -69,9 +69,8 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          for endpoint in "issues/$PR/comments" "pulls/$PR/comments"; do
-            gh api --paginate "repos/$REPO/$endpoint" \
-              --jq '.[] | select(.user.login == "claude[bot]") | .node_id' |
+          collapse() {
+            gh api --paginate "repos/$REPO/$1" --jq "$2" |
             while read -r node_id; do
               [ -z "$node_id" ] && continue
               gh api graphql -f subjectId="$node_id" -f query='
@@ -81,7 +80,20 @@ jobs:
                   }
                 }' || echo "::warning::Could not collapse comment $node_id (already minimized?)"
             done
-          done
+          }
+
+          # PR-level summaries and the track_progress comment.
+          collapse "issues/$PR/comments" \
+            '.[] | select(.user.login == "claude[bot]") | .node_id'
+
+          # Inline findings. Anchored on the severity label because the @claude
+          # mention workflow posts under the same claude[bot] identity and its
+          # replies must not be collapsed. [Positive] is included to clear
+          # comments left by reviews that ran before this prompt change.
+          collapse "pulls/$PR/comments" \
+            '.[] | select(.user.login == "claude[bot]")
+                 | select(.body | test("^\\[(Critical|Major|Minor|Nit|Positive)\\]"))
+                 | .node_id'
 
       - name: Run Claude Code Review
         id: claude-review
@@ -187,8 +199,10 @@ jobs:
               and say how many were omitted.
             - Do NOT default to approval: silence in a category must come from the
               checklist genuinely passing, not from stopping early.
-            - If you find nothing above [Nit]: post exactly "## Code Review\n\nNo
+            - If you have no findings at all: post exactly "## Code Review\n\nNo
               blocking issues found." plus the Confidence line, and nothing else.
+              If your only findings are [Nit], report them under a Nit heading
+              first - never drop a finding to reach that shorter response.
 
             NO PRAISE (this is a review, not a report card):
             - Every comment you post must report a defect or ask a question about a

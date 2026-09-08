@@ -40,6 +40,11 @@ on:
         description: "Release tag to download artifacts from (e.g. v5.1.1). Required for workflow_dispatch; populated automatically from release events."
         required: false
         type: string
+      versionBump:
+        description: "Version component to bump for the next development version after the release: major, minor or patch"
+        required: false
+        default: "minor"
+        type: string
 
 permissions:
   contents: write
@@ -55,6 +60,7 @@ jobs:
     secrets: inherit
     with:
       javaBuildVersion: ${{ inputs.javaBuildVersion }}
+      versionBump: ${{ inputs.versionBump }}
 
   release:
     if: always() && inputs.deployToMavenCentral == true && (needs.maven-release.result == 'success' || needs.maven-release.result == 'skipped')

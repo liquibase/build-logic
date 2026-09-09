@@ -12,8 +12,6 @@ name: "Jira: Bounce ticket to Development"
 #   on:
 #     pull_request_review:
 #       types: [submitted]        # reviewer requested changes
-#     pull_request:
-#       types: [synchronize]      # author's push created conflicts
 #     push:
 #       branches: [main]          # a merge to main conflicted open PRs
 #   permissions:
@@ -33,8 +31,12 @@ name: "Jira: Bounce ticket to Development"
 #   The account needs Browse Issues + Transition Issues + Add Comments on every
 #   project in `project_keys`.
 #
-# This workflow performs NO checkout. pull_request_review and push run in the base-repo context
-# with vault access, so checking out PR-authored code here would be the fork-PR path in GHSA-mqw2-j77g-6486.
+# Supported triggers are `pull_request_review` and `push` only. Do NOT wire a
+# caller to `pull_request`: that event runs the workflow file from the PR, while
+# these two run the copy on the default branch. (The no-checkout property is a
+# separate matter - it covers PR application code, not the workflow file.)
+#
+# Performs NO checkout: reads event payloads and calls APIs.
 
 on:
   workflow_call:
@@ -200,21 +202,6 @@ jobs:
                 reason: `${(review.user && review.user.login) || 'A reviewer'} requested changes`,
               });
 
-            } else if (event === 'pull_request') {
-              // The author pushed. Only act if that push actually conflicted.
-              const pr = context.payload.pull_request;
-              if (!pr) {
-                core.setFailed('No pull_request in the payload for a pull_request event.');
-                return;
-              }
-              const state = await mergeState(pr.number);
-              console.log(`PR #${pr.number}: mergeable_state=${state}`);
-              if (state !== 'dirty') {
-                console.log('Not conflicted. Nothing to do.');
-                return;
-              }
-              targets.push({ pr, reason: 'The PR has merge conflicts' });
-
             } else if (event === 'push') {
               // The base branch moved. GitHub fires nothing on the PRs pointing
               // at it, so enumerate them and check each. Idempotency comes from
@@ -255,7 +242,8 @@ jobs:
             } else {
               core.setFailed(
                 `Unsupported event '${event}'. Wire this workflow to ` +
-                `pull_request_review, pull_request or push.`
+                `pull_request_review or push. A pull_request trigger is refused ` +
+                `on purpose - see the security note in this file's header.`
               );
               return;
             }

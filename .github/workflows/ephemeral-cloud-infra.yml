@@ -354,8 +354,9 @@ jobs:
           fi
           spacectl stack deploy --id $EPHEMERAL_STACK_ID --auto-confirm
 
-      # TECHOPS-1019: destroy-only preflight. The RDS destroy below targets
-      # inputs.stack_id (via Spacelift), while "Destroy ephemeral stack" targets whatever
+      # TECHOPS-1019: destroy-only preflight. The RDS destroy below targets the id this
+      # step resolves (inputs.stack_id when a caller passes one, else the id recorded in
+      # state) via Spacelift, while "Destroy ephemeral stack" targets whatever
       # the S3 state selected in "Terraform Init" (keyed by state_run_id) holds. Confirm
       # they are the SAME stack before destroying anything, and distinguish the two
       # empty-state cases so a missing state is never a silent no-op:
@@ -544,7 +545,7 @@ jobs:
         # fires the alert below, but only after the teardown that did not need state.
         if: ${{ !cancelled() && steps.verify-state.outputs.anomaly == 'true' }}
         env:
-          STACK_ID: ${{ steps.verify-state.outputs.stack_id || inputs.stack_id }}
+          STACK_ID: ${{ steps.verify-state.outputs.stack_id }}
           STATE_RUN_ID: ${{ inputs.state_run_id }}
         run: |
           echo "::error::Destroy ran for stack '${STACK_ID}' but the Terraform state selected by state_run_id '${STATE_RUN_ID}' was unusable: it is either empty or carries no stack identity to confirm it belongs to that stack. The Spacelift-side RDS destroy was attempted, but no state-tracked resources (the ephemeral IAM role with PowerUserAccess, the AWS integration, the stack object) were torn down. Verify state_run_id and clean up manually if they still exist."

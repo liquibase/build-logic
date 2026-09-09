@@ -82,6 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Dependabot
     strategy:
+      fail-fast: false # Continue running jobs even if one fails [TECHOPS-1223]
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:

@@ -79,8 +79,11 @@ jobs:
           stale="$RUNNER_TEMP/stale-comments.txt"
           : > "$stale"
 
-          # PR-level summary. A finished review carries the "## Code Review" title;
-          # an interrupted run leaves the progress comment instead.
+          # PR-level summary, matched on the "## Code Review" title the prompt
+          # mandates. Deliberately not matched on the in-flight progress text:
+          # claude.yml and claude-test-review.yml also set track_progress, so that
+          # would collapse their answers too. The cost is that a cancelled run of
+          # this workflow leaves its own progress comment expanded.
           gh api graphql --paginate -f owner="$owner" -f name="$name" -F pr="$PR" -f query='
             query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
               repository(owner: $owner, name: $name) {
@@ -95,8 +98,9 @@ jobs:
               .data.repository.pullRequest.comments.nodes[]
               | select((.author.login // "") | . == "claude" or . == "claude[bot]")
               | select(.isMinimized | not)
-              | select(.body | test("## Code Review") or test("Claude Code is working"))
-              | .id' >> "$stale"
+              | select(.body | test("## Code Review"))
+              | .id' >> "$stale" ||
+            echo "::warning::Could not list PR-level comments; leaving them expanded."
 
           # Inline findings, anchored on the severity label. [Positive] is included
           # to clear comments left by reviews that ran before this prompt change.
@@ -119,7 +123,8 @@ jobs:
               | select((.author.login // "") | . == "claude" or . == "claude[bot]")
               | select(.isMinimized | not)
               | select(.body | test("^\\[(Critical|Major|Minor|Nit|Positive)\\]"))
-              | .id' >> "$stale"
+              | .id' >> "$stale" ||
+            echo "::warning::Could not list inline comments; leaving them expanded."
 
           echo "Collected $(wc -l < "$stale" | tr -d ' ') stale comment(s) to collapse."
 
@@ -173,7 +178,10 @@ jobs:
             - Binary files or large data files
             - Unchanged code
 
-            TWO-PASS REVIEW - complete BOTH passes before writing any comment:
+            TWO-PASS REVIEW - complete BOTH passes before writing any comment.
+            Like the checklist below, the passes are how you think, NOT output:
+            never add "PASS 1" / "PASS 2" headings, per-pass summaries, or
+            pass-by-pass verdicts to the review.
 
             PASS 1 - Correctness & safety (highest priority). For each changed hunk ask:
             - Does it do what it claims? Any logic error, off-by-one, inverted

@@ -409,6 +409,23 @@ jobs:
                   text += `Ticket left in ${status} - the automatic move did not go through, see the workflow run.`;
                 }
 
+                // Repeat-suppression for the paths that do NOT move the ticket:
+                // multi-ticket PRs, comment_only, a failed transition. Those
+                // leave the ticket eligible, so without this every author push
+                // and every merge to main would comment again. Where we did
+                // move the ticket, the status guard already prevents repeats
+                // and a fresh comment is genuine news.
+                if (!didMove) {
+                  const prior = await fetch(
+                    `${baseUrl}/rest/api/3/issue/${key}/comment?orderBy=-created&maxResults=20`,
+                    { headers }
+                  );
+                  if (prior.ok && JSON.stringify(await prior.json()).includes(pr.html_url)) {
+                    console.log(`${key}: already mentions ${pr.html_url} - not repeating.`);
+                    continue;
+                  }
+                }
+
                 const commentResp = await fetch(
                   `${baseUrl}/rest/api/3/issue/${key}/comment`,
                   {

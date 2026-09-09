@@ -23,6 +23,37 @@ permissions:
 
 jobs:
   claude:
+    # Author gate, here rather than in the callers. This workflow assumes the vault OIDC
+    # role and reads all of /vault/liquibase before `claude-code-action` starts, so the
+    # only thing standing between an anonymous commenter and a job holding every
+    # credential is JavaScript inside a third-party action, which runs after the secrets
+    # are already in the environment. A job-level `if:` is evaluated by GitHub before a
+    # runner exists: no runner, no OIDC, no vault.
+    #
+    # It lives here because callers cannot be trusted to add it. On 2026-09-08, 14 repos
+    # called this workflow and only liquibase/liquibase carried the gate. Two of the
+    # other 13 are public. Fixing the callers alone leaves the next one to reopen it.
+    #
+    # `author_association` hangs off a different object per event (comment, review,
+    # issue), which is why the check is repeated per branch rather than hoisted out.
+    #
+    # The first clause passes through any event that is not one of the four public entity
+    # events. No caller uses a schedule or dispatch trigger today, but without it the
+    # first one to try would be skipped with no explanation.
+    #
+    # Callers keep their own `@claude` mention check: that decides when Claude is wanted,
+    # this decides who is allowed to ask. [TECHOPS-1269]
+    if: |
+      (github.event_name != 'issue_comment' &&
+       github.event_name != 'pull_request_review_comment' &&
+       github.event_name != 'pull_request_review' &&
+       github.event_name != 'issues') ||
+      (github.event.sender.type != 'Bot' && (
+        (github.event_name == 'issue_comment' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+        (github.event_name == 'pull_request_review_comment' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+        (github.event_name == 'pull_request_review' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)) ||
+        (github.event_name == 'issues' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+      ))
     runs-on: ubuntu-latest
     # Prevent excessive API costs from runaway conversations
     # 15 minutes should be sufficient for most interactive tasks

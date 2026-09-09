@@ -77,10 +77,10 @@ on:
         type: boolean
         default: false
       max_prs_per_sweep:
-        description: "Safety cap on how many open PRs a single push-to-base sweep will check. Above this the sweep logs a warning and stops, so a long-lived branch with hundreds of open PRs cannot burn the API budget."
+        description: "Cap on how many open PRs a single push-to-base sweep checks. Above this it checks the most recently updated ones and warns, so the API budget stays bounded without the sweep giving up. Keep it above the repo's usual open-PR count: liquibase-insights sat at 78 when this was set."
         required: false
         type: number
-        default: 50
+        default: 150
       jira_base_url:
         description: "Jira Cloud base URL."
         required: false
@@ -180,15 +180,16 @@ jobs:
                 owner, repo, base: branch, state: 'open', per_page: 100,
               });
               console.log(`Open PRs targeting ${branch}: ${openPrs.length}`);
+              const toCheck = openPrs
+                .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+                .slice(0, maxPrs);
               if (openPrs.length > maxPrs) {
                 core.warning(
-                  `${openPrs.length} open PRs target ${branch}, above the ` +
-                  `max_prs_per_sweep cap of ${maxPrs}. Skipping the sweep rather ` +
-                  `than spending ${openPrs.length} API calls.`
+                  `${openPrs.length} open PRs target ${branch}; checking the ` +
+                  `${maxPrs} most recently updated.`
                 );
-                return;
               }
-              for (const pr of openPrs) {
+              for (const pr of toCheck) {
                 const state = await mergeState(pr.number);
                 console.log(`PR #${pr.number}: mergeable_state=${state}`);
                 if (state === 'dirty') {

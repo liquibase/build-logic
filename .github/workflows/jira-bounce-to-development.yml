@@ -86,6 +86,10 @@ on:
         required: false
         type: string
         default: "https://datical.atlassian.net"
+    secrets:
+      LIQUIBASE_VAULT_OIDC_ROLE_ARN:
+        description: "OIDC role that can read /vault/liquibase. Declared explicitly so callers need not pass every secret they hold."
+        required: true
 
 permissions:
   id-token: write
@@ -116,12 +120,16 @@ jobs:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Get Jira service-account credentials from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53 # v3.0.1
-        with:
-          secret-ids: |
-            ,/vault/liquibase
-          parse-json-secrets: true
+      - name: Load only the Jira credentials
+        run: |
+          blob=$(aws secretsmanager get-secret-value \
+            --secret-id /vault/liquibase --query SecretString --output text)
+          for k in JIRA_USER JIRA_API_TOKEN; do
+            v=$(jq -er --arg k "$k" '.[$k]' <<<"$blob")
+            echo "::add-mask::$v"
+            echo "$k=$v" >> "$GITHUB_ENV"
+          done
+          unset blob
 
       - name: Comment and bounce linked tickets
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

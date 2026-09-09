@@ -114,58 +114,14 @@ jobs:
     # as trustworthy as the caller's `types:` filter.
     if: github.event_name != 'pull_request_review' || github.event.review.state == 'changes_requested'
     steps:
-      - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
-        with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Load only the Jira credentials
-        run: |
-          blob=$(aws secretsmanager get-secret-value \
-            --secret-id /vault/liquibase --query SecretString --output text)
-          for k in JIRA_USER JIRA_API_TOKEN; do
-            v=$(jq -er --arg k "$k" '.[$k]' <<<"$blob")
-            echo "::add-mask::$v"
-            echo "$k=$v" >> "$GITHUB_ENV"
-          done
-          unset blob
-
-      - name: Comment and bounce linked tickets
+      - name: Find candidate PRs
+        id: scan
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          PROJECT_KEYS: ${{ inputs.project_keys }}
-          SOURCE_STATUSES: ${{ inputs.source_statuses }}
-          TARGET_STATUS: ${{ inputs.target_status }}
-          COMMENT_ONLY: ${{ inputs.comment_only }}
           MAX_PRS_PER_SWEEP: ${{ inputs.max_prs_per_sweep }}
-          JIRA_BASE_URL: ${{ inputs.jira_base_url }}
-          JIRA_EMAIL: ${{ env.JIRA_USER }}
-          JIRA_TOKEN: ${{ env.JIRA_API_TOKEN }}
         with:
           script: |
-            // ---- Inputs ----------------------------------------------
-            const projectKeys = process.env.PROJECT_KEYS
-              .split(',').map(s => s.trim()).filter(Boolean);
-            const sourceStatuses = process.env.SOURCE_STATUSES
-              .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-            const targetStatus = process.env.TARGET_STATUS.trim();
-            const commentOnly = process.env.COMMENT_ONLY === 'true';
             const maxPrs = parseInt(process.env.MAX_PRS_PER_SWEEP, 10) || 50;
-            const baseUrl = process.env.JIRA_BASE_URL.replace(/\/$/, '');
-            const email = process.env.JIRA_EMAIL;
-            const token = process.env.JIRA_TOKEN;
-
-            if (!email || !token) {
-              core.setFailed('JIRA_USER or JIRA_API_TOKEN not set in /vault/liquibase');
-              return;
-            }
-
-            const headers = {
-              Authorization: `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`,
-              Accept: 'application/json',
-              'Content-Type': 'application/json',
-            };
             const { owner, repo } = context.repo;
             const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -255,6 +211,77 @@ jobs:
               );
               return;
             }
+
+            // Trim to the fields the next step reads - a full PR object per
+            // entry would be tens of KB against the 1MB step-output limit.
+            core.setOutput('has_targets', targets.length ? 'true' : 'false');
+            core.setOutput('targets', JSON.stringify(targets.map(({ pr, reason }) => ({
+              pr: {
+                number: pr.number,
+                title: pr.title,
+                head: { ref: pr.head && pr.head.ref },
+                body: pr.body,
+                html_url: pr.html_url,
+              },
+              reason,
+            }))));
+
+      - name: Configure AWS credentials for vault access
+        if: steps.scan.outputs.has_targets == 'true'
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Load only the Jira credentials
+        if: steps.scan.outputs.has_targets == 'true'
+        run: |
+          blob=$(aws secretsmanager get-secret-value \
+            --secret-id /vault/liquibase --query SecretString --output text)
+          for k in JIRA_USER JIRA_API_TOKEN; do
+            v=$(jq -er --arg k "$k" '.[$k]' <<<"$blob")
+            echo "::add-mask::$v"
+            echo "$k=$v" >> "$GITHUB_ENV"
+          done
+          unset blob
+
+      - name: Comment and bounce linked tickets
+        if: steps.scan.outputs.has_targets == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PROJECT_KEYS: ${{ inputs.project_keys }}
+          SOURCE_STATUSES: ${{ inputs.source_statuses }}
+          TARGET_STATUS: ${{ inputs.target_status }}
+          COMMENT_ONLY: ${{ inputs.comment_only }}
+          TARGETS: ${{ steps.scan.outputs.targets }}
+          JIRA_BASE_URL: ${{ inputs.jira_base_url }}
+          JIRA_EMAIL: ${{ env.JIRA_USER }}
+          JIRA_TOKEN: ${{ env.JIRA_API_TOKEN }}
+        with:
+          script: |
+            // ---- Inputs ----------------------------------------------
+            const projectKeys = process.env.PROJECT_KEYS
+              .split(',').map(s => s.trim()).filter(Boolean);
+            const sourceStatuses = process.env.SOURCE_STATUSES
+              .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            const targetStatus = process.env.TARGET_STATUS.trim();
+            const commentOnly = process.env.COMMENT_ONLY === 'true';
+            const baseUrl = process.env.JIRA_BASE_URL.replace(/\/$/, '');
+            const email = process.env.JIRA_EMAIL;
+            const token = process.env.JIRA_TOKEN;
+
+            if (!email || !token) {
+              core.setFailed('JIRA_USER or JIRA_API_TOKEN not set in /vault/liquibase');
+              return;
+            }
+
+            const headers = {
+              Authorization: `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`,
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            };
+
+            const targets = JSON.parse(process.env.TARGETS);
 
             // ---- Per-PR: find tickets, filter, comment, transition ----
             const summary = [];

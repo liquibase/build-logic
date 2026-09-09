@@ -220,7 +220,7 @@ jobs:
               pr: {
                 number: pr.number,
                 title: pr.title,
-                head: { ref: pr.head && pr.head.ref },
+                head: { ref: pr.head && pr.head.ref, sha: pr.head && pr.head.sha },
                 body: pr.body,
                 html_url: pr.html_url,
               },
@@ -288,6 +288,7 @@ jobs:
             const summary = [];
 
             for (const { pr, reason } of targets) {
+              const sha7 = ((pr.head && pr.head.sha) || 'unknown').slice(0, 7);
               // ---- Extract ticket keys ---------------------------------
               // Same convention as jira-ticket-linker.yml: title, then branch
               // name, then body. Unlike that workflow we collect EVERY match,
@@ -394,7 +395,7 @@ jobs:
                 // Posted whether or not the move happened - it is the
                 // signal the ticket-watcher needs, and when the move is skipped
                 // it says why so nobody assumes the board is current.
-                let text = `🔁 ${reason} on ${pr.html_url}. `;
+                let text = `🔁 ${reason} on ${pr.html_url} (at ${sha7}). `;
                 if (didMove) {
                   text += `Moved back to ${targetStatus} (was ${status}).`;
                 } else if (commentOnly) {
@@ -409,19 +410,26 @@ jobs:
                   text += `Ticket left in ${status} - the automatic move did not go through, see the workflow run.`;
                 }
 
-                // Repeat-suppression for the paths that do NOT move the ticket:
-                // multi-ticket PRs, comment_only, a failed transition. Those
-                // leave the ticket eligible, so without this every author push
-                // and every merge to main would comment again. Where we did
-                // move the ticket, the status guard already prevents repeats
-                // and a fresh comment is genuine news.
-                if (!didMove) {
-                  const prior = await fetch(
-                    `${baseUrl}/rest/api/3/issue/${key}/comment?orderBy=-created&maxResults=20`,
-                    { headers }
-                  );
-                  if (prior.ok && JSON.stringify(await prior.json()).includes(pr.html_url)) {
-                    console.log(`${key}: already mentions ${pr.html_url} - not repeating.`);
+                // Don't say the same thing twice. Paths that leave the ticket
+                // where it is - multi-ticket PRs, comment_only, a failed
+                // transition - would otherwise comment again on every author
+                // push and every merge to main. Matching URL + head SHA in the
+                // SAME comment is what makes this safe to apply even when we
+                // did move the ticket: a conflict that survives a merge to main
+                // keeps the same SHA and stays quiet, while a fresh conflict
+                // after the author pushes carries a new one and speaks up.
+                const prior = await fetch(
+                  `${baseUrl}/rest/api/3/issue/${key}/comment?orderBy=-created&maxResults=20`,
+                  { headers }
+                );
+                if (prior.ok) {
+                  const { comments = [] } = await prior.json();
+                  const saidBefore = comments.some(c => {
+                    const body = JSON.stringify(c.body);
+                    return body.includes(pr.html_url) && body.includes(sha7);
+                  });
+                  if (saidBefore) {
+                    console.log(`${key}: already mentions ${pr.html_url} at ${sha7} - not repeating.`);
                     continue;
                   }
                 }

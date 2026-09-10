@@ -48,10 +48,10 @@ jobs:
       model: 'claude-sonnet-4-6'
 ```
 
-| Model | Input | Output | Use case |
-|---|---|---|---|
-| `claude-haiku-4-5` (default) | $0.80/MTok | $4/MTok | Standard automated reviews |
-| `claude-sonnet-4-6` | $3/MTok | $15/MTok | Complex repos needing deeper analysis |
+| Model                        | Input      | Output   | Use case                              |
+|------------------------------|------------|----------|---------------------------------------|
+| `claude-haiku-4-5` (default) | $0.80/MTok | $4/MTok  | Standard automated reviews            |
+| `claude-sonnet-4-6`          | $3/MTok    | $15/MTok | Complex repos needing deeper analysis |
 
 **What it does:**
 - Reviews code changes in the PR with a rigorous senior-reviewer persona (see the
@@ -59,11 +59,19 @@ jobs:
 - Runs a two-pass review: pass 1 for correctness and safety, pass 2 for
   maintainability and repo standards (CLAUDE.md)
 - Works through an explicit checklist (correctness, error handling, security, tests,
-  API/contract stability, concurrency/resources, repo standards)
-- Labels every finding by severity: `[Critical]` / `[Major]` / `[Minor]` / `[Nit]`
+  API/contract stability, concurrency/resources, repo standards) internally - the
+  checklist is a thinking aid and is deliberately not written into the review
+- Labels every finding by severity: `[Critical]` / `[Major]` / `[Minor]` / `[Nit]`.
+  This set is closed - there is no `[Positive]` or equivalent label
+- Comments only on defects: no praise, approval or "this is correct" comments, and no
+  "Positive Findings" / "Strengths" sections
 - Ends each review with a 0-100% production-readiness confidence score and justification
 - Does not default to "LGTM"; it must justify approval against the checklist
 - Applies false-positive guards so added rigor does not flood PRs with noise
+- Collapses its own prior comments as OUTDATED once a new review has been posted -
+  both the PR-level summaries and the inline review comments - so a busy PR shows only
+  the latest review expanded. A failed or timed-out review leaves the previous one
+  visible
 
 ### 2. `claude.yml` - @claude Mention Handler
 

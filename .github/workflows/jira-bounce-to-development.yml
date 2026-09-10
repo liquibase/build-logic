@@ -24,12 +24,13 @@ name: "Jira: Bounce ticket to Development"
 #       secrets: inherit
 # ---
 
-# Required org-level setup (one-time, shared with jira-set-fixversion-on-release):
+# Required org-level setup:
 #   /vault/liquibase must contain
-#       JIRA_USER       - Jira account email
-#       JIRA_API_TOKEN  - token from id.atlassian.com
-#   The account needs Browse Issues + Transition Issues + Add Comments on every
-#   project in `project_keys`.
+#       DOCS_AGENT_JIRA_USER       - Jira account email
+#       DOCS_AGENT_JIRA_API_TOKEN  - token from id.atlassian.com
+#   These are the `liquibot` bot account (TECHOPS-1009).
+#   liquibot needs Browse Issues + Transition Issues + Add Comments
+#   on every project in `project_keys.
 #
 # Supported triggers are `pull_request_review` and `push` only. Do NOT wire a
 # caller to `pull_request`: that event runs the workflow file from the PR, while
@@ -239,7 +240,7 @@ jobs:
         run: |
           blob=$(aws secretsmanager get-secret-value \
             --secret-id /vault/liquibase --query SecretString --output text)
-          for k in JIRA_USER JIRA_API_TOKEN; do
+          for k in DOCS_AGENT_JIRA_USER DOCS_AGENT_JIRA_API_TOKEN; do
             v=$(jq -er --arg k "$k" '.[$k]' <<<"$blob")
             echo "::add-mask::$v"
             echo "$k=$v" >> "$GITHUB_ENV"
@@ -256,8 +257,8 @@ jobs:
           COMMENT_ONLY: ${{ inputs.comment_only }}
           TARGETS: ${{ steps.scan.outputs.targets }}
           JIRA_BASE_URL: ${{ inputs.jira_base_url }}
-          JIRA_EMAIL: ${{ env.JIRA_USER }}
-          JIRA_TOKEN: ${{ env.JIRA_API_TOKEN }}
+          JIRA_EMAIL: ${{ env.DOCS_AGENT_JIRA_USER }}
+          JIRA_TOKEN: ${{ env.DOCS_AGENT_JIRA_API_TOKEN }}
         with:
           script: |
             // ---- Inputs ----------------------------------------------
@@ -272,7 +273,7 @@ jobs:
             const token = process.env.JIRA_TOKEN;
 
             if (!email || !token) {
-              core.setFailed('JIRA_USER or JIRA_API_TOKEN not set in /vault/liquibase');
+              core.setFailed('DOCS_AGENT_JIRA_USER or DOCS_AGENT_JIRA_API_TOKEN not set in /vault/liquibase');
               return;
             }
 

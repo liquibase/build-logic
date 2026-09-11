@@ -23,6 +23,50 @@ permissions:
 
 jobs:
   claude:
+    # Author pre-filter, here rather than in the callers. Three layers guard this job and
+    # this `if:` is the weakest of them, not the security boundary:
+    #
+    #   1. This `if:`. GitHub evaluates it before a runner exists, so a rejected event
+    #      means no runner, no OIDC, no vault. Earliest and cheapest, but coarse:
+    #      `author_association` MEMBER is any org member and COLLABORATOR includes read
+    #      and triage.
+    #   2. `claude-code-action`'s own actor check, which requires write or admin on the
+    #      repo. Finer-grained and the standards-aligned control, so it stays. Its only
+    #      weakness is timing, because it runs once the vault is already in the job
+    #      environment, and that is the gap layer 1 covers.
+    #   3. Scoping the secret. Loading only the keys Claude needs instead of all of
+    #      /vault/liquibase is the larger exposure and outranks gating the trigger. That
+    #      is TECHOPS-1108, not this change.
+    #
+    # It lives here because callers cannot be trusted to add it. On 2026-09-08, 14 repos
+    # called this workflow and only liquibase/liquibase carried the gate. Two of the
+    # other 13 are public. Fixing the callers alone leaves the next one to reopen it.
+    #
+    # `author_association` hangs off a different object per event (comment, review,
+    # issue), which is why the check is repeated per branch rather than hoisted out. On
+    # `issues: assigned` that object is the issue, so the value read is the issue
+    # author's association and not the assigner's: a member assigning an outsider's
+    # `@claude` issue is skipped. Intentional, because the body Claude would then act on
+    # is still attacker-authored.
+    #
+    # The first clause passes through any event that is not one of the four public entity
+    # events, so the first caller to want a cron-triggered run is not silently skipped.
+    # It also means this expression gates nothing on a fork-reachable trigger such as
+    # `pull_request_target`; a caller adding one needs its own gate.
+    #
+    # Callers keep their own `@claude` mention check: that decides when Claude is wanted,
+    # this decides who is allowed to ask. [TECHOPS-1269]
+    if: |
+      (github.event_name != 'issue_comment' &&
+       github.event_name != 'pull_request_review_comment' &&
+       github.event_name != 'pull_request_review' &&
+       github.event_name != 'issues') ||
+      (github.event.sender.type != 'Bot' && (
+        (github.event_name == 'issue_comment' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+        (github.event_name == 'pull_request_review_comment' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+        (github.event_name == 'pull_request_review' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)) ||
+        (github.event_name == 'issues' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+      ))
     runs-on: ubuntu-latest
     # Prevent excessive API costs from runaway conversations
     # 15 minutes should be sufficient for most interactive tasks

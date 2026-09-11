@@ -79,9 +79,14 @@ jobs:
 
   run-extensions-dependabot:
     needs: check-security-vulnerabilities
+    # A `needs` edge fails when ANY matrix leg fails, so without this one extension
+    # failing upstream skips this whole job for every sibling, which `fail-fast: false`
+    # alone does not prevent: it stops cancellation, not the failed job status.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     name: Dependabot
     strategy:
+      fail-fast: false # Continue running jobs even if one fails
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:
@@ -159,9 +164,14 @@ jobs:
 
   update-pom:
     needs: check-security-vulnerabilities
+    # A `needs` edge fails when ANY matrix leg fails, so without this one extension
+    # failing upstream skips this whole job for every sibling, which `fail-fast: false`
+    # alone does not prevent: it stops cancellation, not the failed job status.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     name: Update pom.xml
     strategy:
+      fail-fast: false # Continue running jobs even if one fails
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
 
@@ -242,9 +252,14 @@ jobs:
     # liquibase-parent-pom is excluded because it uses its own 1.x versioning,
     # so it never has a v<liquibase-version> draft for this matrix to find.
     needs: update-pom
+    # A `needs` edge fails when ANY matrix leg fails, so without this one extension
+    # failing upstream skips this whole job for every sibling, which `fail-fast: false`
+    # alone does not prevent: it stops cancellation, not the failed job status.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     name: Release Draft
     strategy:
+      fail-fast: false # Continue running jobs even if one fails
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
         exclude:
@@ -347,9 +362,14 @@ jobs:
     # liquibase-parent-pom is excluded because it uses its own 1.x versioning,
     # so it never has a v<liquibase-version> published release to bundle.
     needs: release-draft-releases
+    # A `needs` edge fails when ANY matrix leg fails, so without this one extension
+    # failing upstream skips this whole job for every sibling, which `fail-fast: false`
+    # alone does not prevent: it stops cancellation, not the failed job status.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     name: Central Portal
     strategy:
+      fail-fast: false # Continue running jobs even if one fails
       matrix:
         repository: ${{ fromJson(inputs.repositories) }}
         exclude:

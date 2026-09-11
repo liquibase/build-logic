@@ -77,6 +77,8 @@ jobs:
         run: |
           # The ${parsedVersion.*} placeholders are intentionally left unexpanded (single quotes)
           # so that Maven resolves them from build-helper:parse-version.
+          # A caller forwarding an unset input sends "" and the callee default does not apply.
+          VERSION_BUMP="${VERSION_BUMP:-minor}"
           case "$VERSION_BUMP" in
             major) DEVELOPMENT_VERSION='${parsedVersion.nextMajorVersion}.0.0-SNAPSHOT' ;;
             minor) DEVELOPMENT_VERSION='${parsedVersion.majorVersion}.${parsedVersion.nextMinorVersion}.0-SNAPSHOT' ;;

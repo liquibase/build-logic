@@ -2,6 +2,12 @@ name: Release POM to Sonatype
 
 on:
   workflow_call:
+    inputs:
+      versionBump:
+        description: "Version component to bump for the next development version after the release: major, minor or patch"
+        required: false
+        default: "minor"
+        type: string
 
 permissions:
   contents: write
@@ -82,3 +88,5 @@ jobs:
     needs: release
     uses: liquibase/build-logic/.github/workflows/extension-release-prepare.yml@main
     secrets: inherit
+    with:
+      versionBump: ${{ inputs.versionBump }}

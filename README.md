@@ -1030,7 +1030,7 @@ The following secrets must be available in AWS Secrets Manager (`/vault/liquibas
 - `SONATYPE_USERNAME` - Sonatype Central Portal user token, name half
 - `SONATYPE_TOKEN` - Sonatype Central Portal user token, secret half
 
-The Sonatype pair is a Central Portal *user token* issued to the TechOps publishing service account (a Member of the Liquibase Portal organization), not a person's login. It expires yearly. Rotation is a vault-only change because workflows read the values at run time; the runbook lives in the internal `liquibase-infrastructure` repository (`doc/maven-central-publisher-account.md`).
+The Sonatype pair is a Central Portal *user token* held by a TechOps service account, not a person's login. Rotation is a vault-only change because workflows read the values at run time; ask DevOps to rotate.
 
 #### Permissions
 
@@ -1055,8 +1055,8 @@ The workflow requires:
 - **Check**: GitHub repository → Releases → Draft releases
 
 **Issue: Maven Central upload failed**
-- **Cause**: Invalid credentials or artifact bundle structure
-- **Solution**: Verify SONATYPE_USERNAME and SONATYPE_TOKEN in vault. An HTTP 401 from the Portal upload usually means the user token expired or was revoked; rotate it per the runbook in `liquibase-infrastructure`
+- **Cause**: Invalid credentials or artifact bundle structure. An HTTP 401 usually means the Sonatype user token expired or was revoked
+- **Solution**: Verify SONATYPE_USERNAME and SONATYPE_TOKEN in vault; ask DevOps to rotate the token
 - **Check**: Sonatype Central Portal deployment logs
 
 **Issue: POM update failed**

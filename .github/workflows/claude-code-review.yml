@@ -55,26 +55,78 @@ jobs:
           parse-json-secrets: true
 
       # A review is posted on every push, so a busy PR accumulates a stack of stale
-      # reviews. Collapse the prior claude[bot] comments as OUTDATED before posting the
-      # new one, leaving only the latest expanded. Collapsed, not deleted, so the
-      # history stays auditable.
-      - name: Collapse stale Claude review comments
+      # reviews. The prior comments are collected here but collapsed only after the
+      # new review succeeds: collapsing up front meant a failed or timed-out review
+      # left every earlier finding hidden with nothing to replace it. Collapsed, not
+      # deleted, so the history stays auditable.
+      #
+      # Both comment kinds are covered - the summary is a PR-level comment, the
+      # findings are review comments on the diff. Collapsing only the former left
+      # inline comments expanded forever; one PR reached 94 of them (TECHOPS-1074).
+      #
+      # Filtered by content, not by author: the @claude mention handler and
+      # claude-test-review.yml post under the same claude[bot] identity and must be
+      # left alone. GraphQL (not REST) because only it exposes isMinimized, so
+      # already-collapsed comments are not re-minimized on every push.
+      - name: Collect stale Claude review comments
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          gh api --paginate "repos/$REPO/issues/$PR/comments" \
-            --jq '.[] | select(.user.login == "claude[bot]") | .node_id' |
-          while read -r node_id; do
-            [ -z "$node_id" ] && continue
-            gh api graphql -f subjectId="$node_id" -f query='
-              mutation($subjectId: ID!) {
-                minimizeComment(input: {subjectId: $subjectId, classifier: OUTDATED}) {
-                  minimizedComment { isMinimized }
+          owner=${REPO%%/*}
+          name=${REPO##*/}
+          stale="$RUNNER_TEMP/stale-comments.txt"
+          : > "$stale"
+
+          # PR-level summary, matched on the "## Code Review" title the prompt
+          # mandates. Deliberately not matched on the in-flight progress text:
+          # claude.yml and claude-test-review.yml also set track_progress, so that
+          # would collapse their answers too. The cost is that a cancelled run of
+          # this workflow leaves its own progress comment expanded.
+          gh api graphql --paginate -f owner="$owner" -f name="$name" -F pr="$PR" -f query='
+            query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $pr) {
+                  comments(first: 100, after: $endCursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { id isMinimized author { login } body }
+                  }
                 }
-              }' || echo "::warning::Could not collapse comment $node_id (already minimized?)"
-          done
+              }
+            }' --jq '
+              .data.repository.pullRequest.comments.nodes[]
+              | select((.author.login // "") | . == "claude" or . == "claude[bot]")
+              | select(.isMinimized | not)
+              | select(.body | test("## Code Review"))
+              | .id' >> "$stale" ||
+            echo "::warning::Could not list PR-level comments; leaving them expanded."
+
+          # Inline findings, anchored on the severity label. [Positive] is included
+          # to clear comments left by reviews that ran before this prompt change.
+          gh api graphql --paginate -f owner="$owner" -f name="$name" -F pr="$PR" -f query='
+            query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $pr) {
+                  reviewThreads(first: 100, after: $endCursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      comments(first: 50) {
+                        nodes { id isMinimized author { login } body }
+                      }
+                    }
+                  }
+                }
+              }
+            }' --jq '
+              .data.repository.pullRequest.reviewThreads.nodes[].comments.nodes[]
+              | select((.author.login // "") | . == "claude" or . == "claude[bot]")
+              | select(.isMinimized | not)
+              | select(.body | test("^\\[(Critical|Major|Minor|Nit|Positive)\\]"))
+              | .id' >> "$stale" ||
+            echo "::warning::Could not list inline comments; leaving them expanded."
+
+          echo "Collected $(wc -l < "$stale" | tr -d ' ') stale comment(s) to collapse."
 
       - name: Run Claude Code Review
         id: claude-review
@@ -126,7 +178,10 @@ jobs:
             - Binary files or large data files
             - Unchanged code
 
-            TWO-PASS REVIEW - complete BOTH passes before writing any comment:
+            TWO-PASS REVIEW - complete BOTH passes before writing any comment.
+            Like the checklist below, the passes are how you think, NOT output:
+            never add "PASS 1" / "PASS 2" headings, per-pass summaries, or
+            pass-by-pass verdicts to the review.
 
             PASS 1 - Correctness & safety (highest priority). For each changed hunk ask:
             - Does it do what it claims? Any logic error, off-by-one, inverted
@@ -149,12 +204,17 @@ jobs:
               on exported APIs.
             - Logging/error messages that would hinder debugging a production incident.
 
-            CHECKLIST - before finishing, explicitly confirm you considered each of:
+            CHECKLIST - work through each of these internally before finishing:
             correctness, error handling, security, test coverage, public API/contract
-            stability, concurrency/resources, and repo standards (CLAUDE.md). If a
-            category genuinely has no issue, that is fine - do NOT manufacture one.
+            stability, concurrency/resources, and repo standards (CLAUDE.md). This is
+            a thinking aid, NOT output: do not write the checklist out, do not narrate
+            which categories passed, and do not add per-category confirmation lines or
+            checkmarks. If a category genuinely has no issue, that is fine - do NOT
+            manufacture one.
 
-            SEVERITY - label every finding with exactly one:
+            SEVERITY - label every finding with exactly one of the four labels
+            below. This list is CLOSED: never invent another label. There is no
+            [Positive], [Praise], [Info], [Note] or [Question] label.
             - [Critical] Bug or vulnerability that will break functionality, lose data,
               or expose a security hole. Must be fixed before merge.
             - [Major] Likely bug, missing error handling, or significant standards
@@ -173,11 +233,24 @@ jobs:
               this PR is production-ready and justify the score in one sentence.
             - Report up to 15 findings; if there are more, report the 15 most important
               and say how many were omitted.
-            - Do NOT default to approval. Only indicate the PR looks good when every
-              checklist category genuinely passes, and even then state the confidence
-              score and what you verified.
-            - If you find nothing above [Nit]: post "## Code Review\n\nNo blocking
-              issues found." followed by the checklist confirmation and confidence score.
+            - Do NOT default to approval: silence in a category must come from the
+              checklist genuinely passing, not from stopping early.
+            - If you have no findings at all: post exactly "## Code Review\n\nNo
+              blocking issues found." plus the Confidence line, and nothing else.
+              If your only findings are [Nit], report them under a Nit heading
+              first - never drop a finding to reach that shorter response.
+
+            NO PRAISE (this is a review, not a report card):
+            - Every comment you post must report a defect or ask a question about a
+              possible defect. Nothing else earns a comment.
+            - Do NOT post praise, approval, acknowledgement, or "this is correct"
+              comments, inline or in the summary. Never open an inline comment with
+              [Positive] or any similar label.
+            - Do NOT add "Positive Findings", "Strengths", "What's good", "Well
+              done" or equivalent sections to the summary comment. A severity group
+              with no findings is omitted entirely - do not write "None" under it.
+            - Confirming that code is fine is what the Confidence line is for; it is
+              the only place approval belongs, and it stays one sentence.
 
             FALSE-POSITIVE GUARDS (protect precision - this matters as much as rigor):
             - Every finding must cite specific code and concrete reasoning. If you are
@@ -192,3 +265,25 @@ jobs:
           claude_args: |
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
             --model ${{ inputs.model }}
+
+      # Runs only when the review above succeeded, so a failed run leaves the
+      # previous review expanded and readable.
+      - name: Collapse stale Claude review comments
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          stale="$RUNNER_TEMP/stale-comments.txt"
+          if [ ! -s "$stale" ]; then
+            echo "No stale comments to collapse."
+            exit 0
+          fi
+          while read -r node_id; do
+            [ -z "$node_id" ] && continue
+            gh api graphql -f subjectId="$node_id" -f query='
+              mutation($subjectId: ID!) {
+                minimizeComment(input: {subjectId: $subjectId, classifier: OUTDATED}) {
+                  minimizedComment { isMinimized }
+                }
+              }' || echo "::warning::Could not collapse comment $node_id"
+          done < "$stale"

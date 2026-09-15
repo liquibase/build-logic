@@ -58,8 +58,10 @@ issues *without excessive false positives*." Key structural pieces:
    concrete probes under each (logic errors, error handling, security classes,
    concurrency/resources, API/contract breaks, test coverage; then CLAUDE.md
    violations, duplication, naming, logging).
-3. **Checklist confirmation** across seven categories, with explicit permission to find
-   nothing in a category (anti-false-positive).
+3. **Internal checklist** across seven categories, with explicit permission to find
+   nothing in a category (anti-false-positive). The reviewer originally confirmed the
+   checklist in the review body; TECHOPS-1074 made it a thinking aid only, because the
+   written-out confirmation ran to tens of lines per review.
 4. **Severity labels** on every finding.
 5. **Confidence score** (0-100%) with one-sentence justification, ending every review.
 6. **False-positive guards**: cite specific code and reasoning, phrase uncertainty as a
@@ -82,7 +84,7 @@ check, and an untested branch):
 | Dimension | Previous prompt | Hardened prompt |
 |---|---|---|
 | Issues surfaced on the flawed PR | 1-2 (only the most obvious) | All three, each severity-labeled with a concrete fix |
-| Behavior on the clean PR | "LGTM" | "No blocking issues found" + checklist confirmation + high confidence score (no invented nits) |
+| Behavior on the clean PR | "LGTM" | "No blocking issues found" + high confidence score (no invented nits); the checklist confirmation this originally included was removed by TECHOPS-1074 |
 | Actionability | Terse one-liners | WHY + concrete fix per finding |
 | Triage signal | None | Severity tiers + production-readiness confidence |
 | Coverage | Ad hoc | Explicit seven-category checklist |

@@ -749,6 +749,13 @@ jobs:
     if: ${{ failure() && inputs.nightly }}
     needs: [build, unit-test]
     runs-on: ubuntu-latest
+    # Least privilege for a third-party container action: the workflow-level
+    # `GITHUB_TOKEN` env is in scope for every step, so without this block the
+    # rtCamp container runs with a pull-requests:write token it never uses.
+    # Mirrors the scoping on reusable-docker-build.yml's notify job.
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Configure AWS credentials for vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0

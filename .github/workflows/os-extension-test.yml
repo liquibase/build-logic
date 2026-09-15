@@ -288,6 +288,13 @@ jobs:
     if: ${{ failure() && inputs.nightly }}
     needs: [build, unit-test]
     runs-on: ubuntu-latest
+    # Least privilege for a third-party container action: this job only assumes
+    # the vault OIDC role and posts a webhook, so it has no use for the
+    # pull-requests/packages scopes granted at workflow level. Mirrors the
+    # scoping on reusable-docker-build.yml's notify job.
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0

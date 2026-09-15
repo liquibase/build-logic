@@ -78,6 +78,7 @@ Many workflows use AWS Secrets Manager via OIDC:
 - Role: `LIQUIBASE_VAULT_OIDC_ROLE_ARN`
 - Region: `us-east-1`
 - Secret path: `/vault/liquibase`
+- Sonatype publishing credentials (`SONATYPE_USERNAME` / `SONATYPE_TOKEN`) are a Central Portal user token owned by the TechOps publishing service account, expiring yearly. Rotation runbook: `liquibase-infrastructure/doc/maven-central-publisher-account.md`
 
 ## Version Management
 

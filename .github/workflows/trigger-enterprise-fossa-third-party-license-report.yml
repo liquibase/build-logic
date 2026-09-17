@@ -5,7 +5,7 @@ on:
     inputs:
       version_number_for_3p_fossa_report_generation:
         type: string
-        description: 'Supply the DaticalDb-installer version number to be stored in the s3 bucket. eg 8.7.352'
+        description: 'Supply the DaticalDb-installer version number to be stored in the R2 bucket. eg 8.7.352'
         required: false
 
 permissions:
@@ -129,19 +129,44 @@ jobs:
           ref: main
           path: build-logic
 
-      - name: Configure AWS credentials for S3 access
+      - name: Configure AWS credentials for devops vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
-          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
+          role-to-assume: ${{ secrets.DEVOPS_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Download reports from S3 and Rearrange CSV files
+      - name: Load Cloudflare R2 credentials from devops vault
+        # TECHOPS-1320: the R2 S3-API creds live in /vault/devops (single source of
+        # truth, same pattern as package.yml). Pull ONLY the keys this job needs and
+        # mask them, least privilege, no bulk-import of the DevOps vault into this job.
         run: |
-          # Create a directory to store downloaded reports from S3
+          set -euo pipefail
+          JSON=$(aws secretsmanager get-secret-value --secret-id /vault/devops --region us-east-1 --query SecretString --output text)
+          for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY; do
+            v=$(printf '%s' "$JSON" | jq -r --arg k "$k" '.[$k] // ""')
+            if [ -z "$v" ] || [ "$v" = "null" ]; then echo "::error::$k missing from /vault/devops"; exit 1; fi
+            echo "::add-mask::$v"
+            echo "$k=$v" >> "$GITHUB_ENV"
+          done
+          echo "Loaded CLOUDFLARE_ACCOUNT_ID and R2 access/secret keys from /vault/devops."
+
+      - name: Download reports from R2 and Rearrange CSV files
+        env:
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
+          # env; R2 rejects a request carrying a session token, so drop it (and the
+          # legacy alias) before every R2 S3-API call (same fix as analytics-config#33).
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+
+          # Create a directory to store downloaded reports from R2
           mkdir -p /home/runner/work/enterprise/fossa_reports_s3
 
-          # Download all files from the specified S3 bucket to the created directory
-          aws s3 cp --recursive "s3://liquibaseorg-origin/enterprise_fossa_report/${VERSION_INPUT}/raw_reports" /home/runner/work/enterprise/fossa_reports_s3/
+          # Download all files from the specified R2 bucket to the created directory
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp --recursive "s3://liquibase-org-assets/enterprise_fossa_report/${VERSION_INPUT}/raw_reports" /home/runner/work/enterprise/fossa_reports_s3/ --endpoint-url "$R2_ENDPOINT"
 
           # List the contents of the directory to confirm successful download
           ls -l /home/runner/work/enterprise/fossa_reports_s3
@@ -187,11 +212,22 @@ jobs:
           name: enterprise_report
           path: ./enterprise_report.csv
 
-      - name: Upload merged CSV to S3
+      - name: Upload merged CSV to R2
         if: always()
         env:
           VERSION_NUMBER: ${{ inputs.version_number_for_3p_fossa_report_generation }}
-        run: aws s3 cp enterprise_report.csv "s3://liquibaseorg-origin/enterprise_fossa_report/${VERSION_NUMBER}/enterprise_report_${VERSION_NUMBER}.csv"
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
+          # env; R2 rejects a request carrying a session token, so drop it (and the
+          # legacy alias) before every R2 S3-API call (same fix as analytics-config#33).
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+          # --checksum-algorithm CRC32: newer aws-cli defaults to a CRC64NVME checksum
+          # that R2 rejects.
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp enterprise_report.csv "s3://liquibase-org-assets/enterprise_fossa_report/${VERSION_NUMBER}/enterprise_report_${VERSION_NUMBER}.csv" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
 
 
   trigger-datical-service:

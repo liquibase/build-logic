@@ -309,43 +309,61 @@ jobs:
           path: ${{ github.event.repository.name }}
           repository: "liquibase/${{ github.event.repository.name }}"
 
-      - name: Configure AWS credentials for vault access
+      - name: Configure AWS credentials for devops vault access
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          role-to-assume: ${{ secrets.DEVOPS_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
-        with:
-          secret-ids: |
-            ,/vault/liquibase
-          parse-json-secrets: true
+      - name: Load Cloudflare R2 credentials from devops vault
+        # TECHOPS-1320: the old S3 origin bucket is being emptied for TECHOPS-969,
+        # so this step no longer assumes AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC
+        # (the old AllowXSDAndSchemaSync-scoped prod S3 role) and reads
+        # /vault/liquibase. The R2 S3-API creds live in /vault/devops (single
+        # source of truth, shared with analytics-config and this repo's own
+        # package.yml). Pull ONLY the keys this job needs and mask them.
+        run: |
+          set -euo pipefail
+          JSON=$(aws secretsmanager get-secret-value --secret-id /vault/devops --region us-east-1 --query SecretString --output text)
+          for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY; do
+            v=$(printf '%s' "$JSON" | jq -r --arg k "$k" '.[$k] // ""')
+            if [ -z "$v" ] || [ "$v" = "null" ]; then echo "::error::$k missing from /vault/devops"; exit 1; fi
+            echo "::add-mask::$v"
+            echo "$k=$v" >> "$GITHUB_ENV"
+          done
+          echo "Loaded CLOUDFLARE_ACCOUNT_ID and R2 access/secret keys from /vault/devops."
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
-          aws-region: us-east-1
-
-      - name: Upload to s3
+      - name: Upload to R2
         working-directory: ${{ inputs.artifactPath }}
         # aws s3 sync syncs directories and S3 prefixes.
+        # TECHOPS-1320: migrated off the old S3 origin bucket onto the
+        # liquibase-org-assets R2 bucket, preserving the xml/ns/<namespace>/
+        # key prefix exactly.
         env:
           REPO_NAME: ${{ github.event.repository.name }}
           NAMESPACE: ${{ inputs.nameSpace }}
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
-          aws s3 sync "${REPO_NAME}/src/main/resources/www.liquibase.org/xml/ns/${NAMESPACE}/" "s3://liquibaseorg-origin/xml/ns/${NAMESPACE}/" --content-type application/octet-stream --only-show-errors
+          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the
+          # job env; R2 rejects a request carrying a session token, so drop it
+          # (and the legacy alias) before any R2 call (TECHOPS-818 pattern).
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 sync "${REPO_NAME}/src/main/resources/www.liquibase.org/xml/ns/${NAMESPACE}/" "s3://liquibase-org-assets/xml/ns/${NAMESPACE}/" --content-type application/octet-stream --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT" --only-show-errors
 
       - name: Index.htm file upload
         working-directory: ${{ inputs.artifactPath }}
         # List all xsd and htm files in repository. Copy index.htm to temporary folder
         # Add links for all xsd files to index.htm file (except liquibase-${{ inputs.nameSpace }}-latest.xsd and index.htm)
-        # Sync index.htm with the s3
+        # Sync index.htm with R2
         env:
           REPO_NAME: ${{ github.event.repository.name }}
           NAMESPACE: ${{ inputs.nameSpace }}
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
           search_dir="${REPO_NAME}/src/main/resources/www.liquibase.org/xml/ns/${NAMESPACE}"
           filenames=`ls -1 "$search_dir"`
@@ -358,5 +376,7 @@ jobs:
             fi
           done
 
-          aws s3 sync index-file "s3://liquibaseorg-origin/xml/ns/${NAMESPACE}/" --only-show-errors
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 sync index-file "s3://liquibase-org-assets/xml/ns/${NAMESPACE}/" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT" --only-show-errors
           

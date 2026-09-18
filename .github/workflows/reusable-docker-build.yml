@@ -67,15 +67,10 @@ on:
         required: true
         type: string
       dry_run:
-        description: 'If true: push only to private dry-run ECR; skip DockerHub/GHCR/public ECR'
+        description: 'If true: build every platform and push to no registry'
         required: false
         type: boolean
         default: false
-      dry_run_ecr_repo:
-        description: 'Dry-run ECR repo URL (leave empty to fall back to PRIVATE_ECR_DRY_RUN_REPO vault secret)'
-        required: false
-        type: string
-        default: ''
       no_cache:
         description: 'Disable Docker layer cache'
         required: false
@@ -170,10 +165,10 @@ on:
         default: 'DOCKER_SLACK_WEBHOOK_URL'
     outputs:
       digest:
-        description: 'Image digest of the pushed image (sha256:...)'
+        description: 'Image digest of the pushed image (sha256:...); empty on a dry run, which pushes nothing'
         value: ${{ jobs.build.outputs.digest }}
       tags:
-        description: 'Comma-separated list of all tags pushed'
+        description: 'Comma-separated list of all tags pushed; on a dry run, the tags that were built and discarded'
         value: ${{ jobs.build.outputs.tags }}
       unsigned_repos:
         description: 'Comma-separated repos left without a verifiable signature after retries; empty when every enabled registry was signed AND its signature verified. Only meaningful to callers that set fail_job_on_signing_failure: false, which keeps this job green so a release can still publish; those callers should enforce this output in a job nothing else depends on.'
@@ -224,11 +219,12 @@ jobs:
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Install Cosign
-        if: inputs.sign_with_cosign
+        # Nothing to sign on a dry run.
+        if: ${{ inputs.sign_with_cosign && !inputs.dry_run }}
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
 
       - name: Prepare cosign signing wrapper
-        if: inputs.sign_with_cosign
+        if: ${{ inputs.sign_with_cosign && !inputs.dry_run }}
         run: |
           # Registry token issuance is an external dependency that denies requests
           # transiently: ghcr.io has answered `DENIED: denied` to cosign's pull-scope
@@ -291,6 +287,8 @@ jobs:
 
       - name: Configure AWS credentials for PROD ECR
         id: configure-aws-credentials-prod
+        # Only the public ECR login uses these, and it is skipped on a dry run.
+        if: ${{ !inputs.dry_run }}
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
@@ -322,29 +320,6 @@ jobs:
           username: ${{ steps.configure-aws-credentials-prod.outputs.aws_access_key_id }}
           password: ${{ steps.configure-aws-credentials-prod.outputs.aws_secret_access_key }}
 
-      - name: Resolve dry-run ECR repo
-        if: inputs.dry_run
-        id: resolve-dry-run-repo
-        env:
-          DRY_RUN_ECR_REPO_INPUT: ${{ inputs.dry_run_ecr_repo }}
-          PRIVATE_ECR_DRY_RUN_REPO: ${{ env.PRIVATE_ECR_DRY_RUN_REPO }}
-        run: |
-          if [[ -n "$DRY_RUN_ECR_REPO_INPUT" ]]; then
-            echo "repo=$DRY_RUN_ECR_REPO_INPUT" >> "$GITHUB_OUTPUT"
-          else
-            echo "repo=$PRIVATE_ECR_DRY_RUN_REPO" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Login to Private ECR Registry (dry-run)
-        if: inputs.dry_run
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
-        env:
-          AWS_REGION: us-east-1
-        with:
-          registry: ${{ steps.resolve-dry-run-repo.outputs.repo }}
-          username: ${{ steps.configure-aws-credentials-prod.outputs.aws_access_key_id }}
-          password: ${{ steps.configure-aws-credentials-prod.outputs.aws_secret_access_key }}
-
       - name: Generate Docker Tags
         id: generate-tags
         env:
@@ -353,7 +328,7 @@ jobs:
           SUFFIX: ${{ inputs.suffix }}
           LATEST_TAG: ${{ inputs.latest_tag }}
           IS_DRY_RUN: ${{ inputs.dry_run }}
-          DRY_RUN_REPO: ${{ steps.resolve-dry-run-repo.outputs.repo }}
+          IMAGE_NAME: ${{ inputs.image_name }}
           PUSH_DOCKERHUB: ${{ inputs.push_dockerhub }}
           DOCKERHUB_REPO: ${{ inputs.dockerhub_repo }}
           PUSH_ECR: ${{ inputs.push_ecr }}
@@ -373,9 +348,10 @@ jobs:
           TAGS=""
 
           if [[ "${IS_DRY_RUN}" == "true" ]]; then
-            TAGS="${DRY_RUN_REPO}:${LATEST_TAG}${SUFFIX}"
-            TAGS="${TAGS},${DRY_RUN_REPO}:${VERSION}${SUFFIX}"
-            TAGS="${TAGS},${DRY_RUN_REPO}:${MINOR_VERSION}${SUFFIX}"
+            # localhost/ keeps these unpushable even if push=false below ever regresses.
+            TAGS="localhost/${IMAGE_NAME}:${LATEST_TAG}${SUFFIX}"
+            TAGS="${TAGS},localhost/${IMAGE_NAME}:${VERSION}${SUFFIX}"
+            TAGS="${TAGS},localhost/${IMAGE_NAME}:${MINOR_VERSION}${SUFFIX}"
           else
             if [[ "${PUSH_DOCKERHUB}" == "true" ]]; then
               TAGS="${DOCKERHUB_REPO}:${LATEST_TAG}${SUFFIX}"
@@ -407,7 +383,7 @@ jobs:
 
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
           if [[ "${IS_DRY_RUN}" == "true" ]]; then
-            echo "Generated tags (dry-run): ${TAGS}"
+            echo "Generated tags (dry-run, not pushed): ${TAGS}"
           else
             echo "Generated tags: ${TAGS}"
           fi
@@ -421,10 +397,12 @@ jobs:
           no-cache: ${{ inputs.no_cache }}
           cache-from: ${{ inputs.cache_from_gha && 'type=gha' || '' }}
           cache-to: ${{ inputs.cache_from_gha && 'type=gha,mode=max' || '' }}
-          push: true
+          # A dry run builds every platform and pushes nowhere.
+          push: ${{ !inputs.dry_run }}
           platforms: ${{ inputs.platforms }}
-          sbom: ${{ inputs.generate_sbom }}
-          provenance: ${{ inputs.provenance_mode }}
+          # A dry run exports no image, so attestations would only be generated and thrown away.
+          sbom: ${{ !inputs.dry_run && inputs.generate_sbom }}
+          provenance: ${{ inputs.dry_run && 'false' || inputs.provenance_mode }}
           build-args: ${{ inputs.build_args }}
           tags: ${{ steps.generate-tags.outputs.tags }}
           labels: |
@@ -488,17 +466,6 @@ jobs:
           COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
         run: |
           "${RUNNER_TEMP}/cosign-sign-retry.sh" "${ECR_REPO}@${IMAGE_DIGEST}"
-
-      # Dry-run signing stays fatal: nothing is published from a dry run, so a
-      # signing failure there is a validation result we want to see as red.
-      - name: Sign Dry-Run ECR Image with Cosign
-        if: ${{ inputs.sign_with_cosign && inputs.dry_run }}
-        env:
-          DRY_RUN_REPO: ${{ steps.resolve-dry-run-repo.outputs.repo }}
-          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
-          COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
-        run: |
-          "${RUNNER_TEMP}/cosign-sign-retry.sh" "${DRY_RUN_REPO}@${IMAGE_DIGEST}"
 
       - name: Check signing outcome
         id: check-signing

@@ -136,9 +136,8 @@ jobs:
           aws-region: us-east-1
 
       - name: Load Cloudflare R2 credentials from devops vault
-        # TECHOPS-1320: the R2 S3-API creds live in /vault/devops (single source of
-        # truth, same pattern as package.yml). Pull ONLY the keys this job needs and
-        # mask them, least privilege, no bulk-import of the DevOps vault into this job.
+        # Pulls only the keys this job needs from /vault/devops and masks them
+        # (least privilege), rather than bulk-importing the vault.
         run: |
           set -euo pipefail
           JSON=$(aws secretsmanager get-secret-value --secret-id /vault/devops --region us-east-1 --query SecretString --output text)
@@ -156,9 +155,8 @@ jobs:
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
-          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
-          # env; R2 rejects a request carrying a session token, so drop it (and the
-          # legacy alias) before every R2 S3-API call (same fix as analytics-config#33).
+          # R2 rejects a request carrying a session token; OIDC creds export one, so
+          # drop it (and its legacy alias) before every R2 S3-API call.
           unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
 
           # Create a directory to store downloaded reports from R2
@@ -220,12 +218,10 @@ jobs:
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
-          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
-          # env; R2 rejects a request carrying a session token, so drop it (and the
-          # legacy alias) before every R2 S3-API call (same fix as analytics-config#33).
+          # R2 rejects a request carrying a session token; OIDC creds export one, so
+          # drop it (and its legacy alias) before every R2 S3-API call.
           unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
-          # --checksum-algorithm CRC32: newer aws-cli defaults to a CRC64NVME checksum
-          # that R2 rejects.
+          # CRC32: newer aws-cli defaults to a CRC64NVME checksum, which R2 rejects.
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
             aws s3 cp enterprise_report.csv "s3://liquibase-org-assets/enterprise_fossa_report/${VERSION_NUMBER}/enterprise_report_${VERSION_NUMBER}.csv" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
 

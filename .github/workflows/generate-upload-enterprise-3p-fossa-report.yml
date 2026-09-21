@@ -126,12 +126,14 @@ jobs:
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
           CSV_FILENAME: ${{ steps.get_repo_name.outputs.repo_name }}.csv
         run: |
-          # CodeQL flagged interpolating ${{ env.VERSION_NUMBER }} straight into this
-          # script: that substitutes the raw value into the script text before the
-          # shell parses it, so a value containing shell metacharacters would run as
-          # code. VERSION_NUMBER is already exported at job level (line 19), so it is
-          # read here as an ordinary shell variable instead. Reject anything that does
-          # not look like a version before it reaches the S3 key.
+          # CodeQL flagged interpolating the env.VERSION_NUMBER expression straight
+          # into this script: that substitutes the raw value into the script text
+          # before the shell parses it, so a value containing shell metacharacters
+          # would run as code. VERSION_NUMBER is already exported at job level, so
+          # it is read here as an ordinary shell variable instead. Reject anything
+          # that does not look like a version before it reaches the object key.
+          # The expression is deliberately NOT written in full here: GitHub
+          # interpolates expressions anywhere in a run block, comments included.
           if ! [[ "$VERSION_NUMBER" =~ ^[A-Za-z0-9._-]+$ ]]; then
             echo "::error::VERSION_NUMBER '$VERSION_NUMBER' contains unexpected characters"
             exit 1

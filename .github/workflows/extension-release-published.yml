@@ -1,10 +1,21 @@
+# TECHOPS-1320: the deploy_xsd job (which used to sync inputs.nameSpace's XSDs to
+# s3://liquibaseorg-origin/xml/ns/<nameSpace>/) was deleted as a vestigial write:
+# nothing read it. build-logic has never had a WP Engine mirror step for extension
+# namespaces (unlike liquibase-pro's own publish-to-s3.yml, which SFTP-mirrors the
+# "pro" namespace on every release). Live checks (2026-09-21) show most extension
+# namespaces 404 on www.liquibase.org/xml/ns/<namespace>/, and the few that do
+# resolve (mongodb, neo4j, databricks) are all frozen at the same Dec 2024
+# last-modified date, i.e. a one-time historical import, not a live sync. Same
+# reasoning/precedent as liquibase-pro#4982, which deleted the analogous vestigial
+# S3 write for the "pro" namespace. `nameSpace` is kept as an input (unused) so
+# existing callers that still pass it are not broken.
 name: Release Extension to Sonatype
 
 on:
   workflow_call:
     inputs:
       nameSpace:
-        description: "xsd namespace"
+        description: "xsd namespace (unused as of TECHOPS-1320, see header comment; kept for caller compatibility)"
         required: false
         default: ""
         type: string
@@ -296,96 +307,3 @@ jobs:
             echo "ERROR: No JAR files matching pattern '$jar_pattern' were found"
             exit 1
           fi
-
-  deploy_xsd:
-    if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true && inputs.dry_run == false
-    name: Upload xsds
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Download xsd files
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          # Relative path under $GITHUB_WORKSPACE to place the repository
-          path: ${{ github.event.repository.name }}
-          repository: "liquibase/${{ github.event.repository.name }}"
-
-      - name: Configure AWS credentials for devops vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ secrets.DEVOPS_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Load Cloudflare R2 credentials from devops vault
-        # TECHOPS-1320: the old S3 origin bucket is being emptied for TECHOPS-969,
-        # so this step no longer assumes AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC
-        # (the old AllowXSDAndSchemaSync-scoped prod S3 role) and reads
-        # /vault/liquibase. The R2 S3-API creds live in /vault/devops (single
-        # source of truth, shared with analytics-config and this repo's own
-        # package.yml). Pull ONLY the keys this job needs and mask them.
-        run: |
-          set -euo pipefail
-          JSON=$(aws secretsmanager get-secret-value --secret-id /vault/devops --region us-east-1 --query SecretString --output text)
-          for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY; do
-            # jq -j plus a sentinel: command substitution strips ALL trailing newlines,
-            # which would silently alter a value that legitimately ends in one.
-            v=$(printf '%s' "$JSON" | jq -j --arg k "$k" '.[$k] // ""'; printf 'X')
-            v=${v%X}
-            if [ -z "$v" ]; then echo "::error::$k missing from /vault/devops"; exit 1; fi
-            # The runner unescapes %0D, %0A and %25 in command data, so a value carrying
-            # those literals registers a mask that never matches it; % is escaped first
-            # so the escapes the next two produce are not escaped again.
-            e=$v; e=${e//'%'/%25}; e=${e//$'\r'/%0D}; e=${e//$'\n'/%0A}
-            printf '::add-mask::%s\n' "$e"
-            D="VAULT_EOF_${RANDOM}${RANDOM}"
-            { echo "$k<<$D"; printf '%s\n' "$v"; echo "$D"; } >> "$GITHUB_ENV"
-          done
-          unset JSON
-          echo "Loaded CLOUDFLARE_ACCOUNT_ID and R2 access/secret keys from /vault/devops."
-
-      - name: Upload to R2
-        working-directory: ${{ inputs.artifactPath }}
-        # aws s3 sync syncs directories and S3 prefixes.
-        # TECHOPS-1320: migrated off the old S3 origin bucket onto the
-        # liquibase-org-assets R2 bucket, preserving the xml/ns/<namespace>/
-        # key prefix exactly.
-        env:
-          REPO_NAME: ${{ github.event.repository.name }}
-          NAMESPACE: ${{ inputs.nameSpace }}
-          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
-          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
-        run: |
-          # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the
-          # job env; R2 rejects a request carrying a session token, so drop it
-          # (and the legacy alias) before any R2 call (TECHOPS-818 pattern).
-          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
-          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            aws s3 sync "${REPO_NAME}/src/main/resources/www.liquibase.org/xml/ns/${NAMESPACE}/" "s3://liquibase-org-assets/xml/ns/${NAMESPACE}/" --content-type application/octet-stream --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT" --only-show-errors
-
-      - name: Index.htm file upload
-        working-directory: ${{ inputs.artifactPath }}
-        # List all xsd and htm files in repository. Copy index.htm to temporary folder
-        # Add links for all xsd files to index.htm file (except liquibase-${{ inputs.nameSpace }}-latest.xsd and index.htm)
-        # Sync index.htm with R2
-        env:
-          REPO_NAME: ${{ github.event.repository.name }}
-          NAMESPACE: ${{ inputs.nameSpace }}
-          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
-          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
-        run: |
-          search_dir="${REPO_NAME}/src/main/resources/www.liquibase.org/xml/ns/${NAMESPACE}"
-          filenames=`ls -1 "$search_dir"`
-          mkdir index-file
-          cp "$search_dir/index.htm" index-file/
-          for entry in $filenames
-          do
-            if [[ "$entry" != "${REPO_NAME}-latest.xsd" ]] && [[ "$entry" != "index.htm" ]] ;then
-              sed -ie "s/<\/ul>/  <li><a href=\"\/xml\/ns\/${NAMESPACE}\/${entry}\">${entry}<\/a><\/li>\n<\/ul>/" index-file/index.htm
-            fi
-          done
-
-          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
-          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            aws s3 sync index-file "s3://liquibase-org-assets/xml/ns/${NAMESPACE}/" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT" --only-show-errors
-          

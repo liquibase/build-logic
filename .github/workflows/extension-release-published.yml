@@ -1,14 +1,8 @@
-# TECHOPS-1320: the deploy_xsd job (which used to sync inputs.nameSpace's XSDs to
-# s3://liquibaseorg-origin/xml/ns/<nameSpace>/) was deleted as a vestigial write:
-# nothing read it. build-logic has never had a WP Engine mirror step for extension
-# namespaces (unlike liquibase-pro's own publish-to-s3.yml, which SFTP-mirrors the
-# "pro" namespace on every release). Live checks (2026-09-21) show most extension
-# namespaces 404 on www.liquibase.org/xml/ns/<namespace>/, and the few that do
-# resolve (mongodb, neo4j, databricks) are all frozen at the same Dec 2024
-# last-modified date, i.e. a one-time historical import, not a live sync. Same
-# reasoning/precedent as liquibase-pro#4982, which deleted the analogous vestigial
-# S3 write for the "pro" namespace. `nameSpace` is kept as an input (unused) so
-# existing callers that still pass it are not broken.
+# TECHOPS-1320: deploy_xsd (synced inputs.nameSpace's XSDs to S3) was deleted
+# rather than repointed to R2, because nothing read that path: build-logic has
+# no WP Engine mirror step for extension namespaces, unlike liquibase-pro's own
+# publish-to-s3.yml for the "pro" namespace. See the PR for the evidence.
+# `nameSpace` stays as an unused input so existing callers are not broken.
 name: Release Extension to Sonatype
 
 on:

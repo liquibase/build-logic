@@ -102,11 +102,20 @@ jobs:
           set -euo pipefail
           JSON=$(aws secretsmanager get-secret-value --secret-id /vault/devops --region us-east-1 --query SecretString --output text)
           for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY; do
-            v=$(printf '%s' "$JSON" | jq -r --arg k "$k" '.[$k] // ""')
-            if [ -z "$v" ] || [ "$v" = "null" ]; then echo "::error::$k missing from /vault/devops"; exit 1; fi
-            echo "::add-mask::$v"
-            echo "$k=$v" >> "$GITHUB_ENV"
+            # jq -j plus a sentinel: command substitution strips ALL trailing newlines,
+            # which would silently alter a value that legitimately ends in one.
+            v=$(printf '%s' "$JSON" | jq -j --arg k "$k" '.[$k] // ""'; printf 'X')
+            v=${v%X}
+            if [ -z "$v" ]; then echo "::error::$k missing from /vault/devops"; exit 1; fi
+            # The runner unescapes %0D, %0A and %25 in command data, so a value carrying
+            # those literals registers a mask that never matches it; % is escaped first
+            # so the escapes the next two produce are not escaped again.
+            e=$v; e=${e//'%'/%25}; e=${e//$'\r'/%0D}; e=${e//$'\n'/%0A}
+            printf '::add-mask::%s\n' "$e"
+            D="VAULT_EOF_${RANDOM}${RANDOM}"
+            { echo "$k<<$D"; printf '%s\n' "$v"; echo "$D"; } >> "$GITHUB_ENV"
           done
+          unset JSON
           echo "Loaded CLOUDFLARE_ACCOUNT_ID and R2 access/secret keys from /vault/devops."
 
       - name: Upload 3rd Party report to R2
@@ -115,8 +124,18 @@ jobs:
           R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          CSV_FILENAME: ${{ steps.get_repo_name.outputs.repo_name }}.csv
         run: |
-          csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
+          # CodeQL flagged interpolating ${{ env.VERSION_NUMBER }} straight into this
+          # script: that substitutes the raw value into the script text before the
+          # shell parses it, so a value containing shell metacharacters would run as
+          # code. VERSION_NUMBER is already exported at job level (line 19), so it is
+          # read here as an ordinary shell variable instead. Reject anything that does
+          # not look like a version before it reaches the S3 key.
+          if ! [[ "$VERSION_NUMBER" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::VERSION_NUMBER '$VERSION_NUMBER' contains unexpected characters"
+            exit 1
+          fi
           # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
           # env; R2 rejects a request carrying a session token, so drop it (and the
           # legacy alias) before every R2 S3-API call (same fix as analytics-config#33).
@@ -124,7 +143,7 @@ jobs:
           # --checksum-algorithm CRC32: newer aws-cli defaults to a CRC64NVME checksum
           # that R2 rejects.
           AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-            aws s3 cp $csv_filename s3://liquibase-org-assets/enterprise_fossa_report/${{ env.VERSION_NUMBER }}/raw_reports/ --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+            aws s3 cp "$CSV_FILENAME" "s3://liquibase-org-assets/enterprise_fossa_report/${VERSION_NUMBER}/raw_reports/" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
 
       - name: Set CSV filename
         id: set_csv_filename

@@ -78,6 +78,7 @@ Many workflows use AWS Secrets Manager via OIDC:
 - Role: `LIQUIBASE_VAULT_OIDC_ROLE_ARN`
 - Region: `us-east-1`
 - Secret path: `/vault/liquibase`
+- Sonatype publishing credentials: see the required-secrets list in README.md
 
 ## Version Management
 

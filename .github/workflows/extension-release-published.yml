@@ -1,10 +1,15 @@
+# TECHOPS-1320: deploy_xsd (synced inputs.nameSpace's XSDs to S3) was deleted
+# rather than repointed to R2, because nothing read that path: build-logic has
+# no WP Engine mirror step for extension namespaces, unlike liquibase-pro's own
+# publish-to-s3.yml for the "pro" namespace. See the PR for the evidence.
+# `nameSpace` stays as an unused input so existing callers are not broken.
 name: Release Extension to Sonatype
 
 on:
   workflow_call:
     inputs:
       nameSpace:
-        description: "xsd namespace"
+        description: "xsd namespace (unused as of TECHOPS-1320, see header comment; kept for caller compatibility)"
         required: false
         default: ""
         type: string
@@ -296,67 +301,3 @@ jobs:
             echo "ERROR: No JAR files matching pattern '$jar_pattern' were found"
             exit 1
           fi
-
-  deploy_xsd:
-    if: inputs.nameSpace != '' && inputs.deployToMavenCentral == true && inputs.dry_run == false
-    name: Upload xsds
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Download xsd files
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          # Relative path under $GITHUB_WORKSPACE to place the repository
-          path: ${{ github.event.repository.name }}
-          repository: "liquibase/${{ github.event.repository.name }}"
-
-      - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
-        with:
-          secret-ids: |
-            ,/vault/liquibase
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
-          aws-region: us-east-1
-
-      - name: Upload to s3
-        working-directory: ${{ inputs.artifactPath }}
-        # aws s3 sync syncs directories and S3 prefixes.
-        env:
-          REPO_NAME: ${{ github.event.repository.name }}
-          NAMESPACE: ${{ inputs.nameSpace }}
-        run: |
-          aws s3 sync "${REPO_NAME}/src/main/resources/www.liquibase.org/xml/ns/${NAMESPACE}/" "s3://liquibaseorg-origin/xml/ns/${NAMESPACE}/" --content-type application/octet-stream --only-show-errors
-
-      - name: Index.htm file upload
-        working-directory: ${{ inputs.artifactPath }}
-        # List all xsd and htm files in repository. Copy index.htm to temporary folder
-        # Add links for all xsd files to index.htm file (except liquibase-${{ inputs.nameSpace }}-latest.xsd and index.htm)
-        # Sync index.htm with the s3
-        env:
-          REPO_NAME: ${{ github.event.repository.name }}
-          NAMESPACE: ${{ inputs.nameSpace }}
-        run: |
-          search_dir="${REPO_NAME}/src/main/resources/www.liquibase.org/xml/ns/${NAMESPACE}"
-          filenames=`ls -1 "$search_dir"`
-          mkdir index-file
-          cp "$search_dir/index.htm" index-file/
-          for entry in $filenames
-          do
-            if [[ "$entry" != "${REPO_NAME}-latest.xsd" ]] && [[ "$entry" != "index.htm" ]] ;then
-              sed -ie "s/<\/ul>/  <li><a href=\"\/xml\/ns\/${NAMESPACE}\/${entry}\">${entry}<\/a><\/li>\n<\/ul>/" index-file/index.htm
-            fi
-          done
-
-          aws s3 sync index-file "s3://liquibaseorg-origin/xml/ns/${NAMESPACE}/" --only-show-errors
-          

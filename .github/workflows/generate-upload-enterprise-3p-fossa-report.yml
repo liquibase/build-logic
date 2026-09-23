@@ -88,13 +88,26 @@ jobs:
           @csv
           ' fossa.json >> $csv_filename
 
+      # Push runs of the calling repos pass an empty version: only a dispatch from
+      # trigger-enterprise-fossa-third-party-license-report.yml carries one. Those
+      # runs still scan, and still publish the report to the build page below, but
+      # must not touch R2. Before this guard they uploaded to
+      # enterprise_fossa_report//raw_reports/<repo>.csv (note the empty version
+      # segment), which is where every "//" key in the bucket came from. After the
+      # version check further down was added, the same runs failed instead.
+      - name: Skip R2 upload (no report version)
+        if: inputs.version_number_for_3p_fossa_report_generation == ''
+        run: echo "::notice::No version_number_for_3p_fossa_report_generation (push run), so the report is not uploaded to R2. It is still attached to this run as the fossa-reports artifact."
+
       - name: Configure AWS credentials for devops vault access
+        if: inputs.version_number_for_3p_fossa_report_generation != ''
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ secrets.DEVOPS_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Load Cloudflare R2 credentials from devops vault
+        if: inputs.version_number_for_3p_fossa_report_generation != ''
         # Pulls only the keys this job needs from /vault/devops and masks them
         # (least privilege), rather than bulk-importing the vault.
         run: |
@@ -117,7 +130,7 @@ jobs:
           echo "Loaded CLOUDFLARE_ACCOUNT_ID and R2 access/secret keys from /vault/devops."
 
       - name: Upload 3rd Party report to R2
-        if: always()
+        if: always() && inputs.version_number_for_3p_fossa_report_generation != ''
         env:
           R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}

@@ -13,6 +13,11 @@ on:
         required: false
         default: "21"
         type: string
+      versionBump:
+        description: "Version component to bump for the next development version after the release: major, minor or patch"
+        required: false
+        default: "minor"
+        type: string
 
 permissions:
   contents: write
@@ -67,10 +72,26 @@ jobs:
 
       - name: Prepare Maven Release
         working-directory: ${{ inputs.artifactPath }}
+        env:
+          VERSION_BUMP: ${{ inputs.versionBump }}
         run: |
+          # The ${parsedVersion.*} placeholders are intentionally left unexpanded (single quotes)
+          # so that Maven resolves them from build-helper:parse-version.
+          # A caller forwarding an unset input sends "" and the callee default does not apply.
+          VERSION_BUMP="${VERSION_BUMP:-minor}"
+          case "$VERSION_BUMP" in
+            major) DEVELOPMENT_VERSION='${parsedVersion.nextMajorVersion}.0.0-SNAPSHOT' ;;
+            minor) DEVELOPMENT_VERSION='${parsedVersion.majorVersion}.${parsedVersion.nextMinorVersion}.0-SNAPSHOT' ;;
+            patch) DEVELOPMENT_VERSION='${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT' ;;
+            *)
+              echo "::error::Invalid versionBump '$VERSION_BUMP': must be one of major, minor, patch"
+              exit 1
+              ;;
+          esac
+          echo "Bumping the $VERSION_BUMP version for the next development version"
           mvn -B build-helper:parse-version release:clean release:prepare \
           -Darguments="-Dmaven.javadoc.skip=true -Dmaven.test.skipTests=true -Dmaven.test.skip=true -Dmaven.deploy.skip=true" \
-          -DdevelopmentVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.0-SNAPSHOT -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.incrementalVersion} \
+          -DdevelopmentVersion="$DEVELOPMENT_VERSION" \
           -DcheckModificationExcludeList=pom.xml -DpushChanges=false -Dtag=temp
 
       - name: Get GitHub App token

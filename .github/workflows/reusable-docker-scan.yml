@@ -36,6 +36,11 @@ on:
         required: false
         type: boolean
         default: false
+      gate_fixable_below_high:
+        description: 'Pass through to reusable-vulnerability-scan.yml: also collect MEDIUM/LOW/UNKNOWN and block on the fixable ones. Default false keeps HIGH/CRITICAL-only. Note the nested scan runs with fail_on_vulnerabilities true, so an opted-in caller fails on an unassessed fixable MEDIUM (TECHOPS-1130).'
+        required: false
+        type: boolean
+        default: false
       scout_enabled:
         description: 'Run Docker Scout job'
         required: false
@@ -147,6 +152,7 @@ jobs:
       vex_enabled: ${{ inputs.vex_enabled }}
       build_logic_ref: ${{ inputs.build_logic_ref }}
       dispatch_new_cves: ${{ inputs.dispatch_new_cves }}
+      gate_fixable_below_high: ${{ inputs.gate_fixable_below_high }}
       nested: true  # suppress the nested scheduled auto-notify; this (outer) scan owns the alert (D4)
     secrets: inherit
 

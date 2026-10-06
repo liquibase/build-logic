@@ -25,7 +25,7 @@ name: "Jira: Bounce ticket to Development"
 # ---
 
 # Required org-level setup:
-#   /vault/grouped/docs-agent-jira (TECHOPS-1296) must contain
+#   /vault/liquibase must contain
 #       DOCS_AGENT_JIRA_USER       - Jira account email
 #       DOCS_AGENT_JIRA_API_TOKEN  - token from id.atlassian.com
 #   These are the `liquibot` bot account (TECHOPS-1009).
@@ -88,8 +88,8 @@ on:
         type: string
         default: "https://datical.atlassian.net"
     secrets:
-      VAULT_AWS_ACCOUNT_ID:
-        description: "AWS account that holds the vault; the job assumes vault-grouped-docs-agent-jira in it. Declared explicitly so callers need not pass every secret they hold."
+      LIQUIBASE_VAULT_OIDC_ROLE_ARN:
+        description: "OIDC role that can read /vault/liquibase. Declared explicitly so callers need not pass every secret they hold."
         required: true
 
 permissions:
@@ -228,20 +228,24 @@ jobs:
               reason,
             }))));
 
-      - name: Configure AWS credentials for the docs-agent-jira secret
+      - name: Configure AWS credentials for vault access
         if: steps.scan.outputs.has_targets == 'true'
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-docs-agent-jira
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Get the docs-agent-jira secret from vault
+      - name: Load only the Jira credentials
         if: steps.scan.outputs.has_targets == 'true'
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
-        with:
-          secret-ids: |
-            ,/vault/grouped/docs-agent-jira
-          parse-json-secrets: true
+        run: |
+          blob=$(aws secretsmanager get-secret-value \
+            --secret-id /vault/liquibase --query SecretString --output text)
+          for k in DOCS_AGENT_JIRA_USER DOCS_AGENT_JIRA_API_TOKEN; do
+            v=$(jq -er --arg k "$k" '.[$k]' <<<"$blob")
+            echo "::add-mask::$v"
+            echo "$k=$v" >> "$GITHUB_ENV"
+          done
+          unset blob
 
       - name: Comment and bounce linked tickets
         if: steps.scan.outputs.has_targets == 'true'
@@ -269,7 +273,7 @@ jobs:
             const token = process.env.JIRA_TOKEN;
 
             if (!email || !token) {
-              core.setFailed('DOCS_AGENT_JIRA_USER or DOCS_AGENT_JIRA_API_TOKEN not set in /vault/grouped/docs-agent-jira');
+              core.setFailed('DOCS_AGENT_JIRA_USER or DOCS_AGENT_JIRA_API_TOKEN not set in /vault/liquibase');
               return;
             }
 

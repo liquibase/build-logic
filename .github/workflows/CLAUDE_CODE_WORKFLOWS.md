@@ -146,11 +146,11 @@ jobs:
 ### Organization-Level Secrets
 
 These workflows require the following organization-level secret:
-- `VAULT_AWS_ACCOUNT_ID` - AWS account that holds the vault; each workflow assumes its `vault-grouped-anthropic[-N]` role there (TECHOPS-1296)
+- `LIQUIBASE_VAULT_OIDC_ROLE_ARN` - AWS IAM role for accessing Secrets Manager
 
 ### AWS Secrets Manager
 
-The Anthropic API key is read from the grouped secret `/vault/grouped/anthropic`, key `ANTHROPIC_API_KEY`.
+The Anthropic API key must be stored in AWS Secrets Manager at `/vault/liquibase` with the key `ANTHROPIC_API_KEY`.
 
 ## Permissions
 

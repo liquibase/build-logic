@@ -30,5 +30,5 @@ This repository centralizes reusable GitHub Actions that power Liquibase extensi
 - Include a short checklist in the PR description: linters run, downstream repo tested (with link), docs updated. Attach failure screenshots or logs when addressing regressions.
 
 ## Security & Secrets Handling
-- Never hard-code credentials; rely on the grouped AWS Secrets Manager secrets (`/vault/grouped/<group>`, see README.md "Vault secrets") and the GitHub App tokens already wired into composites.
+- Never hard-code credentials; rely on AWS Secrets Manager (`/vault/liquibase`) and the GitHub App tokens already wired into composites.
 - Review permission blocks whenever touching workflows—scope tokens with the minimal `permissions` set and audit any new `id-token` usage.

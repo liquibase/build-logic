@@ -96,16 +96,8 @@ jobs:
             echo "status_message=SDKMAN package v$oss_latest_version is not yet approved." >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout the vault action
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          sparse-checkout: .github/actions/setup-aws-vault
-
-      - name: Get the liquibase-package-deploy-status-webhook secret from vault
+      - name: Setup AWS Vault
         uses: ./.github/actions/setup-aws-vault
-        with:
-          group: liquibase-package-deploy-status-webhook
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Send Slack Notification
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
@@ -200,16 +192,8 @@ jobs:
             echo "status_color=danger" >> $GITHUB_OUTPUT
             echo "status_message=DEB package v$LATEST_VERSION is not yet available in S3" >> $GITHUB_OUTPUT
           fi
-      - name: Checkout the vault action
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          sparse-checkout: .github/actions/setup-aws-vault
-
-      - name: Get the liquibase-package-deploy-status-webhook secret from vault
+      - name: Setup AWS Vault
         uses: ./.github/actions/setup-aws-vault
-        with:
-          group: liquibase-package-deploy-status-webhook
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Send Slack Notification
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
@@ -242,16 +226,8 @@ jobs:
             echo "status_message=RPM package v$LATEST_VERSION is not yet available in S3" >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout the vault action
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          sparse-checkout: .github/actions/setup-aws-vault
-
-      - name: Get the liquibase-package-deploy-status-webhook secret from vault
+      - name: Setup AWS Vault
         uses: ./.github/actions/setup-aws-vault
-        with:
-          group: liquibase-package-deploy-status-webhook
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Send Slack Notification
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3

@@ -59,17 +59,17 @@ jobs:
             ,/vault/grouped/github-app-liquibase
           parse-json-secrets: true
 
-      - name: Configure AWS credentials for the slack-webhook secret
+      - name: Configure AWS credentials for the team-liquibase-secure-slack-webhook secret
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-slack-webhook-8
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-team-liquibase-secure-slack-webhook
           aws-region: us-east-1
 
-      - name: Get the slack-webhook secret from vault
+      - name: Get the team-liquibase-secure-slack-webhook secret from vault
         uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
           secret-ids: |
-            ,/vault/grouped/slack-webhook
+            ,/vault/grouped/team-liquibase-secure-slack-webhook
           parse-json-secrets: true
 
       - name: Get GitHub App token

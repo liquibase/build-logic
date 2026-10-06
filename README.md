@@ -53,6 +53,14 @@ If inputs are not provided, `'[8, 11, 17, 18]'` and `'["ubuntu-latest", "windows
 - **artifactId**: Value from the `artifactId` field in the pom file. i.e. `liquibase`
 - **version**: Value from the `version` field in the pom file. i.e `4.23.1`
 
+## 🔐 Vault secrets
+
+Since TECHOPS-1296 no workflow here reads the `/vault/liquibase` or `/vault/devops` blobs. A job assumes one role per credential it needs and reads only that credential's grouped secret, `/vault/grouped/<group>`.
+
+- The role ARN is composed from the org secret `VAULT_AWS_ACCOUNT_ID`; callers keep `secrets: inherit` and change nothing.
+- Pin `liquibase/build-logic/...@main`. A tag or sha cannot assume the roles.
+- A key read through `env.` must come from a group the job requests, or it resolves to an empty string. Add the group's read when you add a key.
+
 ## 🧩 Composite Action Wrappers
 
 To reduce Dependabot noise and centralize SHA management, this repo provides **composite action wrappers** for high-frequency third-party actions. Instead of every repo pinning SHAs individually, repos reference the wrapper — and SHAs are updated in one place.
@@ -64,7 +72,7 @@ To reduce Dependabot noise and centralize SHA management, this repo provides **c
 | `checkout` | `actions/checkout` | `uses: liquibase/build-logic/.github/actions/checkout@main` |
 | `setup-java` | `actions/setup-java` | `uses: liquibase/build-logic/.github/actions/setup-java@main` |
 | `configure-aws-credentials` | `aws-actions/configure-aws-credentials` | `uses: liquibase/build-logic/.github/actions/configure-aws-credentials@main` |
-| `setup-aws-vault` | AWS credentials + Secrets Manager | `uses: liquibase/build-logic/.github/actions/setup-aws-vault@main` |
+| `setup-aws-vault` | grouped vault role + one `/vault/grouped/<group>` read | `uses: liquibase/build-logic/.github/actions/setup-aws-vault@main` with `group` and `aws-account-id` |
 | `setup-google-credentials` | Google Cloud credentials | `uses: liquibase/build-logic/.github/actions/setup-google-credentials@main` |
 
 ### 🚀 Usage Example
@@ -338,7 +346,7 @@ Swap `Community` for `Secure`, `Platform`, or `MCP Changelog` when adopting in a
 
 ### Auth
 
-Same OIDC pattern as every other `jira-*` workflow in this repo: GitHub OIDC token → assumes org-level role `LIQUIBASE_VAULT_OIDC_ROLE_ARN` → pulls `,/vault/liquibase` from AWS Secrets Manager → sets `JIRA_USER` + `JIRA_API_TOKEN`. Callers just say `secrets: inherit`.
+Same OIDC pattern as every other `jira-*` workflow in this repo: GitHub OIDC token → assumes `vault-grouped-jira-automation[-N]` (ARN composed from the org secret `VAULT_AWS_ACCOUNT_ID`, see [Vault secrets](#-vault-secrets)) → pulls `/vault/grouped/jira-automation` → sets `JIRA_USER` + `JIRA_API_TOKEN`. Callers just say `secrets: inherit`.
 
 ### Convention dependency
 
@@ -1022,7 +1030,7 @@ Each commercial extension repository must:
 
 #### Secrets Required
 
-The following secrets must be available in AWS Secrets Manager (`/vault/liquibase`):
+The following vault keys are read, each from its own grouped secret (`/vault/grouped/github-app-liquibase`, `liquibot-github-pat`, `sonatype`):
 
 - `LIQUIBASE_GITHUB_APP_ID` - GitHub App ID for repository access
 - `LIQUIBASE_GITHUB_APP_PRIVATE_KEY` - GitHub App private key

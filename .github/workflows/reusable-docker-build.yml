@@ -191,18 +191,30 @@ jobs:
       - name: Checkout caller repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - name: Configure AWS credentials for the aws-prod-github-oidc-role-arn-infrastructure secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-aws-prod-github-oidc-role-arn-infrastructure
           aws-region: us-east-1
 
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+      - name: Get the aws-prod-github-oidc-role-arn-infrastructure secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
           secret-ids: |
-            ,/vault/liquibase
+            ,/vault/grouped/aws-prod-github-oidc-role-arn-infrastructure
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the dockerhub secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-dockerhub
+          aws-region: us-east-1
+
+      - name: Get the dockerhub secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/dockerhub
           parse-json-secrets: true
 
       - name: Decode DOCKERHUB_USERNAME
@@ -289,7 +301,7 @@ jobs:
         id: configure-aws-credentials-prod
         # Only the public ECR login uses these, and it is skipped on a dry run.
         if: ${{ !inputs.dry_run }}
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
           aws-region: us-east-1
@@ -562,17 +574,30 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - name: Configure AWS credentials for the docker-slack-webhook-url secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-docker-slack-webhook-url
           aws-region: us-east-1
 
-      - name: Get secrets from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+      - name: Get the docker-slack-webhook-url secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
           secret-ids: |
-            ,/vault/liquibase
+            ,/vault/grouped/docker-slack-webhook-url
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the slack-webhook secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-slack-webhook-5
+          aws-region: us-east-1
+
+      - name: Get the slack-webhook secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/slack-webhook
           parse-json-secrets: true
 
       - name: Resolve Slack webhook
@@ -588,7 +613,7 @@ jobs:
           fi
           WEBHOOK_VALUE="${!WEBHOOK_ENV_VAR}"
           if [ -z "$WEBHOOK_VALUE" ]; then
-            echo "::error::Slack webhook env $WEBHOOK_ENV_VAR resolved empty — check /vault/liquibase contains this key"
+            echo "::error::Slack webhook env $WEBHOOK_ENV_VAR resolved empty — check that the grouped Slack webhook secrets read above hold this key"
             exit 1
           fi
           if ! printf '%s' "$WEBHOOK_VALUE" | grep -qE '^https://hooks\.slack\.com/[A-Za-z0-9/_+-]+$'; then

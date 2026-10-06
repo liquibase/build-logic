@@ -6,7 +6,7 @@ inputs:
     required: false
     default: 'us-east-1'
   vault-secret-id:
-    description: 'Secret holding GOOGLE_CREDENTIALS. A caller on grouped secrets assumes vault-grouped-google-credentials and passes /vault/grouped/google-credentials (TECHOPS-1108).'
+    description: 'Vault secret ID'
     required: false
     default: '/vault/liquibase'
 runs:

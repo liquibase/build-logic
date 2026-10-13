@@ -13,6 +13,8 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  # GitHub OIDC token. claude-code-action exchanges it for the Claude GitHub App token
+  # and, through workload identity federation, for the Claude API token. [TECHOPS-1129]
   id-token: write
   # Required for CI integration tools (mcp__github_ci__*)
   # These allow Claude to check workflow runs, job statuses, and test results
@@ -27,16 +29,17 @@ jobs:
     # this `if:` is the weakest of them, not the security boundary:
     #
     #   1. This `if:`. GitHub evaluates it before a runner exists, so a rejected event
-    #      means no runner, no OIDC, no vault. Earliest and cheapest, but coarse:
+    #      means no runner and no OIDC token. Earliest and cheapest, but coarse:
     #      `author_association` MEMBER is any org member and COLLABORATOR includes read
     #      and triage.
     #   2. `claude-code-action`'s own actor check, which requires write or admin on the
-    #      repo. Finer-grained and the standards-aligned control, so it stays. Its only
-    #      weakness is timing, because it runs once the vault is already in the job
-    #      environment, and that is the gap layer 1 covers.
-    #   3. Scoping the secret. Loading only the keys Claude needs instead of all of
-    #      /vault/liquibase is the larger exposure and outranks gating the trigger. That
-    #      is TECHOPS-1108, not this change.
+    #      repo. Finer-grained and the standards-aligned control, so it stays. It runs
+    #      before the action exchanges the OIDC token for a Claude API token, so a
+    #      rejected actor never holds one.
+    #   3. The credential itself. This job reads no vault secrets: the Claude API token
+    #      is minted per run through workload identity federation and expires in
+    #      minutes, where it used to be a long-lived key loaded with the whole of
+    #      /vault/liquibase. [TECHOPS-1129]
     #
     # It lives here because callers cannot be trusted to add it. On 2026-09-08, 14 repos
     # called this workflow and only liquibase/liquibase carried the gate. Two of the
@@ -78,25 +81,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
-        with:
-          secret-ids: |
-            ,/vault/liquibase
-          parse-json-secrets: true
-
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@64c7a0ef71df67b14cb4471f4d9c8565c61042bf # v1.0.66
+        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
         with:
-          anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+          # Workload identity federation instead of a stored API key: the action exchanges
+          # this job's GitHub OIDC token for a short-lived Claude API token. The federation
+          # rule accepts only the three build-logic Claude workflows at refs/heads/main, and
+          # only when the calling repo belongs to the liquibase or Datical org. These IDs
+          # are not credentials. They are inlined because a reusable workflow resolves
+          # `vars` and `secrets` against the caller, and callers span two orgs. Keep them
+          # identical in claude.yml, claude-code-review.yml and claude-test-review.yml.
+          # Do not add `anthropic_api_key` back, and do not load ANTHROPIC_API_KEY into
+          # the job env: either one silently wins over federation. [TECHOPS-1129]
+          anthropic_organization_id: TODO-TECHOPS-1129-organization-uuid
+          anthropic_federation_rule_id: TODO-TECHOPS-1129-fdrl
+          anthropic_service_account_id: TODO-TECHOPS-1129-svac
           # Enable CI tools by granting actions:read permission to Claude
           # This activates mcp__github_ci__* tools for checking workflow runs and test results
           # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#additional_permissions

@@ -21,7 +21,6 @@ on:
 jobs:
   claude-review:
     uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@main
-    secrets: inherit
 ```
 
 **Bot PR exclusion:** Bot-authored PRs (dependabot, renovate, etc.) are excluded from auto-review by default. The reusable workflow exposes an optional `allowed_bots` input (default: `""`) that is passed through to `claude-code-action`. To allow specific bots, pass `allowed_bots` from the caller workflow:
@@ -30,7 +29,6 @@ jobs:
 jobs:
   claude-review:
     uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@main
-    secrets: inherit
     with:
       allowed_bots: 'dependabot[bot]'
 ```
@@ -43,7 +41,6 @@ Humans can still `@claude` on any bot PR via the `claude.yml` mention workflow i
 jobs:
   claude-review:
     uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@main
-    secrets: inherit
     with:
       model: 'claude-sonnet-4-6'
 ```
@@ -102,7 +99,6 @@ jobs:
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     uses: liquibase/build-logic/.github/workflows/claude.yml@main
-    secrets: inherit
 ```
 
 **Model selection:** Defaults to `claude-sonnet-4-6` since interactive tasks require stronger reasoning. Override with the `model` input if needed.
@@ -130,7 +126,6 @@ on:
 jobs:
   claude-test-review:
     uses: liquibase/build-logic/.github/workflows/claude-test-review.yml@main
-    secrets: inherit
 ```
 
 **Model selection:** By default uses `claude-haiku-4-5`. Override with `model` input to use Sonnet for complex test suites.
@@ -143,23 +138,48 @@ jobs:
 
 ## Requirements
 
-### Organization-Level Secrets
+### Authentication: workload identity federation
 
-These workflows require the following organization-level secret:
-- `LIQUIBASE_VAULT_OIDC_ROLE_ARN` - AWS IAM role for accessing Secrets Manager
+The workflows authenticate to the Claude API with [workload identity federation](https://platform.claude.com/docs/en/manage-claude/wif-providers/github-actions), not a stored API key. `claude-code-action` exchanges the job's GitHub OIDC token for a short-lived Claude API token. Nothing is read from AWS Secrets Manager and the workflows use no secrets, so `secrets: inherit` is not needed (existing callers that pass it are unaffected).
 
-### AWS Secrets Manager
+The federation rule in the Claude Console (**Settings → Workload identity**) accepts a token only when both of these hold:
 
-The Anthropic API key must be stored in AWS Secrets Manager at `/vault/liquibase` with the key `ANTHROPIC_API_KEY`.
+- `job_workflow_ref` is one of the three workflows in this directory at `refs/heads/main`.
+- `repository_owner_id` is the `liquibase` org (`438548`) or the `Datical` org (`1992825`). build-logic is public, so any repository on GitHub can call these workflows; this claim is what limits the rule to our callers. The numeric ID is used because it survives an org rename.
+
+A caller that pins a branch, tag or SHA instead of `@main` gets `401 Authentication failed` until that ref is added to the rule. The reason for any denied exchange is on the Console's authentication history page.
+
+### Testing changes to these workflows
+
+Because the rule accepts only `refs/heads/main`, a caller pointed at a feature branch gets `401` until the branch is allowed:
+
+1. In the Console, add the three workflows at `@refs/heads/<your-branch>` to the `job_workflow_ref` list in the rule's condition.
+2. In a caller repo, open a test PR that points the caller at your branch (`uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@<your-branch>`), and link the runs from your build-logic PR.
+3. Remove the branch refs from the rule once your PR merges.
+
+`claude-code-review.yml` and `claude-test-review.yml` run on the test PR itself. For `claude.yml`, mention `@claude` in a **review comment** on the test PR: `pull_request_review` and `pull_request_review_comment` run the caller workflow from the PR, whereas a plain PR conversation comment (`issue_comment`) and `issues` events always run it from the caller's default branch.
 
 ## Permissions
 
 All three workflows require the following permissions:
 - `contents: read` - Read repository code
 - `pull-requests: write` - Comment on PRs
-- `issues: write` - Comment on issues (claude.yml only)
-- `id-token: write` - AWS OIDC authentication
-- `actions: read` - Read CI/CD results (claude.yml only)
+- `issues: write` - Comment on issues, and collapse a review workflow's own stale comments
+- `id-token: write` - GitHub OIDC token, exchanged for the Claude GitHub App token and, through workload identity federation, for the Claude API token
+- `actions: read`, `checks: read`, `statuses: read` - Read CI/CD results for the `mcp__github_ci__*` tools
+
+A called workflow cannot raise the permissions its caller passes down, so a caller with its own `permissions:` block must grant all of these, `id-token: write` included, or the run fails at startup:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+  checks: read
+  statuses: read
+```
 
 ## Configuration
 

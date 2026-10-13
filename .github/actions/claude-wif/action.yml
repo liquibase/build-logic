@@ -13,9 +13,11 @@ description: >-
 #     every SDK, even when set to an empty string, so this step fails if one is present.
 #   - Run `claude` processes one at a time. Each GitHub OIDC token can be exchanged only
 #     once, and two processes that both miss the shared token cache would present the same one.
-#   - The workflow file must be listed in the federation rule, which accepts only
-#     `refs/heads/main` of named workflows in liquibase org repos. Anything else gets
-#     `401 Authentication failed`; the Claude Console's authentication history shows why.
+#   - The workflow file and the ref it runs from must be listed in the federation rule.
+#     The rule names each workflow in liquibase org repos with its ref, `refs/heads/main`
+#     for almost all of them. Anything else gets `401 Authentication failed`; the Claude
+#     Console's authentication history shows why. The workflow runs whatever is on that
+#     ref, so a listed ref should be one that only reviewed changes can reach.
 #
 # Everything is written under $RUNNER_TEMP/claude-wif. That directory holds the identity
 # token and, once a process has exchanged it, the cached Claude API token. An agent that

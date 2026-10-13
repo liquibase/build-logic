@@ -66,7 +66,7 @@ To reduce Dependabot noise and centralize SHA management, this repo provides **c
 | `configure-aws-credentials` | `aws-actions/configure-aws-credentials` | `uses: liquibase/build-logic/.github/actions/configure-aws-credentials@main` |
 | `setup-aws-vault` | AWS credentials + Secrets Manager | `uses: liquibase/build-logic/.github/actions/setup-aws-vault@main` |
 | `setup-google-credentials` | Google Cloud credentials | `uses: liquibase/build-logic/.github/actions/setup-google-credentials@main` |
-| `claude-wif` | Claude API auth through workload identity federation, for jobs that run `claude` or an Anthropic SDK directly (no API key). See the requirements at the top of its `action.yml` | `uses: liquibase/build-logic/.github/actions/claude-wif@main` |
+| `claude-wif` | Claude API auth through workload identity federation, for jobs that run `claude` or an Anthropic SDK directly (no API key). See the requirements at the top of its `action.yml` | `uses: liquibase/build-logic/.github/actions/claude-wif@<commit-sha> # main` (liquibase org repos must pin actions to a full commit SHA) |
 
 ### 🚀 Usage Example
 

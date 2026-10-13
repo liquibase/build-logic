@@ -1,0 +1,152 @@
+name: 'Claude API auth (workload identity federation)'
+description: >-
+  Lets the Claude Code CLI and the Anthropic SDKs in this job reach the Claude API with
+  short-lived tokens minted from the job's GitHub OIDC token, instead of a stored API key.
+  For jobs that run `claude` or an SDK themselves. Jobs that use
+  anthropics/claude-code-action pass its anthropic_federation_rule_id,
+  anthropic_organization_id and anthropic_service_account_id inputs instead. [TECHOPS-1129]
+
+# Requirements on the calling job:
+#   - `permissions: id-token: write`. Pull requests from forks never get an OIDC token.
+#   - Run this after any vault step and before the first Claude call. ANTHROPIC_API_KEY,
+#     ANTHROPIC_AUTH_TOKEN and CLAUDE_CODE_OAUTH_TOKEN outrank federation in Claude Code and
+#     every SDK, even when set to an empty string, so this step fails if one is present.
+#   - Run `claude` processes one at a time. Each GitHub OIDC token can be exchanged only
+#     once, and two processes that both miss the shared token cache would present the same one.
+#   - The workflow file must be listed in the federation rule, which accepts only
+#     `refs/heads/main` of named workflows in liquibase org repos. Anything else gets
+#     `401 Authentication failed`; the Claude Console's authentication history shows why.
+#
+# Everything is written under $RUNNER_TEMP/claude-wif. That directory holds the identity
+# token and, once a process has exchanged it, the cached Claude API token. An agent that
+# reads untrusted input should be denied Read on the runner's temp directory. Only the
+# first identity token is masked in logs: the background refresh cannot issue workflow
+# commands, so no step should print the token file. An unused identity token can be
+# exchanged by whoever holds it until it expires, about five minutes after issue.
+
+inputs:
+  federation-rule-id:
+    description: 'Federation rule (fdrl_...). Defaults to the rule for workflows in liquibase org repos.'
+    required: false
+    default: 'TODO-TECHOPS-1129-fdrl-repo-workflows'
+  organization-id:
+    description: 'Anthropic organization UUID.'
+    required: false
+    default: 'TODO-TECHOPS-1129-organization-uuid'
+  service-account-id:
+    description: 'Service account (svac_...) the minted token acts as.'
+    required: false
+    default: 'TODO-TECHOPS-1129-svac'
+  audience:
+    description: 'Audience requested on the GitHub OIDC token. Must match the rule.'
+    required: false
+    default: 'https://api.anthropic.com'
+
+outputs:
+  config-dir:
+    description: 'Directory holding the federation profile, the identity token and the token cache.'
+    value: ${{ steps.setup.outputs.config-dir }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Claude API workload identity federation
+      id: setup
+      shell: bash
+      env:
+        RULE_ID: ${{ inputs.federation-rule-id }}
+        ORG_ID: ${{ inputs.organization-id }}
+        SA_ID: ${{ inputs.service-account-id }}
+        AUDIENCE: ${{ inputs.audience }}
+      run: |
+        set -euo pipefail
+
+        # The defaults stay placeholders until the Claude Console resources exist. Fail
+        # here with the reason rather than at the first Claude call with an opaque 401.
+        for var in RULE_ID ORG_ID SA_ID; do
+          if [[ "${!var}" == TODO-* ]]; then
+            echo "::error title=Claude WIF::$var is still the placeholder '${!var}'. Set the real ID from the Claude Console (Settings > Workload identity)."
+            exit 1
+          fi
+        done
+
+        # `+x` catches a variable that is set but empty: it still wins its precedence slot.
+        for var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN; do
+          if [ -n "${!var+x}" ]; then
+            echo "::error title=Claude WIF::$var is set in the job environment. It outranks workload identity federation, so the job would run on it instead. Remove it, including from any vault read."
+            exit 1
+          fi
+        done
+
+        if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+          echo "::error title=Claude WIF::No GitHub OIDC token is available. Grant the job 'id-token: write'. Pull requests from forks never get one."
+          exit 1
+        fi
+
+        dir="$RUNNER_TEMP/claude-wif"
+        token_file="$dir/identity-token"
+        mkdir -p "$dir/configs"
+        chmod 700 "$dir"
+
+        # Write through a temp file and a rename so a reader never sees a half-written token.
+        cat > "$dir/fetch-identity-token.sh" <<'SH'
+        #!/usr/bin/env bash
+        set -euo pipefail
+        tmp="$(mktemp "$CLAUDE_WIF_DIR/.identity-token.XXXXXX")"
+        trap 'rm -f "$tmp"' EXIT
+        curl -fsS --retry 3 --retry-all-errors --max-time 30 \
+          -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$CLAUDE_WIF_AUDIENCE" \
+          | jq -er .value > "$tmp"
+        chmod 600 "$tmp"
+        mv -f "$tmp" "$CLAUDE_WIF_DIR/identity-token"
+        SH
+        chmod 700 "$dir/fetch-identity-token.sh"
+
+        export CLAUDE_WIF_DIR="$dir" CLAUDE_WIF_AUDIENCE="$AUDIENCE"
+        "$dir/fetch-identity-token.sh"
+        echo "::add-mask::$(cat "$token_file")"
+
+        # A profile, rather than the bare federation variables, turns on the SDK's on-disk
+        # token cache, so every `claude` process in the job shares one exchanged token
+        # instead of each re-presenting the single-use identity token.
+        jq -n \
+          --arg rule "$RULE_ID" \
+          --arg sa "$SA_ID" \
+          --arg org "$ORG_ID" \
+          --arg path "$token_file" \
+          '{
+            version: "1.0",
+            authentication: {
+              type: "oidc_federation",
+              federation_rule_id: $rule,
+              service_account_id: $sa,
+              identity_token: {source: "file", path: $path}
+            },
+            organization_id: $org
+          }' > "$dir/configs/default.json"
+        chmod 600 "$dir/configs/default.json"
+
+        # A GitHub OIDC token expires about five minutes after issue, and the Claude token
+        # minted from it lives at most twice the identity token's remaining life. Claude Code
+        # and the SDKs re-read the token file on every refresh, so keep a fresh, unused token
+        # there for the rest of the job. Every 60 seconds keeps the file at least four
+        # minutes from expiry, which keeps each minted token's lifetime well above the SDKs'
+        # two-minute refresh margin. The runner kills this loop when the job ends.
+        # All three standard streams are redirected so the loop holds none of the step's
+        # pipes open, which would otherwise keep the step from finishing.
+        nohup bash -c 'while sleep 60; do "$CLAUDE_WIF_DIR/fetch-identity-token.sh" || echo "identity token refresh failed" >&2; done' \
+          < /dev/null > "$dir/refresh.log" 2>&1 &
+
+        # The bare federation variables are exported too, for SDK versions that read the
+        # environment but not profiles. With ANTHROPIC_PROFILE set, the profile wins.
+        {
+          echo "ANTHROPIC_CONFIG_DIR=$dir"
+          echo "ANTHROPIC_PROFILE=default"
+          echo "ANTHROPIC_FEDERATION_RULE_ID=$RULE_ID"
+          echo "ANTHROPIC_ORGANIZATION_ID=$ORG_ID"
+          echo "ANTHROPIC_SERVICE_ACCOUNT_ID=$SA_ID"
+          echo "ANTHROPIC_IDENTITY_TOKEN_FILE=$token_file"
+        } >> "$GITHUB_ENV"
+        echo "config-dir=$dir" >> "$GITHUB_OUTPUT"
+        echo "Workload identity federation configured (rule: $RULE_ID, profile: $dir/configs/default.json)"

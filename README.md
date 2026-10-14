@@ -481,6 +481,17 @@ The PR creation is handled by the `extension-release-prepare.yml` workflow:
     delete-branch: true
 ```
 
+By default the minor version is bumped (e.g. `1.1.1-SNAPSHOT` → `1.2.0-SNAPSHOT`). Extensions can choose a different component via the `versionBump` input (`major`, `minor` or `patch`) of `extension-release-published.yml` (also available on `pom-release-published.yml`):
+
+```yml
+jobs:
+  release:
+    uses: liquibase/build-logic/.github/workflows/extension-release-published.yml@main
+    secrets: inherit
+    with:
+      versionBump: patch # 1.1.1-SNAPSHOT → 1.1.2-SNAPSHOT
+```
+
 These version bump PRs are automatically merged through a nightly scheduled workflow (`auto_merge_release_prs.yml`) in the `liquibase-infrastructure` repository. This workflow:
 
 1. Runs on a daily schedule (midnight UTC) or can be triggered manually

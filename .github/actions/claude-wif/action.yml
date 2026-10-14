@@ -18,6 +18,8 @@ description: >-
 #     for almost all of them. Anything else gets `401 Authentication failed`; the Claude
 #     Console's authentication history shows why. The workflow runs whatever is on that
 #     ref, so a listed ref should be one that only reviewed changes can reach.
+#   - The rule must be bound to one workspace. The profile names none, so a rule enabled
+#     in more than one workspace fails every exchange with `workspace_id_required`.
 #
 # Everything is written under $RUNNER_TEMP/claude-wif. That directory holds the identity
 # token and, once a process has exchanged it, the cached Claude API token. An agent that

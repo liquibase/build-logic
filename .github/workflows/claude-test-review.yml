@@ -121,6 +121,9 @@ jobs:
             - Do NOT comment on non-test files
             - Focus on tests that would give false confidence or break unnecessarily
 
+          # Denies `Read` under /proc and on the action's token directory; the reasoning
+          # is on claude_args in claude.yml. [TECHOPS-1129]
           claude_args: |
             --allowedTools "Bash(gh pr diff:*),Bash(gh pr comment:*),Read"
+            --disallowedTools "Read(//proc/**),Read(/${{ runner.temp }}/claude-workload-identity/**)"
             --model ${{ inputs.model }}

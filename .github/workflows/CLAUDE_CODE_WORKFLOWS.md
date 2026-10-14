@@ -147,17 +147,20 @@ The federation rule in the Claude Console (**Settings → Workload identity**) a
 - `job_workflow_ref` is one of the three workflows in this directory at `refs/heads/main`.
 - `repository_owner_id` is the `liquibase` org (`438548`) or the `Datical` org (`1992825`). build-logic is public, so any repository on GitHub can call these workflows; this claim is what limits the rule to our callers. The numeric ID is used because it survives an org rename.
 
-A caller that pins a branch, tag or SHA instead of `@main` gets `401 Authentication failed` until that ref is added to the rule. The reason for any denied exchange is on the Console's authentication history page.
+The rule lists only `refs/heads/main`. A caller that pins a branch, tag or SHA instead of `@main` gets `401 Authentication failed`. The reason for any denied exchange is on the Console's authentication history page.
+
+The rule is bound to one workspace: create it with `workspace_id`, not `applies_to_all_workspaces`. The workflows send no workspace ID, so a rule enabled in more than one workspace fails every exchange with `workspace_id_required`.
 
 ### Testing changes to these workflows
 
-Because the rule accepts only `refs/heads/main`, a caller pointed at a feature branch gets `401` until the branch is allowed:
+A caller pointed at a feature branch gets `401` from the production rule. Do not add branch refs to it: anyone who can push that branch name to build-logic can change the workflow on it, and every caller in both orgs that points at it would get a token. Use a separate test rule instead:
 
-1. In the Console, add the three workflows at `@refs/heads/<your-branch>` to the `job_workflow_ref` list in the rule's condition.
-2. In a caller repo, open a test PR that points the caller at your branch (`uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@<your-branch>`), and link the runs from your build-logic PR.
-3. Remove the branch refs from the rule once your PR merges.
+1. In the Console, create a test rule with the same issuer, service account, workspace, scope and lifetime as the production rule. Its condition lists the three workflows at `@refs/heads/<your-branch>` and pins the test caller repos, for example `claims.repository in ['liquibase/<test-repo>', 'Datical/<test-repo>']`.
+2. On your branch, set `anthropic_federation_rule_id` in the three workflows to the test rule's ID.
+3. In each test caller repo, point the callers at your branch (`uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@<your-branch>`) on its default branch, then open a test PR that changes no workflow file. `claude-code-action` skips any PR that changes a workflow file, before it reaches the token exchange. Link the runs from your build-logic PR.
+4. Before merging, put the production rule's ID back in the three workflows and archive the test rule. A merge that still names the test rule fails every caller, because the test rule accepts only your branch.
 
-`claude-code-review.yml` and `claude-test-review.yml` run on the test PR itself. For `claude.yml`, mention `@claude` in a **review comment** on the test PR: `pull_request_review` and `pull_request_review_comment` run the caller workflow from the PR, whereas a plain PR conversation comment (`issue_comment`) and `issues` events always run it from the caller's default branch.
+`claude-code-review.yml` and `claude-test-review.yml` run on the test PR itself. For `claude.yml`, mention `@claude` in a comment on the test PR. Because the callers point at your branch on the test repo's default branch, review comments, conversation comments and issues all reach it.
 
 ## Permissions
 

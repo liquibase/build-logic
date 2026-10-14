@@ -256,8 +256,11 @@ jobs:
 
             Use the repository's CLAUDE.md as the authoritative source for conventions.
 
+          # Denies `Read` under /proc and on the action's token directory; the reasoning
+          # is on claude_args in claude.yml. [TECHOPS-1129]
           claude_args: |
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
+            --disallowedTools "Read(//proc/**),Read(/${{ runner.temp }}/claude-workload-identity/**)"
             --model ${{ inputs.model }}
 
       # Runs only when the review above succeeded, so a failed run leaves the

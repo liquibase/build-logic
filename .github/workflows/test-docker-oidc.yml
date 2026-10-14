@@ -1,0 +1,128 @@
+# TEMPORARY (TECHOPS-1015): proves Docker Hub OIDC login from a reusable workflow. Delete after rollout.
+name: TEMP Test Docker OIDC login
+
+on:
+  workflow_call:
+    inputs:
+      test_repo:
+        description: "Docker Hub repo for the test push, e.g. <org>/oidc-test (scratch repo, not a real image)"
+        type: string
+        default: ""
+      push_test_image:
+        description: "Push busybox to test_repo to prove write access"
+        type: boolean
+        default: false
+      sleep_seconds:
+        description: "Wait between login and push to measure how long the token lives"
+        type: number
+        default: 0
+      expire_seconds:
+        description: "OIDC access token lifetime in seconds (production uses 3600; login-action default 300, allowed 300-21600)"
+        type: number
+        default: 3600
+      try_description_update:
+        description: "PATCH test_repo's short description with the OIDC token (does the Hub API accept it?)"
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  docker-oidc-login:
+    name: Docker Hub OIDC login
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # Runs before any Docker setting is needed, so it works with no connection yet.
+      # The sub shown here is what the Docker ruleset has to match.
+      - name: Show OIDC token claims
+        run: |
+          set -euo pipefail
+          token=$(curl -sSf -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=docker-oidc-test" | jq -r .value)
+          echo "::add-mask::${token}"
+          jq -R 'split(".")[1] | gsub("-";"+") | gsub("_";"/") | @base64d | fromjson
+            | {sub, job_workflow_ref, ref, repository, event_name, environment}' <<<"${token}"
+
+      - name: Configure AWS credentials for the dockerhub secret
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-dockerhub
+          aws-region: us-east-1
+
+      - name: Get the dockerhub secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+        with:
+          secret-ids: |
+            ,/vault/grouped/dockerhub
+          parse-json-secrets: true
+
+      - name: Check the connection id is real, not the placeholder
+        run: |
+          [ -n "${DOCKERHUB_OIDC_CONNECTIONID:-}" ] || { echo "::error::DOCKERHUB_OIDC_CONNECTIONID is missing from /vault/grouped/dockerhub"; exit 1; }
+          case "${DOCKERHUB_OIDC_CONNECTIONID}" in
+            PLACEHOLDER*) echo "::error::DOCKERHUB_OIDC_CONNECTIONID is still the placeholder"; exit 1 ;;
+          esac
+          echo "connection id present (${#DOCKERHUB_OIDC_CONNECTIONID} chars)"
+
+      - name: Decode DOCKERHUB_USERNAME
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
+        run: |
+          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d | tr -d '\r\n')
+          [ -n "$decoded_username" ] || { echo "::error::DOCKERHUB_USERNAME decoded to empty"; exit 1; }
+          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
+          echo "Docker org: $decoded_username"
+
+      - name: Login to Docker Hub (OIDC)
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ env.DOCKERHUB_OIDC_CONNECTIONID }}
+          DOCKERHUB_OIDC_EXPIREIN: ${{ inputs.expire_seconds }}
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME_DECODED }}
+
+      - name: Wait before using the token
+        if: ${{ inputs.sleep_seconds > 0 }}
+        env:
+          SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
+        run: sleep "${SLEEP_SECONDS}"
+
+      - name: Push test image
+        if: ${{ inputs.push_test_image && inputs.test_repo != '' }}
+        env:
+          TEST_REPO: ${{ inputs.test_repo }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          tag="${TEST_REPO}:oidc-test-${RUN_ID}"
+          docker pull busybox:1.37
+          docker tag busybox:1.37 "${tag}"
+          docker push "${tag}"
+          echo "Pushed ${tag}"
+
+      # Settles whether README sync can use OIDC: does the Hub management API accept the
+      # login-action access token? Only touches test_repo, and only when asked.
+      - name: Try a description update with the OIDC token
+        if: ${{ inputs.try_description_update && inputs.test_repo != '' }}
+        env:
+          TEST_REPO: ${{ inputs.test_repo }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          auth=$(jq -r '[.auths | to_entries[] | select(.key | test("docker\\.io")) | .value.auth][0] // empty' ~/.docker/config.json)
+          [ -n "${auth}" ] || { echo "::error::no inline Docker Hub credential in ~/.docker/config.json"; exit 1; }
+          token=$(printf '%s' "${auth}" | base64 -d | cut -d: -f2-)
+          echo "::add-mask::${token}"
+          body=$(jq -n --arg d "OIDC description test ${RUN_ID}" '{description: $d}')
+          ok=0
+          for scheme in Bearer JWT; do
+            code=$(curl -sS -o "${RUNNER_TEMP}/resp.json" -w '%{http_code}' -X PATCH \
+              "https://hub.docker.com/v2/repositories/${TEST_REPO}/" \
+              -H "Authorization: ${scheme} ${token}" -H 'Content-Type: application/json' -d "${body}")
+            echo "${scheme}: HTTP ${code}"; head -c 300 "${RUNNER_TEMP}/resp.json"; echo
+            if [ "${code}" = "200" ]; then ok=1; break; fi
+          done
+          [ "${ok}" = "1" ]

@@ -205,6 +205,13 @@ jobs:
             ,/vault/liquibase
           parse-json-secrets: true
 
+      - name: Decode DOCKERHUB_USERNAME
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
+        run: |
+          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d | tr -d '\r\n')
+          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
 
@@ -288,34 +295,11 @@ jobs:
           aws-region: us-east-1
           output-credentials: true
 
-      - name: Configure AWS credentials for the dockerhub secret
-        if: ${{ !inputs.dry_run && inputs.push_dockerhub }}
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-dockerhub
-          aws-region: us-east-1
-
-      - name: Get the dockerhub secret from vault
-        if: ${{ !inputs.dry_run && inputs.push_dockerhub }}
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
-        with:
-          secret-ids: |
-            ,/vault/grouped/dockerhub
-          parse-json-secrets: true
-
-      - name: Decode DOCKERHUB_USERNAME
-        if: ${{ !inputs.dry_run && inputs.push_dockerhub }}
-        env:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
-        run: |
-          decoded_username=$(echo "$DOCKERHUB_USERNAME" | base64 -d | tr -d '\r\n')
-          echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
-
       - name: Login to Docker Hub
-        if: ${{ !inputs.dry_run && inputs.push_dockerhub }}
+        if: ${{ inputs.push_dockerhub }}
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         env:
-          DOCKERHUB_OIDC_CONNECTIONID: ${{ env.DOCKERHUB_OIDC_CONNECTIONID }}
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
           DOCKERHUB_OIDC_EXPIREIN: 3600
         with:
           username: ${{ env.DOCKERHUB_USERNAME_DECODED }}

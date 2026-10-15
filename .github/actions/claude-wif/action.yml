@@ -32,15 +32,15 @@ inputs:
   federation-rule-id:
     description: 'Federation rule (fdrl_...). Defaults to the rule for workflows in liquibase org repos.'
     required: false
-    default: 'TODO-TECHOPS-1129-fdrl-repo-workflows'
+    default: 'fdrl_01Lu2NBwxSCvNpgbq4WUyo8x'
   organization-id:
     description: 'Anthropic organization UUID.'
     required: false
-    default: 'TODO-TECHOPS-1129-organization-uuid'
+    default: 'eead731b-3597-46ca-8e5f-75c5956bb781'
   service-account-id:
     description: 'Service account (svac_...) the minted token acts as.'
     required: false
-    default: 'TODO-TECHOPS-1129-svac'
+    default: 'svac_01AzJbNCHk8R4Na66HtSLxVS'
   audience:
     description: 'Audience requested on the GitHub OIDC token. Must match the rule.'
     required: false
@@ -64,15 +64,6 @@ runs:
         AUDIENCE: ${{ inputs.audience }}
       run: |
         set -euo pipefail
-
-        # The defaults stay placeholders until the Claude Console resources exist. Fail
-        # here with the reason rather than at the first Claude call with an opaque 401.
-        for var in RULE_ID ORG_ID SA_ID; do
-          if [[ "${!var}" == TODO-* ]]; then
-            echo "::error title=Claude WIF::$var is still the placeholder '${!var}'. Set the real ID from the Claude Console (Settings > Workload identity)."
-            exit 1
-          fi
-        done
 
         # `+x` catches a variable that is set but empty: it still wins its precedence slot.
         for var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN; do

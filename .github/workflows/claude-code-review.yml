@@ -19,6 +19,8 @@ permissions:
   pull-requests: write
   # write (not read) so the workflow can collapse its own prior review comments as outdated
   issues: write
+  # GitHub OIDC token. claude-code-action exchanges it for the Claude GitHub App token
+  # and, through workload identity federation, for the Claude API token. [TECHOPS-1129]
   id-token: write
   # Required for CI integration tools (mcp__github_ci__*)
   # These allow Claude to check workflow runs, job statuses, and test results
@@ -39,20 +41,6 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-
-      - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
-        with:
-          secret-ids: |
-            ,/vault/liquibase
-          parse-json-secrets: true
 
       # A review is posted on every push, so a busy PR accumulates a stack of stale
       # reviews. The prior comments are collected here but collapsed only after the
@@ -130,9 +118,15 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@64c7a0ef71df67b14cb4471f4d9c8565c61042bf # v1.0.66
+        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
         with:
-          anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+          # Claude API auth through workload identity federation; the reasoning is on the
+          # same inputs in claude.yml. Keep these IDs identical across the three Claude
+          # workflows, and never set `anthropic_api_key` or load ANTHROPIC_API_KEY into
+          # the job env, which would silently win over federation. [TECHOPS-1129]
+          anthropic_organization_id: eead731b-3597-46ca-8e5f-75c5956bb781
+          anthropic_federation_rule_id: fdrl_019Z4pCgENxpcyqV8Fm76RW4
+          anthropic_service_account_id: svac_01AzJbNCHk8R4Na66HtSLxVS
           allowed_bots: ${{ inputs.allowed_bots }}
           # Enable CI tools by granting actions:read permission to Claude
           # This activates mcp__github_ci__* tools for checking workflow runs and test results
@@ -262,8 +256,11 @@ jobs:
 
             Use the repository's CLAUDE.md as the authoritative source for conventions.
 
+          # Denies `Read` under /proc and on the action's token directory; the reasoning
+          # is on claude_args in claude.yml. [TECHOPS-1129]
           claude_args: |
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
+            --disallowedTools "Read(//proc/**),Read(/${{ runner.temp }}/claude-workload-identity/**)"
             --model ${{ inputs.model }}
 
       # Runs only when the review above succeeded, so a failed run leaves the

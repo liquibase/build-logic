@@ -21,7 +21,6 @@ on:
 jobs:
   claude-review:
     uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@main
-    secrets: inherit
 ```
 
 **Bot PR exclusion:** Bot-authored PRs (dependabot, renovate, etc.) are excluded from auto-review by default. The reusable workflow exposes an optional `allowed_bots` input (default: `""`) that is passed through to `claude-code-action`. To allow specific bots, pass `allowed_bots` from the caller workflow:
@@ -30,7 +29,6 @@ jobs:
 jobs:
   claude-review:
     uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@main
-    secrets: inherit
     with:
       allowed_bots: 'dependabot[bot]'
 ```
@@ -43,7 +41,6 @@ Humans can still `@claude` on any bot PR via the `claude.yml` mention workflow i
 jobs:
   claude-review:
     uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@main
-    secrets: inherit
     with:
       model: 'claude-sonnet-4-6'
 ```
@@ -102,7 +99,6 @@ jobs:
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     uses: liquibase/build-logic/.github/workflows/claude.yml@main
-    secrets: inherit
 ```
 
 **Model selection:** Defaults to `claude-sonnet-4-6` since interactive tasks require stronger reasoning. Override with the `model` input if needed.
@@ -130,7 +126,6 @@ on:
 jobs:
   claude-test-review:
     uses: liquibase/build-logic/.github/workflows/claude-test-review.yml@main
-    secrets: inherit
 ```
 
 **Model selection:** By default uses `claude-haiku-4-5`. Override with `model` input to use Sonnet for complex test suites.
@@ -143,23 +138,51 @@ jobs:
 
 ## Requirements
 
-### Organization-Level Secrets
+### Authentication: workload identity federation
 
-These workflows require the following organization-level secret:
-- `LIQUIBASE_VAULT_OIDC_ROLE_ARN` - AWS IAM role for accessing Secrets Manager
+The workflows authenticate to the Claude API with [workload identity federation](https://platform.claude.com/docs/en/manage-claude/wif-providers/github-actions), not a stored API key. `claude-code-action` exchanges the job's GitHub OIDC token for a short-lived Claude API token. Nothing is read from AWS Secrets Manager and the workflows use no secrets, so `secrets: inherit` is not needed (existing callers that pass it are unaffected).
 
-### AWS Secrets Manager
+The federation rule in the Claude Console (**Settings → Workload identity**) accepts a token only when both of these hold:
 
-The Anthropic API key must be stored in AWS Secrets Manager at `/vault/liquibase` with the key `ANTHROPIC_API_KEY`.
+- `job_workflow_ref` is one of the three workflows in this directory at `refs/heads/main`.
+- `repository_owner_id` is the `liquibase` org (`438548`) or the `Datical` org (`1992825`). build-logic is public, so any repository on GitHub can call these workflows; this claim is what limits the rule to our callers. The numeric ID is used because it survives an org rename.
+
+The rule lists only `refs/heads/main`. A caller that pins a branch, tag or SHA instead of `@main` gets `401 Authentication failed`. The reason for any denied exchange is on the Console's authentication history page.
+
+The rule is bound to one workspace: create it with `workspace_id`, not `applies_to_all_workspaces`. The workflows send no workspace ID, so a rule enabled in more than one workspace fails every exchange with `workspace_id_required`.
+
+### Testing changes to these workflows
+
+A caller pointed at a feature branch gets `401` from the production rule. Do not add branch refs to it: anyone who can push that branch name to build-logic can change the workflow on it, and every caller in both orgs that points at it would get a token. Use a separate test rule instead:
+
+1. In the Console, create a test rule with the same issuer, service account, workspace, scope and lifetime as the production rule. Its condition lists the three workflows at `@refs/heads/<your-branch>` and pins the test caller repos, for example `claims.repository in ['liquibase/<test-repo>', 'Datical/<test-repo>']`.
+2. On your branch, set `anthropic_federation_rule_id` in the three workflows to the test rule's ID.
+3. In each test caller repo, point the callers at your branch (`uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@<your-branch>`) on its default branch, then open a test PR that changes no workflow file. `claude-code-action` skips any PR that changes a workflow file, before it reaches the token exchange. Link the runs from your build-logic PR.
+4. Before merging, put the production rule's ID back in the three workflows and archive the test rule. A merge that still names the test rule fails every caller, because the test rule accepts only your branch.
+
+`claude-code-review.yml` and `claude-test-review.yml` run on the test PR itself. For `claude.yml`, mention `@claude` in a comment on the test PR. Because the callers point at your branch on the test repo's default branch, review comments, conversation comments and issues all reach it.
 
 ## Permissions
 
 All three workflows require the following permissions:
 - `contents: read` - Read repository code
 - `pull-requests: write` - Comment on PRs
-- `issues: write` - Comment on issues (claude.yml only)
-- `id-token: write` - AWS OIDC authentication
-- `actions: read` - Read CI/CD results (claude.yml only)
+- `issues: write` - Comment on issues, and collapse a review workflow's own stale comments
+- `id-token: write` - GitHub OIDC token, exchanged for the Claude GitHub App token and, through workload identity federation, for the Claude API token
+- `actions: read`, `checks: read`, `statuses: read` - Read CI/CD results for the `mcp__github_ci__*` tools
+
+A called workflow cannot raise the permissions its caller passes down, so a caller with its own `permissions:` block must grant all of these, `id-token: write` included, or the run fails at startup:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+  checks: read
+  statuses: read
+```
 
 ## Configuration
 

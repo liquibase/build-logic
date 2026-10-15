@@ -124,9 +124,9 @@ jobs:
           # same inputs in claude.yml. Keep these IDs identical across the three Claude
           # workflows, and never set `anthropic_api_key` or load ANTHROPIC_API_KEY into
           # the job env, which would silently win over federation. [TECHOPS-1129]
-          anthropic_organization_id: TODO-TECHOPS-1129-organization-uuid
-          anthropic_federation_rule_id: TODO-TECHOPS-1129-fdrl
-          anthropic_service_account_id: TODO-TECHOPS-1129-svac
+          anthropic_organization_id: eead731b-3597-46ca-8e5f-75c5956bb781
+          anthropic_federation_rule_id: fdrl_019Z4pCgENxpcyqV8Fm76RW4
+          anthropic_service_account_id: svac_01AzJbNCHk8R4Na66HtSLxVS
           allowed_bots: ${{ inputs.allowed_bots }}
           # Enable CI tools by granting actions:read permission to Claude
           # This activates mcp__github_ci__* tools for checking workflow runs and test results

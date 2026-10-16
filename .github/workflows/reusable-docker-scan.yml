@@ -155,7 +155,8 @@ jobs:
   # ============================================
   scout:
     needs: build-ghcr
-    if: inputs.scout_enabled
+    # PR jobs get no Docker Hub token (TECHOPS-1015)
+    if: inputs.scout_enabled && github.event_name != 'pull_request'
     name: Docker Scout ${{ inputs.image_name }}${{ inputs.suffix }}
     runs-on: ubuntu-22.04
     permissions:
@@ -212,10 +213,12 @@ jobs:
           echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
 
       - name: Login to Docker Hub
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+          DOCKERHUB_OIDC_EXPIREIN: 3600
         with:
           username: ${{ env.DOCKERHUB_USERNAME_DECODED }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
 
       - name: Restore Scout CLI cache
         uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0

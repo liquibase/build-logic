@@ -141,43 +141,100 @@ jobs:
       HOMEBREW_PR_NUMBER: ${{ steps.capture-pr.outputs.HOMEBREW_PR_NUMBER }}
       HOMEBREW_PR_URL: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
     steps:
-      - name: Configure AWS credentials for devops vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - name: Configure AWS credentials for the aws-prod-github-oidc-role-arn-build-logic secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ secrets.DEVOPS_VAULT_OIDC_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-aws-prod-github-oidc-role-arn-build-logic
           aws-region: us-east-1
 
-      - name: Load Cloudflare R2 credentials from devops vault
-        # TECHOPS-818: the R2 S3-API creds live in /vault/devops (single source of
-        # truth, shared with analytics-config); every other secret stays in
-        # /vault/liquibase, read below. Pull ONLY the keys this job needs and mask
-        # them — least privilege, no bulk-import of the DevOps vault into this job.
-        # CLOUDFLARE_CACHE_PURGE_TOKEN (TECHOPS-1114) must be a token scoped to zone
-        # liquibase.com with only the Cache Purge permission — never the admin
-        # CLOUDFLARE_API_TOKEN, which has no business in release CI.
+      - name: Get the aws-prod-github-oidc-role-arn-build-logic secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/aws-prod-github-oidc-role-arn-build-logic
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the cloudflare-api secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-cloudflare-api-2
+          aws-region: us-east-1
+
+      - name: Load only CLOUDFLARE_CACHE_PURGE_TOKEN from the cloudflare-api secret
+        # TECHOPS-1114: the zone-scoped Cache Purge token only; the admin CLOUDFLARE_API_TOKEN in the same group has no business in release CI.
         run: |
           set -euo pipefail
-          JSON=$(aws secretsmanager get-secret-value --secret-id /vault/devops --region us-east-1 --query SecretString --output text)
-          for k in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_R2_ACCESS_KEY_ID CLOUDFLARE_R2_SECRET_ACCESS_KEY CLOUDFLARE_CACHE_PURGE_TOKEN; do
+          JSON=$(aws secretsmanager get-secret-value --secret-id /vault/grouped/cloudflare-api --region us-east-1 --query SecretString --output text)
+          for k in CLOUDFLARE_CACHE_PURGE_TOKEN; do
             v=$(printf '%s' "$JSON" | jq -r --arg k "$k" '.[$k] // ""')
-            if [ -z "$v" ] || [ "$v" = "null" ]; then echo "::error::$k missing from /vault/devops"; exit 1; fi
+            if [ -z "$v" ] || [ "$v" = "null" ]; then echo "::error::$k missing from /vault/grouped/cloudflare-api"; exit 1; fi
             echo "::add-mask::$v"
             echo "$k=$v" >> "$GITHUB_ENV"
           done
-          echo "Loaded CLOUDFLARE_ACCOUNT_ID, R2 access/secret keys and the cache-purge token from /vault/devops."
 
-      - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - name: Configure AWS credentials for the cloudflare-r2 secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-cloudflare-r2-2
           aws-region: us-east-1
 
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+      - name: Get the cloudflare-r2 secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
           secret-ids: |
-            ,/vault/liquibase
+            ,/vault/grouped/cloudflare-r2
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the github-app-liquibase secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-github-app-liquibase-6
+          aws-region: us-east-1
+
+      - name: Get the github-app-liquibase secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/github-app-liquibase
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the gpg-signing secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-gpg-signing-3
+          aws-region: us-east-1
+
+      - name: Get the gpg-signing secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/gpg-signing
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the liquibot-github-pat secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-7
+          aws-region: us-east-1
+
+      - name: Get the liquibot-github-pat secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/liquibot-github-pat
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the sdkman secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-sdkman
+          aws-region: us-east-1
+
+      - name: Get the sdkman secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/sdkman
           parse-json-secrets: true
 
       - name: Get GitHub App token
@@ -281,7 +338,7 @@ jobs:
           passphrase: ${{ env.GPG_PASSPHRASE }}
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
           aws-region: us-east-1
@@ -365,7 +422,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           GPG_PASS: ${{ env.GPG_PASSPHRASE }}
           # TECHOPS-818: R2 S3-API creds (endpoint from CLOUDFLARE_ACCOUNT_ID). These
-          # come from the /vault/liquibase get-secrets step earlier in the job.
+          # come from the cloudflare-r2 vault step earlier in the job.
           R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
@@ -437,7 +494,7 @@ jobs:
             sleep 10
           done
           if [ -z "$purged" ]; then
-            echo "::error::Cloudflare cache purge failed, so the edge may keep serving stale apt metadata against the new InRelease and apt update will break for customers (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            echo "::error::Cloudflare cache purge failed, so the edge may keep serving stale apt metadata against the new InRelease and apt update will break for customers (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-api."
             exit 1
           fi
 
@@ -767,7 +824,7 @@ jobs:
           RPM_FILENAME: ${{ env.RPM_FILENAME }}
           GPG_PASS: ${{ env.GPG_PASSPHRASE }}
           # TECHOPS-818: R2 S3-API creds (endpoint from CLOUDFLARE_ACCOUNT_ID) from
-          # the /vault/liquibase get-secrets step earlier in the job.
+          # the cloudflare-r2 vault step earlier in the job.
           R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
@@ -977,7 +1034,7 @@ jobs:
             sleep 10
           done
           if [ -z "$purged" ]; then
-            echo "::error::Cloudflare cache purge failed, so the edge may keep serving a stale yum index (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            echo "::error::Cloudflare cache purge failed, so the edge may keep serving a stale yum index (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-api."
             exit 1
           fi
 
@@ -1411,7 +1468,7 @@ jobs:
             done
             # Not fatal on its own: the resolvability gate below is the check that matters,
             # and it fails the job if the edge is still wrong.
-            echo "::warning::Cloudflare cache purge failed for $ZIP_FILENAME. Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            echo "::warning::Cloudflare cache purge failed for $ZIP_FILENAME. Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-api."
             return 1
           }
 
@@ -1437,7 +1494,7 @@ jobs:
           done
           rm -f /tmp/sdkman-probe.zip
           if [ -z "$resolved" ]; then
-            echo "::error::$WEB_URL$ZIP_FILENAME does not serve the zip that was just uploaded, so SDKMAN would reject the release with 'URL cannot be resolved' (TECHOPS-1137). Check the R2 upload and CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/devops."
+            echo "::error::$WEB_URL$ZIP_FILENAME does not serve the zip that was just uploaded, so SDKMAN would reject the release with 'URL cannot be resolved' (TECHOPS-1137). Check the R2 upload and CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-api."
             exit 1
           fi
 
@@ -1539,18 +1596,17 @@ jobs:
     needs: [upload_packages]
     if: ${{ inputs.distribution != 'liquibase-secure' && inputs.dry_run == false }}
     steps:
-      - name: Configure AWS credentials for vault access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - name: Configure AWS credentials for the github-app-liquibase secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-github-app-liquibase-6
           aws-region: us-east-1
 
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
+      - name: Get the github-app-liquibase secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
           secret-ids: |
-            ,/vault/liquibase
+            ,/vault/grouped/github-app-liquibase
           parse-json-secrets: true
 
       - name: Get GitHub App token

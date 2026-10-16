@@ -75,9 +75,9 @@ Workflows use specific Maven configurations. Extensions calling these workflows 
 
 ### AWS Vault Integration
 Many workflows use AWS Secrets Manager via OIDC:
-- Role: `LIQUIBASE_VAULT_OIDC_ROLE_ARN`
+- Role: `arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-<group>[-N]`, one per credential (TECHOPS-1296)
 - Region: `us-east-1`
-- Secret path: `/vault/liquibase`
+- Secret path: `/vault/grouped/<group>`; see "Vault secrets" in README.md for which group a workflow may read
 - Sonatype publishing credentials: see the required-secrets list in README.md
 
 ## Version Management

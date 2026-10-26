@@ -61,6 +61,12 @@ usermod -aG docker runner
 echo 'runner ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/90-runner
 chmod 0440 /etc/sudoers.d/90-runner
 
+# Apple Silicon: the CPU flags show SVE, but the JVM can't use it in the VM and prints a warning on every start,
+# which breaks tests that compare a command's output. Hide SVE from the VM.
+if [ "$(uname -m)" = aarch64 ]; then
+  grubby --update-kernel=ALL --args=arm64.nosve
+fi
+
 # FIPS mode from the next boot.
 if [ "$(cat /proc/sys/crypto/fips_enabled)" != 1 ]; then
   fips-mode-setup --enable

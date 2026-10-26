@@ -76,7 +76,6 @@ jobs:
       - name: Testcontainers starts PostgreSQL and a FIPS-mode JVM connects
         env:
           MAVEN_OPTS: -Dcom.redhat.fips=false
-          TESTCONTAINERS_RYUK_DISABLED: "true"
         run: mvn -B -ntp -f fips/selftest/pom.xml verify
 
       - name: Maven itself in FIPS mode (informational)
@@ -111,8 +110,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils >/dev/null
+          .github/actions/fips-vm/apt-install.sh qemu-system-x86 qemu-utils ovmf
           curl -fsSL -o "$RUNNER_TEMP/lima.tar.gz" \
             "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Linux-x86_64.tar.gz"
           echo "$LIMA_SHA256  $RUNNER_TEMP/lima.tar.gz" | sha256sum -c -
@@ -129,4 +127,12 @@ jobs:
           test "$(fips/fips-vm run docker run --rm registry.access.redhat.com/ubi9/ubi-minimal cat /proc/sys/crypto/fips_enabled)" = 1
 
       - name: Testcontainers starts PostgreSQL in the VM
-        run: fips/fips-vm run env TESTCONTAINERS_RYUK_DISABLED=true mvn -B -ntp -f fips/selftest/pom.xml verify
+        run: fips/fips-vm run mvn -B -ntp -f fips/selftest/pom.xml verify
+
+      - name: Lima logs
+        if: failure()
+        run: |
+          for f in ~/.fips-vm/lima/fips/{ha.stderr.log,serial*.log}; do
+            [ -f "$f" ] && { echo "::group::$f"; tail -n 80 "$f"; echo "::endgroup::"; }
+          done
+          true

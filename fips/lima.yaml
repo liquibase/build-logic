@@ -19,7 +19,11 @@ containerd:
   system: false
   user: false
 
-# The VM's Docker socket, for `fips-vm docker-env`.
+# The VM's Docker socket, for `fips-vm docker-env`. Ports the VM listens on, like a database container's,
+# reach the laptop's localhost, except rpcbind's 111, which the laptop already uses.
 portForwards:
   - guestSocket: "/var/run/docker.sock"
     hostSocket: "{{.Dir}}/sock/docker.sock"
+  - guestPort: 111
+    proto: any
+    ignore: true

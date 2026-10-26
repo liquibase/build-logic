@@ -30,22 +30,7 @@ step "Checking the runner"
 [ "$(id -u)" = 1001 ] || echo "::warning::The runner user has uid $(id -u), not 1001. Files created in the VM may get a different owner."
 
 step "Installing QEMU and virtiofsd"
-# Hosted runners carry many third-party apt repos and slow dpkg triggers: read only the Ubuntu archive,
-# and skip man-db and needrestart.
-apt_opts=(-o DPkg::Lock::Timeout=300 -o Acquire::Retries=3)
-if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
-  apt_sources=$(mktemp -d)
-  cp /etc/apt/sources.list.d/ubuntu.sources "$apt_sources/"
-  apt_opts+=(-o Dir::Etc::SourceList=/dev/null -o "Dir::Etc::SourceParts=$apt_sources")
-fi
-sudo rm -f /var/lib/man-db/auto-update
-t=$SECONDS
-sudo apt-get "${apt_opts[@]}" update -qq
-t_update=$((SECONDS - t))
-t=$SECONDS
-sudo NEEDRESTART_SUSPEND=1 DEBIAN_FRONTEND=noninteractive apt-get "${apt_opts[@]}" install -y -qq --no-install-recommends \
-  qemu-system-x86 qemu-utils cloud-image-utils virtiofsd >/dev/null
-echo "    apt-get update ${t_update}s, install $((SECONDS - t))s"
+"$action_dir/apt-install.sh" qemu-system-x86 qemu-utils cloud-image-utils virtiofsd
 virtiofsd_bin=$(command -v virtiofsd || echo /usr/libexec/virtiofsd)
 [ -x "$virtiofsd_bin" ] || fail "virtiofsd is not installed."
 

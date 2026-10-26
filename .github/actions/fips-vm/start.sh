@@ -17,44 +17,45 @@ fail() {
   exit 1
 }
 
+# One visible line per phase. Groups would hide progress in the live log.
+step() { echo "==> $*"; }
+
 # Keep the VM disks off the shared work directory. /mnt is the large scratch disk on GitHub-hosted runners.
 vm_dir=/mnt/fips-vm
 sudo mkdir -p "$vm_dir" && sudo chown "$(id -u):$(id -g)" "$vm_dir"
 
-echo "::group::Check the runner"
+step "Checking the runner"
 [ -e /dev/kvm ] || fail "This runner has no /dev/kvm, so it can't start the FIPS VM. Use a Linux x64 runner with KVM, for example ubuntu-latest or blacksmith-4vcpu-ubuntu-2404."
 [ "$(uname -m)" = x86_64 ] || fail "The FIPS VM needs an x86_64 runner, this one is $(uname -m)."
 [ "$(id -u)" = 1001 ] || echo "::warning::The runner user has uid $(id -u), not 1001. Files created in the VM may get a different owner."
-echo "::endgroup::"
 
-echo "::group::Install QEMU and virtiofsd"
+step "Installing QEMU and virtiofsd"
 sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
   qemu-system-x86 qemu-utils cloud-image-utils virtiofsd >/dev/null
 virtiofsd_bin=$(command -v virtiofsd || echo /usr/libexec/virtiofsd)
 [ -x "$virtiofsd_bin" ] || fail "virtiofsd is not installed."
-echo "::endgroup::"
 
-echo "::group::Get the VM disk"
 if [ -n "$FIPS_VM_IMAGE" ]; then
+  step "Downloading the FIPS VM image $FIPS_VM_IMAGE"
   "$action_dir/install-oras.sh"
   echo "$FIPS_VM_TOKEN" | oras login ghcr.io -u fips-vm --password-stdin >/dev/null
-  oras pull --output "$vm_dir" "$FIPS_VM_IMAGE"
+  oras pull --output "$vm_dir" "$FIPS_VM_IMAGE" >/dev/null
   base="$vm_dir/fips-vm.qcow2"
   image_ref="$FIPS_VM_IMAGE@$(oras resolve "$FIPS_VM_IMAGE")"
 else
+  step "Downloading the AlmaLinux 9 cloud image (no prebuilt image requested)"
   curl -fsSL -o "$vm_dir/$alma_image" "$alma_url/$alma_image"
   (cd "$vm_dir" && curl -fsSL "$alma_url/CHECKSUM" | grep " $alma_image\$" | sha256sum -c -)
   base="$vm_dir/$alma_image"
   image_ref="$alma_url/$alma_image (sha256:$(sha256sum "$base" | cut -d' ' -f1)), provisioned by fips/provision.sh"
 fi
 qemu-img create -q -f qcow2 -b "$base" -F qcow2 "$vm_dir/disk.qcow2" "$FIPS_VM_DISK_SIZE"
-echo "$image_ref"
-echo "::endgroup::"
+echo "    $image_ref"
 
-echo "::group::Write the cloud-init seed"
 rm -f "$vm_dir/key" "$vm_dir/key.pub"
-ssh-keygen -q -t ed25519 -N '' -C fips-vm -f "$vm_dir/key"
+# ECDSA, not Ed25519: OpenSSH on RHEL 9 refuses Ed25519 keys in FIPS mode.
+ssh-keygen -q -t ecdsa -b 384 -N '' -C fips-vm -f "$vm_dir/key"
 uid=$(id -u)
 cat > "$vm_dir/user-data" <<EOF
 #cloud-config
@@ -83,11 +84,10 @@ EOF
 fi
 printf 'instance-id: fips-vm-%s\nlocal-hostname: fips-vm\n' "$(date +%s)$RANDOM" > "$vm_dir/meta-data"
 cloud-localds "$vm_dir/seed.iso" "$vm_dir/user-data" "$vm_dir/meta-data"
-echo "::endgroup::"
 
-echo "::group::Boot the VM"
 cpus=${FIPS_VM_CPUS:-$(nproc)}
 memory_mb=${FIPS_VM_MEMORY_MB:-$(($(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo) * 3 / 4))}
+step "Booting the VM with $cpus CPUs and $memory_mb MB of memory"
 sock="$vm_dir/virtiofs.sock"
 rm -f "$sock"
 nohup sudo "$virtiofsd_bin" --socket-path="$sock" --shared-dir="$share" --cache=auto \
@@ -106,8 +106,6 @@ sudo qemu-system-x86_64 -name fips-vm -machine q35,accel=kvm -cpu host -smp "$cp
   -nic user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:${ssh_port}-:22 \
   -display none -serial file:"$vm_dir/serial.log" -pidfile "$vm_dir/qemu.pid" -daemonize
 qemu_pid=$(sudo cat "$vm_dir/qemu.pid")
-echo "Started with $cpus CPUs and $memory_mb MB of memory (qemu pid $qemu_pid)."
-echo "::endgroup::"
 
 ssh_opts=(-i "$vm_dir/key" -p "$ssh_port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
   -o LogLevel=ERROR -o BatchMode=yes -o ConnectTimeout=5)
@@ -122,29 +120,60 @@ show_logs() {
   echo "::endgroup::"
 }
 
-echo "::group::Wait for the VM"
+# The last readable line of the VM console, to show what the VM is doing.
+console_tail() {
+  sudo tail -c 4000 "$vm_dir/serial.log" 2>/dev/null | tr '\r' '\n' |
+    sed -E 's/\x1b\[[0-9;?]*[A-Za-z]//g; s/[[:cntrl:]]//g' | grep -v '^[[:space:]]*$' | tail -n 1 | cut -c1-140
+}
+
+if [ -n "$FIPS_VM_IMAGE" ]; then
+  step "Waiting for the VM to boot in FIPS mode"
+else
+  step "Waiting for the VM: it installs Docker, Java and Maven, then reboots in FIPS mode (about 10 minutes)"
+fi
 timeout_s=$([ -n "$FIPS_VM_IMAGE" ] && echo 600 || echo 1800)
-deadline=$((SECONDS + timeout_s))
-until vm "test \"\$(cat /proc/sys/crypto/fips_enabled)\" = 1 && mountpoint -q '$share'" 2>/dev/null; do
+started=$SECONDS
+last_report=$SECONDS
+while :; do
+  if ! state=$(vm "echo fips=\$(cat /proc/sys/crypto/fips_enabled)" \
+    "provisioned=\$(test -f /var/lib/fips-vm/provisioned && echo 1 || echo 0)" \
+    "mounted=\$(mountpoint -q '$share' && echo 1 || echo 0)" \
+    "cloudinit=\$(cloud-init status 2>/dev/null | sed -n 's/^status: //p')" 2>"$vm_dir/ssh.err"); then
+    state=unreachable
+  fi
+  case $state in *fips=1*mounted=1*) break ;; esac
+
   if ! sudo kill -0 "$qemu_pid" 2>/dev/null; then
     show_logs
     fail "The VM stopped while booting."
   fi
-  if vm 'cloud-init status 2>/dev/null | grep -q "status: error" && ! test -f /var/lib/fips-vm/provisioned' 2>/dev/null; then
+  case $state in *provisioned=0*cloudinit=error*)
     show_logs
-    fail "Provisioning the VM failed."
-  fi
-  if [ "$SECONDS" -ge "$deadline" ]; then
+    fail "Installing the software in the VM failed. See the cloud-init output above."
+    ;;
+  esac
+  elapsed=$((SECONDS - started))
+  if [ "$elapsed" -ge "$timeout_s" ]; then
     show_logs
     fail "The VM wasn't in FIPS mode after $((timeout_s / 60)) minutes."
   fi
-  sleep 10
+
+  if [ $((SECONDS - last_report)) -ge 20 ]; then
+    last_report=$SECONDS
+    case $state in
+      unreachable) phase="waiting for SSH ($(tail -n 1 "$vm_dir/ssh.err" | cut -c1-60))" ;;
+      *fips=0*provisioned=0*) phase="installing Docker, Java and Maven" ;;
+      *fips=0*provisioned=1*) phase="rebooting in FIPS mode" ;;
+      *) phase="mounting the work folder" ;;
+    esac
+    printf '    %2dm%02ds  %-34s console: %s\n' $((elapsed / 60)) $((elapsed % 60)) "$phase" "$(console_tail)"
+  fi
+  sleep 5
 done
 vm 'cloud-init status --wait >/dev/null 2>&1 || true'
-echo "Ready after ${SECONDS}s."
-echo "::endgroup::"
+elapsed=$((SECONDS - started))
+step "VM ready in FIPS mode after $((elapsed / 60))m$((elapsed % 60))s"
 
-echo "::group::FIPS status"
 # shellcheck disable=SC2016 # expanded in the VM
 status=$(vm 'echo "fips_enabled: $(cat /proc/sys/crypto/fips_enabled)"
   echo "fips-mode-setup: $(sudo fips-mode-setup --check 2>&1 | tail -n 1)"
@@ -160,7 +189,6 @@ printf 'image: %s\n%s\n' "$image_ref" "$status" | tee "$vm_dir/status.txt"
   cat "$vm_dir/status.txt"
   echo '```'
 } >> "$GITHUB_STEP_SUMMARY"
-echo "::endgroup::"
 
 sudo install -m 0755 "$action_dir/fips-run" /usr/local/bin/fips-run
 {

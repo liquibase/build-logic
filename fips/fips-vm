@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# fips-vm: a FIPS-mode AlmaLinux 9 VM on your laptop, set up like the one GitHub Actions jobs get.
+#
+#   fips-vm up               create the VM the first time (about 10 minutes), or start it
+#   fips-vm shell            open a shell in the VM, in the current folder
+#   fips-vm run CMD [ARGS]   run a command in the VM, in the current folder, for example: fips-vm run mvn verify
+#   fips-vm status           show whether FIPS mode is on
+#   fips-vm docker-env       print the DOCKER_HOST line to use the VM's Docker from the laptop
+#   fips-vm stop             stop the VM
+#   fips-vm delete           delete the VM
+#
+# Needs Lima (brew install lima). Your home folder is shared with the VM at the same path.
+# Guide: https://datical.atlassian.net/wiki/spaces/TE/pages/5892636673
+set -euo pipefail
+
+name=${FIPS_VM_NAME:-fips}
+# A Lima home of its own, so the VM gets an ECDSA SSH key: OpenSSH on RHEL 9 refuses Ed25519 keys in FIPS mode,
+# and Lima's default key is Ed25519. Other Lima VMs on the laptop are not affected.
+export LIMA_HOME=${FIPS_VM_LIMA_HOME:-$HOME/.fips-vm/lima}
+source_url=${FIPS_VM_SOURCE_URL:-https://raw.githubusercontent.com/liquibase/build-logic/main/fips}
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+die() {
+  echo "fips-vm: $*" >&2
+  exit 1
+}
+
+command -v limactl >/dev/null || die "Lima isn't installed. Install it with: brew install lima"
+
+# A file from build-logic/fips: next to this script when run from a checkout, otherwise from GitHub.
+fetch() {
+  if [ -f "$here/$1" ] && [ -z "${FIPS_VM_SOURCE_URL:-}" ]; then
+    cat "$here/$1"
+  else
+    curl -fsSL "$source_url/$1"
+  fi
+}
+
+exists() { limactl list --format '{{.Name}}' 2>/dev/null | grep -qx "$name"; }
+running() { [ "$(limactl list --format '{{.Status}}' "$name" 2>/dev/null)" = Running ]; }
+need_running() { running || die "The FIPS VM isn't running. Start it with: fips-vm up"; }
+in_vm() { limactl shell --workdir / "$name" "$@"; }
+
+up() {
+  if ! exists; then
+    echo "Creating the FIPS VM '$name'. The first time takes about 10 minutes."
+    mkdir -p "$LIMA_HOME/_config"
+    [ -f "$LIMA_HOME/_config/user" ] || ssh-keygen -q -t ecdsa -b 384 -N '' -C fips-vm -f "$LIMA_HOME/_config/user"
+    local template
+    template=$(mktemp -t fips-vm).yaml
+    fetch lima.yaml > "$template"
+    limactl create --tty=false --name "$name" "$template"
+    rm -f "$template"
+  fi
+  running || limactl start --tty=false "$name"
+  if [ "$(in_vm cat /proc/sys/crypto/fips_enabled)" != 1 ]; then
+    echo "Installing Docker, Java and Maven, and turning FIPS mode on."
+    fetch provision.sh | in_vm sudo bash -s
+    # shellcheck disable=SC2016 # expanded in the VM
+    in_vm sh -c 'sudo usermod -aG docker "$(id -un)"'
+    echo "Restarting the VM in FIPS mode."
+    limactl stop "$name"
+    limactl start --tty=false "$name"
+  fi
+  status
+}
+
+status() {
+  need_running
+  # shellcheck disable=SC2016 # expanded in the VM
+  in_vm sh -c 'echo "fips_enabled: $(cat /proc/sys/crypto/fips_enabled)"
+    echo "$(sudo fips-mode-setup --check 2>&1 | tail -n 1)"
+    echo "os: $(. /etc/os-release && echo "$PRETTY_NAME") ($(uname -m)), kernel $(uname -r)"
+    echo "java: $(java -version 2>&1 | head -n 1)"
+    echo "docker: $(docker --version)"'
+}
+
+case "${1:-}" in
+  up) up ;;
+  shell) need_running && limactl shell "$name" bash -l ;;
+  run)
+    shift
+    [ $# -gt 0 ] || die "usage: fips-vm run CMD [ARGS]"
+    need_running
+    limactl shell "$name" bash -lc '"$@"' fips-vm "$@"
+    ;;
+  status) status ;;
+  docker-env)
+    need_running
+    echo "export DOCKER_HOST=unix://$(limactl list --format '{{.Dir}}' "$name")/sock/docker.sock"
+    ;;
+  stop) limactl stop "$name" ;;
+  delete) limactl delete --force "$name" ;;
+  *) sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' && exit 2 ;;
+esac

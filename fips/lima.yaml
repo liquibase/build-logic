@@ -1,0 +1,29 @@
+# FIPS-mode AlmaLinux 9 VM for Liquibase FIPS 140-3 testing on a laptop.
+# Don't use this file directly: `fips-vm up` creates the VM from it, then runs provision.sh and turns FIPS mode on.
+minimumLimaVersion: "1.0.0"
+
+images:
+  - location: "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2"
+    arch: "x86_64"
+  - location: "https://repo.almalinux.org/almalinux/9/cloud/aarch64/images/AlmaLinux-9-GenericCloud-latest.aarch64.qcow2"
+    arch: "aarch64"
+
+cpus: 4
+memory: "8GiB"
+disk: "60GiB"
+
+# Your home folder is shared at the same path, so `fips-vm run` works in any project folder under it.
+mounts:
+  - location: "~"
+    writable: true
+  - location: "/tmp/lima"
+    writable: true
+
+containerd:
+  system: false
+  user: false
+
+# The VM's Docker socket, for `fips-vm docker-env`.
+portForwards:
+  - guestSocket: "/var/run/docker.sock"
+    hostSocket: "{{.Dir}}/sock/docker.sock"

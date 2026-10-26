@@ -190,3 +190,73 @@ jobs:
         if: always()
         shell: bash
         run: rm -rf "$RUNNER_TEMP/licenses"
+
+  guide-examples:
+    # Runs the GitHub Actions steps from "Run Liquibase in the VM" in the developer guide, as written there, so the
+    # guide stays correct: https://datical.atlassian.net/wiki/spaces/TE/pages/5892636673
+    # Keep these steps and the guide in sync. The Secure part needs the vault, so it skips PRs from forks.
+    name: Developer guide examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: fips-run {0}
+    env:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://localhost:5432/postgres
+      LIQUIBASE_COMMAND_USERNAME: postgres
+      LIQUIBASE_COMMAND_PASSWORD: choose-14-or-more-chars
+      FROM_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository && github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Use the self-test changelog
+        shell: bash
+        run: cp fips/selftest/liquibase/changelog.yaml changelog.yaml
+
+      - if: env.FROM_FORK != 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - if: env.FROM_FORK != 'true'
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: ",/vault/liquibase"
+          parse-json-secrets: true
+
+      - name: Start the FIPS VM
+        uses: ./.github/actions/fips-vm
+
+      # --- Guide: Liquibase Community in GitHub Actions ---
+      - name: Start PostgreSQL
+        run: |
+          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD="$LIQUIBASE_COMMAND_PASSWORD" postgres:17
+          until docker exec pg pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
+
+      - name: Install Liquibase and the PostgreSQL driver
+        run: |
+          sudo dnf install -y liquibase
+          curl -fsSL -o postgresql.jar https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
+
+      - name: Update the database
+        run: liquibase update --changelog-file=changelog.yaml --classpath=postgresql.jar
+
+      # --- Guide: Liquibase Secure in GitHub Actions ---
+      - name: Swap Community for Secure (only here; the guide's Secure job starts clean)
+        if: env.FROM_FORK != 'true'
+        run: sudo dnf remove -y liquibase
+
+      - name: Install Liquibase Secure
+        if: env.FROM_FORK != 'true'
+        run: sudo dnf install -y liquibase-secure
+
+      - name: Update the database with Liquibase Secure
+        if: env.FROM_FORK != 'true'
+        env:
+          LIQUIBASE_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          JAVA_OPTS: -Dcom.redhat.fips=false
+        run: liquibase update --changelog-file=changelog.yaml

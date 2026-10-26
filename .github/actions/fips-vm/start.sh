@@ -105,7 +105,8 @@ sudo qemu-system-x86_64 -name fips-vm -machine q35,accel=kvm -cpu host -smp "$cp
   -drive file="$vm_dir/seed.iso",if=virtio,format=raw,readonly=on \
   -nic user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:${ssh_port}-:22 \
   -display none -serial file:"$vm_dir/serial.log" -pidfile "$vm_dir/qemu.pid" -daemonize
-echo "Started with $cpus CPUs and $memory_mb MB of memory."
+qemu_pid=$(sudo cat "$vm_dir/qemu.pid")
+echo "Started with $cpus CPUs and $memory_mb MB of memory (qemu pid $qemu_pid)."
 echo "::endgroup::"
 
 ssh_opts=(-i "$vm_dir/key" -p "$ssh_port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
@@ -125,7 +126,7 @@ echo "::group::Wait for the VM"
 timeout_s=$([ -n "$FIPS_VM_IMAGE" ] && echo 600 || echo 1800)
 deadline=$((SECONDS + timeout_s))
 until vm "test \"\$(cat /proc/sys/crypto/fips_enabled)\" = 1 && mountpoint -q '$share'" 2>/dev/null; do
-  if ! sudo kill -0 "$(cat "$vm_dir/qemu.pid")" 2>/dev/null; then
+  if ! sudo kill -0 "$qemu_pid" 2>/dev/null; then
     show_logs
     fail "The VM stopped while booting."
   fi

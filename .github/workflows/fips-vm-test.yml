@@ -239,6 +239,7 @@ jobs:
 
       - name: Install Liquibase and the PostgreSQL driver
         run: |
+          sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
           sudo dnf install -y liquibase
           curl -fsSL -o postgresql.jar https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
 
@@ -252,7 +253,9 @@ jobs:
 
       - name: Install Liquibase Secure
         if: env.FROM_FORK != 'true'
-        run: sudo dnf install -y liquibase-secure
+        run: |
+          sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
+          sudo dnf install -y liquibase-secure
 
       - name: Update the database with Liquibase Secure
         if: env.FROM_FORK != 'true'

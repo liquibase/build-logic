@@ -27,26 +27,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  kvm-probe:
-    name: KVM on ${{ matrix.runner }}
+  fips-vm:
+    name: FIPS VM on ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         runner: [ubuntu-latest, blacksmith-4vcpu-ubuntu-2404]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 5
-    steps:
-      - name: Report virtualization support
-        run: |
-          ls -l /dev/kvm || echo "no /dev/kvm"
-          echo "vmx/svm CPU flags: $(grep -cE 'vmx|svm' /proc/cpuinfo || true)"
-          echo "cpus=$(nproc) uid=$(id -u) RUNNER_TEMP=$RUNNER_TEMP"
-          free -g
-          df -h / /mnt 2>/dev/null || df -h /
-          apt-cache policy virtiofsd | head -3
-
-  fips-vm:
-    runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
       run:

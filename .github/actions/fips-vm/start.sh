@@ -22,7 +22,7 @@ vm_dir=/mnt/fips-vm
 sudo mkdir -p "$vm_dir" && sudo chown "$(id -u):$(id -g)" "$vm_dir"
 
 echo "::group::Check the runner"
-[ -e /dev/kvm ] || fail "This runner has no /dev/kvm, so it can't start the FIPS VM. Use a GitHub-hosted Linux x64 runner, for example ubuntu-latest."
+[ -e /dev/kvm ] || fail "This runner has no /dev/kvm, so it can't start the FIPS VM. Use a Linux x64 runner with KVM, for example ubuntu-latest or blacksmith-4vcpu-ubuntu-2404."
 [ "$(uname -m)" = x86_64 ] || fail "The FIPS VM needs an x86_64 runner, this one is $(uname -m)."
 [ "$(id -u)" = 1001 ] || echo "::warning::The runner user has uid $(id -u), not 1001. Files created in the VM may get a different owner."
 echo "::endgroup::"
@@ -37,6 +37,7 @@ echo "::endgroup::"
 
 echo "::group::Get the VM disk"
 if [ -n "$FIPS_VM_IMAGE" ]; then
+  "$action_dir/install-oras.sh"
   echo "$FIPS_VM_TOKEN" | oras login ghcr.io -u fips-vm --password-stdin >/dev/null
   oras pull --output "$vm_dir" "$FIPS_VM_IMAGE"
   base="$vm_dir/fips-vm.qcow2"

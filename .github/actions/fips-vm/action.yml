@@ -3,7 +3,7 @@ description: |
   Starts a FIPS-mode AlmaLinux 9 VM on the runner and shares the runner's work directory with it.
   Steps that use `shell: fips-run {0}` then run inside the VM, where /proc/sys/crypto/fips_enabled is 1
   and Docker, Red Hat OpenJDK 17 and 21, and Maven 3.9 are installed.
-  Needs a GitHub-hosted Linux x64 runner (KVM). INT-2303.
+  Needs a Linux x64 runner with KVM: GitHub-hosted (ubuntu-latest) or Blacksmith. INT-2303.
 
 inputs:
   image:
@@ -31,9 +31,6 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - if: inputs.image != ''
-      uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4 # v2.0.2
-
     - id: start
       shell: bash
       env:

@@ -14,7 +14,7 @@ vm() {
 }
 
 # Next boot is a new instance: cloud-init runs again with the new job's SSH key, and the VM gets new
-# SSH host keys and a new machine id.
+# SSH host keys and a new machine id. This removes the SSH key, so it shuts the VM down in the same session.
 vm 'sudo bash -s' <<'SCRIPT'
 set -euo pipefail
 docker system prune --all --force --volumes >/dev/null
@@ -23,8 +23,8 @@ rm -rf /home/runner/.m2 /tmp/* /var/tmp/*
 rm -f /home/runner/.ssh/authorized_keys /home/runner/.bash_history /root/.bash_history
 cloud-init clean --logs --machine-id
 fstrim --all || true
+systemctl --no-block poweroff
 SCRIPT
-vm 'sudo systemctl poweroff' || true
 
 pid=$(sudo cat "$FIPS_VM_DIR/qemu.pid")
 for _ in $(seq 120); do

@@ -58,10 +58,13 @@ jobs:
 
       - name: Red Hat OpenJDK runs in FIPS mode, and -Dcom.redhat.fips=false turns it off
         run: |
-          java -XshowSettings:security:providers -version 2>&1 | tee providers-fips.txt | head -n 8
-          grep -q 'SunPKCS11-NSS-FIPS' providers-fips.txt
+          java -XshowSettings:security:providers -version > providers-on.txt 2>&1
           java -Dcom.redhat.fips=false -XshowSettings:security:providers -version > providers-off.txt 2>&1
-          ! grep -q 'SunPKCS11-NSS-FIPS' providers-off.txt
+          on=$(awk '/Provider name:/ {print $3; exit}' providers-on.txt)
+          off=$(awk '/Provider name:/ {print $3; exit}' providers-off.txt)
+          echo "First security provider: $on by default, $off with -Dcom.redhat.fips=false"
+          test "$on" = SunPKCS11-NSS-FIPS
+          test "$off" != SunPKCS11-NSS-FIPS
 
       - name: docker compose starts PostgreSQL
         run: |

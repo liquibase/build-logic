@@ -120,10 +120,12 @@ show_logs() {
   echo "::endgroup::"
 }
 
-# The last readable line of the VM console, to show what the VM is doing.
+# The last readable line of the VM console, to show what the VM is doing. The SSH sessions that check on
+# the VM are left out, since they are this script.
 console_tail() {
-  sudo tail -c 4000 "$vm_dir/serial.log" 2>/dev/null | tr '\r' '\n' |
-    sed -E 's/\x1b\[[0-9;?]*[A-Za-z]//g; s/[[:cntrl:]]//g' | grep -v '^[[:space:]]*$' | tail -n 1 | cut -c1-140
+  sudo tail -c 8000 "$vm_dir/serial.log" 2>/dev/null | tr '\r' '\n' |
+    sed -E 's/\x1b\[[0-9;?]*[A-Za-z]//g; s/[[:cntrl:]]//g' |
+    grep -vE '^[[:space:]]*$|Session [0-9]+ of User|session-[0-9]+\.scope' | tail -n 1 | cut -c1-140
 }
 
 if [ -n "$FIPS_VM_IMAGE" ]; then
@@ -161,7 +163,7 @@ while :; do
   if [ $((SECONDS - last_report)) -ge 20 ]; then
     last_report=$SECONDS
     case $state in
-      unreachable) phase="waiting for SSH ($(tail -n 1 "$vm_dir/ssh.err" | cut -c1-60))" ;;
+      unreachable) phase="waiting for SSH ($(tr -d '\r' < "$vm_dir/ssh.err" | tail -n 1 | cut -c1-60))" ;;
       *fips=0*provisioned=0*) phase="installing Docker, Java and Maven" ;;
       *fips=0*provisioned=1*) phase="rebooting in FIPS mode" ;;
       *) phase="mounting the work folder" ;;

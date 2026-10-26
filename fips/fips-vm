@@ -4,6 +4,7 @@
 #   fips-vm up               create the VM the first time (5 to 30 minutes), or start it
 #   fips-vm shell            open a shell in the VM, in the current folder
 #   fips-vm run CMD [ARGS]   run a command in the VM, in the current folder, for example: fips-vm run mvn verify
+#                            Your LIQUIBASE_* environment variables go with it, for example LIQUIBASE_LICENSE_KEY.
 #   fips-vm status           show whether FIPS mode is on
 #   fips-vm docker-env       print the DOCKER_HOST line to use the VM's Docker from the laptop
 #   fips-vm stop             stop the VM
@@ -83,7 +84,13 @@ case "${1:-}" in
     shift
     [ $# -gt 0 ] || die "usage: fips-vm run CMD [ARGS]"
     need_running
-    limactl shell "$name" bash -lc '"$@"' fips-vm "$@"
+    # Pass LIQUIBASE_* variables (license key, command arguments) to the VM; the rest of the laptop's
+    # environment, like PATH or JAVA_HOME, doesn't apply there.
+    liquibase_env=()
+    while IFS= read -r var; do
+      liquibase_env+=("$var=${!var}")
+    done < <(compgen -e | grep '^LIQUIBASE_' || true)
+    limactl shell "$name" env ${liquibase_env[@]+"${liquibase_env[@]}"} bash -lc '"$@"' fips-vm "$@"
     ;;
   status) status ;;
   docker-env)
@@ -92,5 +99,5 @@ case "${1:-}" in
     ;;
   stop) limactl stop "$name" ;;
   delete) limactl delete --force "$name" ;;
-  *) sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' && exit 2 ;;
+  *) sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' && exit 2 ;;
 esac

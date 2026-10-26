@@ -1,8 +1,8 @@
 name: FIPS VM test
 
 # Checks the fips-vm action end to end with the published image: the VM boots in FIPS mode, a UBI 9 container
-# inherits it, docker compose and Testcontainers start PostgreSQL, and files and GITHUB_ENV round-trip to the
-# runner. Changes to fips/provision.sh are checked by fips-vm-image.yml, which builds the VM from scratch, and
+# inherits it, docker compose and Testcontainers start PostgreSQL, Liquibase installed from its RPM repo updates
+# PostgreSQL with a FIPS-mode JVM, and files and GITHUB_ENV round-trip to the runner. Changes to fips/provision.sh are checked by fips-vm-image.yml, which builds the VM from scratch, and
 # the laptop setup by fips-vm-laptop-test.yml.
 
 on:
@@ -66,7 +66,43 @@ jobs:
         run: |
           docker compose -f fips/selftest/compose.yml up -d --wait
           docker compose -f fips/selftest/compose.yml exec -T postgres psql -U postgres -tAc 'select 1'
-          docker compose -f fips/selftest/compose.yml down
+
+      # The same steps as "Run Liquibase in the VM" in the developer guide. Liquibase OSS needs no license, so this
+      # public repo can run it on every PR. Liquibase 5 doesn't bundle JDBC drivers.
+      - name: Install Liquibase from its RPM repo
+        run: |
+          [ -f /etc/yum.repos.d/repo-liquibase-com.repo ] ||
+            sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
+          sudo dnf install -y -q liquibase
+          curl -fsSL -o "$RUNNER_TEMP/postgresql.jar" https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
+          liquibase --version | grep -E 'Liquibase Version|Java Home'
+
+      - name: Liquibase updates PostgreSQL with a FIPS-mode JVM
+        working-directory: fips/selftest/liquibase
+        env:
+          LIQUIBASE_COMMAND_URL: jdbc:postgresql://localhost:5432/postgres
+          LIQUIBASE_COMMAND_USERNAME: postgres
+          LIQUIBASE_COMMAND_PASSWORD: fips-vm-selftest-password
+          LIQUIBASE_COMMAND_CHANGELOG_FILE: changelog.yaml
+        run: |
+          liquibase --classpath="$RUNNER_TEMP/postgresql.jar" update
+          liquibase --classpath="$RUNNER_TEMP/postgresql.jar" validate
+          liquibase --classpath="$RUNNER_TEMP/postgresql.jar" rollback-count --count=1
+          liquibase --classpath="$RUNNER_TEMP/postgresql.jar" update
+          docker exec "$(docker ps -qf name=postgres)" psql -U postgres -tAc 'select note from fips_check' |
+            grep -qx 'written by Liquibase in the FIPS VM'
+          {
+            echo "### Liquibase in the FIPS VM"
+            echo
+            echo '| Changeset | Checksum |'
+            echo '| --- | --- |'
+            docker exec "$(docker ps -qf name=postgres)" psql -U postgres -tAc \
+              "select '| ' || id || ' | ' || md5sum || ' |' from databasechangelog order by orderexecuted"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker compose -f fips/selftest/compose.yml down
 
       - name: Testcontainers starts PostgreSQL and a FIPS-mode JVM connects
         env:

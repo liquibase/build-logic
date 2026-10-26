@@ -33,6 +33,9 @@ EOF
 systemctl enable docker
 systemctl restart docker
 
+# Liquibase's own RPM repo, so `sudo dnf install liquibase-secure` (or liquibase) works in the VM.
+dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
+
 # Maven 3.9, because the distribution only ships 3.6.
 if [ "$(/opt/maven/bin/mvn -v 2>/dev/null | awk 'NR==1{print $3}')" != "$MAVEN_VERSION" ]; then
   url="https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz"
@@ -54,6 +57,10 @@ export JAVA_21_HOME=/usr/lib/jvm/java-21-openjdk
 export MAVEN_HOME=/opt/maven
 case ":$PATH:" in *:/usr/local/bin:*) ;; *) export PATH="/usr/local/bin:$PATH" ;; esac
 EOF
+
+# rpcbind isn't needed, and on a laptop Lima tries to forward its port 111, which the laptop already uses.
+systemctl disable --now rpcbind.socket rpcbind.service 2>/dev/null || true
+systemctl mask rpcbind.socket rpcbind.service 2>/dev/null || true
 
 # The runner user has the same uid as the GitHub runner, so files in the shared work directory keep their owner.
 id runner >/dev/null 2>&1 || useradd -m -u "$RUNNER_UID" runner

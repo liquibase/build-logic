@@ -30,19 +30,34 @@ step "Checking the runner"
 [ "$(id -u)" = 1001 ] || echo "::warning::The runner user has uid $(id -u), not 1001. Files created in the VM may get a different owner."
 
 step "Installing QEMU and virtiofsd"
-sudo apt-get update -qq
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+# Hosted runners carry many third-party apt repos and slow dpkg triggers: read only the Ubuntu archive,
+# and skip man-db and needrestart.
+apt_opts=(-o DPkg::Lock::Timeout=300 -o Acquire::Retries=3)
+if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+  apt_sources=$(mktemp -d)
+  cp /etc/apt/sources.list.d/ubuntu.sources "$apt_sources/"
+  apt_opts+=(-o Dir::Etc::SourceList=/dev/null -o "Dir::Etc::SourceParts=$apt_sources")
+fi
+sudo rm -f /var/lib/man-db/auto-update
+t=$SECONDS
+sudo apt-get "${apt_opts[@]}" update -qq
+t_update=$((SECONDS - t))
+t=$SECONDS
+sudo NEEDRESTART_SUSPEND=1 DEBIAN_FRONTEND=noninteractive apt-get "${apt_opts[@]}" install -y -qq --no-install-recommends \
   qemu-system-x86 qemu-utils cloud-image-utils virtiofsd >/dev/null
+echo "    apt-get update ${t_update}s, install $((SECONDS - t))s"
 virtiofsd_bin=$(command -v virtiofsd || echo /usr/libexec/virtiofsd)
 [ -x "$virtiofsd_bin" ] || fail "virtiofsd is not installed."
 
 if [ -n "$FIPS_VM_IMAGE" ]; then
   step "Downloading the FIPS VM image $FIPS_VM_IMAGE"
+  t=$SECONDS
   "$action_dir/install-oras.sh"
   echo "$FIPS_VM_TOKEN" | oras login ghcr.io -u fips-vm --password-stdin >/dev/null
   oras pull --output "$vm_dir" "$FIPS_VM_IMAGE" >/dev/null
   base="$vm_dir/fips-vm.qcow2"
   image_ref="$FIPS_VM_IMAGE@$(oras resolve "$FIPS_VM_IMAGE")"
+  echo "    $(du -h "$base" | cut -f1) in $((SECONDS - t))s"
 else
   step "Downloading the AlmaLinux 9 cloud image (no prebuilt image requested)"
   curl -fsSL -o "$vm_dir/$alma_image" "$alma_url/$alma_image"

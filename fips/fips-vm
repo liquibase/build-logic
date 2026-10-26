@@ -25,7 +25,7 @@ die() {
   exit 1
 }
 
-command -v limactl >/dev/null || die "Lima isn't installed. Install it with: brew install lima"
+command -v limactl >/dev/null || die "Lima 2 isn't installed. Install it with: brew install lima (macOS) or see https://lima-vm.io/docs/installation/ (Linux)"
 
 # A file from build-logic/fips: next to this script when run from a checkout, otherwise from GitHub.
 fetch() {

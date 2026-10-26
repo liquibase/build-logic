@@ -38,32 +38,58 @@ fetch() {
   fi
 }
 
+# Lima's own messages: only warnings and errors.
+lima() { limactl --log-level=warn "$@"; }
 exists() { limactl list --format '{{.Name}}' 2>/dev/null | grep -qx "$name"; }
 running() { [ "$(limactl list --format '{{.Status}}' "$name" 2>/dev/null)" = Running ]; }
 need_running() { running || die "The FIPS VM isn't running. Start it with: fips-vm up"; }
 in_vm() { limactl shell --workdir / "$name" "$@"; }
 
+# Runs the provisioning in the VM, with its output in a log and a progress line every 20 seconds.
+provision() {
+  local log="$HOME/.fips-vm/provision.log" script="$HOME/.fips-vm/provision.sh" started=$SECONDS pid
+  echo "==> Installing Docker, Java and Maven, and turning FIPS mode on (log: $log)"
+  fetch provision.sh > "$script" || die "Couldn't download provision.sh from $source_url"
+  in_vm sudo bash -s < "$script" > "$log" 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 20
+    kill -0 "$pid" 2>/dev/null || break
+    printf '    %2dm%02ds  %s\n' $(((SECONDS - started) / 60)) $(((SECONDS - started) % 60)) \
+      "$(tr '\r' '\n' < "$log" | grep -v '^[[:space:]]*$' | tail -n 1 | cut -c1-100)"
+  done
+  if ! wait "$pid"; then
+    tail -n 30 "$log"
+    die "Installing the software in the VM failed. The full log is $log"
+  fi
+}
+
 up() {
   if ! exists; then
-    echo "Creating the FIPS VM '$name'. This takes 5 to 30 minutes, depending on how fast the AlmaLinux mirrors are."
+    echo "==> Creating the FIPS VM '$name'. This takes 5 to 30 minutes, depending on how fast the AlmaLinux mirrors are."
     mkdir -p "$LIMA_HOME/_config"
     [ -f "$LIMA_HOME/_config/user" ] || ssh-keygen -q -t ecdsa -b 384 -N '' -C fips-vm -f "$LIMA_HOME/_config/user"
     template_dir=$(mktemp -d "${TMPDIR:-/tmp}/fips-vm.XXXXXX")
     trap 'rm -rf "$template_dir"' EXIT
     fetch lima.yaml > "$template_dir/fips.yaml"
-    limactl create --tty=false --name "$name" \
+    lima create --tty=false --name "$name" \
       ${FIPS_VM_CPUS:+--cpus="$FIPS_VM_CPUS"} ${FIPS_VM_MEMORY:+--memory="$FIPS_VM_MEMORY"} "$template_dir/fips.yaml"
   fi
-  running || limactl start --tty=false "$name"
+  if ! running; then
+    echo "==> Starting the FIPS VM"
+    lima start --tty=false "$name"
+  fi
   if [ "$(in_vm cat /proc/sys/crypto/fips_enabled)" != 1 ]; then
-    echo "Installing Docker, Java and Maven, and turning FIPS mode on."
-    fetch provision.sh | in_vm sudo bash -s
+    provision
     # shellcheck disable=SC2016 # expanded in the VM
     in_vm sh -c 'sudo usermod -aG docker "$(id -un)"'
-    echo "Restarting the VM in FIPS mode."
-    limactl stop "$name"
-    limactl start --tty=false "$name"
+    echo "==> Restarting the VM in FIPS mode"
+    lima stop "$name" >/dev/null 2>&1
+    lima start --tty=false "$name"
+    [ "$(in_vm cat /proc/sys/crypto/fips_enabled)" = 1 ] ||
+      die "The VM didn't come back in FIPS mode. See $HOME/.fips-vm/provision.log, then try: fips-vm delete && fips-vm up"
   fi
+  echo "==> Ready"
   status
 }
 
@@ -97,7 +123,7 @@ case "${1:-}" in
     need_running
     echo "export DOCKER_HOST=unix://$(limactl list --format '{{.Dir}}' "$name")/sock/docker.sock"
     ;;
-  stop) limactl stop "$name" ;;
-  delete) limactl delete --force "$name" ;;
+  stop) lima stop "$name" ;;
+  delete) lima delete --force "$name" ;;
   *) sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' && exit 2 ;;
 esac

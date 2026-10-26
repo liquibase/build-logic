@@ -19,6 +19,14 @@ containerd:
   system: false
   user: false
 
+# rpcbind isn't needed. Stopping it at boot, before Lima starts forwarding ports, avoids warnings about port 111,
+# which the laptop already uses.
+provision:
+  - mode: boot
+    script: |
+      #!/bin/sh
+      systemctl disable --now rpcbind.socket rpcbind.service >/dev/null 2>&1 || true
+
 # The VM's Docker socket, for `fips-vm docker-env`. Ports the VM listens on, like a database container's,
 # also reach the laptop's localhost.
 portForwards:

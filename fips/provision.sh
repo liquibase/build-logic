@@ -17,7 +17,16 @@ dnf -y install dnf-plugins-core crypto-policies-scripts \
 # Docker CE, not Podman: the test suites depend on Docker behaviour (liquibase-pro-tests QA plan, section 6.3).
 dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-systemctl enable --now docker
+# Docker Hub images come through Google's public mirror first. Anonymous Docker Hub pulls have a low limit,
+# and CI runners share IP addresses.
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'EOF'
+{
+  "registry-mirrors": ["https://mirror.gcr.io"]
+}
+EOF
+systemctl enable docker
+systemctl restart docker
 
 # Maven 3.9, because the distribution only ships 3.6.
 if [ "$(/opt/maven/bin/mvn -v 2>/dev/null | awk 'NR==1{print $3}')" != "$MAVEN_VERSION" ]; then

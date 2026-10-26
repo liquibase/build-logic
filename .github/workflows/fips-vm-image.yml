@@ -4,8 +4,14 @@ name: FIPS VM image
 # package: ghcr.io/liquibase/fips-vm. Runs every week to pick up OS and package updates. INT-2303.
 #
 # Tags: alma9-<date>-<run> for every build, and alma9 for the latest build from main.
+# Pull requests build and check the image but don't publish it.
 
 on:
+  pull_request:
+    paths:
+      - "fips/provision.sh"
+      - ".github/actions/fips-vm/**"
+      - ".github/workflows/fips-vm-image.yml"
   schedule:
     - cron: "0 4 * * 1" # Mondays, 04:00 UTC
   workflow_dispatch:
@@ -50,9 +56,11 @@ jobs:
           docker compose version
 
       - name: Seal the VM into an image
+        if: github.event_name != 'pull_request'
         run: .github/actions/fips-vm/seal.sh "$RUNNER_TEMP/fips-vm.qcow2"
 
       - name: Push the image to GHCR
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -66,7 +74,8 @@ jobs:
             --annotation "org.opencontainers.image.revision=$GITHUB_SHA" \
             --annotation "org.opencontainers.image.description=FIPS-mode AlmaLinux 9 VM for Liquibase FIPS 140-3 tests (INT-2303)" \
             fips-vm.qcow2:application/vnd.liquibase.fips-vm.disk.v1+qcow2
-          if [ "$GITHUB_REF" = refs/heads/main ]; then
+          # alma9 follows main. The very first build also creates it, so the action has an image to start from.
+          if [ "$GITHUB_REF" = refs/heads/main ] || ! oras resolve "$IMAGE:alma9" >/dev/null 2>&1; then
             oras tag "$IMAGE:$tag" alma9
           fi
           echo "Pushed \`$IMAGE:$tag\` (\`$(oras resolve "$IMAGE:$tag")\`)" >> "$GITHUB_STEP_SUMMARY"

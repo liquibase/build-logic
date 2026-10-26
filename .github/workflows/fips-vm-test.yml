@@ -1,7 +1,8 @@
 name: FIPS VM test
 
-# Checks the fips-vm action end to end: the VM boots in FIPS mode, a UBI 9 container inherits it,
-# docker compose and Testcontainers start PostgreSQL, and files and GITHUB_ENV round-trip to the runner.
+# Checks the fips-vm action end to end with the published image: the VM boots in FIPS mode, a UBI 9 container
+# inherits it, docker compose and Testcontainers start PostgreSQL, and files and GITHUB_ENV round-trip to the
+# runner. Changes to fips/provision.sh are checked by fips-vm-image.yml, which builds the VM from scratch.
 
 on:
   pull_request:
@@ -15,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: "FIPS VM image to test. Empty builds the VM from the AlmaLinux cloud image."
+        description: "FIPS VM image to test. Empty builds the VM from the AlmaLinux 9 cloud image."
         required: false
         default: "ghcr.io/liquibase/fips-vm:alma9"
 
@@ -45,7 +46,7 @@ jobs:
         id: fips
         uses: ./.github/actions/fips-vm
         with:
-          image: ${{ github.event_name == 'workflow_dispatch' && inputs.image || '' }}
+          image: ${{ inputs.image || 'ghcr.io/liquibase/fips-vm:alma9' }}
 
       - name: The kernel is in FIPS mode
         run: |

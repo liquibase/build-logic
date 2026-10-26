@@ -31,6 +31,16 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    # The QEMU packages, kept between jobs and refreshed every week: some hosted runners download them very slowly.
+    - id: apt-cache-key
+      shell: bash
+      run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      with:
+        path: ~/.cache/fips-vm/apt
+        key: fips-vm-apt-${{ runner.os }}-${{ runner.arch }}-${{ steps.apt-cache-key.outputs.week }}
+        restore-keys: fips-vm-apt-${{ runner.os }}-${{ runner.arch }}-
+
     - id: start
       shell: bash
       env:
@@ -39,4 +49,5 @@ runs:
         FIPS_VM_MEMORY_MB: ${{ inputs.memory-mb }}
         FIPS_VM_DISK_SIZE: ${{ inputs.disk-size }}
         FIPS_VM_TOKEN: ${{ github.token }}
+        FIPS_VM_APT_CACHE: ~/.cache/fips-vm/apt
       run: '"$GITHUB_ACTION_PATH/start.sh"'

@@ -12,6 +12,10 @@ with `/proc/sys/crypto/fips_enabled` set to `1`. INT-2303.
 | `provision.sh` | Installs everything and turns FIPS mode on. Both the CI image and the laptop VM use it. |
 | `lima.yaml` | Lima template that `fips-vm up` uses. |
 | `fips-vm` | Laptop command: `up`, `shell`, `run`, `status`, `stop`, `delete`. |
-| `selftest/` | The PostgreSQL checks that `.github/workflows/fips-vm-test.yml` runs in the VM. |
+| `selftest/` | The PostgreSQL checks that the test workflows run in the VM. |
 
-The image is built every Monday by `.github/workflows/fips-vm-image.yml` and published to `ghcr.io/liquibase/fips-vm`.
+| Workflow | When it runs |
+| --- | --- |
+| `fips-vm-image.yml` | Mondays, and on PRs that change the image. Builds the image, boots the sealed image to check it, and publishes it to `ghcr.io/liquibase/fips-vm` (not on PRs). |
+| `fips-vm-test.yml` | PRs that change the action or `fips/`. Runs the self-test on the published image. |
+| `fips-vm-laptop-test.yml` | PRs that change the laptop files. Runs `fips-vm up` with Lima on Linux. |

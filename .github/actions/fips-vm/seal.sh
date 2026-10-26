@@ -36,5 +36,6 @@ if sudo kill -0 "$pid" 2>/dev/null; then
   exit 1
 fi
 
-qemu-img convert -c -O qcow2 "$FIPS_VM_DIR/disk.qcow2" "$output"
+# zstd compresses and decompresses faster than the default zlib, and -m runs the conversion in parallel.
+qemu-img convert -c -m 8 -O qcow2 -o compression_type=zstd "$FIPS_VM_DIR/disk.qcow2" "$output"
 qemu-img info "$output"

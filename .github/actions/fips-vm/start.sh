@@ -2,7 +2,8 @@
 # Boots a FIPS-mode AlmaLinux 9 VM on this runner with KVM and shares the runner's work directory with it
 # at the same path, so steps that use `shell: fips-run {0}` see the same files. Called by action.yml.
 #
-# Inputs (environment): FIPS_VM_IMAGE, FIPS_VM_CPUS, FIPS_VM_MEMORY_MB, FIPS_VM_DISK_SIZE, FIPS_VM_TOKEN.
+# Inputs (environment): FIPS_VM_IMAGE, FIPS_VM_CPUS, FIPS_VM_MEMORY_MB, FIPS_VM_DISK_SIZE, FIPS_VM_TOKEN, FIPS_VM_APT_CACHE.
+# FIPS_VM_IMAGE_FILE boots a local image file instead: fips-vm-image.yml uses it to check the image it just sealed.
 set -euo pipefail
 
 action_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -34,7 +35,11 @@ step "Installing QEMU and virtiofsd"
 virtiofsd_bin=$(command -v virtiofsd || echo /usr/libexec/virtiofsd)
 [ -x "$virtiofsd_bin" ] || fail "virtiofsd is not installed."
 
-if [ -n "$FIPS_VM_IMAGE" ]; then
+if [ -n "${FIPS_VM_IMAGE_FILE:-}" ]; then
+  step "Using the image file $FIPS_VM_IMAGE_FILE"
+  base=$FIPS_VM_IMAGE_FILE
+  image_ref="$FIPS_VM_IMAGE_FILE (sha256:$(sha256sum "$base" | cut -d' ' -f1))"
+elif [ -n "$FIPS_VM_IMAGE" ]; then
   step "Downloading the FIPS VM image $FIPS_VM_IMAGE"
   t=$SECONDS
   "$action_dir/install-oras.sh"
@@ -53,7 +58,10 @@ else
   base="$vm_dir/$alma_image"
   image_ref="$alma_url/$alma_image (sha256:$(sha256sum "$base" | cut -d' ' -f1)), provisioned by fips/provision.sh"
 fi
+rm -f "$vm_dir/disk.qcow2"
 qemu-img create -q -f qcow2 -b "$base" -F qcow2 "$vm_dir/disk.qcow2" "$FIPS_VM_DISK_SIZE"
+# Building from the cloud image means installing everything first.
+scratch=$([ -z "${FIPS_VM_IMAGE_FILE:-}" ] && [ -z "$FIPS_VM_IMAGE" ] && echo 1 || echo 0)
 echo "    $image_ref"
 
 rm -f "$vm_dir/key" "$vm_dir/key.pub"
@@ -70,7 +78,7 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_authorized_keys: ["$(cat "$vm_dir/key.pub")"]
 EOF
-if [ -z "$FIPS_VM_IMAGE" ]; then
+if [ "$scratch" = 1 ]; then
   # No prebuilt image: provision the cloud image now, then reboot into FIPS mode.
   cat >> "$vm_dir/user-data" <<EOF
 write_files:
@@ -131,12 +139,12 @@ console_tail() {
     grep -vE '^[[:space:]]*$|Session [0-9]+ of User|session-[0-9]+\.scope' | tail -n 1 | cut -c1-140
 }
 
-if [ -n "$FIPS_VM_IMAGE" ]; then
+if [ "$scratch" = 0 ]; then
   step "Waiting for the VM to boot in FIPS mode"
 else
   step "Waiting for the VM: it installs Docker, Java and Maven, then reboots in FIPS mode (about 10 minutes)"
 fi
-timeout_s=$([ -n "$FIPS_VM_IMAGE" ] && echo 600 || echo 1800)
+timeout_s=$([ "$scratch" = 0 ] && echo 600 || echo 1800)
 started=$SECONDS
 last_report=$SECONDS
 while :; do

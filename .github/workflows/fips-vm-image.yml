@@ -4,7 +4,7 @@ name: FIPS VM image
 # package: ghcr.io/liquibase/fips-vm. Runs every week to pick up OS and package updates. INT-2303.
 #
 # Tags: alma9-<date>-<run> for every build, and alma9 for the latest build from main.
-# Pull requests build and check the image but don't publish it.
+# Pull requests build, seal and boot-check the image but don't publish it.
 
 on:
   pull_request:
@@ -49,8 +49,21 @@ jobs:
           docker compose version
 
       - name: Seal the VM into an image
-        if: github.event_name != 'pull_request'
         run: .github/actions/fips-vm/seal.sh "$RUNNER_TEMP/fips-vm.qcow2"
+
+      - name: Boot the sealed image
+        env:
+          FIPS_VM_IMAGE: ""
+          FIPS_VM_IMAGE_FILE: ${{ runner.temp }}/fips-vm.qcow2
+          FIPS_VM_DISK_SIZE: 100G
+        run: .github/actions/fips-vm/start.sh
+
+      - name: Check the sealed image in FIPS mode and in a UBI 9 container
+        shell: fips-run {0}
+        run: |
+          sudo fips-mode-setup --check
+          test "$(cat /proc/sys/crypto/fips_enabled)" = 1
+          test "$(docker run --rm registry.access.redhat.com/ubi9/ubi-minimal cat /proc/sys/crypto/fips_enabled)" = 1
 
       - name: Push the image to GHCR
         if: github.event_name != 'pull_request'

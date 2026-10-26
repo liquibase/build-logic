@@ -47,13 +47,11 @@ up() {
     echo "Creating the FIPS VM '$name'. This takes 5 to 30 minutes, depending on how fast the AlmaLinux mirrors are."
     mkdir -p "$LIMA_HOME/_config"
     [ -f "$LIMA_HOME/_config/user" ] || ssh-keygen -q -t ecdsa -b 384 -N '' -C fips-vm -f "$LIMA_HOME/_config/user"
-    local tmp
-    tmp=$(mktemp -d "${TMPDIR:-/tmp}/fips-vm.XXXXXX")
-    trap 'rm -rf "$tmp"' EXIT
-    fetch lima.yaml > "$tmp/fips.yaml"
+    template_dir=$(mktemp -d "${TMPDIR:-/tmp}/fips-vm.XXXXXX")
+    trap 'rm -rf "$template_dir"' EXIT
+    fetch lima.yaml > "$template_dir/fips.yaml"
     limactl create --tty=false --name "$name" \
-      ${FIPS_VM_CPUS:+--cpus="$FIPS_VM_CPUS"} ${FIPS_VM_MEMORY:+--memory="$FIPS_VM_MEMORY"} "$tmp/fips.yaml"
-    rm -rf "$tmp"
+      ${FIPS_VM_CPUS:+--cpus="$FIPS_VM_CPUS"} ${FIPS_VM_MEMORY:+--memory="$FIPS_VM_MEMORY"} "$template_dir/fips.yaml"
   fi
   running || limactl start --tty=false "$name"
   if [ "$(in_vm cat /proc/sys/crypto/fips_enabled)" != 1 ]; then

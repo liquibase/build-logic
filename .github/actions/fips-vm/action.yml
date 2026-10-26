@@ -1,0 +1,45 @@
+name: 'Liquibase FIPS VM'
+description: |
+  Starts a FIPS-mode AlmaLinux 9 VM on the runner and shares the runner's work directory with it.
+  Steps that use `shell: fips-run {0}` then run inside the VM, where /proc/sys/crypto/fips_enabled is 1
+  and Docker, Red Hat OpenJDK 17 and 21, and Maven 3.9 are installed.
+  Needs a GitHub-hosted Linux x64 runner (KVM). INT-2303.
+
+inputs:
+  image:
+    description: 'OCI reference of the prebuilt FIPS VM image from fips-vm-image.yml. Empty builds the VM from the AlmaLinux 9 cloud image instead, which takes about 10 minutes longer.'
+    required: false
+    default: 'ghcr.io/liquibase/fips-vm:alma9'
+  cpus:
+    description: 'CPUs for the VM. Empty uses all the runner CPUs.'
+    required: false
+    default: ''
+  memory-mb:
+    description: 'Memory for the VM in MB. Empty uses 75% of the runner memory.'
+    required: false
+    default: ''
+  disk-size:
+    description: 'Size of the VM disk. Space is only used as the VM writes.'
+    required: false
+    default: '100G'
+
+outputs:
+  image:
+    description: 'The image the VM booted from, with its digest. Keep it with test evidence.'
+    value: ${{ steps.start.outputs.image }}
+
+runs:
+  using: 'composite'
+  steps:
+    - if: inputs.image != ''
+      uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4 # v2.0.2
+
+    - id: start
+      shell: bash
+      env:
+        FIPS_VM_IMAGE: ${{ inputs.image }}
+        FIPS_VM_CPUS: ${{ inputs.cpus }}
+        FIPS_VM_MEMORY_MB: ${{ inputs.memory-mb }}
+        FIPS_VM_DISK_SIZE: ${{ inputs.disk-size }}
+        FIPS_VM_TOKEN: ${{ github.token }}
+      run: '"$GITHUB_ACTION_PATH/start.sh"'

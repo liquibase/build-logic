@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Runs a step, or one command, inside the FIPS VM started by the fips-vm action.
+#
+#   defaults: { run: { shell: fips-run {0} } }   every run: step of the job runs in the VM
+#   shell: fips-run {0}                          one step runs in the VM
+#   run: fips-run -c 'mvn -v'                    one command runs in the VM from a normal bash step
+#
+# The step keeps its working directory and environment variables, and GITHUB_ENV, GITHUB_OUTPUT and
+# GITHUB_STEP_SUMMARY work as usual, because the runner's work directory is shared with the VM.
+set -euo pipefail
+
+if [ -z "${FIPS_VM_SSH_KEY:-}" ]; then
+  echo "::error::fips-run needs the FIPS VM. Add 'uses: liquibase/build-logic/.github/actions/fips-vm@<ref>' before this step." >&2
+  exit 2
+fi
+
+cleanup=()
+trap 'rm -f "${cleanup[@]}"' EXIT
+
+if [ "${1:-}" = "-c" ]; then
+  [ $# -eq 2 ] || { echo "usage: fips-run -c 'command'" >&2; exit 2; }
+  script=$(mktemp -p "$RUNNER_TEMP" fips-run.XXXXXX)
+  printf '%s\n' "$2" > "$script"
+  cleanup+=("$script")
+else
+  script=${1:?usage: fips-run SCRIPT or fips-run -c COMMAND}
+fi
+
+# Pass the step's environment to the VM, except variables that only make sense on the runner.
+env_file=$(mktemp -p "$RUNNER_TEMP" fips-env.XXXXXX)
+cleanup+=("$env_file")
+while IFS= read -r -d '' pair; do
+  name=${pair%%=*}
+  case $name in
+    PATH | HOME | USER | LOGNAME | SHELL | PWD | OLDPWD | SHLVL | _ | HOSTNAME | TMPDIR | LANG | LC_* | \
+      JAVA_HOME | JAVA_HOME_* | MAVEN_HOME | M2_HOME | XDG_* | SSH_* | FIPS_VM_*) continue ;;
+  esac
+  [[ $name =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+  printf 'export %s=%q\n' "$name" "${pair#*=}"
+done < <(env -0) > "$env_file"
+
+remote="source /etc/profile.d/fips-vm.sh && source $(printf %q "$env_file") && rm -f $(printf %q "$env_file")"
+remote+=" && cd $(printf %q "$PWD") && exec bash --noprofile --norc -eo pipefail $(printf %q "$script")"
+
+set +e
+ssh -i "$FIPS_VM_SSH_KEY" -p "$FIPS_VM_SSH_PORT" \
+  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes \
+  -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+  runner@127.0.0.1 "$remote"
+status=$?
+set -e
+exit "$status"

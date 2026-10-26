@@ -1,0 +1,105 @@
+name: FIPS VM test
+
+# Checks the fips-vm action end to end: the VM boots in FIPS mode, a UBI 9 container inherits it,
+# docker compose and Testcontainers start PostgreSQL, and files and GITHUB_ENV round-trip to the runner.
+
+on:
+  pull_request:
+    paths:
+      - ".github/actions/fips-vm/**"
+      - ".github/workflows/fips-vm-*.yml"
+      - "fips/**"
+  push:
+    branches:
+      - feat/INT-2303-fips-vm
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "FIPS VM image to test. Empty builds the VM from the AlmaLinux cloud image."
+        required: false
+        default: "ghcr.io/liquibase/fips-vm:alma9"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fips-vm-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kvm-probe:
+    name: KVM on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, blacksmith-4vcpu-ubuntu-2404]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    steps:
+      - name: Report virtualization support
+        run: |
+          ls -l /dev/kvm || echo "no /dev/kvm"
+          echo "vmx/svm CPU flags: $(grep -cE 'vmx|svm' /proc/cpuinfo || true)"
+          echo "cpus=$(nproc) uid=$(id -u) RUNNER_TEMP=$RUNNER_TEMP"
+          free -g
+          df -h / /mnt 2>/dev/null || df -h /
+          apt-cache policy virtiofsd | head -3
+
+  fips-vm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: fips-run {0}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start the FIPS VM
+        id: fips
+        uses: ./.github/actions/fips-vm
+        with:
+          image: ${{ github.event_name == 'workflow_dispatch' && inputs.image || '' }}
+
+      - name: The kernel is in FIPS mode
+        run: |
+          sudo fips-mode-setup --check
+          test "$(cat /proc/sys/crypto/fips_enabled)" = 1
+
+      - name: A UBI 9 container inherits FIPS mode
+        run: |
+          test "$(docker run --rm registry.access.redhat.com/ubi9/ubi-minimal cat /proc/sys/crypto/fips_enabled)" = 1
+
+      - name: Red Hat OpenJDK runs in FIPS mode, and -Dcom.redhat.fips=false turns it off
+        run: |
+          java -XshowSettings:security:providers -version 2>&1 | tee providers-fips.txt | head -n 8
+          grep -q 'SunPKCS11-NSS-FIPS' providers-fips.txt
+          java -Dcom.redhat.fips=false -XshowSettings:security:providers -version > providers-off.txt 2>&1
+          ! grep -q 'SunPKCS11-NSS-FIPS' providers-off.txt
+
+      - name: docker compose starts PostgreSQL
+        run: |
+          docker compose -f fips/selftest/compose.yml up -d --wait
+          docker compose -f fips/selftest/compose.yml exec -T postgres psql -U postgres -tAc 'select 1'
+          docker compose -f fips/selftest/compose.yml down
+
+      - name: Testcontainers starts PostgreSQL and a FIPS-mode JVM connects
+        env:
+          MAVEN_OPTS: -Dcom.redhat.fips=false
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+        run: mvn -B -ntp -f fips/selftest/pom.xml verify
+
+      - name: Maven itself in FIPS mode (informational)
+        continue-on-error: true
+        run: mvn -B -ntp -q -f fips/selftest/pom.xml -Dmaven.repo.local=/tmp/m2-fips -DskipTests verify
+
+      - name: Write a file and an env var from the VM
+        run: |
+          echo "written in the VM" > fips-vm-roundtrip.txt
+          echo "FIPS_ROUNDTRIP=yes" >> "$GITHUB_ENV"
+
+      - name: The runner sees them
+        shell: bash
+        run: |
+          test "$(cat fips-vm-roundtrip.txt)" = "written in the VM"
+          test "$FIPS_ROUNDTRIP" = yes
+          echo "VM image: ${{ steps.fips.outputs.image }}"

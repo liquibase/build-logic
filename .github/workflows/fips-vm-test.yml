@@ -2,7 +2,8 @@ name: FIPS VM test
 
 # Checks the fips-vm action end to end with the published image: the VM boots in FIPS mode, a UBI 9 container
 # inherits it, docker compose and Testcontainers start PostgreSQL, Liquibase installed from its RPM repo updates
-# PostgreSQL with a FIPS-mode JVM, and files and GITHUB_ENV round-trip to the runner. Changes to fips/provision.sh are checked by fips-vm-image.yml, which builds the VM from scratch, and
+# PostgreSQL with a FIPS-mode JVM, and files and GITHUB_ENV round-trip to the runner. A second job tries Liquibase
+# Secure 6 with the old license key and the new license file from the vault. Changes to fips/provision.sh are checked by fips-vm-image.yml, which builds the VM from scratch, and
 # the laptop setup by fips-vm-laptop-test.yml.
 
 on:
@@ -124,3 +125,68 @@ jobs:
           test "$(cat fips-vm-roundtrip.txt)" = "written in the VM"
           test "$FIPS_ROUNDTRIP" = yes
           echo "VM image: ${{ steps.fips.outputs.image }}"
+
+  liquibase-secure-licenses:
+    # Liquibase Secure 6 with the old license key and the new license file, each in FIPS mode and with FIPS off.
+    # Reports what works in FIPS mode and fails only if a license is broken (see try-licenses.sh). Needs the
+    # vault, so it doesn't run on PRs from forks.
+    name: Liquibase Secure licenses in FIPS mode
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: fips-run {0}
+    env:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://localhost:5432/postgres
+      LIQUIBASE_COMMAND_USERNAME: postgres
+      LIQUIBASE_COMMAND_PASSWORD: fips-vm-selftest-password
+      LIQUIBASE_COMMAND_CHANGELOG_FILE: changelog.yaml
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # Only the two licenses, masked, instead of exporting the whole vault into the environment (and the VM).
+      - name: Read the licenses from the vault
+        shell: bash
+        run: |
+          json=$(aws secretsmanager get-secret-value --secret-id /vault/liquibase --query SecretString --output text)
+          dir="$RUNNER_TEMP/licenses"
+          mkdir -p "$dir" && chmod 700 "$dir"
+          for key in PRO_LICENSE_KEY PRO_LICENSE_FILE; do
+            value=$(jq -r --arg key "$key" '.[$key] // ""' <<<"$json")
+            [ -n "$value" ] || continue
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "::add-mask::$line"
+            done <<<"$value"
+            printf '%s' "$value" > "$dir/$key"
+            chmod 600 "$dir/$key"
+          done
+          echo "LICENSES_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Start the FIPS VM
+        uses: ./.github/actions/fips-vm
+
+      - name: Install Liquibase Secure and start PostgreSQL
+        run: |
+          [ -f /etc/yum.repos.d/repo-liquibase-com.repo ] ||
+            sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
+          sudo dnf install -y -q liquibase-secure
+          curl -fsSL -o "$RUNNER_TEMP/postgresql.jar" https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
+          docker compose -f fips/selftest/compose.yml up -d --wait
+
+      - name: Try each license in FIPS mode and with FIPS off
+        working-directory: fips/selftest/liquibase
+        run: LIQUIBASE_CLASSPATH="$RUNNER_TEMP/postgresql.jar" ./try-licenses.sh "$LICENSES_DIR"
+
+      - name: Remove the licenses
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/licenses"

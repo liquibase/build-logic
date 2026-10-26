@@ -68,8 +68,8 @@ jobs:
           docker compose -f fips/selftest/compose.yml up -d --wait
           docker compose -f fips/selftest/compose.yml exec -T postgres psql -U postgres -tAc 'select 1'
 
-      # The same steps as "Run Liquibase in the VM" in the developer guide. Liquibase OSS needs no license, so this
-      # public repo can run it on every PR. Liquibase 5 doesn't bundle JDBC drivers.
+      # Liquibase OSS needs no license, so this public repo can run it on every PR. Liquibase 5 doesn't bundle
+      # JDBC drivers.
       - name: Install Liquibase from its RPM repo
         run: |
           [ -f /etc/yum.repos.d/repo-liquibase-com.repo ] ||
@@ -192,8 +192,8 @@ jobs:
         run: rm -rf "$RUNNER_TEMP/licenses"
 
   guide-examples:
-    # Runs the GitHub Actions steps from "Run Liquibase in the VM" in the developer guide, as written there, so the
-    # guide stays correct: https://datical.atlassian.net/wiki/spaces/TE/pages/5892636673
+    # Runs the steps of the developer guide's Liquibase jobs for GitHub Actions, as written there, so the guide stays
+    # correct: https://datical.atlassian.net/wiki/spaces/TE/pages/5892636673
     # Keep these steps and the guide in sync. The Secure part needs the vault, so it skips PRs from forks.
     name: Developer guide examples
     runs-on: ubuntu-latest
@@ -232,32 +232,33 @@ jobs:
         uses: ./.github/actions/fips-vm
 
       # --- Guide: Liquibase Community in GitHub Actions ---
-      - name: Start PostgreSQL
+      - name: Start PostgreSQL and install Liquibase
         run: |
           docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD="$LIQUIBASE_COMMAND_PASSWORD" postgres:17
-          until docker exec pg pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
-
-      - name: Install Liquibase and the PostgreSQL driver
-        run: |
           sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
           sudo dnf install -y liquibase
           curl -fsSL -o postgresql.jar https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
+          until docker exec pg pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; do sleep 1; done
 
       - name: Update the database
         run: liquibase update --changelog-file=changelog.yaml --classpath=postgresql.jar
 
       # --- Guide: Liquibase Secure in GitHub Actions ---
-      - name: Swap Community for Secure (only here; the guide's Secure job starts clean)
-        if: env.FROM_FORK != 'true'
-        run: sudo dnf remove -y liquibase
-
-      - name: Install Liquibase Secure
+      - name: Start over for the Secure job (only here; in the guide it's a job of its own)
         if: env.FROM_FORK != 'true'
         run: |
+          sudo dnf remove -y liquibase
+          docker rm -f pg
+
+      - name: Start PostgreSQL and install Liquibase Secure
+        if: env.FROM_FORK != 'true'
+        run: |
+          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD="$LIQUIBASE_COMMAND_PASSWORD" postgres:17
           sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
           sudo dnf install -y liquibase-secure
+          until docker exec pg pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; do sleep 1; done
 
-      - name: Update the database with Liquibase Secure
+      - name: Update the database
         if: env.FROM_FORK != 'true'
         env:
           LIQUIBASE_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}

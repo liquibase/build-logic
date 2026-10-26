@@ -129,7 +129,7 @@ jobs:
   liquibase-secure-licenses:
     # Liquibase Secure 6 with the old license key and the new license file, each in FIPS mode and with FIPS off.
     # Reports what works in FIPS mode and fails only if a license is broken (see try-licenses.sh). Needs the
-    # vault, so it doesn't run on PRs from forks.
+    # vault, so it doesn't run on PRs from forks. The license file is only read on runs from main.
     name: Liquibase Secure licenses in FIPS mode
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
@@ -148,28 +148,31 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
           aws-region: us-east-1
 
-      # Only the two licenses, masked, instead of exporting the whole vault into the environment (and the VM).
-      - name: Read the licenses from the vault
+      - name: Read the old license key from the vault
         shell: bash
         run: |
-          json=$(aws secretsmanager get-secret-value --secret-id /vault/liquibase --query SecretString --output text)
-          dir="$RUNNER_TEMP/licenses"
-          mkdir -p "$dir" && chmod 700 "$dir"
-          for key in PRO_LICENSE_KEY PRO_LICENSE_FILE; do
-            value=$(jq -r --arg key "$key" '.[$key] // ""' <<<"$json")
-            [ -n "$value" ] || continue
-            while IFS= read -r line; do
-              [ -n "$line" ] && echo "::add-mask::$line"
-            done <<<"$value"
-            printf '%s' "$value" > "$dir/$key"
-            chmod 600 "$dir/$key"
-          done
-          echo "LICENSES_DIR=$dir" >> "$GITHUB_ENV"
+          fips/selftest/liquibase/save-licenses.sh /vault/liquibase "$RUNNER_TEMP/licenses" PRO_LICENSE_KEY
+          echo "LICENSES_DIR=$RUNNER_TEMP/licenses" >> "$GITHUB_ENV"
+
+      # The license file has a grouped secret of its own, whose role trusts this workflow from main only
+      # (liquibase-infrastructure, vault-manager/GROUPED-SECRETS.md), so pull request runs skip it.
+      - if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-file
+          aws-region: us-east-1
+
+      - name: Read the new license file from the vault
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        shell: bash
+        run: fips/selftest/liquibase/save-licenses.sh /vault/grouped/pro-license-file "$RUNNER_TEMP/licenses" PRO_LICENSE_FILE
 
       - name: Start the FIPS VM
         uses: ./.github/actions/fips-vm

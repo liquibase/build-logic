@@ -44,8 +44,13 @@ for kind in key file; do
     secret="$dir/PRO_LICENSE_FILE"
   fi
   if [ ! -s "$secret" ]; then
-    echo "::warning::No $label: $(basename "$secret") isn't in /vault/liquibase."
-    rows+=("| $label | - | not in the vault | - | - |")
+    if [ "$kind" = file ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ]; then
+      echo "The $label is only read on runs from main: its vault role trusts this workflow from main only."
+      rows+=("| $label | - | only on runs from main | - | - |")
+    else
+      echo "::warning::No $label: $(basename "$secret") wasn't read from the vault."
+      rows+=("| $label | - | not read from the vault | - | - |")
+    fi
     continue
   fi
   if [ "$kind" = key ]; then

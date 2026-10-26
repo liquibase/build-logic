@@ -12,7 +12,7 @@ with `/proc/sys/crypto/fips_enabled` set to `1`. INT-2303.
 | `provision.sh` | Installs everything and turns FIPS mode on. Both the CI image and the laptop VM use it. |
 | `lima.yaml` | Lima template that `fips-vm up` uses. |
 | `fips-vm` | Laptop command: `up`, `shell`, `run`, `status`, `stop`, `delete`. |
-| `selftest/` | The checks the test workflows run in the VM: PostgreSQL with docker compose and Testcontainers, and in `liquibase/` a changelog and `try-licenses.sh` for Liquibase Secure licenses. |
+| `selftest/` | The checks the test workflows run in the VM: PostgreSQL with docker compose and Testcontainers, and in `liquibase/` a changelog, `save-licenses.sh`, which reads the licenses from the vault, and `try-licenses.sh`, which tries them with Liquibase Secure. |
 
 | Workflow | When it runs |
 | --- | --- |

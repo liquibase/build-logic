@@ -77,7 +77,9 @@ up() {
   fi
   if ! running; then
     echo "==> Starting the FIPS VM"
-    lima start --tty=false "$name"
+    # The first start installs a few packages from the AlmaLinux mirrors, which can take longer than Lima's
+    # default 10 minutes.
+    lima start --tty=false --timeout=30m "$name"
   fi
   if [ "$(in_vm cat /proc/sys/crypto/fips_enabled)" != 1 ]; then
     provision

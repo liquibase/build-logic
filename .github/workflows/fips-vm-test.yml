@@ -10,9 +10,6 @@ on:
       - ".github/actions/fips-vm/**"
       - ".github/workflows/fips-vm-*.yml"
       - "fips/**"
-  push:
-    branches:
-      - feat/INT-2303-fips-vm
   workflow_dispatch:
     inputs:
       image:
@@ -107,10 +104,11 @@ jobs:
 
       - name: Install Lima and QEMU
         run: |
+          .github/actions/fips-vm/apt-install.sh qemu-system-x86 qemu-utils ovmf
+          # Lima runs QEMU as the runner user, which needs access to /dev/kvm.
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          .github/actions/fips-vm/apt-install.sh qemu-system-x86 qemu-utils ovmf
           curl -fsSL -o "$RUNNER_TEMP/lima.tar.gz" \
             "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Linux-x86_64.tar.gz"
           echo "$LIMA_SHA256  $RUNNER_TEMP/lima.tar.gz" | sha256sum -c -

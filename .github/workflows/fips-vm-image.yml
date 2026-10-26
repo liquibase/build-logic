@@ -15,13 +15,6 @@ on:
   schedule:
     - cron: "0 4 * * 1" # Mondays, 04:00 UTC
   workflow_dispatch:
-  push:
-    branches:
-      - feat/INT-2303-fips-vm
-    paths:
-      - "fips/provision.sh"
-      - ".github/actions/fips-vm/**"
-      - ".github/workflows/fips-vm-image.yml"
 
 permissions:
   contents: read

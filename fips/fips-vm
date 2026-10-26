@@ -123,7 +123,11 @@ case "${1:-}" in
     need_running
     echo "export DOCKER_HOST=unix://$(limactl list --format '{{.Dir}}' "$name")/sock/docker.sock"
     ;;
-  stop) lima stop "$name" ;;
+  stop)
+    # Lima logs a harmless "use of closed network connection" error while it shuts the VM down.
+    lima stop "$name" 2>&1 | { grep -v 'use of closed network connection' || true; }
+    [ "${PIPESTATUS[0]}" = 0 ] && echo "==> Stopped"
+    ;;
   delete) lima delete --force "$name" ;;
   *) sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' && exit 2 ;;
 esac

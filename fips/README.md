@@ -12,10 +12,10 @@ with `/proc/sys/crypto/fips_enabled` set to `1`. INT-2303.
 | `provision.sh` | Installs everything and turns FIPS mode on. Both the CI image and the laptop VM use it. |
 | `lima.yaml` | Lima template that `fips-vm up` uses. |
 | `fips-vm` | Laptop command: `up`, `shell`, `run`, `status`, `stop`, `delete`. |
-| `selftest/` | The PostgreSQL checks that the test workflows run in the VM. |
+| `selftest/` | The checks the test workflows run in the VM: PostgreSQL with docker compose and Testcontainers, and in `liquibase/` a changelog and `try-licenses.sh` for Liquibase Secure licenses. |
 
 | Workflow | When it runs |
 | --- | --- |
 | `fips-vm-image.yml` | Mondays, and on PRs that change the image. Builds the image, boots the sealed image to check it, and publishes it to `ghcr.io/liquibase/fips-vm` (not on PRs). |
-| `fips-vm-test.yml` | PRs that change the action or `fips/`. Runs the self-test on the published image. |
+| `fips-vm-test.yml` | PRs that change the action or `fips/`. Runs the self-test on the published image, Liquibase Community included, and tries Liquibase Secure with the licenses from the vault in FIPS mode and with FIPS off (reported, not enforced). |
 | `fips-vm-laptop-test.yml` | PRs that change the laptop files. Runs `fips-vm up` with Lima on Linux. |

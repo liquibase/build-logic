@@ -27,13 +27,10 @@ concurrency:
 
 jobs:
   fips-vm:
-    name: FIPS VM on ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [ubuntu-latest, blacksmith-4vcpu-ubuntu-2404]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    # Blacksmith runners work too (checked 2026-10-26); the self-test runs on GitHub-hosted runners only.
+    name: FIPS VM on ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         shell: fips-run {0}

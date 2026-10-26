@@ -9,6 +9,11 @@ set -euo pipefail
 MAVEN_VERSION="${MAVEN_VERSION:-3.9.16}"
 RUNNER_UID="${RUNNER_UID:-1001}"
 
+# Pick the closest mirror and download in parallel: some AlmaLinux mirrors are very slow from some networks.
+for setting in fastestmirror=True max_parallel_downloads=10; do
+  grep -q "^${setting%%=*}=" /etc/dnf/dnf.conf || echo "$setting" >> /etc/dnf/dnf.conf
+done
+
 dnf -y upgrade --refresh
 dnf -y install dnf-plugins-core crypto-policies-scripts \
   git jq tar gzip unzip rsync which findutils procps-ng time libxml2 sqlite python3 \

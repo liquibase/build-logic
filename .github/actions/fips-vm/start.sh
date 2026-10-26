@@ -56,7 +56,10 @@ if [ -n "$FIPS_VM_IMAGE" ]; then
   echo "$FIPS_VM_TOKEN" | oras login ghcr.io -u fips-vm --password-stdin >/dev/null
   oras pull --output "$vm_dir" "$FIPS_VM_IMAGE" >/dev/null
   base="$vm_dir/fips-vm.qcow2"
-  image_ref="$FIPS_VM_IMAGE@$(oras resolve "$FIPS_VM_IMAGE")"
+  case $FIPS_VM_IMAGE in
+    *@sha256:*) image_ref=$FIPS_VM_IMAGE ;;
+    *) image_ref="$FIPS_VM_IMAGE@$(oras resolve "$FIPS_VM_IMAGE")" ;;
+  esac
   echo "    $(du -h "$base" | cut -f1) in $((SECONDS - t))s"
 else
   step "Downloading the AlmaLinux 9 cloud image (no prebuilt image requested)"
@@ -212,5 +215,6 @@ sudo install -m 0755 "$action_dir/fips-run" /usr/local/bin/fips-run
   echo "FIPS_VM_DIR=$vm_dir"
   echo "FIPS_VM_SSH_KEY=$vm_dir/key"
   echo "FIPS_VM_SSH_PORT=$ssh_port"
+  echo "FIPS_VM_SHARE=$share"
 } >> "$GITHUB_ENV"
 echo "image=$image_ref" >> "$GITHUB_OUTPUT"

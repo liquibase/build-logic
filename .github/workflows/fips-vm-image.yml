@@ -79,3 +79,12 @@ jobs:
             oras tag "$IMAGE:$tag" alma9
           fi
           echo "Pushed \`$IMAGE:$tag\` (\`$(oras resolve "$IMAGE:$tag")\`)" >> "$GITHUB_STEP_SUMMARY"
+
+      # Each image is about 1.1 GB. Keep the last 8, which is two months of weekly builds; alma9 is always the newest.
+      - name: Delete old images
+        if: github.ref == 'refs/heads/main'
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: fips-vm
+          package-type: container
+          min-versions-to-keep: 8

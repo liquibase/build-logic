@@ -14,6 +14,14 @@ if [ -z "${FIPS_VM_SSH_KEY:-}" ]; then
   exit 2
 fi
 
+case $PWD/ in
+  "$FIPS_VM_SHARE"/*) ;;
+  *)
+    echo "::error::fips-run can only run steps under $FIPS_VM_SHARE, which is shared with the FIPS VM. This step runs in $PWD." >&2
+    exit 2
+    ;;
+esac
+
 cleanup=()
 trap 'rm -f "${cleanup[@]}"' EXIT
 

@@ -9,7 +9,8 @@
 #   fips-vm stop             stop the VM
 #   fips-vm delete           delete the VM
 #
-# Needs Lima (brew install lima). Your home folder is shared with the VM at the same path.
+# Needs Lima 2 (brew install lima). Your home folder is shared with the VM at the same path.
+# FIPS_VM_CPUS and FIPS_VM_MEMORY (GiB) size the VM when it's created; the default is 4 CPUs and 8 GiB.
 # Guide: https://datical.atlassian.net/wiki/spaces/TE/pages/5892636673
 set -euo pipefail
 
@@ -46,11 +47,12 @@ up() {
     echo "Creating the FIPS VM '$name'. The first time takes about 10 minutes."
     mkdir -p "$LIMA_HOME/_config"
     [ -f "$LIMA_HOME/_config/user" ] || ssh-keygen -q -t ecdsa -b 384 -N '' -C fips-vm -f "$LIMA_HOME/_config/user"
-    local template
-    template=$(mktemp -t fips-vm).yaml
-    fetch lima.yaml > "$template"
-    limactl create --tty=false --name "$name" "$template"
-    rm -f "$template"
+    local tmp
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/fips-vm.XXXXXX")
+    fetch lima.yaml > "$tmp/fips.yaml"
+    limactl create --tty=false --name "$name" \
+      ${FIPS_VM_CPUS:+--cpus="$FIPS_VM_CPUS"} ${FIPS_VM_MEMORY:+--memory="$FIPS_VM_MEMORY"} "$tmp/fips.yaml"
+    rm -rf "$tmp"
   fi
   running || limactl start --tty=false "$name"
   if [ "$(in_vm cat /proc/sys/crypto/fips_enabled)" != 1 ]; then
@@ -91,5 +93,5 @@ case "${1:-}" in
     ;;
   stop) limactl stop "$name" ;;
   delete) limactl delete --force "$name" ;;
-  *) sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' && exit 2 ;;
+  *) sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' && exit 2 ;;
 esac

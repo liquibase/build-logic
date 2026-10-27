@@ -9,6 +9,8 @@ permissions:
 jobs:
   liquibase-test-harness:
     name: Liquibase Test Harness
+    # The harness needs the Pro license key from the vault, which fork PRs cannot read.
+    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
     runs-on: ubuntu-latest
 
     strategy:

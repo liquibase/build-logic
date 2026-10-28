@@ -11,7 +11,8 @@ class PostgresInFipsVmTest {
 
     @Test
     void testcontainersStartsPostgresAndTheJvmConnects() throws Exception {
-        System.out.println("First security provider: " + Security.getProviders()[0].getName());
+        // Red Hat OpenJDK switches itself to FIPS mode in the VM; MAVEN_OPTS only changes Maven's own JVM.
+        assertEquals("SunPKCS11-NSS-FIPS", Security.getProviders()[0].getName());
         // SCRAM authentication runs PBKDF2, which a FIPS-mode JVM only accepts with a password of 14+ characters.
         try (var postgres = new PostgreSQLContainer("postgres:17-alpine").withPassword("fips-vm-selftest-password")) {
             postgres.start();

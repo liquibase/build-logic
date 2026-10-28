@@ -3,8 +3,11 @@ name: FIPS VM test
 # Checks the fips-vm action end to end with the published image: the VM boots in FIPS mode, a UBI 9 container
 # inherits it, docker compose and Testcontainers start PostgreSQL, Liquibase installed from its RPM repo updates
 # PostgreSQL with a FIPS-mode JVM, and files and GITHUB_ENV round-trip to the runner. A second job tries Liquibase
-# Secure 6 with the old license key and the new license file from the vault. Changes to fips/provision.sh are checked by fips-vm-image.yml, which builds the VM from scratch, and
-# the laptop setup by fips-vm-laptop-test.yml.
+# Secure 6 with the old license key and the new license file from the vault. Changes to fips/provision.sh are checked
+# by fips-vm-image.yml, which builds the VM from scratch, and the laptop setup by fips-vm-laptop-test.yml.
+#
+# The vault roles trust this workflow from main only, so the Liquibase Secure parts run on the weekly and manual runs
+# from main, not on pull requests (liquibase-infrastructure, vault-manager/GROUPED-SECRETS.md).
 
 on:
   pull_request:
@@ -12,6 +15,8 @@ on:
       - ".github/actions/fips-vm/**"
       - ".github/workflows/fips-vm-*.yml"
       - "fips/**"
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC: after fips-vm-image.yml publishes the week's image, and catches an expired CI license
   workflow_dispatch:
     inputs:
       image:
@@ -37,6 +42,8 @@ jobs:
         shell: fips-run {0}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false # the VM shares the work directory, where checkout would keep the token
 
       - name: Start the FIPS VM
         id: fips
@@ -128,10 +135,10 @@ jobs:
 
   liquibase-secure-licenses:
     # Liquibase Secure 6 with the old license key and the new license file, each in FIPS mode and with FIPS off.
-    # Reports what works in FIPS mode and fails only if a license is broken (see try-licenses.sh). Needs the
-    # vault, so it doesn't run on PRs from forks. The license file is only read on runs from main.
+    # Reports what works in FIPS mode and fails only if a license is broken (see try-licenses.sh). Each license has a
+    # grouped secret of its own, read alone, and their roles trust this workflow from main only.
     name: Liquibase Secure licenses in FIPS mode
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -147,30 +154,26 @@ jobs:
       LIQUIBASE_COMMAND_CHANGELOG_FILE: changelog.yaml
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false # the VM shares the work directory, where checkout would keep the token
 
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-6
           aws-region: us-east-1
 
       - name: Read the old license key from the vault
         shell: bash
         run: |
-          fips/selftest/liquibase/save-licenses.sh /vault/liquibase "$RUNNER_TEMP/licenses" PRO_LICENSE_KEY
+          fips/selftest/liquibase/save-licenses.sh /vault/grouped/pro-license "$RUNNER_TEMP/licenses" PRO_LICENSE_KEY
           echo "LICENSES_DIR=$RUNNER_TEMP/licenses" >> "$GITHUB_ENV"
 
-      # The license file has a grouped secret of its own, whose role trusts this workflow from main only
-      # (liquibase-infrastructure, vault-manager/GROUPED-SECRETS.md), so pull request runs skip it.
-      - if: github.event_name != 'pull_request'
-        continue-on-error: true
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-file
           aws-region: us-east-1
 
       - name: Read the new license file from the vault
-        if: github.event_name != 'pull_request'
-        continue-on-error: true
         shell: bash
         run: fips/selftest/liquibase/save-licenses.sh /vault/grouped/pro-license-file "$RUNNER_TEMP/licenses" PRO_LICENSE_FILE
 
@@ -197,7 +200,7 @@ jobs:
   guide-examples:
     # Runs the steps of the developer guide's Liquibase jobs for GitHub Actions, as written there, so the guide stays
     # correct: https://datical.atlassian.net/wiki/spaces/TE/pages/5892636673
-    # Keep these steps and the guide in sync. The Secure part needs the vault, so it skips PRs from forks.
+    # Keep these steps and the guide in sync. The Secure part needs the vault, so it only runs from main.
     name: Developer guide examples
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -211,25 +214,24 @@ jobs:
       LIQUIBASE_COMMAND_URL: jdbc:postgresql://localhost:5432/postgres
       LIQUIBASE_COMMAND_USERNAME: postgres
       LIQUIBASE_COMMAND_PASSWORD: choose-14-or-more-chars
-      FROM_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository && github.event_name == 'pull_request' }}
+      SECURE: ${{ github.event_name != 'pull_request' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false # the VM shares the work directory, where checkout would keep the token
 
       - name: Use the self-test changelog
         shell: bash
         run: cp fips/selftest/liquibase/changelog.yaml changelog.yaml
 
-      - if: env.FROM_FORK != 'true'
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+      # The guide uses this action from @main, with the role that trusts the reader's repo.
+      - name: Read the license from the vault
+        if: env.SECURE == 'true'
+        uses: ./.github/actions/setup-aws-vault
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - if: env.FROM_FORK != 'true'
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
-        with:
-          secret-ids: ",/vault/liquibase"
-          parse-json-secrets: true
+          group: pro-license
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-pro-license-6
 
       - name: Start the FIPS VM
         uses: ./.github/actions/fips-vm
@@ -248,13 +250,13 @@ jobs:
 
       # --- Guide: Liquibase Secure in GitHub Actions ---
       - name: Start over for the Secure job (only here; in the guide it's a job of its own)
-        if: env.FROM_FORK != 'true'
+        if: env.SECURE == 'true'
         run: |
           sudo dnf remove -y liquibase
           docker rm -f pg
 
       - name: Start PostgreSQL and install Liquibase Secure
-        if: env.FROM_FORK != 'true'
+        if: env.SECURE == 'true'
         run: |
           docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD="$LIQUIBASE_COMMAND_PASSWORD" postgres:17
           sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
@@ -262,7 +264,7 @@ jobs:
           until docker exec pg pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; do sleep 1; done
 
       - name: Update the database
-        if: env.FROM_FORK != 'true'
+        if: env.SECURE == 'true'
         env:
           LIQUIBASE_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
           JAVA_OPTS: -Dcom.redhat.fips=false

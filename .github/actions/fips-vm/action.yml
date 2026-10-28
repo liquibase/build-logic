@@ -7,7 +7,7 @@ description: |
 
 inputs:
   image:
-    description: 'OCI reference of the prebuilt FIPS VM image from fips-vm-image.yml. Empty builds the VM from the AlmaLinux 9 cloud image instead, which takes about 10 minutes longer.'
+    description: 'OCI reference of the prebuilt FIPS VM image from fips-vm-image.yml: the alma9 tag (rebuilt every week), or a digest such as ghcr.io/liquibase/fips-vm@sha256:... to pin one build; only the last 8 weekly builds are kept. Empty builds the VM from the AlmaLinux 9 cloud image instead, which takes about 10 minutes longer.'
     required: false
     default: 'ghcr.io/liquibase/fips-vm:alma9'
   cpus:
@@ -48,6 +48,7 @@ runs:
         FIPS_VM_CPUS: ${{ inputs.cpus }}
         FIPS_VM_MEMORY_MB: ${{ inputs.memory-mb }}
         FIPS_VM_DISK_SIZE: ${{ inputs.disk-size }}
-        FIPS_VM_TOKEN: ${{ github.token }}
+        # Only to pull the image: building from the cloud image doesn't need it.
+        FIPS_VM_TOKEN: ${{ inputs.image != '' && github.token || '' }}
         FIPS_VM_APT_CACHE: ~/.cache/fips-vm/apt
       run: '"$GITHUB_ACTION_PATH/start.sh"'

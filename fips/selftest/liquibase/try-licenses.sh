@@ -18,11 +18,11 @@ rows=()
 attempt() { # LICENSE_LABEL JVM_LABEL JAVA_OPTS ENV...
   local label=$1 jvm=$2 java_opts=$3
   shift 3
-  local out status code update
+  local out status code update update_out
   out=$(env "$@" JAVA_OPTS="$java_opts" liquibase ${classpath:+--classpath="$classpath"} license status 2>&1 || true)
   status=$(awk '/^Status:/ {print $2; exit}' <<<"$out")
   code=$(awk '/^Code:/ {print $2; exit}' <<<"$out")
-  if env "$@" JAVA_OPTS="$java_opts" liquibase ${classpath:+--classpath="$classpath"} update >/dev/null 2>&1; then
+  if update_out=$(env "$@" JAVA_OPTS="$java_opts" liquibase ${classpath:+--classpath="$classpath"} update 2>&1); then
     update=works
   else
     update=refused
@@ -30,6 +30,8 @@ attempt() { # LICENSE_LABEL JVM_LABEL JAVA_OPTS ENV...
   rows+=("| $label | $jvm | ${status:-unknown} | ${code:--} | $update |")
   echo "$label, $jvm JVM: license ${status:-unknown} ${code:+($code)}, update $update"
   if [ "$jvm" = "FIPS off" ] && [ "$update" != works ]; then
+    # The masks from the vault step still apply to this output.
+    printf '%s\n' "$update_out" >&2
     echo "::error::The $label doesn't work even with FIPS off. Check the license in the vault."
     broken=1
   fi
@@ -44,13 +46,8 @@ for kind in key file; do
     secret="$dir/PRO_LICENSE_FILE"
   fi
   if [ ! -s "$secret" ]; then
-    if [ "$kind" = file ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ]; then
-      echo "The $label is only read on runs from main: its vault role trusts this workflow from main only."
-      rows+=("| $label | - | only on runs from main | - | - |")
-    else
-      echo "::warning::No $label: $(basename "$secret") wasn't read from the vault."
-      rows+=("| $label | - | not read from the vault | - | - |")
-    fi
+    echo "::warning::No $label: $(basename "$secret") wasn't read from the vault."
+    rows+=("| $label | - | not read from the vault | - | - |")
     continue
   fi
   if [ "$kind" = key ]; then

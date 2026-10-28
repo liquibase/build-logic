@@ -113,12 +113,17 @@ case "${1:-}" in
     [ $# -gt 0 ] || die "usage: fips-vm run CMD [ARGS]"
     need_running
     # Pass LIQUIBASE_* variables (license key, command arguments) to the VM; the rest of the laptop's
-    # environment, like PATH or JAVA_HOME, doesn't apply there.
-    liquibase_env=()
+    # environment, like PATH or JAVA_HOME, doesn't apply there. They go through a file only you can read, in the
+    # home folder the VM shares, which the VM deletes as soon as it has read it: on the command line, a license
+    # key would be visible to every user of the laptop. stdin stays free for the command.
+    mkdir -p "$HOME/.fips-vm"
+    env_file=$(mktemp "$HOME/.fips-vm/run-env.XXXXXX")
+    trap 'rm -f "$env_file"' EXIT
     while IFS= read -r var; do
-      liquibase_env+=("$var=${!var}")
-    done < <(compgen -e | grep '^LIQUIBASE_' || true)
-    limactl shell "$name" env ${liquibase_env[@]+"${liquibase_env[@]}"} bash -lc '"$@"' fips-vm "$@"
+      printf 'export %s=%q\n' "$var" "${!var}"
+    done < <(compgen -e | grep '^LIQUIBASE_' || true) > "$env_file"
+    # shellcheck disable=SC2016 # expanded in the VM
+    limactl shell "$name" bash -lc '. "$1" && rm -f "$1" && shift && exec "$@"' fips-vm "$env_file" "$@"
     ;;
   status) status ;;
   docker-env)

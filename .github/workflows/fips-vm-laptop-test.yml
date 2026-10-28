@@ -31,6 +31,8 @@ jobs:
       FIPS_VM_APT_CACHE: ~/.cache/fips-vm/apt
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false # the VM shares the work directory, where checkout would keep the token
 
       - id: apt-cache-key
         run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
@@ -62,6 +64,14 @@ jobs:
           test "$(fips/fips-vm run cat /proc/sys/crypto/fips_enabled)" = 1
           test "$(fips/fips-vm run pwd)" = "$PWD"
           test "$(fips/fips-vm run docker run --rm registry.access.redhat.com/ubi9/ubi-minimal cat /proc/sys/crypto/fips_enabled)" = 1
+
+      - name: LIQUIBASE_* variables reach the VM, and the file that carries them is gone
+        env:
+          LIQUIBASE_FIPS_VM_CHECK: "a value with spaces, 'quotes' and $dollars"
+        run: |
+          test "$(fips/fips-vm run printenv LIQUIBASE_FIPS_VM_CHECK)" = "$LIQUIBASE_FIPS_VM_CHECK"
+          test "$(echo from stdin | fips/fips-vm run cat)" = "from stdin"
+          test -z "$(ls ~/.fips-vm/run-env.* 2>/dev/null)"
 
       - name: Testcontainers starts PostgreSQL in the VM
         run: fips/fips-vm run mvn -B -ntp -f fips/selftest/pom.xml verify

@@ -63,7 +63,15 @@ systemctl disable --now rpcbind.socket rpcbind.service 2>/dev/null || true
 systemctl mask rpcbind.socket rpcbind.service 2>/dev/null || true
 
 # The runner user has the same uid as the GitHub runner, so files in the shared work directory keep their owner.
-id runner >/dev/null 2>&1 || useradd -m -u "$RUNNER_UID" runner
+# On a Linux laptop, Lima's user takes the laptop user's uid, which may be that one; the laptop doesn't use the
+# runner user, so it gets the next free uid there.
+if ! id runner >/dev/null 2>&1; then
+  if getent passwd "$RUNNER_UID" >/dev/null; then
+    useradd -m runner
+  else
+    useradd -m -u "$RUNNER_UID" runner
+  fi
+fi
 usermod -aG docker runner
 echo 'runner ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/90-runner
 chmod 0440 /etc/sudoers.d/90-runner

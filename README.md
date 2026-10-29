@@ -68,7 +68,7 @@ A `pull_request` from a fork gets no secrets and no OIDC token. The guard is `gi
 | Workflow | What a fork PR does |
 |---|---|
 | `os-extension-test.yml`, `codeql.yml` | Skip the vault and GitHub Packages settings steps and build from Maven Central only |
-| `lth-docker.yml` | Skips the Pro license read and runs the harness with an empty `LIQUIBASE_PRO_LICENSE_KEY` |
+| `lth-docker.yml` | Skips the Pro license read and runs the harness with an empty `LIQUIBASE_PRO_LICENSE_KEY`. Skips the Test Reporter check run, which needs a write token; results stay in the job log |
 | `sonar-scan.yml`, `fossa_ai.yml` | Skip the job. The skipped check still passes a required status check |
 | `extension-attach-artifact-release.yml` | A merged fork PR skips every job; the push to main attaches the artifact |
 

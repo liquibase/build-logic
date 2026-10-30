@@ -120,11 +120,32 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           MAX_PRS_PER_SWEEP: ${{ inputs.max_prs_per_sweep }}
+          PROJECT_KEYS: ${{ inputs.project_keys }}
         with:
           script: |
             const maxPrs = parseInt(process.env.MAX_PRS_PER_SWEEP, 10) || 50;
+            const projectKeys = process.env.PROJECT_KEYS
+              .split(',').map(s => s.trim()).filter(Boolean);
             const { owner, repo } = context.repo;
             const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+            // ---- Extract ticket keys ---------------------------------
+            // Same convention as jira-ticket-linker.yml: title, then branch
+            // name, then body. Unlike that workflow we collect EVERY match,
+            // not the first one - knowing a PR spans several tickets is what
+            // drives the no-transition decision in the next step.
+            const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const keyRegex = new RegExp(
+              `\\b(?:${projectKeys.map(escapeRegex).join('|')})-\\d+\\b`, 'gi'
+            );
+            function jiraKeys(pr) {
+              const keys = new Set();
+              for (const source of [pr.title, pr.head && pr.head.ref, pr.body]) {
+                const matches = (source || '').match(keyRegex);
+                if (matches) matches.forEach(k => keys.add(k.toUpperCase()));
+              }
+              return [...keys].sort();
+            }
 
             // ---- Is this PR actually conflicted? ---------------------
             // `mergeable_state` is absent from the list endpoint and computed
@@ -214,16 +235,17 @@ jobs:
               return;
             }
 
-            // Trim to the fields the next step reads - a full PR object per
-            // entry would be tens of KB against the 1MB step-output limit.
+            // Send keys, not PR bodies: `targets` becomes one env var in the
+            // next step, and Linux refuses to start a process with any single
+            // env string over 128 KB.
             core.setOutput('has_targets', targets.length ? 'true' : 'false');
             core.setOutput('targets', JSON.stringify(targets.map(({ pr, reason }) => ({
               pr: {
                 number: pr.number,
                 title: pr.title,
                 head: { ref: pr.head && pr.head.ref, sha: pr.head && pr.head.sha },
-                body: pr.body,
                 html_url: pr.html_url,
+                keys: jiraKeys(pr),
               },
               reason,
             }))));
@@ -247,7 +269,6 @@ jobs:
         if: steps.scan.outputs.has_targets == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          PROJECT_KEYS: ${{ inputs.project_keys }}
           SOURCE_STATUSES: ${{ inputs.source_statuses }}
           TARGET_STATUS: ${{ inputs.target_status }}
           COMMENT_ONLY: ${{ inputs.comment_only }}
@@ -258,8 +279,6 @@ jobs:
         with:
           script: |
             // ---- Inputs ----------------------------------------------
-            const projectKeys = process.env.PROJECT_KEYS
-              .split(',').map(s => s.trim()).filter(Boolean);
             const sourceStatuses = process.env.SOURCE_STATUSES
               .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
             const targetStatus = process.env.TARGET_STATUS.trim();
@@ -286,21 +305,7 @@ jobs:
 
             for (const { pr, reason } of targets) {
               const sha7 = ((pr.head && pr.head.sha) || 'unknown').slice(0, 7);
-              // ---- Extract ticket keys ---------------------------------
-              // Same convention as jira-ticket-linker.yml: title, then branch
-              // name, then body. Unlike that workflow we collect EVERY match,
-              // not the first one - knowing a PR spans several tickets is what
-              // drives the no-transition decision below.
-              const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const keyRegex = new RegExp(
-                `\\b(?:${projectKeys.map(escapeRegex).join('|')})-\\d+\\b`, 'gi'
-              );
-              const keys = new Set();
-              for (const source of [pr.title, pr.head && pr.head.ref, pr.body]) {
-                const matches = (source || '').match(keyRegex);
-                if (matches) matches.forEach(k => keys.add(k.toUpperCase()));
-              }
-              if (keys.size === 0) {
+              if (pr.keys.length === 0) {
                 console.log(`PR #${pr.number}: no Jira keys in title, branch or body. Skipping.`);
                 continue;
               }
@@ -309,7 +314,7 @@ jobs:
               // Eligibility is the ticket's current status. This is both the
               // TECHOPS-421 guard and the idempotency guard.
               const eligible = [];
-              for (const key of [...keys].sort()) {
+              for (const key of pr.keys) {
                 const resp = await fetch(
                   `${baseUrl}/rest/api/3/issue/${key}?fields=status`, { headers }
                 );

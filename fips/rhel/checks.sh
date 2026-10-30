@@ -155,7 +155,9 @@ if [ -x "$secure/liquibase" ]; then
     say INFO "No license: the Liquibase Secure license and update checks were skipped"
   fi
 fi
-docker compose -f "$selftest/compose.yml" down >>"$log" 2>&1
+# The instance is discarded after the checks, so a failed teardown is reported but doesn't fail the run.
+docker compose -f "$selftest/compose.yml" down >>"$log" 2>&1 ||
+  say INFO "compose: docker compose down failed (see $log)"
 check testcontainers "Testcontainers starts PostgreSQL and a FIPS-mode JVM connects" testcontainers_postgres
 # Informational, as in the self-test: Maven itself in FIPS mode.
 if maven_in_fips_mode >>"$log" 2>&1; then

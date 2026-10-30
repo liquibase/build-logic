@@ -131,19 +131,27 @@ EOF
 size=$(wc -c <"$work/user-data.yaml" | tr -d ' ')
 [ "$size" -le 16384 ] || fail "The user data is $size bytes; EC2 allows 16384."
 
-name="fips-rhel-${GITHUB_RUN_ID:-local-$(date +%s)}"
+name="fips-rhel-${GITHUB_RUN_ID:-local-$(date +%s)}${GITHUB_RUN_ATTEMPT:+-$GITHUB_RUN_ATTEMPT}"
 tags="{Key=managed_by,Value=fips-rhel},{Key=Name,Value=$name},{Key=Project,Value=fips-rhel}"
 id=""
+write_report() {
+  [ ! -f "$work/seen" ] || sort -n "$work/seen" | cut -d' ' -f2- >"$out/report.txt"
+}
 finish() {
+  # What arrived is kept also when the run ends early: a timeout, a failure, the instance gone.
+  write_report
   [ -n "$id" ] || return 0
   aws ec2 get-console-output --instance-id "$id" --latest --query Output --output text >"$out/console.txt" 2>/dev/null || true
   aws ec2 terminate-instances --instance-ids "$id" >/dev/null && step "Terminated $id"
 }
 trap finish EXIT
 
-# Some zones don't have every instance type at times: try the next subnet.
+# Some zones don't have every instance type at times: try the next subnet. A client token per subnet makes each
+# launch idempotent: if the call fails after EC2 accepted it (a timeout), the instance is found by its token and
+# used, so finish() terminates it like any other.
 for subnet in ${subnets//,/ }; do
-  if id=$(aws ec2 run-instances --image-id "$ami" --instance-type "$type" \
+  token="$name-$subnet"
+  if id=$(aws ec2 run-instances --client-token "$token" --image-id "$ami" --instance-type "$type" \
     --network-interfaces "DeviceIndex=0,SubnetId=$subnet,Groups=$sg,AssociatePublicIpAddress=true,DeleteOnTermination=true" \
     --block-device-mappings "DeviceName=$root_device,Ebs={VolumeSize=40,VolumeType=gp3,DeleteOnTermination=true,Encrypted=true}" \
     --metadata-options HttpTokens=required,HttpPutResponseHopLimit=1,HttpEndpoint=enabled \
@@ -151,6 +159,12 @@ for subnet in ${subnets//,/ }; do
     --tag-specifications "ResourceType=instance,Tags=[$tags]" "ResourceType=volume,Tags=[$tags]" \
     --user-data "file://$work/user-data.yaml" \
     --query 'Instances[0].InstanceId' --output text 2>"$work/run.err"); then
+    break
+  fi
+  id=$(aws ec2 describe-instances --filters "Name=client-token,Values=$token" \
+    --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || true)
+  if [[ $id == i-* ]]; then
+    echo "    The launch call failed, but EC2 started $id: using it"
     break
   fi
   id=""
@@ -180,7 +194,7 @@ while [ $((SECONDS - started)) -lt $((timeout_min * 60)) ]; do
 done
 [ -n "$result" ] || fail "No result after $timeout_min minutes."
 
-sort -n "$work/seen" | cut -d' ' -f2- >"$out/report.txt"
+write_report
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
     echo "### FIPS checks on RHEL 9"

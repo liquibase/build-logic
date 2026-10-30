@@ -15,9 +15,12 @@ say() { "$here/say.sh" "$@"; }
 
 if [ "$(cat /proc/sys/crypto/fips_enabled)" = 1 ]; then
   [ -f /var/lib/fips-rhel/checked ] && exit 0
-  touch /var/lib/fips-rhel/checked
   say STEP "Booted in FIPS mode"
-  exec "$here/checks.sh" "$fips/selftest"
+  # Marked done only once the checks end: a reboot in the middle runs them again instead of leaving no END.
+  "$here/checks.sh" "$fips/selftest"
+  status=$?
+  touch /var/lib/fips-rhel/checked
+  exit "$status"
 fi
 
 if [ -f /var/lib/fips-vm/provisioned ]; then

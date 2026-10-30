@@ -3,19 +3,61 @@ name: FIPS RHEL test
 # account (INT-2446). AlmaLinux 9 in the FIPS VM (fips-vm-test.yml) covers daily and nightly runs; this
 # covers each release. fips/rhel/run.sh does the work: see fips/README.md.
 #
-# The role in FIPS_RHEL_ROLE_ARN (github-actions-fips-rhel, liquibase-infrastructure dev-account/fips-rhel.tf)
-# trusts this file on main in the fips-rhel environment only, and may only start, read the console of and
-# terminate instances tagged managed_by=fips-rhel. The environment and its variable are in
-# liquibase-infrastructure github/liquibase/repos/public/fips-rhel-environment.tf.
+# With a version, it also tests that Liquibase Secure release archive from repo.liquibase.com with the CI
+# license, which the instance reads from the vault itself (fips/rhel/secure.sh).
+#
+# Run it by hand from main, or call it from a release workflow. Either way the job runs in the caller repo's
+# `fips-rhel` environment, which holds the variables FIPS_RHEL_ROLE_ARN and FIPS_RHEL_LICENSE_ROLE_ARN.
+# The role in FIPS_RHEL_ROLE_ARN, github-actions-fips-rhel (liquibase-infrastructure dev-account/fips-rhel.tf),
+# trusts this file on main from that environment in build-logic and liquibase-pro only, and may only start,
+# read the console of and terminate instances tagged managed_by=fips-rhel. The environments are in
+# liquibase-infrastructure github/liquibase/repos/{public,internal}/fips-rhel-environment.tf.
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Liquibase Secure version to test, a release (6.0.1) or an RC (6.0.1-RC1). Empty: platform checks with Liquibase Community only."
+        required: false
+        type: string
+      package:
+        description: "Release archive to test"
+        required: false
+        type: choice
+        options: [liquibase-secure, liquibase-secure-fips]
+        default: liquibase-secure
+      require-fips-license:
+        description: "Fail when the license or update fails in FIPS mode (once license files verify in FIPS mode, INT-2438)"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      version:
+        description: "Liquibase Secure version to test, a release (6.0.1) or an RC (6.0.1-RC1). Empty: platform checks only."
+        required: false
+        type: string
+        default: ""
+      package:
+        description: "liquibase-secure or liquibase-secure-fips"
+        required: false
+        type: string
+        default: liquibase-secure
+      require-fips-license:
+        description: "Fail when the license or update fails in FIPS mode"
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      result:
+        description: "PASS or FAIL"
+        value: ${{ jobs.rhel.outputs.result }}
 
 permissions:
   contents: read
 
 concurrency:
-  group: fips-rhel-test
+  group: fips-rhel-test-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -27,9 +69,14 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      result: ${{ steps.run.outputs.result }}
     steps:
+      # The scripts come from build-logic at the ref this workflow runs from, also when another repo calls it.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          repository: liquibase/build-logic
+          ref: ${{ github.repository == 'liquibase/build-logic' && github.sha || 'main' }}
           persist-credentials: false
 
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -39,14 +86,26 @@ jobs:
           role-duration-seconds: 4500 # outlasts the job's 60 minutes, so the instance can always be terminated
 
       - name: Run the checks on a RHEL 9 instance
+        id: run
         env:
           FIPS_RHEL_OUT_DIR: ${{ runner.temp }}/fips-rhel
-        run: fips/rhel/run.sh
+          FIPS_RHEL_SECURE_VERSION: ${{ inputs.version }}
+          FIPS_RHEL_SECURE_PACKAGE: ${{ inputs.package || 'liquibase-secure' }}
+          FIPS_RHEL_REQUIRE_FIPS_LICENSE: ${{ inputs.require-fips-license && 'true' || 'false' }}
+          # Only with a version: the instance reads the license from the vault with this role.
+          FIPS_RHEL_LICENSE_ROLE_ARN: ${{ inputs.version != '' && vars.FIPS_RHEL_LICENSE_ROLE_ARN || '' }}
+        run: |
+          if fips/rhel/run.sh; then
+            echo "result=PASS" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=FAIL" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
 
       - name: Keep the report and the console output
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: fips-rhel-${{ github.run_id }}
+          name: fips-rhel-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/fips-rhel
           if-no-files-found: ignore

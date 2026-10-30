@@ -42,11 +42,36 @@ checked on real RHEL 9 (INT-2446): `fips-rhel-test.yml` runs `rhel/run.sh`, whic
 3. Reads the results from the instance's serial console, writes them to the job summary, and terminates the
    instance, also when something fails. The instance stops itself, and so terminates, an hour after each boot.
 
-A run takes about 10 minutes. Nothing connects to the instance: its security group has no inbound rule, and it
-has no SSH key and no instance role. The role `github-actions-fips-rhel` trusts this workflow from `main` in the
-`fips-rhel` environment only, and may only start `m7i.xlarge` instances tagged `managed_by=fips-rhel`, read their
-console and terminate them. The role, the security group and the environment are in liquibase-infrastructure
-(`dev-account/fips-rhel.tf`, `test-automation/fips-rhel-config.tf`, `github/liquibase/repos/public/fips-rhel-environment.tf`).
+A run takes about 10 minutes. Nothing connects to the instance: its security group has no inbound rule and it has
+no SSH key.
 
-To run it from a laptop, with dev account credentials: `fips/rhel/run.sh`. Set `FIPS_RHEL_SUBNET_IDS` and
-`FIPS_RHEL_SECURITY_GROUP_ID` if your credentials can't read `/fips-rhel/config/*` in SSM.
+### Testing a Liquibase Secure release
+
+With a `version` (a release, `6.0.1`, or an RC, `6.0.1-RC1`) the run also tests that archive from
+`repo.liquibase.com` (`releases/secure/` or `non-releases/secure/`; `package: liquibase-secure-fips` once that
+archive exists):
+
+- `run.sh` reads the published `.sha256`, and the instance checks the archive against it before unpacking it.
+- On its first boot, before FIPS mode is on, the instance reads the CI license itself (`rhel/secure.sh`). Its role,
+  `fips-rhel-instance`, may only assume `vault-grouped-pro-license-file`, which lists it in `aws_roles`. The license
+  never passes through GitHub, the runner or the user data.
+- The checks run `liquibase --version`, then `license status` and `update` with FIPS off for Liquibase, which must
+  work, and in FIPS mode, which is reported, not enforced, until license files verify in FIPS mode (INT-2438).
+  `require-fips-license: true` makes the FIPS-mode run a check.
+
+Runs without a version get no instance role.
+
+### Who runs it
+
+- **By hand:** Actions, **FIPS RHEL test**, from `main` (the `fips-rhel` environment admits no other branch).
+- **Releases:** liquibase-pro's `secure-release-orchestrator.yml` and `rc-release-orchestrator.yml` call it after
+  publishing, with the released version. It runs in liquibase-pro's own `fips-rhel` environment.
+- **From a laptop**, with dev account credentials: `fips/rhel/run.sh`, with the settings at the top of the script.
+  It tests the local files, committed or not. Set `FIPS_RHEL_SUBNET_IDS` and `FIPS_RHEL_SECURITY_GROUP_ID` if your
+  credentials can't read `/fips-rhel/config/*` in SSM.
+
+The role `github-actions-fips-rhel` trusts this workflow from `main`, in the `fips-rhel` environment of build-logic
+or liquibase-pro, and may only start `m7i.xlarge` instances tagged `managed_by=fips-rhel` (with `fips-rhel-instance`
+at most), read their console and terminate them. The roles, the security group and both environments are in
+liquibase-infrastructure: `dev-account/fips-rhel.tf`, `test-automation/fips-rhel-config.tf` and
+`github/liquibase/repos/{public,internal}/fips-rhel-environment.tf`.

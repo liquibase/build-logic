@@ -26,11 +26,24 @@ if [ -f /var/lib/fips-vm/provisioned ]; then
 fi
 
 say STEP "Installing Docker, Java and Maven, and turning FIPS mode on (fips/provision.sh)"
-if bash "$fips/provision.sh" >"$log" 2>&1; then
-  say STEP "Installed. Rebooting into FIPS mode"
-else
+if ! bash "$fips/provision.sh" >"$log" 2>&1; then
   say FAIL "provision: fips/provision.sh failed"
   tail -n 20 "$log" | while IFS= read -r line; do say LOG "provision: $line"; done
   say END "FAIL Installing the software failed"
   exit 1
 fi
+
+# The Liquibase Secure archive and the license, while FIPS mode is still off.
+# shellcheck source=/dev/null
+. "$fips/../run.env"
+if [ -n "${FIPS_RHEL_SECURE_URL:-}${FIPS_RHEL_LICENSE_ROLE_ARN:-}" ]; then
+  say STEP "Getting Liquibase Secure ${FIPS_RHEL_SECURE_VERSION:-} ${FIPS_RHEL_LICENSE_ROLE_ARN:+and the CI license}"
+  if ! "$here/secure.sh" "$fips/../run.env" >/var/log/fips-rhel/secure.log 2>&1; then
+    say FAIL "secure: getting the Liquibase Secure archive or the license failed"
+    tail -n 10 /var/log/fips-rhel/secure.log | while IFS= read -r line; do say LOG "secure: $line"; done
+    say END "FAIL Getting Liquibase Secure failed"
+    touch /var/lib/fips-rhel/checked # nothing to run after the reboot
+    exit 1
+  fi
+fi
+say STEP "Installed. Rebooting into FIPS mode"

@@ -10,6 +10,10 @@
 set -uo pipefail
 
 selftest=${1:?usage: checks.sh SELFTEST_DIR}
+# shellcheck source=/dev/null
+. "$selftest/../../run.env"
+secure=/opt/liquibase-secure
+license=/root/.fips-rhel/license.lic
 log=/var/log/fips-rhel/checks.log
 work=$(mktemp -d)
 mkdir -p "$(dirname "$log")"
@@ -87,6 +91,36 @@ liquibase_update() {
     grep -qx 'written by Liquibase in the FIPS VM'
 }
 
+secure_version() {
+  "$secure/liquibase" --version 2>&1 | tee /dev/stderr |
+    grep -qE "Liquibase Secure Version: ${FIPS_RHEL_SECURE_VERSION%%-*}"
+}
+
+# secure_run JAVA_OPTS: license status and update on the `secure` database with the CI license. Prints
+# "<status> <code> <update>" and fails when update fails.
+secure_run() {
+  local out status code
+  out=$(env JAVA_OPTS="$1" LIQUIBASE_LICENSE_FILE="$license" LIQUIBASE_ANALYTICS_ENABLED=false \
+    timeout -k 10 180 "$secure/liquibase" license status 2>&1) || true
+  status=$(awk '/^Status:/ {print $2; exit}' <<<"$out")
+  code=$(awk '/^Code:/ {print $2; exit}' <<<"$out")
+  if (
+    cd "$selftest/liquibase" &&
+      env JAVA_OPTS="$1" LIQUIBASE_LICENSE_FILE="$license" LIQUIBASE_ANALYTICS_ENABLED=false \
+        LIQUIBASE_COMMAND_URL=jdbc:postgresql://localhost:5432/secure LIQUIBASE_COMMAND_USERNAME=postgres \
+        LIQUIBASE_COMMAND_PASSWORD=fips-vm-selftest-password LIQUIBASE_COMMAND_CHANGELOG_FILE=changelog.yaml \
+        timeout -k 10 180 "$secure/liquibase" update
+  ) >&2; then
+    echo "${status:-unknown} ${code:--} works"
+  else
+    echo "${status:-unknown} ${code:--} refused"
+    return 1
+  fi
+}
+
+secure_fips_off() { secure_run -Dcom.redhat.fips=false; }
+secure_fips() { secure_run ""; }
+
 testcontainers_postgres() {
   MAVEN_OPTS=-Dcom.redhat.fips=false mvn -B -ntp -f "$selftest/pom.xml" verify
 }
@@ -102,6 +136,25 @@ check ubi9 "A UBI 9 container inherits FIPS mode" ubi9_inherits
 check java "Red Hat OpenJDK runs in FIPS mode, and -Dcom.redhat.fips=false turns it off" java_fips
 check compose "docker compose starts PostgreSQL" compose_postgres
 check liquibase "Liquibase updates PostgreSQL with a FIPS-mode JVM" liquibase_update
+
+# Liquibase Secure from the release archive, when run.sh named one (secure.sh unpacked it).
+if [ -x "$secure/liquibase" ]; then
+  check secure-version "Liquibase Secure $FIPS_RHEL_SECURE_VERSION from the release archive starts" secure_version
+  if [ -s "$license" ]; then
+    docker compose -f "$selftest/compose.yml" exec -T postgres psql -U postgres -qc 'create database secure' >>"$log" 2>&1
+    check secure-fips-off "Liquibase Secure: the license and update work with FIPS off for Liquibase" secure_fips_off
+    if [ "${FIPS_RHEL_REQUIRE_FIPS_LICENSE:-false}" = true ]; then
+      check secure-fips "Liquibase Secure: the license verifies and update works in FIPS mode" secure_fips
+    else
+      # Liquibase 6 can't verify license files in FIPS mode until INT-2438, so this is reported, not enforced.
+      result=$(secure_fips 2>>"$log" || true)
+      read -r status code update <<<"$result"
+      say INFO "Liquibase Secure in FIPS mode: license $status ($code), update $update. Not enforced until license files verify in FIPS mode (INT-2438)"
+    fi
+  else
+    say INFO "No license: the Liquibase Secure license and update checks were skipped"
+  fi
+fi
 docker compose -f "$selftest/compose.yml" down >>"$log" 2>&1
 check testcontainers "Testcontainers starts PostgreSQL and a FIPS-mode JVM connects" testcontainers_postgres
 # Informational, as in the self-test: Maven itself in FIPS mode.
@@ -117,6 +170,9 @@ say ENV "$(fips-mode-setup --check 2>&1 | tail -n 1) crypto policy: $(update-cry
 say ENV "java: $(java -version 2>&1 | head -n 1)"
 say ENV "docker: $(docker --version)"
 say ENV "liquibase: $(liquibase --version 2>/dev/null | awk '/Liquibase Version/ {print $3}')"
+if [ -x "$secure/liquibase" ]; then
+  say ENV "liquibase secure: $("$secure/liquibase" --version 2>/dev/null | awk '/Liquibase Secure Version/ {print $4}')"
+fi
 
 if [ "$failed" = 0 ]; then
   say END "PASS $passed checks passed"

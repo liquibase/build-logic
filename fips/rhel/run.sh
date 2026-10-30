@@ -18,6 +18,16 @@
 #   FIPS_RHEL_AMI                by default Red Hat's hourly x86_64 AMI of the newest RHEL 9 minor release
 #   FIPS_RHEL_TIMEOUT_MINUTES    45 by default; the instance also stops itself 15 minutes after that
 #   FIPS_RHEL_OUT_DIR            where report.txt and console.txt go; a temporary folder by default
+#
+# Liquibase Secure (optional; without it the checks use Liquibase Community, as the FIPS VM self-test does):
+#   FIPS_RHEL_SECURE_VERSION     a release (6.0.1) or an RC (6.0.1-RC1) on repo.liquibase.com; the archive and its
+#                                published .sha256 come from releases/secure/ or non-releases/secure/
+#   FIPS_RHEL_SECURE_PACKAGE     liquibase-secure (default) or liquibase-secure-fips
+#   FIPS_RHEL_SECURE_URL         instead of a version: an https archive URL, with FIPS_RHEL_SECURE_SHA256
+#   FIPS_RHEL_LICENSE_ROLE_ARN   the vault role that holds PRO_LICENSE_FILE (vault-grouped-pro-license-file). The
+#                                instance assumes it with the fips-rhel-instance role and reads the license itself.
+#   FIPS_RHEL_REQUIRE_FIPS_LICENSE  true to fail when the license or update fails in FIPS mode (false by default
+#                                until license files verify in FIPS mode, INT-2438)
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -53,14 +63,51 @@ else
     --query 'Images[].[Name, ImageId]' --output text | sort -V | tail -n 1 | cut -f2)
 fi
 [[ $ami == ami-* ]] || fail "No RHEL 9 AMI found."
+
+# Liquibase Secure: the archive to test, pinned by its checksum. Every value is checked here, because it ends up
+# in a shell file on the instance.
+secure_version=${FIPS_RHEL_SECURE_VERSION:-}
+secure_package=${FIPS_RHEL_SECURE_PACKAGE:-liquibase-secure}
+secure_url=${FIPS_RHEL_SECURE_URL:-}
+secure_sha256=${FIPS_RHEL_SECURE_SHA256:-}
+license_role=${FIPS_RHEL_LICENSE_ROLE_ARN:-}
+require_fips_license=${FIPS_RHEL_REQUIRE_FIPS_LICENSE:-false}
+[[ $secure_package =~ ^liquibase-secure(-fips)?$ ]] || fail "FIPS_RHEL_SECURE_PACKAGE must be liquibase-secure or liquibase-secure-fips."
+[[ $require_fips_license =~ ^(true|false)$ ]] || fail "FIPS_RHEL_REQUIRE_FIPS_LICENSE must be true or false."
+if [ -n "$secure_version" ]; then
+  [[ $secure_version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || fail "Bad FIPS_RHEL_SECURE_VERSION: $secure_version"
+  channel=$([[ $secure_version == *-* ]] && echo non-releases || echo releases)
+  secure_url="https://repo.liquibase.com/$channel/secure/$secure_version/$secure_package-$secure_version.tar.gz"
+  secure_sha256=$(curl -fsSL --retry 3 "$secure_url.sha256" | awk '{print $1}') ||
+    fail "No published checksum at $secure_url.sha256: is $secure_package $secure_version on repo.liquibase.com?"
+fi
+if [ -n "$secure_url" ]; then
+  [[ $secure_url =~ ^https://[A-Za-z0-9./_+-]+$ ]] || fail "Bad FIPS_RHEL_SECURE_URL: $secure_url"
+  [[ $secure_sha256 =~ ^[0-9a-f]{64}$ ]] || fail "FIPS_RHEL_SECURE_URL needs FIPS_RHEL_SECURE_SHA256 (64 hex characters)."
+  step "Liquibase Secure: $secure_url (sha256 $secure_sha256)"
+fi
+if [ -n "$license_role" ]; then
+  [[ $license_role =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ ]] || fail "Bad FIPS_RHEL_LICENSE_ROLE_ARN."
+fi
+{
+  printf 'FIPS_RHEL_SECURE_VERSION=%q\n' "$secure_version"
+  printf 'FIPS_RHEL_SECURE_URL=%q\n' "$secure_url"
+  printf 'FIPS_RHEL_SECURE_SHA256=%q\n' "$secure_sha256"
+  printf 'FIPS_RHEL_LICENSE_ROLE_ARN=%q\n' "$license_role"
+  printf 'FIPS_RHEL_REQUIRE_FIPS_LICENSE=%q\n' "$require_fips_license"
+} >"$work/run.env"
+# Only a run that reads the license gets an instance role, and it may only assume the vault role.
+profile_args=()
+[ -z "$license_role" ] || profile_args=(--iam-instance-profile "Name=${FIPS_RHEL_INSTANCE_PROFILE:-fips-rhel-instance}")
 read -r ami_name root_device < <(aws ec2 describe-images --image-ids "$ami" \
   --query 'Images[0].[Name, RootDeviceName]' --output text)
 step "RHEL 9 image: $ami_name ($ami), $type in $AWS_REGION"
 
 # The scripts and the self-test go in the user data, which EC2 limits to 16 KB.
 COPYFILE_DISABLE=1 tar -czf "$work/bundle.tgz" --no-xattrs -C "$root" \
-  fips/provision.sh fips/rhel/instance.sh fips/rhel/checks.sh fips/rhel/say.sh \
-  fips/selftest/compose.yml fips/selftest/pom.xml fips/selftest/src fips/selftest/liquibase/changelog.yaml
+  fips/provision.sh fips/rhel/instance.sh fips/rhel/checks.sh fips/rhel/say.sh fips/rhel/secure.sh \
+  fips/selftest/compose.yml fips/selftest/pom.xml fips/selftest/src fips/selftest/liquibase/changelog.yaml \
+  -C "$work" run.env
 cat >"$work/user-data.yaml" <<EOF
 #cloud-config
 write_files:
@@ -100,7 +147,7 @@ for subnet in ${subnets//,/ }; do
     --network-interfaces "DeviceIndex=0,SubnetId=$subnet,Groups=$sg,AssociatePublicIpAddress=true,DeleteOnTermination=true" \
     --block-device-mappings "DeviceName=$root_device,Ebs={VolumeSize=40,VolumeType=gp3,DeleteOnTermination=true,Encrypted=true}" \
     --metadata-options HttpTokens=required,HttpPutResponseHopLimit=1,HttpEndpoint=enabled \
-    --instance-initiated-shutdown-behavior terminate \
+    --instance-initiated-shutdown-behavior terminate ${profile_args[@]+"${profile_args[@]}"} \
     --tag-specifications "ResourceType=instance,Tags=[$tags]" "ResourceType=volume,Tags=[$tags]" \
     --user-data "file://$work/user-data.yaml" \
     --query 'Instances[0].InstanceId' --output text 2>"$work/run.err"); then
@@ -140,6 +187,10 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo
     echo "Image \`$ami_name\` ($ami), \`$type\`, $AWS_REGION. Result: **$result**."
     echo
+    if [ -n "$secure_url" ]; then
+      echo "Liquibase Secure: \`$secure_url\`, sha256 \`$secure_sha256\`$([ -n "$license_role" ] && echo ", with the CI license")."
+      echo
+    fi
     echo "| Result | Check |"
     echo "| --- | --- |"
     awk '$1 == "PASS" || $1 == "FAIL" {k = $1; $1 = ""; print "| " k " |" $0 " |"}' "$out/report.txt"

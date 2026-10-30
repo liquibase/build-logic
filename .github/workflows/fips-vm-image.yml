@@ -1,0 +1,98 @@
+name: FIPS VM image
+
+# Builds the FIPS-mode AlmaLinux 9 image that the fips-vm action boots, and publishes it as a public
+# package: ghcr.io/liquibase/fips-vm. Runs every week to pick up OS and package updates. INT-2303.
+#
+# Tags: alma9-<date>-<run> for every build, and alma9 for the latest build from main.
+# Pull requests build, seal and boot-check the image but don't publish it.
+
+on:
+  pull_request:
+    paths:
+      - "fips/provision.sh"
+      - ".github/actions/fips-vm/**"
+      - ".github/workflows/fips-vm-image.yml"
+  schedule:
+    - cron: "0 4 * * 1" # Mondays, 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: fips-vm-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      IMAGE: ghcr.io/liquibase/fips-vm
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false # the VM shares the work directory, where checkout would keep the token
+
+      - name: Build the VM from the AlmaLinux 9 cloud image
+        uses: ./.github/actions/fips-vm
+        with:
+          image: ""
+
+      - name: Check FIPS mode in the VM and in a UBI 9 container
+        shell: fips-run {0}
+        run: |
+          sudo fips-mode-setup --check
+          test "$(cat /proc/sys/crypto/fips_enabled)" = 1
+          test "$(docker run --rm registry.access.redhat.com/ubi9/ubi-minimal cat /proc/sys/crypto/fips_enabled)" = 1
+          java -version
+          mvn -v
+          docker compose version
+
+      - name: Seal the VM into an image
+        run: .github/actions/fips-vm/seal.sh "$RUNNER_TEMP/fips-vm.qcow2"
+
+      - name: Boot the sealed image
+        env:
+          FIPS_VM_IMAGE: ""
+          FIPS_VM_IMAGE_FILE: ${{ runner.temp }}/fips-vm.qcow2
+          FIPS_VM_DISK_SIZE: 100G
+        run: .github/actions/fips-vm/start.sh
+
+      - name: Check the sealed image in FIPS mode and in a UBI 9 container
+        shell: fips-run {0}
+        run: |
+          sudo fips-mode-setup --check
+          test "$(cat /proc/sys/crypto/fips_enabled)" = 1
+          test "$(docker run --rm registry.access.redhat.com/ubi9/ubi-minimal cat /proc/sys/crypto/fips_enabled)" = 1
+
+      - name: Push the image to GHCR
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .github/actions/fips-vm/install-oras.sh
+          tag="alma9-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+          echo "$GH_TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          cd "$RUNNER_TEMP"
+          oras push "$IMAGE:$tag" \
+            --artifact-type application/vnd.liquibase.fips-vm.v1 \
+            --annotation "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --annotation "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --annotation "org.opencontainers.image.description=FIPS-mode AlmaLinux 9 VM for Liquibase FIPS 140-3 tests (INT-2303)" \
+            fips-vm.qcow2:application/vnd.liquibase.fips-vm.disk.v1+qcow2
+          # alma9 follows main. The very first build also creates it, so the action has an image to start from.
+          if [ "$GITHUB_REF" = refs/heads/main ] || ! oras resolve "$IMAGE:alma9" >/dev/null 2>&1; then
+            oras tag "$IMAGE:$tag" alma9
+          fi
+          echo "Pushed \`$IMAGE:$tag\` (\`$(oras resolve "$IMAGE:$tag")\`)" >> "$GITHUB_STEP_SUMMARY"
+
+      # Each image is about 1.1 GB. Keep the last 8, which is two months of weekly builds; alma9 is always the newest.
+      - name: Delete old images
+        if: github.ref == 'refs/heads/main'
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: fips-vm
+          package-type: container
+          min-versions-to-keep: 8

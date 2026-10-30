@@ -1,0 +1,54 @@
+name: 'Liquibase FIPS VM'
+description: |
+  Starts a FIPS-mode AlmaLinux 9 VM on the runner and shares the runner's work directory with it.
+  Steps that use `shell: fips-run {0}` then run inside the VM, where /proc/sys/crypto/fips_enabled is 1
+  and Docker, Red Hat OpenJDK 17 and 21, and Maven 3.9 are installed.
+  Needs a Linux x64 runner with KVM: GitHub-hosted (ubuntu-latest) or Blacksmith. INT-2303.
+
+inputs:
+  image:
+    description: 'OCI reference of the prebuilt FIPS VM image from fips-vm-image.yml: the alma9 tag (rebuilt every week), or a digest such as ghcr.io/liquibase/fips-vm@sha256:... to pin one build; only the last 8 weekly builds are kept. Empty builds the VM from the AlmaLinux 9 cloud image instead, which takes about 10 minutes longer.'
+    required: false
+    default: 'ghcr.io/liquibase/fips-vm:alma9'
+  cpus:
+    description: 'CPUs for the VM. Empty uses all the runner CPUs.'
+    required: false
+    default: ''
+  memory-mb:
+    description: 'Memory for the VM in MB. Empty uses 75% of the runner memory.'
+    required: false
+    default: ''
+  disk-size:
+    description: 'Size of the VM disk. Space is only used as the VM writes.'
+    required: false
+    default: '100G'
+
+outputs:
+  image:
+    description: 'The image the VM booted from, with its digest. Keep it with test evidence.'
+    value: ${{ steps.start.outputs.image }}
+
+runs:
+  using: 'composite'
+  steps:
+    # The QEMU packages, kept between jobs and refreshed every week: some hosted runners download them very slowly.
+    - id: apt-cache-key
+      shell: bash
+      run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      with:
+        path: ~/.cache/fips-vm/apt
+        key: fips-vm-apt-${{ runner.os }}-${{ runner.arch }}-${{ steps.apt-cache-key.outputs.week }}
+        restore-keys: fips-vm-apt-${{ runner.os }}-${{ runner.arch }}-
+
+    - id: start
+      shell: bash
+      env:
+        FIPS_VM_IMAGE: ${{ inputs.image }}
+        FIPS_VM_CPUS: ${{ inputs.cpus }}
+        FIPS_VM_MEMORY_MB: ${{ inputs.memory-mb }}
+        FIPS_VM_DISK_SIZE: ${{ inputs.disk-size }}
+        # Only to pull the image: building from the cloud image doesn't need it.
+        FIPS_VM_TOKEN: ${{ inputs.image != '' && github.token || '' }}
+        FIPS_VM_APT_CACHE: ~/.cache/fips-vm/apt
+      run: '"$GITHUB_ACTION_PATH/start.sh"'

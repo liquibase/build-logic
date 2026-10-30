@@ -1,0 +1,52 @@
+name: FIPS RHEL test
+# Runs the FIPS VM self-test checks on real RHEL 9 in FIPS mode, on an on-demand EC2 instance in the dev
+# account (INT-2446). AlmaLinux 9 in the FIPS VM (fips-vm-test.yml) covers daily and nightly runs; this
+# covers each release. fips/rhel/run.sh does the work: see fips/README.md.
+#
+# The role in FIPS_RHEL_ROLE_ARN (github-actions-fips-rhel, liquibase-infrastructure dev-account/fips-rhel.tf)
+# trusts this file on main in the fips-rhel environment only, and may only start, read the console of and
+# terminate instances tagged managed_by=fips-rhel. The environment and its variable are in
+# liquibase-infrastructure github/liquibase/repos/public/fips-rhel-environment.tf.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fips-rhel-test
+  cancel-in-progress: false
+
+jobs:
+  rhel:
+    name: FIPS checks on RHEL 9
+    runs-on: ubuntu-latest
+    environment: fips-rhel
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.FIPS_RHEL_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 4500 # outlasts the job's 60 minutes, so the instance can always be terminated
+
+      - name: Run the checks on a RHEL 9 instance
+        env:
+          FIPS_RHEL_OUT_DIR: ${{ runner.temp }}/fips-rhel
+        run: fips/rhel/run.sh
+
+      - name: Keep the report and the console output
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: fips-rhel-${{ github.run_id }}
+          path: ${{ runner.temp }}/fips-rhel
+          if-no-files-found: ignore

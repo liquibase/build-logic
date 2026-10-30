@@ -7,26 +7,40 @@
 # Today Liquibase 6 can't verify license files in a FIPS-mode JVM (LB-LIC-0003: Ed25519), so the FIPS rows are
 # reported, not enforced, until the FIPS work changes the license signature (INT-2302, INT-2395).
 #
+# Each Liquibase command gets LIQUIBASE_TIMEOUT seconds (default 120; it normally takes a few). A command that
+# hangs is reported as timed out, with the end of its output, instead of running into the job's timeout.
+#
 # usage: try-licenses.sh LICENSES_DIR   (holds PRO_LICENSE_KEY and PRO_LICENSE_FILE, either may be missing)
 set -euo pipefail
 
 dir=${1:?usage: try-licenses.sh LICENSES_DIR}
 classpath=${LIQUIBASE_CLASSPATH:-}
+limit=${LIQUIBASE_TIMEOUT:-120}
 broken=0
 rows=()
 
 attempt() { # LICENSE_LABEL JVM_LABEL JAVA_OPTS ENV...
   local label=$1 jvm=$2 java_opts=$3
   shift 3
-  local out status code update update_out
-  out=$(env "$@" JAVA_OPTS="$java_opts" liquibase ${classpath:+--classpath="$classpath"} license status 2>&1 || true)
-  status=$(awk '/^Status:/ {print $2; exit}' <<<"$out")
-  code=$(awk '/^Code:/ {print $2; exit}' <<<"$out")
-  if update_out=$(env "$@" JAVA_OPTS="$java_opts" liquibase ${classpath:+--classpath="$classpath"} update 2>&1); then
-    update=works
+  local out status code update update_out rc=0
+  out=$(env "$@" JAVA_OPTS="$java_opts" timeout -k 10 "$limit" liquibase ${classpath:+--classpath="$classpath"} license status 2>&1) || rc=$?
+  if [ "$rc" = 124 ]; then
+    status="timed out after ${limit}s"
+    timed_out "$label" "$jvm" "license status" "$out"
   else
-    update=refused
+    status=$(awk '/^Status:/ {print $2; exit}' <<<"$out")
   fi
+  code=$(awk '/^Code:/ {print $2; exit}' <<<"$out")
+  rc=0
+  update_out=$(env "$@" JAVA_OPTS="$java_opts" timeout -k 10 "$limit" liquibase ${classpath:+--classpath="$classpath"} update 2>&1) || rc=$?
+  case $rc in
+    0) update=works ;;
+    124)
+      update="timed out after ${limit}s"
+      timed_out "$label" "$jvm" "update" "$update_out"
+      ;;
+    *) update=refused ;;
+  esac
   rows+=("| $label | $jvm | ${status:-unknown} | ${code:--} | $update |")
   echo "$label, $jvm JVM: license ${status:-unknown} ${code:+($code)}, update $update"
   if [ "$jvm" = "FIPS off" ] && [ "$update" != works ]; then
@@ -35,6 +49,12 @@ attempt() { # LICENSE_LABEL JVM_LABEL JAVA_OPTS ENV...
     echo "::error::The $label doesn't work even with FIPS off. Check the license in the vault."
     broken=1
   fi
+}
+
+timed_out() { # LICENSE_LABEL JVM_LABEL COMMAND OUTPUT
+  # The masks from the vault step still apply to this output.
+  echo "::warning::$1, $2 JVM: 'liquibase $3' timed out after ${limit}s. The last lines it printed:"
+  tail -n 20 <<<"$4" >&2
 }
 
 for kind in key file; do

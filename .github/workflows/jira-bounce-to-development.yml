@@ -463,7 +463,7 @@ jobs:
               await core.summary
                 .addHeading('Jira bounce to Development', 2)
                 .addRaw(
-                  `Event: \`${event}\`\n\n` +
+                  `Event: \`${context.eventName}\`\n\n` +
                   (summary.length ? summary.map(l => `- ${l}`).join('\n') : 'No ticket was affected.') + '\n'
                 )
                 .write();

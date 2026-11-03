@@ -35,20 +35,22 @@ jobs:
 
 Humans can still `@claude` on any bot PR via the `claude.yml` mention workflow if a review is needed.
 
-**Model selection:** By default this workflow uses `claude-haiku-4-5` (~75% cheaper than Sonnet) which is sufficient for structured code review tasks. The model is set via `--model` in `claude_args`. Note: `#` comment lines in `claude_args` are parsed by `shell-quote` as comment characters and will cause all subsequent flags to be silently dropped ([upstream issue #802](https://github.com/anthropics/claude-code-action/issues/802)) — avoid using `#` comments inside `claude_args`. High-value repositories that need deeper reasoning can opt into Sonnet:
+**Model selection:** By default this workflow uses `haiku`, the alias for the latest Haiku (~97% cheaper than Sonnet) which is sufficient for structured code review tasks. The model is set via `--model` in `claude_args`. Note: `#` comment lines in `claude_args` are parsed by `shell-quote` as comment characters and will cause all subsequent flags to be silently dropped ([upstream issue #802](https://github.com/anthropics/claude-code-action/issues/802)) — avoid using `#` comments inside `claude_args`. High-value repositories that need deeper reasoning can opt into Sonnet:
 
 ```yaml
 jobs:
   claude-review:
     uses: liquibase/build-logic/.github/workflows/claude-code-review.yml@main
     with:
-      model: 'claude-sonnet-4-6'
+      model: 'sonnet'
 ```
 
-| Model                        | Input      | Output   | Use case                              |
-|------------------------------|------------|----------|---------------------------------------|
-| `claude-haiku-4-5` (default) | $0.80/MTok | $4/MTok  | Standard automated reviews            |
-| `claude-sonnet-4-6`          | $3/MTok    | $15/MTok | Complex repos needing deeper analysis |
+| Model                         | Input      | Output     | Use case                              |
+|-------------------------------|------------|------------|---------------------------------------|
+| `haiku` (default, Haiku 5.5)  | $0.10/MTok | $0.50/MTok | Standard automated reviews            |
+| `sonnet` (Sonnet 5.5)         | $2/MTok    | $10/MTok   | Complex repos needing deeper analysis |
+
+The aliases resolve to the latest model the Claude Code CLI bundled in `claude-code-action` knows, so a new model arrives with the action bump, without a change here. Pass a full model ID to pin one.
 
 **What it does:**
 - Reviews code changes in the PR with a rigorous senior-reviewer persona (see the
@@ -101,7 +103,7 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/claude.yml@main
 ```
 
-**Model selection:** Defaults to `claude-sonnet-4-6` since interactive tasks require stronger reasoning. Override with the `model` input if needed.
+**Model selection:** Defaults to `sonnet`, the latest Sonnet, since interactive tasks require stronger reasoning. Override with the `model` input if needed.
 
 **What it does:**
 - Responds to natural language requests in comments
@@ -128,7 +130,7 @@ jobs:
     uses: liquibase/build-logic/.github/workflows/claude-test-review.yml@main
 ```
 
-**Model selection:** By default uses `claude-haiku-4-5`. Override with `model` input to use Sonnet for complex test suites.
+**Model selection:** By default uses `haiku`, the latest Haiku. Override with `model` input to use Sonnet for complex test suites.
 
 **What it does:**
 - Reviews only test files changed in the PR

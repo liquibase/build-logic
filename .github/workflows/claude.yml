@@ -4,9 +4,9 @@ on:
   workflow_call:
     inputs:
       model:
-        description: 'Claude model to use (default: claude-sonnet-4-6)'
+        description: 'Claude model to use (default: sonnet, the latest Sonnet)'
         required: false
-        default: 'claude-sonnet-4-6'
+        default: 'sonnet'
         type: string
 
 permissions:
@@ -83,7 +83,7 @@ jobs:
 
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
         with:
           # Workload identity federation instead of a stored API key: the action exchanges
           # this job's GitHub OIDC token for a short-lived Claude API token. The federation

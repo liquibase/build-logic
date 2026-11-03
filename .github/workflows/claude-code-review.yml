@@ -9,9 +9,9 @@ on:
         default: ''
         type: string
       model:
-        description: 'Claude model to use for reviews (default: claude-haiku-4-5)'
+        description: 'Claude model to use for reviews (default: haiku, the latest Haiku)'
         required: false
-        default: 'claude-haiku-4-5'
+        default: 'haiku'
         type: string
 
 permissions:
@@ -118,7 +118,7 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
         with:
           # Claude API auth through workload identity federation; the reasoning is on the
           # same inputs in claude.yml. Keep these IDs identical across the three Claude

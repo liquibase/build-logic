@@ -1,0 +1,271 @@
+name: FIPS VM test
+
+# Checks the fips-vm action end to end with the published image: the VM boots in FIPS mode, a UBI 9 container
+# inherits it, docker compose and Testcontainers start PostgreSQL, Liquibase installed from its RPM repo updates
+# PostgreSQL with a FIPS-mode JVM, and files and GITHUB_ENV round-trip to the runner. A second job tries Liquibase
+# Secure 6 with the old license key and the new license file from the vault. Changes to fips/provision.sh are checked
+# by fips-vm-image.yml, which builds the VM from scratch, and the laptop setup by fips-vm-laptop-test.yml.
+#
+# The vault roles trust this workflow from main only, so the Liquibase Secure parts run on the weekly and manual runs
+# from main, not on pull requests (liquibase-infrastructure, vault-manager/GROUPED-SECRETS.md).
+
+on:
+  pull_request:
+    paths:
+      - ".github/actions/fips-vm/**"
+      - ".github/workflows/fips-vm-*.yml"
+      - "fips/**"
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC: after fips-vm-image.yml publishes the week's image, and catches an expired CI license
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "FIPS VM image to test. Empty builds the VM from the AlmaLinux 9 cloud image."
+        required: false
+        default: "ghcr.io/liquibase/fips-vm:alma9"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fips-vm-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fips-vm:
+    # Blacksmith runners work too (checked 2026-10-26); the self-test runs on GitHub-hosted runners only.
+    name: FIPS VM on ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: fips-run {0}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false # the VM shares the work directory, where checkout would keep the token
+
+      - name: Start the FIPS VM
+        id: fips
+        uses: ./.github/actions/fips-vm
+        with:
+          image: ${{ inputs.image || 'ghcr.io/liquibase/fips-vm:alma9' }}
+
+      - name: The kernel is in FIPS mode
+        run: |
+          sudo fips-mode-setup --check
+          test "$(cat /proc/sys/crypto/fips_enabled)" = 1
+
+      - name: A UBI 9 container inherits FIPS mode
+        run: |
+          test "$(docker run --rm registry.access.redhat.com/ubi9/ubi-minimal cat /proc/sys/crypto/fips_enabled)" = 1
+
+      - name: Red Hat OpenJDK runs in FIPS mode, and -Dcom.redhat.fips=false turns it off
+        run: |
+          java -XshowSettings:security:providers -version > providers-on.txt 2>&1
+          java -Dcom.redhat.fips=false -XshowSettings:security:providers -version > providers-off.txt 2>&1
+          on=$(awk '/Provider name:/ {print $3; exit}' providers-on.txt)
+          off=$(awk '/Provider name:/ {print $3; exit}' providers-off.txt)
+          echo "First security provider: $on by default, $off with -Dcom.redhat.fips=false"
+          test "$on" = SunPKCS11-NSS-FIPS
+          test "$off" != SunPKCS11-NSS-FIPS
+
+      - name: docker compose starts PostgreSQL
+        run: |
+          docker compose -f fips/selftest/compose.yml up -d --wait
+          docker compose -f fips/selftest/compose.yml exec -T postgres psql -U postgres -tAc 'select 1'
+
+      # Liquibase OSS needs no license, so this public repo can run it on every PR. Liquibase 5 doesn't bundle
+      # JDBC drivers.
+      - name: Install Liquibase from its RPM repo
+        run: |
+          [ -f /etc/yum.repos.d/repo-liquibase-com.repo ] ||
+            sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
+          sudo dnf install -y -q liquibase
+          curl -fsSL -o "$RUNNER_TEMP/postgresql.jar" https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
+          liquibase --version | grep -E 'Liquibase Version|Java Home'
+
+      - name: Liquibase updates PostgreSQL with a FIPS-mode JVM
+        working-directory: fips/selftest/liquibase
+        env:
+          LIQUIBASE_COMMAND_URL: jdbc:postgresql://localhost:5432/postgres
+          LIQUIBASE_COMMAND_USERNAME: postgres
+          LIQUIBASE_COMMAND_PASSWORD: fips-vm-selftest-password
+          LIQUIBASE_COMMAND_CHANGELOG_FILE: changelog.yaml
+        run: |
+          liquibase --classpath="$RUNNER_TEMP/postgresql.jar" update
+          liquibase --classpath="$RUNNER_TEMP/postgresql.jar" validate
+          liquibase --classpath="$RUNNER_TEMP/postgresql.jar" rollback-count --count=1
+          liquibase --classpath="$RUNNER_TEMP/postgresql.jar" update
+          docker exec "$(docker ps -qf name=postgres)" psql -U postgres -tAc 'select note from fips_check' |
+            grep -qx 'written by Liquibase in the FIPS VM'
+          {
+            echo "### Liquibase in the FIPS VM"
+            echo
+            echo '| Changeset | Checksum |'
+            echo '| --- | --- |'
+            docker exec "$(docker ps -qf name=postgres)" psql -U postgres -tAc \
+              "select '| ' || id || ' | ' || md5sum || ' |' from databasechangelog order by orderexecuted"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker compose -f fips/selftest/compose.yml down
+
+      - name: Testcontainers starts PostgreSQL and a FIPS-mode JVM connects
+        env:
+          MAVEN_OPTS: -Dcom.redhat.fips=false
+        run: mvn -B -ntp -f fips/selftest/pom.xml verify
+
+      - name: Maven itself in FIPS mode (informational)
+        continue-on-error: true
+        run: mvn -B -ntp -q -f fips/selftest/pom.xml -Dmaven.repo.local=/tmp/m2-fips -DskipTests verify
+
+      - name: Write a file and an env var from the VM
+        run: |
+          echo "written in the VM" > fips-vm-roundtrip.txt
+          echo "FIPS_ROUNDTRIP=yes" >> "$GITHUB_ENV"
+
+      - name: The runner sees them
+        shell: bash
+        run: |
+          test "$(cat fips-vm-roundtrip.txt)" = "written in the VM"
+          test "$FIPS_ROUNDTRIP" = yes
+          echo "VM image: ${{ steps.fips.outputs.image }}"
+
+  liquibase-secure-licenses:
+    # Liquibase Secure 6 with the old license key and the new license file, each in FIPS mode and with FIPS off.
+    # Reports what works in FIPS mode and fails only if a license is broken (see try-licenses.sh). Each license has a
+    # grouped secret of its own, read alone, and their roles trust this workflow from main only.
+    name: Liquibase Secure licenses in FIPS mode
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: fips-run {0}
+    env:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://localhost:5432/postgres
+      LIQUIBASE_COMMAND_USERNAME: postgres
+      LIQUIBASE_COMMAND_PASSWORD: fips-vm-selftest-password
+      LIQUIBASE_COMMAND_CHANGELOG_FILE: changelog.yaml
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false # the VM shares the work directory, where checkout would keep the token
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-6
+          aws-region: us-east-1
+
+      - name: Read the old license key from the vault
+        shell: bash
+        run: |
+          fips/selftest/liquibase/save-licenses.sh /vault/grouped/pro-license "$RUNNER_TEMP/licenses" PRO_LICENSE_KEY
+          echo "LICENSES_DIR=$RUNNER_TEMP/licenses" >> "$GITHUB_ENV"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-file
+          aws-region: us-east-1
+
+      - name: Read the new license file from the vault
+        shell: bash
+        run: fips/selftest/liquibase/save-licenses.sh /vault/grouped/pro-license-file "$RUNNER_TEMP/licenses" PRO_LICENSE_FILE
+
+      - name: Start the FIPS VM
+        uses: ./.github/actions/fips-vm
+
+      - name: Install Liquibase Secure and start PostgreSQL
+        run: |
+          [ -f /etc/yum.repos.d/repo-liquibase-com.repo ] ||
+            sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
+          sudo dnf install -y -q liquibase-secure
+          curl -fsSL -o "$RUNNER_TEMP/postgresql.jar" https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
+          docker compose -f fips/selftest/compose.yml up -d --wait
+
+      - name: Try each license in FIPS mode and with FIPS off
+        working-directory: fips/selftest/liquibase
+        run: LIQUIBASE_CLASSPATH="$RUNNER_TEMP/postgresql.jar" ./try-licenses.sh "$LICENSES_DIR"
+
+      - name: Remove the licenses
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/licenses"
+
+  guide-examples:
+    # Runs the steps of the developer guide's Liquibase jobs for GitHub Actions, as written there, so the guide stays
+    # correct: https://datical.atlassian.net/wiki/spaces/TE/pages/5892636673
+    # Keep these steps and the guide in sync. The Secure part needs the vault, so it only runs from main.
+    name: Developer guide examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: fips-run {0}
+    env:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://localhost:5432/postgres
+      LIQUIBASE_COMMAND_USERNAME: postgres
+      LIQUIBASE_COMMAND_PASSWORD: choose-14-or-more-chars
+      SECURE: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false # the VM shares the work directory, where checkout would keep the token
+
+      - name: Use the self-test changelog
+        shell: bash
+        run: cp fips/selftest/liquibase/changelog.yaml changelog.yaml
+
+      # The guide uses this action from @main, with the role that trusts the reader's repo.
+      - name: Read the license from the vault
+        if: env.SECURE == 'true'
+        uses: ./.github/actions/setup-aws-vault
+        with:
+          group: pro-license
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-pro-license-6
+
+      - name: Start the FIPS VM
+        uses: ./.github/actions/fips-vm
+
+      # --- Guide: Liquibase Community in GitHub Actions ---
+      - name: Start PostgreSQL and install Liquibase
+        run: |
+          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD="$LIQUIBASE_COMMAND_PASSWORD" postgres:17
+          sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
+          sudo dnf install -y liquibase
+          curl -fsSL -o postgresql.jar https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
+          until docker exec pg pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; do sleep 1; done
+
+      - name: Update the database
+        run: liquibase update --changelog-file=changelog.yaml --classpath=postgresql.jar
+
+      # --- Guide: Liquibase Secure in GitHub Actions ---
+      - name: Start over for the Secure job (only here; in the guide it's a job of its own)
+        if: env.SECURE == 'true'
+        run: |
+          sudo dnf remove -y liquibase
+          docker rm -f pg
+
+      - name: Start PostgreSQL and install Liquibase Secure
+        if: env.SECURE == 'true'
+        run: |
+          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD="$LIQUIBASE_COMMAND_PASSWORD" postgres:17
+          sudo dnf config-manager --add-repo https://repo.liquibase.com/repo-liquibase-com.repo
+          sudo dnf install -y liquibase-secure
+          until docker exec pg pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; do sleep 1; done
+
+      - name: Update the database
+        if: env.SECURE == 'true'
+        env:
+          LIQUIBASE_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          JAVA_OPTS: -Dcom.redhat.fips=false
+        run: liquibase update --changelog-file=changelog.yaml

@@ -5,7 +5,7 @@ inputs:
     description: 'Grouped secret to read: /vault/grouped/<group>'
     required: true
   aws-account-id:
-    description: 'Account that holds the vault, normally ${{ secrets.VAULT_AWS_ACCOUNT_ID }}'
+    description: 'Account that holds the vault, normally the VAULT_AWS_ACCOUNT_ID secret'
     required: true
   role:
     description: 'Role to assume when it is not vault-grouped-<group> (a later shard is vault-grouped-<group>-N)'

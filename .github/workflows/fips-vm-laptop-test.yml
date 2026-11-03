@@ -1,0 +1,85 @@
+name: FIPS VM laptop test
+
+# Checks the laptop setup (fips/fips-vm with Lima) on Linux, where Lima uses QEMU with KVM as on a Linux laptop.
+# It builds the VM from scratch, so it only runs when the laptop files change.
+
+on:
+  pull_request:
+    paths:
+      - "fips/fips-vm"
+      - "fips/lima.yaml"
+      - "fips/provision.sh"
+      - "fips/selftest/**"
+      - ".github/workflows/fips-vm-laptop-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fips-vm-laptop-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: fips-vm command on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      LIMA_VERSION: 2.2.1
+      LIMA_SHA256: b391ac7fcac2b2a5a1628107756463188ded4d18d3104a40a66a8bb6fec01bcb
+      FIPS_VM_APT_CACHE: ~/.cache/fips-vm/apt
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false # the VM shares the work directory, where checkout would keep the token
+
+      - id: apt-cache-key
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/fips-vm/apt
+          key: fips-vm-laptop-apt-${{ runner.os }}-${{ runner.arch }}-${{ steps.apt-cache-key.outputs.week }}
+          restore-keys: fips-vm-laptop-apt-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install Lima and QEMU
+        run: |
+          .github/actions/fips-vm/apt-install.sh qemu-system-x86 qemu-utils ovmf
+          # Lima runs QEMU as the runner user, which needs access to /dev/kvm.
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          curl -fsSL -o "$RUNNER_TEMP/lima.tar.gz" \
+            "https://github.com/lima-vm/lima/releases/download/v${LIMA_VERSION}/lima-${LIMA_VERSION}-Linux-x86_64.tar.gz"
+          echo "$LIMA_SHA256  $RUNNER_TEMP/lima.tar.gz" | sha256sum -c -
+          sudo tar -xzf "$RUNNER_TEMP/lima.tar.gz" -C /usr/local
+          limactl --version
+
+      - name: fips-vm up
+        run: fips/fips-vm up
+
+      - name: Commands run in the VM, in FIPS mode, in the current folder
+        run: |
+          test "$(fips/fips-vm run cat /proc/sys/crypto/fips_enabled)" = 1
+          test "$(fips/fips-vm run pwd)" = "$PWD"
+          test "$(fips/fips-vm run docker run --rm registry.access.redhat.com/ubi9/ubi-minimal cat /proc/sys/crypto/fips_enabled)" = 1
+
+      - name: LIQUIBASE_* variables reach the VM, and the file that carries them is gone
+        env:
+          LIQUIBASE_FIPS_VM_CHECK: "a value with spaces, 'quotes' and $dollars"
+        run: |
+          test "$(fips/fips-vm run printenv LIQUIBASE_FIPS_VM_CHECK)" = "$LIQUIBASE_FIPS_VM_CHECK"
+          test "$(echo from stdin | fips/fips-vm run cat)" = "from stdin"
+          test -z "$(ls ~/.fips-vm/run-env.* 2>/dev/null)"
+
+      - name: Testcontainers starts PostgreSQL in the VM
+        run: fips/fips-vm run mvn -B -ntp -f fips/selftest/pom.xml verify
+
+      - name: Lima logs
+        if: failure()
+        run: |
+          for f in ~/.fips-vm/lima/fips/{ha.stderr.log,serial*.log}; do
+            [ -f "$f" ] && { echo "::group::$f"; tail -n 80 "$f"; echo "::endgroup::"; }
+          done
+          true

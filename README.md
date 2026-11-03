@@ -61,6 +61,19 @@ Since TECHOPS-1296 no workflow here reads the `/vault/liquibase` or `/vault/devo
 - Pin `liquibase/build-logic/...@main`. A tag or sha cannot assume the roles.
 - A key read through `env.` must come from a group the job requests, or it resolves to an empty string. Add the group's read when you add a key.
 
+### 🍴 Fork PRs
+
+A `pull_request` from a fork gets no secrets and no OIDC token. The guard is `github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository`. In a called workflow `github` is the caller's, so the guard sees the extension repo's PR.
+
+| Workflow | What a fork PR does |
+|---|---|
+| `os-extension-test.yml`, `codeql.yml` | Skip the vault and GitHub Packages settings steps and build from Maven Central only |
+| `lth-docker.yml` | Skips the Pro license read and runs the harness with an empty `LIQUIBASE_PRO_LICENSE_KEY`. Skips the Test Reporter check run, which needs a write token; results stay in the job log |
+| `sonar-scan.yml`, `fossa_ai.yml` | Skip the job. The skipped check still passes a required status check |
+| `extension-attach-artifact-release.yml` | A merged fork PR skips every job; the push to main attaches the artifact |
+
+Same-repo, Dependabot, push, schedule and dispatch runs are unchanged. Copy the guard into any new vault step that runs on `pull_request`.
+
 ## 🧩 Composite Action Wrappers
 
 To reduce Dependabot noise and centralize SHA management, this repo provides **composite action wrappers** for high-frequency third-party actions. Instead of every repo pinning SHAs individually, repos reference the wrapper — and SHAs are updated in one place.

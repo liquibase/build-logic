@@ -77,7 +77,8 @@ jobs:
       matrix:
         os: ${{fromJson(inputs.os || '["ubuntu-latest"]')}}
     name: Build & Package - ${{ matrix.os }}
-    if: ${{ inputs.combineJars }}
+    # A merged fork PR gets no secrets; the push to main attaches the artifact instead.
+    if: ${{ inputs.combineJars && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
     runs-on: ${{ matrix.os }}
     concurrency:
       group: attach-artifact-${{ github.ref }}-${{ matrix.os }}
@@ -263,7 +264,8 @@ jobs:
 
   cleanup-individual-artifacts:
     needs: [build-multi-architecture, combineJars]
-    if: ${{ inputs.combineJars && always() }}
+    # A merged fork PR gets no secrets; the push to main attaches the artifact instead.
+    if: ${{ inputs.combineJars && always() && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
     uses: liquibase/build-logic/.github/workflows/cleanup-individual-artifacts.yml@main
     with:
       artifact_id: ${{needs.build-multi-architecture.outputs.artifact_id}}
@@ -271,7 +273,8 @@ jobs:
 
   attach-to-release:
     # Only run for pushes/dispatches, or PRs that actually merged - a closed-without-merge PR (e.g. Dependabot's PR rejected/superseded) has nothing to release.
-    if: ${{ always() && !contains(needs.*.result, 'failure') && (github.event_name != 'pull_request' || github.event.pull_request.merged == true) }}
+    # A merged fork PR gets no secrets; the push to main attaches the artifact instead.
+    if: ${{ always() && !contains(needs.*.result, 'failure') && (github.event_name != 'pull_request' || github.event.pull_request.merged == true) && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
     name: Attach Artifact to Release
     needs: [build-multi-architecture, combineJars]
     runs-on: ubuntu-latest
@@ -664,7 +667,8 @@ jobs:
   notify-failure:
     name: Notify Slack on Release Artifact Failure
     needs: [build-multi-architecture, combineJars, attach-to-release]
-    if: ${{ always() && contains(needs.*.result, 'failure') }}
+    # A merged fork PR gets no secrets; the push to main attaches the artifact instead.
+    if: ${{ always() && contains(needs.*.result, 'failure') && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS credentials for the nightly-builds-slack-webhook secret

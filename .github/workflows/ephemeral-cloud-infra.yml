@@ -556,6 +556,20 @@ jobs:
       # both the same-run and cross-run download steps are gone, along with the
       # actions: read requirement the cross-run one imposed.
 
+      # The OIDC session from "Configure AWS Credentials" lasts one hour, counted from the
+      # start of the job, and "Destroy ephemeral infra" can use most of it: each attempt
+      # waits for a free Spacelift worker. On 2026-10-29 that wait was 57 minutes, the S3
+      # backend below then failed with ExpiredToken after the infra was already gone, and
+      # the Spacelift stack was left behind (TECHOPS-1569). Assume the role again so this
+      # step always starts with a fresh hour. The Spacelift state token needs no refresh:
+      # its JWT is valid for ten hours.
+      - name: Refresh AWS credentials for the stack destroy
+        if: ${{ inputs.destroy && steps.verify-state.outputs.present == 'true' && steps.destroy_infra.outcome == 'success' }}
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ env.AWS_DEV_GITHUB_OIDC_ROLE_ARN_BUILD_LOGIC }}
+          aws-region: us-east-1
+
       - name: Destroy ephemeral stack
         # Only delete the Spacelift stack object when the AWS resource destroy
         # actually succeeded. If the infra destroy failed we keep the stack (and

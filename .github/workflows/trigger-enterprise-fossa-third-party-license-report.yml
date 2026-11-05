@@ -33,17 +33,17 @@ jobs:
     env:
       VERSION_INPUT: ${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}
     steps:
-      - name: Configure AWS credentials for the fossa secret
+      - name: Configure AWS credentials for the GitHub token
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-fossa-3
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-11
           aws-region: us-east-1
 
-      - name: Get the fossa secret from vault
+      - name: Get the GitHub token from vault
         uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
           secret-ids: |
-            ,/vault/grouped/fossa
+            ,/vault/grouped/liquibot-github-pat
           parse-json-secrets: true
 
       - name: Set workflow inputs
@@ -61,7 +61,7 @@ jobs:
         id: return_dispatch
         continue-on-error: true
         with:
-          token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
+          token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
           ref: ${{ matrix.repo.ref }}
           repo: ${{ matrix.repo.name }}
           owner: ${{ matrix.repo.owner }}
@@ -97,7 +97,7 @@ jobs:
       - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
         uses: Codex-/await-remote-run@1fd400f3e2033480390bd521e6626b24365c9c20 # v1
         with:
-          token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
+          token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
           run_id: ${{ steps.return_dispatch.outputs.run_id }}
           repo: ${{ matrix.repo.name }}
           owner: ${{ matrix.repo.owner }}
@@ -219,23 +219,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Configure AWS credentials for the fossa secret
+      - name: Configure AWS credentials for the GitHub token
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-fossa-3
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-11
           aws-region: us-east-1
 
-      - name: Get the fossa secret from vault
+      - name: Get the GitHub token from vault
         uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
           secret-ids: |
-            ,/vault/grouped/fossa
+            ,/vault/grouped/liquibot-github-pat
           parse-json-secrets: true
 
       - name: Dispatch an action for datical-service
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
-          token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
+          token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
           repository: Datical/datical-service
           event-type: trigger-fossa-report-generation
           client-payload: '{"ref": "main", "version_number_for_3p_fossa_report_generation": "${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}"}'

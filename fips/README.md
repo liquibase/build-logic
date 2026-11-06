@@ -65,7 +65,9 @@ Runs without a version get no instance role.
 
 - **By hand:** Actions, **FIPS RHEL test**, from `main` (the `fips-rhel` environment admits no other branch).
 - **Releases:** liquibase-pro's `secure-release-orchestrator.yml` and `rc-release-orchestrator.yml` call it after
-  publishing, with the released version. It runs in liquibase-pro's own `fips-rhel` environment.
+  publishing, with the released version and `report-only: true`. It runs in liquibase-pro's own `fips-rhel`
+  environment. With `report-only`, a FAIL shows in the `result` output, the job summary and an annotation, but the
+  job passes, so it can't fail the release run (GA `from_rc` accepts only a successful RC run).
 - **From a laptop**, with dev account credentials: `fips/rhel/run.sh`, with the settings at the top of the script.
   It tests the local files, committed or not. Set `FIPS_RHEL_SUBNET_IDS` and `FIPS_RHEL_SECURITY_GROUP_ID` if your
   credentials can't read `/fips-rhel/config/*` in SSM.

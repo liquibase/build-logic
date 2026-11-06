@@ -48,6 +48,11 @@ on:
         required: false
         type: boolean
         default: false
+      report-only:
+        description: "Report FAIL in the result output, the job summary and an annotation, without failing the job. For release workflows, where a failed job would fail the release run."
+        required: false
+        type: boolean
+        default: false
     outputs:
       result:
         description: "PASS or FAIL"
@@ -79,7 +84,10 @@ jobs:
           ref: ${{ github.repository == 'liquibase/build-logic' && github.sha || 'main' }}
           persist-credentials: false
 
-      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+      - name: Assume the fips-rhel role
+        id: aws
+        continue-on-error: ${{ inputs.report-only == true }}
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.FIPS_RHEL_ROLE_ARN }}
           aws-region: us-east-1
@@ -94,13 +102,22 @@ jobs:
           FIPS_RHEL_REQUIRE_FIPS_LICENSE: ${{ inputs.require-fips-license && 'true' || 'false' }}
           # Only with a version: the instance reads the license from the vault with this role.
           FIPS_RHEL_LICENSE_ROLE_ARN: ${{ inputs.version != '' && vars.FIPS_RHEL_LICENSE_ROLE_ARN || '' }}
+          AWS_OUTCOME: ${{ steps.aws.outcome }}
+          REPORT_ONLY: ${{ inputs.report-only == true && 'true' || 'false' }}
+        # With report-only, a FAIL (including a role that can't be assumed) is reported and the job still passes.
         run: |
-          if fips/rhel/run.sh; then
+          if [ "$AWS_OUTCOME" = success ] && fips/rhel/run.sh; then
             echo "result=PASS" >> "$GITHUB_OUTPUT"
-          else
-            echo "result=FAIL" >> "$GITHUB_OUTPUT"
-            exit 1
+            exit 0
           fi
+          echo "result=FAIL" >> "$GITHUB_OUTPUT"
+          [ "$AWS_OUTCOME" = success ] || echo "::error::Could not assume the fips-rhel role, so no checks ran."
+          if [ "$REPORT_ONLY" = true ]; then
+            echo "::error title=FIPS checks on RHEL 9::FAIL, reported only: this job does not fail the calling workflow."
+            [ -z "${GITHUB_STEP_SUMMARY:-}" ] || echo "**FIPS checks on RHEL 9: FAIL** (reported only, the job passes)." >>"$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit 1
 
       - name: Keep the report and the console output
         if: always()

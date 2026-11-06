@@ -84,9 +84,11 @@ jobs:
           ref: ${{ github.repository == 'liquibase/build-logic' && github.sha || 'main' }}
           persist-credentials: false
 
+      # Never stops the job here: the next step turns a failure into result=FAIL, and fails the job unless
+      # report-only is set.
       - name: Assume the fips-rhel role
         id: aws
-        continue-on-error: ${{ inputs.report-only == true }}
+        continue-on-error: true
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.FIPS_RHEL_ROLE_ARN }}
@@ -104,7 +106,7 @@ jobs:
           FIPS_RHEL_LICENSE_ROLE_ARN: ${{ inputs.version != '' && vars.FIPS_RHEL_LICENSE_ROLE_ARN || '' }}
           AWS_OUTCOME: ${{ steps.aws.outcome }}
           REPORT_ONLY: ${{ inputs.report-only == true && 'true' || 'false' }}
-        # With report-only, a FAIL (including a role that can't be assumed) is reported and the job still passes.
+        # Any failure, including a role that can't be assumed, sets result=FAIL. With report-only, the job passes.
         run: |
           if [ "$AWS_OUTCOME" = success ] && fips/rhel/run.sh; then
             echo "result=PASS" >> "$GITHUB_OUTPUT"

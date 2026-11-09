@@ -92,18 +92,12 @@ jobs:
         id: normalize-os
         uses: liquibase/build-logic/.github/actions/normalize-os@2660ba32055efd3301bcf624a3d60ca8b11cc482 # main
 
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-4
-          aws-region: us-east-1
-
       - name: Get the liquibot-github-pat secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-4
 
       - name: Set up JDK ${{ inputs.javaBuildVersion }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -290,31 +284,19 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Configure AWS credentials for the gpg-signing secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-gpg-signing-2
-          aws-region: us-east-1
-
       - name: Get the gpg-signing secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/gpg-signing
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-4
-          aws-region: us-east-1
+          group: gpg-signing
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-gpg-signing-2
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-4
 
       - name: Set up JDK ${{ inputs.javaBuildVersion }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -671,18 +653,11 @@ jobs:
     if: ${{ always() && contains(needs.*.result, 'failure') && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
     runs-on: ubuntu-latest
     steps:
-      - name: Configure AWS credentials for the nightly-builds-slack-webhook secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-nightly-builds-slack-webhook
-          aws-region: us-east-1
-
       - name: Get the nightly-builds-slack-webhook secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/nightly-builds-slack-webhook
-          parse-json-secrets: true
+          group: nightly-builds-slack-webhook
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Notify Slack on Failure
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3

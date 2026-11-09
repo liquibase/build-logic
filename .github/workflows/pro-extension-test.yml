@@ -114,83 +114,43 @@ jobs:
         id: normalize-os
         uses: liquibase/build-logic/.github/actions/normalize-os@2660ba32055efd3301bcf624a3d60ca8b11cc482 # main
 
-      - name: Configure AWS credentials for the aws-github-oidc-role-arn-s3-gha secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-aws-github-oidc-role-arn-s3-gha
-          aws-region: us-east-1
-
       - name: Get the aws-github-oidc-role-arn-s3-gha secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/aws-github-oidc-role-arn-s3-gha
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the azure-service-principal secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-azure-service-principal
-          aws-region: us-east-1
+          group: aws-github-oidc-role-arn-s3-gha
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the azure-service-principal secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/azure-service-principal
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the hashicorp-vault secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-hashicorp-vault
-          aws-region: us-east-1
+          group: azure-service-principal
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the hashicorp-vault secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/hashicorp-vault
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the liquibase-azure-storage-account secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibase-azure-storage-account
-          aws-region: us-east-1
+          group: hashicorp-vault
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the liquibase-azure-storage-account secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibase-azure-storage-account
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-8
-          aws-region: us-east-1
+          group: liquibase-azure-storage-account
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the pro-license secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-3
-          aws-region: us-east-1
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-8
 
       - name: Get the pro-license secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/pro-license
-          parse-json-secrets: true
+          group: pro-license
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-pro-license-3
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -391,83 +351,43 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: build
     steps:
-      - name: Configure AWS credentials for the aws-github-oidc-role-arn-s3-gha secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-aws-github-oidc-role-arn-s3-gha
-          aws-region: us-east-1
-
       - name: Get the aws-github-oidc-role-arn-s3-gha secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/aws-github-oidc-role-arn-s3-gha
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the azure-service-principal secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-azure-service-principal
-          aws-region: us-east-1
+          group: aws-github-oidc-role-arn-s3-gha
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the azure-service-principal secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/azure-service-principal
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the hashicorp-vault secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-hashicorp-vault
-          aws-region: us-east-1
+          group: azure-service-principal
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the hashicorp-vault secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/hashicorp-vault
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the liquibase-azure-storage-account secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibase-azure-storage-account
-          aws-region: us-east-1
+          group: hashicorp-vault
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the liquibase-azure-storage-account secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibase-azure-storage-account
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-8
-          aws-region: us-east-1
+          group: liquibase-azure-storage-account
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the pro-license secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-3
-          aws-region: us-east-1
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-8
 
       - name: Get the pro-license secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/pro-license
-          parse-json-secrets: true
+          group: pro-license
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-pro-license-3
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -787,31 +707,18 @@ jobs:
     name: Trigger Cleanup Individual OS Artifacts
     runs-on: ubuntu-latest
     steps:
-      - name: Configure AWS credentials for the aws-github-oidc-role-arn-s3-gha secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-aws-github-oidc-role-arn-s3-gha
-          aws-region: us-east-1
-
       - name: Get the aws-github-oidc-role-arn-s3-gha secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/aws-github-oidc-role-arn-s3-gha
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the github-app-liquibase secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-github-app-liquibase-7
-          aws-region: us-east-1
+          group: aws-github-oidc-role-arn-s3-gha
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the github-app-liquibase secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/github-app-liquibase
-          parse-json-secrets: true
+          group: github-app-liquibase
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-github-app-liquibase-7
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -897,18 +804,12 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Configure AWS credentials for the nightly-builds-slack-webhook secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-nightly-builds-slack-webhook-2
-          aws-region: us-east-1
-
       - name: Get the nightly-builds-slack-webhook secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/nightly-builds-slack-webhook
-          parse-json-secrets: true
+          group: nightly-builds-slack-webhook
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-nightly-builds-slack-webhook-2
 
       - name: Notify Slack
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3

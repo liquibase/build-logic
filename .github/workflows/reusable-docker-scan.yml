@@ -190,18 +190,12 @@ jobs:
           docker build -f "$DOCKERFILE_PATH" \
             -t "${IMAGE_NAME}${SUFFIX}:${GHCR_TAG}" "$BUILD_CONTEXT"
 
-      - name: Configure AWS credentials for the dockerhub secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-dockerhub-2
-          aws-region: us-east-1
-
       - name: Get the dockerhub secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/dockerhub
-          parse-json-secrets: true
+          group: dockerhub
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-dockerhub-2
 
       - name: Decode DOCKERHUB_USERNAME
         env:
@@ -410,31 +404,18 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Configure AWS credentials for the docker-slack-webhook-url secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-docker-slack-webhook-url
-          aws-region: us-east-1
-
       - name: Get the docker-slack-webhook-url secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/docker-slack-webhook-url
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the slack-webhook secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-slack-webhook-6
-          aws-region: us-east-1
+          group: docker-slack-webhook-url
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the slack-webhook secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          secret-ids: |
-            ,/vault/grouped/slack-webhook
-          parse-json-secrets: true
+          group: slack-webhook
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-slack-webhook-6
 
       - name: Resolve Slack webhook
         id: webhook

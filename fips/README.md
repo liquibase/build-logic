@@ -40,7 +40,8 @@ checked on real RHEL 9 (INT-2446): `fips-rhel-test.yml` runs `rhel/run.sh`, whic
    reboots into FIPS mode and runs `rhel/checks.sh`: the same checks as `fips-vm-test.yml`'s self-test, plus a check
    that the host is RHEL 9.
 3. Reads the results from the instance's serial console, writes them to the job summary, and terminates the
-   instance, also when something fails. The instance stops itself, and so terminates, an hour after each boot.
+   instance, also when something fails. If the job is cancelled or times out first, a last step finds the instance
+   by its `Name` tag and terminates it. The instance also stops itself, and so terminates, an hour after each boot.
 
 A run takes about 10 minutes. Nothing connects to the instance: its security group has no inbound rule and it has
 no SSH key.
@@ -67,7 +68,9 @@ Runs without a version get no instance role.
 - **Releases:** liquibase-pro's `secure-release-orchestrator.yml` and `rc-release-orchestrator.yml` call it after
   publishing, with the released version and `report-only: true`. It runs in liquibase-pro's own `fips-rhel`
   environment. With `report-only`, a FAIL shows in the `result` output, the job summary and an annotation, but the
-  job passes, so it can't fail the release run (GA `from_rc` accepts only a successful RC run).
+  job passes, so it can't fail the release run (GA `from_rc` accepts only a successful RC run). The job also has
+  `continue-on-error`, for a failed checkout or a timeout.
+- Runs in the same repo take turns: up to 100 wait in the queue, and none cancels another.
 - **From a laptop**, with dev account credentials: `fips/rhel/run.sh`, with the settings at the top of the script.
   It tests the local files, committed or not. Set `FIPS_RHEL_SUBNET_IDS` and `FIPS_RHEL_SECURITY_GROUP_ID` if your
   credentials can't read `/fips-rhel/config/*` in SSM.

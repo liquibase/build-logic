@@ -61,9 +61,12 @@ on:
 permissions:
   contents: read
 
+# One run at a time per caller repo. queue: max keeps up to 100 runs waiting; with the default queue, a third run
+# would cancel the one waiting (for example a GA and two RC runs in liquibase-pro).
 concurrency:
   group: fips-rhel-test-${{ github.repository }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   rhel:
@@ -71,6 +74,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: fips-rhel
     timeout-minutes: 60
+    # With report-only, nothing in this job fails the calling workflow: not a failed check (the run step handles
+    # that), and not a failed checkout or a timeout either.
+    continue-on-error: ${{ inputs.report-only == true }}
     permissions:
       contents: read
       id-token: write
@@ -120,6 +126,25 @@ jobs:
             exit 0
           fi
           exit 1
+
+      # run.sh terminates the instance when it exits, but a cancelled or timed-out job may kill it first. This finds
+      # the run's instance by its Name tag (set in run.sh) and terminates it; when run.sh already did, it finds none.
+      - name: Terminate the instance if it is still running
+        if: always() && steps.aws.outcome == 'success'
+        env:
+          NAME: fips-rhel-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          ids=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$NAME" Name=tag:managed_by,Values=fips-rhel \
+            Name=instance-state-name,Values=pending,running,stopping,stopped \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+          if [ -n "$ids" ]; then
+            # shellcheck disable=SC2086 # one or more ids, split on whitespace
+            aws ec2 terminate-instances --instance-ids $ids >/dev/null
+            echo "Terminated $ids"
+          else
+            echo "No instance left running"
+          fi
 
       - name: Keep the report and the console output
         if: always()

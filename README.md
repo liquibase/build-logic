@@ -85,7 +85,7 @@ To reduce Dependabot noise and centralize SHA management, this repo provides **c
 | `checkout` | `actions/checkout` | `uses: liquibase/build-logic/.github/actions/checkout@main` |
 | `setup-java` | `actions/setup-java` | `uses: liquibase/build-logic/.github/actions/setup-java@main` |
 | `configure-aws-credentials` | `aws-actions/configure-aws-credentials` | `uses: liquibase/build-logic/.github/actions/configure-aws-credentials@main` |
-| `setup-aws-vault` | grouped vault role + one `/vault/grouped/<group>` read | `uses: liquibase/build-logic/.github/actions/setup-aws-vault@main` with `group` and `aws-account-id` |
+| `setup-aws-vault` | grouped vault role + one `/vault/grouped/<group>` read | `uses: liquibase/build-logic/.github/actions/setup-aws-vault@<commit-sha> # main` with `group` and either `role-arn` (repo secret `VAULT_GROUPED_<GROUP>_ROLE_ARN`) or `aws-account-id`; optional `keys` exports only those keys. The role's credentials are not left in the job env |
 | `setup-google-credentials` | Google Cloud credentials | `uses: liquibase/build-logic/.github/actions/setup-google-credentials@main` |
 | `claude-wif` | Claude API auth through workload identity federation, for jobs that run `claude` or an Anthropic SDK directly (no API key). See the requirements at the top of its `action.yml` | `uses: liquibase/build-logic/.github/actions/claude-wif@<commit-sha> # main` (liquibase org repos must pin actions to a full commit SHA) |
 

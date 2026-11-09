@@ -68,31 +68,19 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-5
-          aws-region: us-east-1
-
       - name: Get the liquibot-github-pat secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the sonatype secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-sonatype-2
-          aws-region: us-east-1
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-5
 
       - name: Get the sonatype secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/sonatype
-          parse-json-secrets: true
+          group: sonatype
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-sonatype-2
 
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -164,31 +152,18 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-5
-          aws-region: us-east-1
-
       - name: Get the liquibot-github-pat secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the repo-liquibase-net secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-repo-liquibase-net
-          aws-region: us-east-1
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-5
 
       - name: Get the repo-liquibase-net secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/repo-liquibase-net
-          parse-json-secrets: true
+          group: repo-liquibase-net
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Set up Java for publishing to Maven Central Repository
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0

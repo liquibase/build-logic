@@ -91,70 +91,38 @@ jobs:
       ghcr_ref: ${{ steps.image-tag.outputs.ghcr_ref }}
 
     steps:
-      - name: Configure AWS credentials for the aws-prod-github-oidc-role-arn-liquibase-pro secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-aws-prod-github-oidc-role-arn-liquibase-pro
-          aws-region: us-east-1
-
       - name: Get the aws-prod-github-oidc-role-arn-liquibase-pro secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/aws-prod-github-oidc-role-arn-liquibase-pro
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the cloudflare-r2 secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-cloudflare-r2-3
-          aws-region: us-east-1
+          group: aws-prod-github-oidc-role-arn-liquibase-pro
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the cloudflare-r2 secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/cloudflare-r2
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the github-app-liquibase secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-github-app-liquibase-8
-          aws-region: us-east-1
+          group: cloudflare-r2
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-cloudflare-r2-3
 
       - name: Get the github-app-liquibase secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/github-app-liquibase
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-8
-          aws-region: us-east-1
+          group: github-app-liquibase
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-github-app-liquibase-8
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the nexus-repo secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-nexus-repo
-          aws-region: us-east-1
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-8
 
       - name: Get the nexus-repo secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/nexus-repo
-          parse-json-secrets: true
+          group: nexus-repo
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Configure AWS credentials for Liquibase-Secure builds
         if: ${{ inputs.build_type == 'secure' }}

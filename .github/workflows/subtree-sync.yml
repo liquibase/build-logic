@@ -46,31 +46,18 @@ jobs:
     name: Sync Subtree
     runs-on: ubuntu-latest
     steps:
-      - name: Configure AWS credentials for the github-app-liquibase secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-github-app-liquibase-9
-          aws-region: us-east-1
-
       - name: Get the github-app-liquibase secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/github-app-liquibase
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the team-liquibase-secure-slack-webhook secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-team-liquibase-secure-slack-webhook
-          aws-region: us-east-1
+          group: github-app-liquibase
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-github-app-liquibase-9
 
       - name: Get the team-liquibase-secure-slack-webhook secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/team-liquibase-secure-slack-webhook
-          parse-json-secrets: true
+          group: team-liquibase-secure-slack-webhook
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get GitHub App token
         id: get-token

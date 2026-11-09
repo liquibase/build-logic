@@ -77,57 +77,32 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Configure AWS credentials for the aws-github-oidc-role-arn-s3-gha secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-aws-github-oidc-role-arn-s3-gha
-          aws-region: us-east-1
-
       - name: Get the aws-github-oidc-role-arn-s3-gha secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/aws-github-oidc-role-arn-s3-gha
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the github-app-liquibase secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-github-app-liquibase-7
-          aws-region: us-east-1
+          group: aws-github-oidc-role-arn-s3-gha
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the github-app-liquibase secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/github-app-liquibase
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-7
-          aws-region: us-east-1
+          group: github-app-liquibase
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-github-app-liquibase-7
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
-
-      - name: Configure AWS credentials for the pro-license secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-3
-          aws-region: us-east-1
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-7
 
       - name: Get the pro-license secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/pro-license
-          parse-json-secrets: true
+          group: pro-license
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-pro-license-3
 
       - name: Get GitHub App token
         id: get-token
@@ -248,18 +223,12 @@ jobs:
     name: Combine Jars
     runs-on: ubuntu-latest
     steps:
-      - name: Configure AWS credentials for the github-app-liquibase secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-github-app-liquibase-7
-          aws-region: us-east-1
-
       - name: Get the github-app-liquibase secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/github-app-liquibase
-          parse-json-secrets: true
+          group: github-app-liquibase
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-github-app-liquibase-7
 
       - name: Get GitHub App token
         id: get-token
@@ -386,18 +355,12 @@ jobs:
     name: Trigger Cleanup Individual OS Artifacts
     runs-on: ubuntu-latest
     steps:
-      - name: Configure AWS credentials for the github-app-liquibase secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-github-app-liquibase-7
-          aws-region: us-east-1
-
       - name: Get the github-app-liquibase secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
         with:
-          secret-ids: |
-            ,/vault/grouped/github-app-liquibase
-          parse-json-secrets: true
+          group: github-app-liquibase
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-github-app-liquibase-7
 
       - name: Get GitHub App token
         id: get-token

@@ -27,12 +27,18 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Get the fossa secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
+      - name: Configure AWS credentials for the fossa secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          group: fossa
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
-          role: vault-grouped-fossa-2
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-fossa-2
+          aws-region: us-east-1
+
+      - name: Get the fossa secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/fossa
+          parse-json-secrets: true
 
       - name: Get the commit sha
         id: get_commit_sha
@@ -92,12 +98,20 @@ jobs:
         if: inputs.version_number_for_3p_fossa_report_generation == ''
         run: echo "::notice::No version_number_for_3p_fossa_report_generation (push run), so the report is not uploaded to R2. It is still attached to this run as the fossa-reports artifact."
 
+      - name: Configure AWS credentials for the cloudflare-r2 secret
+        if: inputs.version_number_for_3p_fossa_report_generation != ''
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-cloudflare-r2
+          aws-region: us-east-1
+
       - name: Get the cloudflare-r2 secret from vault
         if: inputs.version_number_for_3p_fossa_report_generation != ''
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
-          group: cloudflare-r2
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          secret-ids: |
+            ,/vault/grouped/cloudflare-r2
+          parse-json-secrets: true
 
       - name: Upload 3rd Party report to R2
         if: always() && inputs.version_number_for_3p_fossa_report_generation != ''

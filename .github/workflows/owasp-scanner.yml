@@ -35,18 +35,31 @@ jobs:
     env:
       REPO_DIR: ${{ inputs.repository }}
     steps:
-      - name: Get the liquibot-github-pat secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
+      - name: Configure AWS credentials for the liquibot-github-pat secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          group: liquibot-github-pat
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
-          role: vault-grouped-liquibot-github-pat-6
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-6
+          aws-region: us-east-1
+
+      - name: Get the liquibot-github-pat secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/liquibot-github-pat
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the nvd secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-nvd
+          aws-region: us-east-1
 
       - name: Get the nvd secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
-          group: nvd
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          secret-ids: |
+            ,/vault/grouped/nvd
+          parse-json-secrets: true
 
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

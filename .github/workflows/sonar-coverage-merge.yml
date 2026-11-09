@@ -61,25 +61,44 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.event.after }}
 
-      - name: Get the liquibot-github-pat secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
+      - name: Configure AWS credentials for the liquibot-github-pat secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          group: liquibot-github-pat
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
-          role: vault-grouped-liquibot-github-pat-9
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-9
+          aws-region: us-east-1
+
+      - name: Get the liquibot-github-pat secret from vault
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ,/vault/grouped/liquibot-github-pat
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the pro-license secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-4
+          aws-region: us-east-1
 
       - name: Get the pro-license secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
-          group: pro-license
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
-          role: vault-grouped-pro-license-4
+          secret-ids: |
+            ,/vault/grouped/pro-license
+          parse-json-secrets: true
+
+      - name: Configure AWS credentials for the sonar secret
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-sonar
+          aws-region: us-east-1
 
       - name: Get the sonar secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@main
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
         with:
-          group: sonar
-          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          secret-ids: |
+            ,/vault/grouped/sonar
+          parse-json-secrets: true
 
       - name: Set up JDK
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0

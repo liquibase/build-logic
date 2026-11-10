@@ -151,6 +151,9 @@ if [ -x "$secure/liquibase" ]; then
       read -r status code update <<<"$result"
       say INFO "Liquibase Secure in FIPS mode: license $status ($code), update $update. Not enforced until license files verify in FIPS mode (INT-2438)"
     fi
+  elif [ "${FIPS_RHEL_REQUIRE_FIPS_LICENSE:-false}" = true ]; then
+    # A required check can't pass by being skipped.
+    check secure-fips "Liquibase Secure: the license verifies and update works in FIPS mode (no license was read)" false
   else
     say INFO "No license: the Liquibase Secure license and update checks were skipped"
   fi

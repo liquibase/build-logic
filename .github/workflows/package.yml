@@ -147,14 +147,12 @@ jobs:
           group: aws-prod-github-oidc-role-arn-build-logic
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
-      - name: Load only CLOUDFLARE_CACHE_PURGE_TOKEN from the cloudflare-api secret
-        # TECHOPS-1114: the zone-scoped Cache Purge token only; the admin CLOUDFLARE_API_TOKEN in the same group has no business in release CI.
+      # TECHOPS-1114: the zone-scoped Cache Purge token only, in a group of its own so this job can't reach the admin CLOUDFLARE_API_TOKEN.
+      - name: Get the cloudflare-cache-purge secret from vault
         uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
         with:
-          group: cloudflare-api
+          group: cloudflare-cache-purge
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
-          role: vault-grouped-cloudflare-api-2
-          keys: CLOUDFLARE_CACHE_PURGE_TOKEN
 
       - name: Get the cloudflare-r2 secret from vault
         uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
@@ -447,7 +445,7 @@ jobs:
             sleep 10
           done
           if [ -z "$purged" ]; then
-            echo "::error::Cloudflare cache purge failed, so the edge may keep serving stale apt metadata against the new InRelease and apt update will break for customers (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-api."
+            echo "::error::Cloudflare cache purge failed, so the edge may keep serving stale apt metadata against the new InRelease and apt update will break for customers (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-cache-purge."
             exit 1
           fi
 
@@ -987,7 +985,7 @@ jobs:
             sleep 10
           done
           if [ -z "$purged" ]; then
-            echo "::error::Cloudflare cache purge failed, so the edge may keep serving a stale yum index (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-api."
+            echo "::error::Cloudflare cache purge failed, so the edge may keep serving a stale yum index (TECHOPS-1114). Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-cache-purge."
             exit 1
           fi
 
@@ -1421,7 +1419,7 @@ jobs:
             done
             # Not fatal on its own: the resolvability gate below is the check that matters,
             # and it fails the job if the edge is still wrong.
-            echo "::warning::Cloudflare cache purge failed for $ZIP_FILENAME. Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-api."
+            echo "::warning::Cloudflare cache purge failed for $ZIP_FILENAME. Check CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-cache-purge."
             return 1
           }
 
@@ -1447,7 +1445,7 @@ jobs:
           done
           rm -f /tmp/sdkman-probe.zip
           if [ -z "$resolved" ]; then
-            echo "::error::$WEB_URL$ZIP_FILENAME does not serve the zip that was just uploaded, so SDKMAN would reject the release with 'URL cannot be resolved' (TECHOPS-1137). Check the R2 upload and CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-api."
+            echo "::error::$WEB_URL$ZIP_FILENAME does not serve the zip that was just uploaded, so SDKMAN would reject the release with 'URL cannot be resolved' (TECHOPS-1137). Check the R2 upload and CLOUDFLARE_CACHE_PURGE_TOKEN in /vault/grouped/cloudflare-cache-purge."
             exit 1
           fi
 

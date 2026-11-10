@@ -1,0 +1,155 @@
+name: FIPS RHEL test
+# Runs the FIPS VM self-test checks on real RHEL 9 in FIPS mode, on an on-demand EC2 instance in the dev
+# account (INT-2446). AlmaLinux 9 in the FIPS VM (fips-vm-test.yml) covers daily and nightly runs; this
+# covers each release. fips/rhel/run.sh does the work: see fips/README.md.
+#
+# With a version, it also tests that Liquibase Secure release archive from repo.liquibase.com with the CI
+# license, which the instance reads from the vault itself (fips/rhel/secure.sh).
+#
+# Run it by hand from main, or call it from a release workflow. Either way the job runs in the caller repo's
+# `fips-rhel` environment, which holds the variables FIPS_RHEL_ROLE_ARN and FIPS_RHEL_LICENSE_ROLE_ARN.
+# The role in FIPS_RHEL_ROLE_ARN, github-actions-fips-rhel (liquibase-infrastructure dev-account/fips-rhel.tf),
+# trusts this file on main from that environment in build-logic and liquibase-pro only, and may only start,
+# read the console of and terminate instances tagged managed_by=fips-rhel. The environments are in
+# liquibase-infrastructure github/liquibase/repos/{public,internal}/fips-rhel-environment.tf.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Liquibase Secure version to test, a release (6.0.1) or an RC (6.0.1-RC1). Empty: platform checks with Liquibase Community only."
+        required: false
+        type: string
+      package:
+        description: "Release archive to test"
+        required: false
+        type: choice
+        options: [liquibase-secure, liquibase-secure-fips]
+        default: liquibase-secure
+      require-fips-license:
+        description: "Fail when the license or update fails in FIPS mode (once license files verify in FIPS mode, INT-2438)"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      version:
+        description: "Liquibase Secure version to test, a release (6.0.1) or an RC (6.0.1-RC1). Empty: platform checks only."
+        required: false
+        type: string
+        default: ""
+      package:
+        description: "liquibase-secure or liquibase-secure-fips"
+        required: false
+        type: string
+        default: liquibase-secure
+      require-fips-license:
+        description: "Fail when the license or update fails in FIPS mode"
+        required: false
+        type: boolean
+        default: false
+      report-only:
+        description: "Report FAIL in the result output, the job summary and an annotation, without failing the job. For release workflows, where a failed job would fail the release run."
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      result:
+        description: "PASS or FAIL"
+        value: ${{ jobs.rhel.outputs.result }}
+
+permissions:
+  contents: read
+
+# One run at a time per caller repo. queue: max keeps up to 100 runs waiting; with the default queue, a third run
+# would cancel the one waiting (for example a GA and two RC runs in liquibase-pro).
+concurrency:
+  group: fips-rhel-test-${{ github.repository }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  rhel:
+    name: FIPS checks on RHEL 9
+    runs-on: ubuntu-latest
+    environment: fips-rhel
+    timeout-minutes: 60
+    # With report-only, nothing in this job fails the calling workflow: not a failed check (the run step handles
+    # that), and not a failed checkout or a timeout either.
+    continue-on-error: ${{ inputs.report-only == true }}
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      result: ${{ steps.run.outputs.result }}
+    steps:
+      # The scripts come from build-logic at the ref this workflow runs from, also when another repo calls it.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: liquibase/build-logic
+          ref: ${{ github.repository == 'liquibase/build-logic' && github.sha || 'main' }}
+          persist-credentials: false
+
+      # Never stops the job here: the next step turns a failure into result=FAIL, and fails the job unless
+      # report-only is set.
+      - name: Assume the fips-rhel role
+        id: aws
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.FIPS_RHEL_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 4500 # outlasts the job's 60 minutes, so the instance can always be terminated
+
+      - name: Run the checks on a RHEL 9 instance
+        id: run
+        env:
+          FIPS_RHEL_OUT_DIR: ${{ runner.temp }}/fips-rhel
+          FIPS_RHEL_SECURE_VERSION: ${{ inputs.version }}
+          FIPS_RHEL_SECURE_PACKAGE: ${{ inputs.package || 'liquibase-secure' }}
+          FIPS_RHEL_REQUIRE_FIPS_LICENSE: ${{ inputs.require-fips-license && 'true' || 'false' }}
+          # Only with a version: the instance reads the license from the vault with this role.
+          FIPS_RHEL_LICENSE_ROLE_ARN: ${{ inputs.version != '' && vars.FIPS_RHEL_LICENSE_ROLE_ARN || '' }}
+          AWS_OUTCOME: ${{ steps.aws.outcome }}
+          REPORT_ONLY: ${{ inputs.report-only == true && 'true' || 'false' }}
+        # Any failure, including a role that can't be assumed, sets result=FAIL. With report-only, the job passes.
+        run: |
+          if [ "$AWS_OUTCOME" = success ] && fips/rhel/run.sh; then
+            echo "result=PASS" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "result=FAIL" >> "$GITHUB_OUTPUT"
+          [ "$AWS_OUTCOME" = success ] || echo "::error::Could not assume the fips-rhel role, so no checks ran."
+          if [ "$REPORT_ONLY" = true ]; then
+            echo "::error title=FIPS checks on RHEL 9::FAIL, reported only: this job does not fail the calling workflow."
+            [ -z "${GITHUB_STEP_SUMMARY:-}" ] || echo "**FIPS checks on RHEL 9: FAIL** (reported only, the job passes)." >>"$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit 1
+
+      # run.sh terminates the instance when it exits, but a cancelled or timed-out job may kill it first. This finds
+      # the run's instance by its Name tag (set in run.sh) and terminates it; when run.sh already did, it finds none.
+      - name: Terminate the instance if it is still running
+        if: always() && steps.aws.outcome == 'success'
+        env:
+          NAME: fips-rhel-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          ids=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$NAME" Name=tag:managed_by,Values=fips-rhel \
+            Name=instance-state-name,Values=pending,running,stopping,stopped \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+          if [ -n "$ids" ]; then
+            # shellcheck disable=SC2086 # one or more ids, split on whitespace
+            aws ec2 terminate-instances --instance-ids $ids >/dev/null
+            echo "Terminated $ids"
+          else
+            echo "No instance left running"
+          fi
+
+      - name: Keep the report and the console output
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: fips-rhel-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/fips-rhel
+          if-no-files-found: ignore

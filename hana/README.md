@@ -22,8 +22,8 @@ jobs:
 ```
 
 - **License:** `agree-to-sap-license: true` accepts SAP's license for the express edition. The image doesn't start without it.
-- **Start time:** about 3 to 4 minutes, plus the image download (1.8 GB).
-- **Runner:** Linux x64 with 16 GB of memory. In a private repository `ubuntu-latest` has 7 GB, which is not enough: use a larger runner.
+- **Start time:** 3 to 4 minutes, image download (1.8 GB) included.
+- **Runner:** Linux x64 with 16 GB of memory, which `ubuntu-latest` has in a public repository such as this one.
 - **Driver:** SAP's JDBC driver is `com.sap.cloud.db.jdbc:ngdbc` on Maven Central. Liquibase needs the `liquibase-hanadb` extension.
 - **Databases:** `url` is the tenant database `HXE` (port 39041), the one to test against. `system-url` is the system database (port 39017).
 - **User:** `SYSTEM`, with a password the action generates and masks, unless you pass `password`.
@@ -69,4 +69,4 @@ For JDBC from the VM, use `jdbc:sap://10.0.2.2:39041/?encrypt=true&validateCerti
 
 1. Liquibase 5 with `liquibase-hanadb` and `ngdbc` updates, rolls back and reads the status of `HXE` over TLS with certificate validation (`hana/selftest`).
 2. A client that trusts another CA must be refused because of the certificate.
-3. From the FIPS VM, OpenSSL in FIPS mode verifies the certificate and connects.
+3. From the FIPS VM, OpenSSL in FIPS mode verifies the certificate and connects (TLS 1.3, `TLS_AES_256_GCM_SHA384`).

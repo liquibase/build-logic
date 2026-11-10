@@ -17,7 +17,7 @@ inputs:
     required: false
     default: ''
   keys:
-    description: 'Space- or newline-separated keys to export; empty exports the whole group. A filter, not an access boundary.'
+    description: 'Space- or newline-separated keys to export; empty exports the whole group. A filter, not an access boundary. Needs bash, aws, jq and openssl in the job environment.'
     required: false
     default: ''
   aws-region:
@@ -35,7 +35,7 @@ runs:
         echo "::error::setup-aws-vault needs role-arn or aws-account-id for ${{ inputs.group }}; is its VAULT_GROUPED_*_ROLE_ARN secret set?"
         exit 1
 
-    # Credentials stay out of the job env. Not a boundary: a job with id-token: write can assume the role itself.
+    # Credentials and region stay out of the job env. Not a boundary: a job with id-token: write can assume the role itself.
     - name: Configure AWS credentials for ${{ inputs.group }}
       id: creds
       uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -49,7 +49,9 @@ runs:
       if: inputs.keys == ''
       uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
       env:
+        # get-secrets builds its client from AWS_DEFAULT_REGION.
         AWS_REGION: ${{ inputs.aws-region }}
+        AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
         AWS_ACCESS_KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}
         AWS_SECRET_ACCESS_KEY: ${{ steps.creds.outputs.aws-secret-access-key }}
         AWS_SESSION_TOKEN: ${{ steps.creds.outputs.aws-session-token }}
@@ -58,47 +60,65 @@ runs:
           ,/vault/grouped/${{ inputs.group }}
         parse-json-secrets: true
 
-    # Subset read: names match the whole-group read (upper-cased, other characters to _), values are kept as stored.
+    # Subset read with get-secrets' names and values: objects (and JSON-object strings) flatten to KEY_SUB,
+    # other non-strings are JSON text, a leading digit gets "_", and a name already set fails.
     - name: Get ${{ inputs.keys }} from vault
       if: inputs.keys != ''
       shell: bash
       env:
-        GROUP: ${{ inputs.group }}
-        KEYS: ${{ inputs.keys }}
+        SETUP_AWS_VAULT_GROUP: ${{ inputs.group }}
+        SETUP_AWS_VAULT_KEYS: ${{ inputs.keys }}
         AWS_REGION: ${{ inputs.aws-region }}
+        AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
         AWS_ACCESS_KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}
         AWS_SECRET_ACCESS_KEY: ${{ steps.creds.outputs.aws-secret-access-key }}
         AWS_SESSION_TOKEN: ${{ steps.creds.outputs.aws-session-token }}
         # Git Bash on Windows would rewrite /vault/... into a Windows path.
         MSYS_NO_PATHCONV: '1'
+        SETUP_AWS_VAULT_JQ: |
+          def envname: (if test("^[0-9]") then "_" + . else . end) | gsub("[^a-zA-Z0-9_]"; "_") | ascii_upcase;
+          def emit($name):
+            if type == "object" then to_entries[] | .key as $sub | .value
+              | emit(if $sub == "" then $name else $name + "_" + $sub end)
+            elif type == "string" and (try (fromjson | type == "object") catch false) then fromjson | emit($name)
+            else {n: ($name | envname), v: (if type == "string" then . else tojson end)} end;
+          if has($k) then .[$k] | emit($k) else empty end
       run: |
-        set -euo pipefail
+        set -eu
+        # -b stops jq.exe writing CRLF into values; jq 1.6 (ubuntu-22.04) has no -b.
+        jqx() { if [ "${RUNNER_OS:-}" = Windows ]; then jq -b "$@"; else jq "$@"; fi; }
         vault_json="$(aws secretsmanager get-secret-value \
-          --secret-id "/vault/grouped/${GROUP}" \
+          --secret-id "/vault/grouped/${SETUP_AWS_VAULT_GROUP}" \
           --query SecretString --output text)"
-        for key in ${KEYS}; do
-          # -b stops jq.exe writing CRLF; the x sentinel keeps trailing newlines.
-          # == null instead of // so a stored false is exported, not treated as missing.
-          value="$(jq -jb --arg k "$key" 'if .[$k] == null then empty elif (.[$k] | type) == "string" then .[$k] else (.[$k] | tojson) end' <<< "$vault_json" && printf x)" \
-            || { echo "::error::/vault/grouped/${GROUP} is not valid JSON"; exit 1; }
-          value="${value%x}"
-          if [ -z "$value" ]; then
-            echo "::error::/vault/grouped/${GROUP} has no value for $key"
+        for key in ${SETUP_AWS_VAULT_KEYS}; do
+          pairs="$(jq -c --arg k "$key" "$SETUP_AWS_VAULT_JQ" <<< "$vault_json")" \
+            || { echo "::error::/vault/grouped/${SETUP_AWS_VAULT_GROUP} is not a JSON object"; exit 1; }
+          if [ -z "$pairs" ]; then
+            echo "::error::/vault/grouped/${SETUP_AWS_VAULT_GROUP} has no key $key"
             exit 1
           fi
-          # tr, not ${key^^}: macOS runners ship bash 3.2.
-          name="$(printf '%s' "$key" | tr '[:lower:]' '[:upper:]' | tr -c 'A-Z0-9_' '_')"
-          while IFS= read -r line; do
-            if [ -n "$line" ]; then
-              # The runner unescapes %25 and %0D before matching a mask, so escape % first.
-              line="${line//'%'/%25}"
-              echo "::add-mask::${line//$'\r'/%0D}"
+          while IFS= read -r pair; do
+            name="$(jq -j .n <<< "$pair")"
+            # The x sentinel keeps trailing newlines.
+            value="$(jqx -j .v <<< "$pair" && printf x)"
+            value="${value%x}"
+            if [ "$name" = SECRETS_LIST_CLEAN_UP ] || [ -n "${!name:-}" ]; then
+              echo "::error::The environment name '${name}' from $key is already in use"
+              exit 1
             fi
-          done <<< "$value"
-          delimiter="EOF_$(openssl rand -hex 16)"
-          {
-            printf '%s<<%s\n' "$name" "$delimiter"
-            printf '%s\n' "$value"
-            printf '%s\n' "$delimiter"
-          } >> "$GITHUB_ENV"
+            printf -v "$name" '%s' "$value"
+            while IFS= read -r line; do
+              if [ -n "$line" ]; then
+                # The runner unescapes %25 and %0D before matching a mask, so escape % first.
+                line="${line//'%'/%25}"
+                echo "::add-mask::${line//$'\r'/%0D}"
+              fi
+            done <<< "$value"
+            delimiter="EOF_$(openssl rand -hex 16)"
+            {
+              printf '%s<<%s\n' "$name" "$delimiter"
+              printf '%s\n' "$value"
+              printf '%s\n' "$delimiter"
+            } >> "$GITHUB_ENV"
+          done <<< "$pairs"
         done

@@ -12,6 +12,7 @@
 #   HANA_AGREE_TO_SAP_LICENSE  must be true: the image only starts when SAP's license is accepted
 #   HANA_IMAGE                 the image, by default the pinned saplabs/hanaexpress release
 #   HANA_PASSWORD              password of SYSTEM; generated when empty
+#   HANA_EXTRA_SAN             more names for the certificate, such as DNS:db.test,IP:192.0.2.10
 #   HANA_NAME                  container name, hana-express by default
 #   HANA_WORK_DIR              where the certificates and passwords go; a temporary folder by default
 #   HANA_TIMEOUT_MINUTES       how long to wait for the database, 20 by default
@@ -32,6 +33,9 @@ work=${HANA_WORK_DIR:-${RUNNER_TEMP:-$(mktemp -d)}/hana-express}
 timeout_min=${HANA_TIMEOUT_MINUTES:-20}
 # The host name inside the container. HANA's own certificate is issued to it.
 host=hxehost
+# Names in the certificate: localhost for the runner, and 10.0.2.2, the runner's address as seen from the
+# FIPS VM (fips-vm action).
+san="DNS:localhost,DNS:$host,IP:127.0.0.1,IP:10.0.2.2${HANA_EXTRA_SAN:+,$HANA_EXTRA_SAN}"
 # SQL ports of instance 90: 39017 is the system database, 39041 the tenant database HXE.
 system_port=39017
 tenant_port=39041
@@ -42,7 +46,6 @@ done
 [ "$(uname -m)" = x86_64 ] || fail "SAP HANA, express edition runs on x86_64 only."
 
 mkdir -p "$work/mounts" "$work/tls"
-chmod 700 "$work"
 
 password=${HANA_PASSWORD:-}
 if [ -z "$password" ]; then
@@ -85,7 +88,7 @@ step "The database started in $((SECONDS - started)) seconds"
 # The image no longer needs the password file.
 sudo rm -f "$work/mounts/passwords.json"
 
-step "Making a CA and a server certificate for localhost"
+step "Making a CA and a server certificate for $san"
 tls=$work/tls
 openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 30 \
   -subj "/O=Liquibase test/CN=hana-express test CA" \
@@ -93,7 +96,7 @@ openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 30 \
   -keyout "$tls/ca.key" -out "$tls/ca.pem" 2>/dev/null
 openssl req -newkey rsa:3072 -sha256 -nodes -subj "/O=Liquibase test/CN=localhost" \
   -keyout "$tls/server.key" -out "$tls/server.csr" 2>/dev/null
-printf 'subjectAltName=DNS:localhost,DNS:%s,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' "$host" >"$tls/server.ext"
+printf 'subjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' "$san" >"$tls/server.ext"
 openssl x509 -req -in "$tls/server.csr" -CA "$tls/ca.pem" -CAkey "$tls/ca.key" -CAcreateserial \
   -sha256 -days 30 -extfile "$tls/server.ext" -out "$tls/server.pem" 2>/dev/null
 # The CA key has done its job: nothing else can be signed with this CA.
@@ -134,6 +137,10 @@ truststore_password=changeit
 rm -f "$truststore"
 keytool -importcert -noprompt -alias hana-express-ca -file "$tls/ca.pem" \
   -keystore "$truststore" -storetype PKCS12 -storepass "$truststore_password" >/dev/null 2>&1
+
+# Public files: other users, such as the FIPS VM's, may read them.
+chmod 755 "$work" "$tls"
+chmod 644 "$tls/ca.pem" "$tls/server.pem" "$truststore"
 
 tls_params="encrypt=true&validateCertificate=true&trustStore=$truststore&trustStorePassword=$truststore_password&trustStoreType=PKCS12"
 url="jdbc:sap://localhost:$tenant_port/?$tls_params"

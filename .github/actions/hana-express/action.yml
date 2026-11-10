@@ -17,6 +17,10 @@ inputs:
     description: 'Password of the SYSTEM user: 8 or more characters with upper case, lower case and a digit. Empty generates one.'
     required: false
     default: ''
+  extra-san:
+    description: 'More names for the server certificate, such as DNS:db.test,IP:192.0.2.10. It always has localhost, 127.0.0.1 and 10.0.2.2 (the runner as seen from the FIPS VM).'
+    required: false
+    default: ''
   timeout-minutes:
     description: 'How long to wait for the database to start.'
     required: false
@@ -69,5 +73,6 @@ runs:
         HANA_AGREE_TO_SAP_LICENSE: ${{ inputs.agree-to-sap-license }}
         HANA_IMAGE: ${{ inputs.image }}
         HANA_PASSWORD: ${{ inputs.password }}
+        HANA_EXTRA_SAN: ${{ inputs.extra-san }}
         HANA_TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
       run: '"$GITHUB_ACTION_PATH/start.sh"'

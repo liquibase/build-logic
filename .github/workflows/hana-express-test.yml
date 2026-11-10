@@ -3,12 +3,13 @@ name: SAP HANA express test
 # Checks the hana-express action end to end (INT-2383): SAP HANA, express edition starts in Docker, serves a
 # certificate for localhost signed by the job's CA, and Liquibase with liquibase-hanadb and SAP's JDBC driver
 # updates and rolls back the tenant database over TLS with certificate validation. A connection that trusts
-# another CA must fail.
+# another CA must fail. A second job connects from the FIPS VM, with OpenSSL in FIPS mode.
 
 on:
   pull_request:
     paths:
       - ".github/actions/hana-express/**"
+      - ".github/actions/fips-vm/**"
       - ".github/workflows/hana-express-test.yml"
       - "hana/**"
   schedule:
@@ -75,8 +76,14 @@ jobs:
             echo "::error::The connection worked with a trust store that doesn't hold the server's CA."
             exit 1
           fi
-          grep -i -m3 -E 'certificate|SSL|PKIX|trust' "$other/out.txt" || tail -n 20 "$other/out.txt"
-          echo "Refused, as expected."
+          # Refused because of the certificate, not for another reason. The URL is cut out: it has "trustStore" in it.
+          reason=$(sed 's#jdbc:sap://[^ ]*##g' "$other/out.txt" | grep -i -o -m1 -E '[^:]*(PKIX|certification path|certificate|SSL)[^:]*' || true)
+          if [ -z "$reason" ]; then
+            tail -n 30 "$other/out.txt"
+            echo "::error::The connection failed, but not because of the certificate."
+            exit 1
+          fi
+          echo "Refused, as expected: $reason"
 
       - name: Summary
         if: always()
@@ -100,3 +107,44 @@ jobs:
       - name: Container log, when something failed
         if: failure()
         run: docker logs --tail 200 hana-express 2>&1 || true
+
+  from-the-fips-vm:
+    # A client on a FIPS-mode kernel reaches HANA on the runner at 10.0.2.2, and its OpenSSL, in FIPS mode,
+    # accepts the certificate and agrees on a cipher.
+    name: From the FIPS VM
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Start SAP HANA, express edition
+        id: hana
+        uses: ./.github/actions/hana-express
+        with:
+          agree-to-sap-license: true
+          image: ${{ inputs.image || 'saplabs/hanaexpress:2.00.088.00.20251110.1' }}
+
+      # HANA needs most of the runner's 16 GB, so the VM gets 3 GB.
+      - name: Start the FIPS VM
+        uses: ./.github/actions/fips-vm
+        with:
+          memory-mb: '3072'
+
+      - name: OpenSSL in FIPS mode verifies HANA's certificate
+        shell: fips-run {0}
+        env:
+          CA_CERT: ${{ steps.hana.outputs.ca-cert }}
+          HANA_PORT: ${{ steps.hana.outputs.port }}
+        run: |
+          test "$(cat /proc/sys/crypto/fips_enabled)" = 1
+          openssl s_client -connect "10.0.2.2:$HANA_PORT" -CAfile "$CA_CERT" -verify_return_error \
+            -verify_ip 10.0.2.2 </dev/null >tls.txt 2>&1 || { cat tls.txt; exit 1; }
+          grep -E 'Protocol|Cipher is|Verification|Verify return code' tls.txt
+          {
+            echo "### From the FIPS VM"
+            echo '```'
+            grep -E 'New,|Verification' tls.txt
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"

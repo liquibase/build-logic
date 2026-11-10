@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Smoke test for the hana-express action: Liquibase updates SAP HANA over TLS with certificate validation. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.liquibase.hana</groupId>
+  <artifactId>hana-express-selftest</artifactId>
+  <version>1</version>
+  <packaging>pom</packaging>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <liquibase.version>5.0.4</liquibase.version>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.liquibase</groupId>
+        <artifactId>liquibase-maven-plugin</artifactId>
+        <version>${liquibase.version}</version>
+        <configuration>
+          <!-- The URL, user and password come from the environment (LIQUIBASE_COMMAND_*). -->
+          <changeLogFile>changelog.yaml</changeLogFile>
+          <searchPath>${project.basedir}</searchPath>
+        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>org.liquibase.ext</groupId>
+            <artifactId>liquibase-hanadb</artifactId>
+            <version>5.0.4</version>
+          </dependency>
+          <!-- SAP's JDBC driver, from Maven Central. -->
+          <dependency>
+            <groupId>com.sap.cloud.db.jdbc</groupId>
+            <artifactId>ngdbc</artifactId>
+            <version>2.30.11</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+    </plugins>
+  </build>
+</project>

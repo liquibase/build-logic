@@ -48,9 +48,9 @@ jobs:
       - name: Liquibase updates and rolls back HANA over verified TLS
         working-directory: hana/selftest
         env:
-          LIQUIBASE_COMMAND_URL: ${{ steps.hana.outputs.url }}
-          LIQUIBASE_COMMAND_USERNAME: ${{ steps.hana.outputs.username }}
-          LIQUIBASE_COMMAND_PASSWORD: ${{ steps.hana.outputs.password }}
+          HANA_URL: ${{ steps.hana.outputs.url }}
+          HANA_USERNAME: ${{ steps.hana.outputs.username }}
+          HANA_PASSWORD: ${{ steps.hana.outputs.password }}
         run: |
           mvn -B -ntp liquibase:update
           mvn -B -ntp liquibase:rollback -Dliquibase.rollbackCount=1
@@ -60,8 +60,8 @@ jobs:
         working-directory: hana/selftest
         env:
           HANA_PORT: ${{ steps.hana.outputs.port }}
-          LIQUIBASE_COMMAND_USERNAME: ${{ steps.hana.outputs.username }}
-          LIQUIBASE_COMMAND_PASSWORD: ${{ steps.hana.outputs.password }}
+          HANA_USERNAME: ${{ steps.hana.outputs.username }}
+          HANA_PASSWORD: ${{ steps.hana.outputs.password }}
         run: |
           other="$RUNNER_TEMP/other-ca"
           mkdir -p "$other"
@@ -70,7 +70,7 @@ jobs:
           keytool -importcert -noprompt -alias other -file "$other/ca.pem" -keystore "$other/truststore.p12" \
             -storetype PKCS12 -storepass changeit >/dev/null 2>&1
           url="jdbc:sap://localhost:$HANA_PORT/?encrypt=true&validateCertificate=true&trustStore=$other/truststore.p12&trustStorePassword=changeit&trustStoreType=PKCS12"
-          if LIQUIBASE_COMMAND_URL=$url mvn -B -ntp liquibase:status >"$other/out.txt" 2>&1; then
+          if HANA_URL=$url mvn -B -ntp liquibase:status >"$other/out.txt" 2>&1; then
             cat "$other/out.txt"
             echo "::error::The connection worked with a trust store that doesn't hold the server's CA."
             exit 1

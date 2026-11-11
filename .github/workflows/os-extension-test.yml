@@ -62,7 +62,7 @@ jobs:
     steps:
       - name: Get the liquibot-github-pat secret from vault
         if: env.IS_FORK_PR != 'true'
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibot-github-pat
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -156,7 +156,7 @@ jobs:
     steps:
       - name: Get the liquibot-github-pat secret from vault
         if: env.IS_FORK_PR != 'true'
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibot-github-pat
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -289,7 +289,7 @@ jobs:
       contents: read
     steps:
       - name: Get the nightly-builds-slack-webhook secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: nightly-builds-slack-webhook
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}

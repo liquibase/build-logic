@@ -33,7 +33,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -66,19 +66,19 @@ jobs:
       GIT_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the gpg-signing secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: gpg-signing
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibot-github-pat
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}

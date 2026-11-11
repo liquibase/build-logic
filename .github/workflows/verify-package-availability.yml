@@ -97,7 +97,7 @@ jobs:
           fi
 
       - name: Get the liquibase-package-deploy-status-webhook secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibase-package-deploy-status-webhook
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -196,7 +196,7 @@ jobs:
             echo "status_message=DEB package v$LATEST_VERSION is not yet available in S3" >> $GITHUB_OUTPUT
           fi
       - name: Get the liquibase-package-deploy-status-webhook secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibase-package-deploy-status-webhook
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -233,7 +233,7 @@ jobs:
           fi
 
       - name: Get the liquibase-package-deploy-status-webhook secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibase-package-deploy-status-webhook
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}

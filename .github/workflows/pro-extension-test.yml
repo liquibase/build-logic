@@ -115,38 +115,38 @@ jobs:
         uses: liquibase/build-logic/.github/actions/normalize-os@2660ba32055efd3301bcf624a3d60ca8b11cc482 # main
 
       - name: Get the aws-github-oidc-role-arn-s3-gha secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: aws-github-oidc-role-arn-s3-gha
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the azure-service-principal secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: azure-service-principal
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the hashicorp-vault secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: hashicorp-vault
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the liquibase-azure-storage-account secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibase-azure-storage-account
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibot-github-pat
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-liquibot-github-pat-8
 
       - name: Get the pro-license secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: pro-license
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -352,38 +352,38 @@ jobs:
     needs: build
     steps:
       - name: Get the aws-github-oidc-role-arn-s3-gha secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: aws-github-oidc-role-arn-s3-gha
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the azure-service-principal secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: azure-service-principal
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the hashicorp-vault secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: hashicorp-vault
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the liquibase-azure-storage-account secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibase-azure-storage-account
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibot-github-pat
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-liquibot-github-pat-8
 
       - name: Get the pro-license secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: pro-license
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -708,13 +708,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get the aws-github-oidc-role-arn-s3-gha secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: aws-github-oidc-role-arn-s3-gha
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -805,7 +805,7 @@ jobs:
       contents: read
     steps:
       - name: Get the nightly-builds-slack-webhook secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: nightly-builds-slack-webhook
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}

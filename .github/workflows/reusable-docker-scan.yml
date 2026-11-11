@@ -191,7 +191,7 @@ jobs:
             -t "${IMAGE_NAME}${SUFFIX}:${GHCR_TAG}" "$BUILD_CONTEXT"
 
       - name: Get the dockerhub secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: dockerhub
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -405,13 +405,13 @@ jobs:
       contents: read
     steps:
       - name: Get the docker-slack-webhook-url secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: docker-slack-webhook-url
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the slack-webhook secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: slack-webhook
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}

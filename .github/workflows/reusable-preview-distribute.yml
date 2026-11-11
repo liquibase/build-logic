@@ -142,20 +142,20 @@ jobs:
           echo "Inputs validated: product=$PRODUCT version=$VERSION customers=$CUSTOMERS expires-days=$DAYS"
 
       - name: Get the cloudflare-r2 secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: cloudflare-r2
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-cloudflare-r2-3
 
       - name: Get the cloudflare-r2-mcp secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: cloudflare-r2-mcp
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the aws-prod-github-oidc-role-arn-liquibase-pro secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: aws-prod-github-oidc-role-arn-liquibase-pro
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}

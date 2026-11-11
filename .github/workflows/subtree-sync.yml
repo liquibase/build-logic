@@ -47,14 +47,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-github-app-liquibase-9
 
       - name: Get the team-liquibase-secure-slack-webhook secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: team-liquibase-secure-slack-webhook
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}

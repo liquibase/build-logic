@@ -35,7 +35,7 @@ jobs:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -84,7 +84,7 @@ jobs:
         repository: ${{ fromJson(inputs.repositories) }}
     steps:
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -163,14 +163,14 @@ jobs:
 
     steps:
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-github-app-liquibase-5
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibot-github-pat
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -252,7 +252,7 @@ jobs:
           - repository: liquibase-parent-pom
     steps:
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -355,14 +355,14 @@ jobs:
           - repository: liquibase-parent-pom
     steps:
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-github-app-liquibase-5
 
       - name: Get the sonatype secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: sonatype
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}

@@ -142,48 +142,48 @@ jobs:
       HOMEBREW_PR_URL: ${{ steps.capture-pr.outputs.HOMEBREW_PR_URL }}
     steps:
       - name: Get the aws-prod-github-oidc-role-arn-build-logic secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: aws-prod-github-oidc-role-arn-build-logic
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       # TECHOPS-1114: the zone-scoped Cache Purge token only, in a group of its own so this job can't reach the admin CLOUDFLARE_API_TOKEN.
       - name: Get the cloudflare-cache-purge secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: cloudflare-cache-purge
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Get the cloudflare-r2 secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: cloudflare-r2
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-cloudflare-r2-2
 
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-github-app-liquibase-6
 
       - name: Get the gpg-signing secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: gpg-signing
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-gpg-signing-3
 
       - name: Get the liquibot-github-pat secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: liquibot-github-pat
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
           role: vault-grouped-liquibot-github-pat-7
 
       - name: Get the sdkman secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: sdkman
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
@@ -1548,7 +1548,7 @@ jobs:
     if: ${{ inputs.distribution != 'liquibase-secure' && inputs.dry_run == false }}
     steps:
       - name: Get the github-app-liquibase secret from vault
-        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2fadfdc96308152e1f71794a20f002b963972756 # main
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
           group: github-app-liquibase
           aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}

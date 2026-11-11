@@ -193,14 +193,17 @@ jobs:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           SCM_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
-          EVENT_NAME: ${{ github.event_name }}
           REF_NAME: ${{ github.ref_name }}
           REPO_OWNER: ${{ github.repository_owner }}
           MAVEN_ARGS: ${{ inputs.mavenArgs }}
           LIQUIBASE_BRANCH: ${{ inputs.liquibaseBranchName }}
         run: |
           SONAR_ARGS=""
-          if [ "$EVENT_NAME" = "pull_request" ]; then
+          # TECHOPS-1680: key on the PR number, not the event name. liquibase-pro
+          # calls this from pull_request_target, which the old event check missed,
+          # so every PR was analysed as branch `main` (REF_NAME is the default
+          # branch there) and overwrote main's analysis and quality gate.
+          if [ -n "$PR_NUMBER" ]; then
             SONAR_ARGS="-Dsonar.pullrequest.key=$PR_NUMBER"
             SONAR_ARGS="$SONAR_ARGS -Dsonar.pullrequest.branch=$PR_HEAD_REF"
             SONAR_ARGS="$SONAR_ARGS -Dsonar.pullrequest.base=$PR_BASE_REF"

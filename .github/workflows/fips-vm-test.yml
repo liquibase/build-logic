@@ -157,24 +157,41 @@ jobs:
         with:
           persist-credentials: false # the VM shares the work directory, where checkout would keep the token
 
-      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+      # Role credentials go to step outputs, not the job env, so the VM steps can't re-read the vault.
+      - id: key-creds
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-6
           aws-region: us-east-1
+          output-credentials: true
+          output-env-credentials: false
 
       - name: Read the old license key from the vault
         shell: bash
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: ${{ steps.key-creds.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.key-creds.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.key-creds.outputs.aws-session-token }}
         run: |
           fips/selftest/liquibase/save-licenses.sh /vault/grouped/pro-license "$RUNNER_TEMP/licenses" PRO_LICENSE_KEY
           echo "LICENSES_DIR=$RUNNER_TEMP/licenses" >> "$GITHUB_ENV"
 
-      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+      - id: file-creds
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-pro-license-file
           aws-region: us-east-1
+          output-credentials: true
+          output-env-credentials: false
 
       - name: Read the new license file from the vault
         shell: bash
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: ${{ steps.file-creds.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.file-creds.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.file-creds.outputs.aws-session-token }}
         run: fips/selftest/liquibase/save-licenses.sh /vault/grouped/pro-license-file "$RUNNER_TEMP/licenses" PRO_LICENSE_FILE
 
       - name: Start the FIPS VM

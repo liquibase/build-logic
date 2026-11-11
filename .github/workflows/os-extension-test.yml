@@ -60,20 +60,13 @@ jobs:
     name: Build & Package
     runs-on: ubuntu-latest
     steps:
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        if: env.IS_FORK_PR != 'true'
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-6
-          aws-region: us-east-1
-
       - name: Get the liquibot-github-pat secret from vault
         if: env.IS_FORK_PR != 'true'
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-6
 
       # persist-credentials: false - this build does not use the git-persisted token,
       # so dropping it removes an exfil path at no cost. Defense-in-depth behind the caller's environment gate.
@@ -161,20 +154,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: build
     steps:
-      - name: Configure AWS credentials for the liquibot-github-pat secret
-        if: env.IS_FORK_PR != 'true'
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-liquibot-github-pat-6
-          aws-region: us-east-1
-
       - name: Get the liquibot-github-pat secret from vault
         if: env.IS_FORK_PR != 'true'
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
-          secret-ids: |
-            ,/vault/grouped/liquibot-github-pat
-          parse-json-secrets: true
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-6
 
       # persist-credentials: false - see build job above (PR-code checkout with secrets in scope).
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -302,18 +288,11 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Configure AWS credentials for the nightly-builds-slack-webhook secret
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-nightly-builds-slack-webhook
-          aws-region: us-east-1
-
       - name: Get the nightly-builds-slack-webhook secret from vault
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
-          secret-ids: |
-            ,/vault/grouped/nightly-builds-slack-webhook
-          parse-json-secrets: true
+          group: nightly-builds-slack-webhook
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Notify Slack
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3

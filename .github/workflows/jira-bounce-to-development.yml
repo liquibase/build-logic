@@ -250,20 +250,12 @@ jobs:
               reason,
             }))));
 
-      - name: Configure AWS credentials for the docs-agent-jira secret
-        if: steps.scan.outputs.has_targets == 'true'
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-docs-agent-jira
-          aws-region: us-east-1
-
       - name: Get the docs-agent-jira secret from vault
         if: steps.scan.outputs.has_targets == 'true'
-        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
-          secret-ids: |
-            ,/vault/grouped/docs-agent-jira
-          parse-json-secrets: true
+          group: docs-agent-jira
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
 
       - name: Comment and bounce linked tickets
         if: steps.scan.outputs.has_targets == 'true'

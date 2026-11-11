@@ -12,18 +12,12 @@ jobs:
     slack-notification:
         runs-on: ubuntu-latest
         steps:
-        - name: Configure AWS credentials for the nightly-builds-slack-webhook secret
-          uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-          with:
-            role-to-assume: arn:aws:iam::${{ secrets.VAULT_AWS_ACCOUNT_ID }}:role/vault-grouped-nightly-builds-slack-webhook-2
-            aws-region: us-east-1
-
         - name: Get the nightly-builds-slack-webhook secret from vault
-          uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+          uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
           with:
-            secret-ids: |
-              ,/vault/grouped/nightly-builds-slack-webhook
-            parse-json-secrets: true
+            group: nightly-builds-slack-webhook
+            aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+            role: vault-grouped-nightly-builds-slack-webhook-2
 
         - name: Notify Slack on Build Failure
           uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3

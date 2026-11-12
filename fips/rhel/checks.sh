@@ -8,6 +8,10 @@
 #
 # usage: checks.sh SELFTEST_DIR   (the bundled fips/selftest)
 set -uo pipefail
+# Under pipefail, never end a pipe with `grep -q`: grep exits at the first match, and the next write of the
+# command before it dies of SIGPIPE (141), which fails the pipe although the match was found. Whether that write
+# comes after grep exits is timing, so such a check passes on one run and fails on the next. Use
+# `grep ... >/dev/null`, which reads to the end.
 
 selftest=${1:?usage: checks.sh SELFTEST_DIR}
 # shellcheck source=/dev/null
@@ -41,7 +45,7 @@ check() {
 }
 
 kernel_fips() {
-  fips-mode-setup --check | tee /dev/stderr | grep -q 'FIPS mode is enabled' &&
+  fips-mode-setup --check | tee /dev/stderr | grep 'FIPS mode is enabled' >/dev/null &&
     [ "$(cat /proc/sys/crypto/fips_enabled)" = 1 ] &&
     [ "$(update-crypto-policies --show)" = FIPS ]
 }
@@ -88,12 +92,13 @@ liquibase_update() {
       liquibase --classpath="$work/postgresql.jar" update
   ) || return 1
   docker compose -f "$selftest/compose.yml" exec -T postgres psql -U postgres -tAc 'select note from fips_check' |
-    grep -qx 'written by Liquibase in the FIPS VM'
+    grep -x 'written by Liquibase in the FIPS VM' >/dev/null
 }
 
 secure_version() {
+  # --version prints more lines after the version, so this pipe is where grep -q failed (see the top).
   "$secure/liquibase" --version 2>&1 | tee /dev/stderr |
-    grep -qE "Liquibase Secure Version: ${FIPS_RHEL_SECURE_VERSION%%-*}"
+    grep -E "Liquibase Secure Version: ${FIPS_RHEL_SECURE_VERSION%%-*}" >/dev/null
 }
 
 # secure_run JAVA_OPTS: license status and update on the `secure` database with the CI license. Prints

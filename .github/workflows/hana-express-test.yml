@@ -31,7 +31,7 @@ concurrency:
 jobs:
   hana-express:
     name: SAP HANA express on ubuntu-latest
-    # 16 GB of memory in a public repository. HANA express needs about 12 GB.
+    # 16 GB of memory in a public repository. HANA used 5.2 GB at most in 20 starts.
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -126,7 +126,7 @@ jobs:
           agree-to-sap-license: true
           image: ${{ inputs.image || 'saplabs/hanaexpress:2.00.088.00.20251110.1@sha256:432be2785506e97cefc413f495393fc22fcdda034c2c80db2f0f88efeb16dfaf' }}
 
-      # HANA needs most of the runner's 16 GB, so the VM gets 3 GB.
+      # HANA needs about 5 GB; the VM gets 3 GB, which the 8 GB of an internal repo's runner could also hold.
       - name: Start the FIPS VM
         uses: ./.github/actions/fips-vm
         with:

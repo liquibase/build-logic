@@ -7,7 +7,7 @@ SAP HANA has no shared test database. Jobs start SAP HANA, express edition in Do
 ```yaml
 jobs:
   hana:
-    runs-on: blacksmith-4vcpu-ubuntu-2404 # 16 GB; see "Runner" below
+    runs-on: blacksmith-2vcpu-ubuntu-2404 # 8 GB; see "Runner" below
     steps:
       - id: hana
         uses: liquibase/build-logic/.github/actions/hana-express@<commit SHA> # main
@@ -22,11 +22,10 @@ jobs:
 ```
 
 - **License:** `agree-to-sap-license: true` accepts SAP's license for the express edition. The image doesn't start without it.
-- **Start time:** 3 to 4 minutes, image download (1.8 GB) included.
-- **Runner:** Linux x64 with 16 GB of memory. HANA needs about 12 GB.
-  - In a private or internal repository (liquibase-pro, liquibase-pro-tests), use `blacksmith-4vcpu-ubuntu-2404`: 4 vCPU, 16 GB, $0.008 a minute. There `ubuntu-latest` has 8 GB, which is not enough. A GitHub larger runner with 16 GB costs $0.012 a minute and would have to be created for the organization.
+- **Start time:** 3 to 4 minutes on `ubuntu-latest`, 5 to 6 on Blacksmith, image download (1.8 GB) included. The database itself starts in 150 to 171 seconds.
+- **Runner:** Linux x64 with 8 GB of memory or more. Measured on 2026-11-12 in 20 starts on Blacksmith: the runner used 5.2 GB at most while HANA started, and HANA 3.2 to 4.4 GB once running.
+  - In a private or internal repository (liquibase-pro, liquibase-pro-tests), use `blacksmith-2vcpu-ubuntu-2404`: 2 vCPU, 8 GB, $0.004 a minute, so about $0.06 for a 15-minute job. Tested there 10 times. Leave about 2 GB for the job's own work; `blacksmith-4vcpu-ubuntu-2404` (16 GB, $0.008 a minute) if it needs more.
   - In a public repository such as this one, `ubuntu-latest` has 16 GB and costs nothing.
-  - A job that starts HANA and runs a short test takes about 10 to 15 minutes: about $0.12 on Blacksmith.
 - **Pinning:** use the action at a commit SHA, as for any shared action. The default image is pinned by digest, because SAP re-pushes its tags.
 - **Driver:** SAP's JDBC driver is `com.sap.cloud.db.jdbc:ngdbc` on Maven Central. Liquibase needs the `liquibase-hanadb` extension.
 - **Databases:** `url` is the tenant database `HXE` (port 39041), the one to test against. `system-url` is the system database (port 39017).
@@ -43,6 +42,8 @@ HANA accepts TLS on its SQL ports. The action replaces the image's self-signed c
 
 Measured on 2026-11-10 with image `2.00.088.00.20251110.1`: TLS 1.3, `TLS_AES_256_GCM_SHA384`.
 
+The action turns off HANA's client PKI (`[communication] sslclientpki = false`). With it on, HANA makes a certificate of its own 30 to 50 seconds after it starts and serves that one instead: a client then fails certificate validation, and whether it does depended on how soon it connected (4 of 10 starts failed).
+
 ## With the FIPS VM
 
 HANA stays on the runner and the client runs in the FIPS VM ([fips/README.md](../fips/README.md)). The VM reaches the runner at `10.0.2.2`, which is in the certificate:
@@ -54,7 +55,7 @@ HANA stays on the runner and the client runs in the FIPS VM ([fips/README.md](..
           agree-to-sap-license: true
       - uses: liquibase/build-logic/.github/actions/fips-vm@<commit SHA> # main
         with:
-          memory-mb: '3072' # HANA needs most of the runner's memory
+          memory-mb: '3072' # HANA needs about 5 GB of the runner's memory
       - shell: fips-run {0}
         run: openssl s_client -connect 10.0.2.2:39041 -CAfile "$CA_CERT" -verify_ip 10.0.2.2 </dev/null
         env:

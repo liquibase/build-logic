@@ -2,8 +2,9 @@ name: 'SAP HANA, express edition'
 description: |
   Starts SAP HANA, express edition in Docker on the runner, with TLS that a client can verify: the server
   certificate is for localhost and signed by a CA made in the job. Gives the JDBC URL, the SYSTEM password, the CA
-  and a PKCS12 trust store. Needs a Linux x64 runner with 16 GB of memory: ubuntu-latest in a public repository,
-  blacksmith-4vcpu-ubuntu-2404 in a private or internal one (where ubuntu-latest has 8 GB). TECHOPS-1693.
+  and a PKCS12 trust store. Needs a Linux x64 runner with 8 GB of memory or more: HANA used 5.2 GB at most in 20
+  starts. In a private or internal repository, blacksmith-2vcpu-ubuntu-2404; in a public one, ubuntu-latest.
+  TECHOPS-1693.
 
 inputs:
   agree-to-sap-license:

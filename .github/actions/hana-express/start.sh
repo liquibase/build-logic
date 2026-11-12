@@ -6,7 +6,7 @@
 # localhost with full certificate validation. Writes the CA, a PKCS12 trust store and connection
 # details to the work folder, and to GITHUB_OUTPUT when it runs in a workflow.
 #
-# Needs Docker on Linux x86_64, about 12 GB of free memory, openssl and keytool.
+# Needs Docker on Linux x86_64, about 6 GB of free memory (5.2 GB at most in 20 starts), openssl, keytool and jq.
 #
 # Settings (environment):
 #   HANA_AGREE_TO_SAP_LICENSE  must be true: the image only starts when SAP's license is accepted
@@ -133,31 +133,20 @@ docker exec "$name" bash -lc '
 '
 rm -f "$tls/server.key"
 
-# Puts the new PSE in place with a rename, so sapsrv.pse is never missing or half written.
-install_pse() {
-  docker exec "$name" bash -lc 'cd "$SECUDIR" && cp sapsrv-new.pse sapsrv-tmp.pse && mv -f sapsrv-tmp.pse sapsrv.pse'
-}
-install_pse
+# The new PSE goes in place with a rename, so sapsrv.pse is never missing or half written.
+docker exec "$name" bash -lc 'cd "$SECUDIR" && mv -f sapsrv-new.pse sapsrv.pse'
 
-# HANA picks up the new file by itself. Wait until both ports serve the new certificate. If they don't after a
-# minute, put the file in place again: a new file is what makes HANA read it.
+# HANA picks up the new file by itself. Wait until both ports serve the new certificate.
 verify() {
   openssl s_client -connect "localhost:$1" -servername localhost -CAfile "$tls/ca.pem" \
     -verify_return_error -verify_hostname localhost </dev/null >"$work/s_client-$1.txt" 2>&1
 }
 started=$SECONDS
-reinstalled=$SECONDS
 until verify "$tenant_port" && verify "$system_port"; do
   [ $((SECONDS - started)) -lt 300 ] || {
     tail -n 30 "$work/s_client-$tenant_port.txt" >&2 || true
     fail "HANA did not serve the new certificate in 5 minutes."
   }
-  if [ $((SECONDS - reinstalled)) -ge 60 ]; then
-    served=$(grep -m1 -E '^ *0 s:' "$work/s_client-$tenant_port.txt" | sed 's/^ *0 s://' || true)
-    step "HANA still serves another certificate (${served:-none}): putting the new one in place again"
-    install_pse
-    reinstalled=$SECONDS
-  fi
   sleep 5
 done
 step "HANA serves the new certificate ($(grep -m1 -E 'Protocol|New,' "$work/s_client-$tenant_port.txt" | xargs))"

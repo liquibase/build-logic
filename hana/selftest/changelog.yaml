@@ -1,0 +1,30 @@
+# Smoke test for the hana-express action, run by .github/workflows/hana-express-test.yml.
+databaseChangeLog:
+  - changeSet:
+      id: create-hana-check
+      author: hana-express
+      changes:
+        - createTable:
+            tableName: hana_check
+            columns:
+              - column:
+                  name: id
+                  type: int
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: note
+                  type: varchar(100)
+  - changeSet:
+      id: insert-hana-check
+      author: hana-express
+      changes:
+        - insert:
+            tableName: hana_check
+            columns:
+              - column: { name: id, value: "1" }
+              - column: { name: note, value: "written by Liquibase over verified TLS" }
+      rollback:
+        - delete:
+            tableName: hana_check
+            where: id = 1

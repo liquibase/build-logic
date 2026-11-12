@@ -40,7 +40,8 @@ fetch() {
 
 # Lima's own messages: only warnings and errors.
 lima() { limactl --log-level=warn "$@"; }
-exists() { limactl list --format '{{.Name}}' 2>/dev/null | grep -qx "$name"; }
+# grep without -q reads to the end: under pipefail, -q can kill limactl with SIGPIPE when other VMs follow.
+exists() { limactl list --format '{{.Name}}' 2>/dev/null | grep -x "$name" >/dev/null; }
 running() { [ "$(limactl list --format '{{.Status}}' "$name" 2>/dev/null)" = Running ]; }
 need_running() { running || die "The FIPS VM isn't running. Start it with: fips-vm up"; }
 in_vm() { limactl shell --workdir / "$name" "$@"; }

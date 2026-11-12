@@ -104,6 +104,19 @@ openssl x509 -req -in "$tls/server.csr" -CA "$tls/ca.pem" -CAkey "$tls/ca.key" -
 # The CA key has done its job: nothing else can be signed with this CA.
 rm -f "$tls/ca.key" "$tls/server.csr" "$tls/server.ext" "$tls/ca.srl"
 
+# HANA's client PKI ([communication] sslclientpki, on in this image) makes a certificate of its own, "SAP HANA
+# ClientPKI", 30 to 50 seconds after the database starts, and that certificate then takes TLS over from sapsrv.pse
+# (SAP HANA Security Guide, "Client PKI"). A check run before that passed; one run after failed: 4 of 10 starts.
+# Turned off before our certificate goes in, for the whole system (SYSTEM layer of global.ini).
+step "Turning off HANA's client PKI, so TLS uses the certificate below"
+set_pki="ALTER SYSTEM ALTER CONFIGURATION ('global.ini', 'SYSTEM') SET ('communication', 'sslclientpki') = 'false' WITH RECONFIGURE"
+get_pki="SELECT VALUE FROM M_INIFILE_CONTENTS WHERE FILE_NAME = 'global.ini' AND LAYER_NAME = 'SYSTEM' AND SECTION = 'communication' AND KEY = 'sslclientpki'"
+docker exec -e P="$password" -e PORT="$system_port" -e SET_PKI="$set_pki" -e GET_PKI="$get_pki" "$name" bash -lc '
+  set -e
+  hdbsql -n "localhost:$PORT" -u SYSTEM -p "$P" -a -x -j "$SET_PKI"
+  echo "sslclientpki is now $(hdbsql -n "localhost:$PORT" -u SYSTEM -p "$P" -a -x -j "$GET_PKI")"
+'
+
 step "Installing the server certificate in HANA"
 docker exec "$name" mkdir -p /tmp/tls
 for f in server.key server.pem ca.pem; do docker cp -q "$tls/$f" "$name:/tmp/tls/$f"; done
@@ -120,9 +133,7 @@ docker exec "$name" bash -lc '
 '
 rm -f "$tls/server.key"
 
-# Puts the new PSE in place with a rename, so sapsrv.pse is never missing or half written. When HANA can't load
-# sapsrv.pse it falls back to a certificate of its own ("SAP HANA ClientPKI") and keeps it: that happened once in
-# eight starts while the file was removed and rewritten in place.
+# Puts the new PSE in place with a rename, so sapsrv.pse is never missing or half written.
 install_pse() {
   docker exec "$name" bash -lc 'cd "$SECUDIR" && cp sapsrv-new.pse sapsrv-tmp.pse && mv -f sapsrv-tmp.pse sapsrv.pse'
 }

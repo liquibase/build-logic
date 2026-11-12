@@ -13,7 +13,7 @@ on:
       - ".github/workflows/hana-express-test.yml"
       - "hana/**"
   schedule:
-    - cron: "0 7 * * 1" # Mondays, 07:00 UTC: catches a removed image tag or a broken driver release
+    - cron: "0 7 * * 1" # Mondays, 07:00 UTC: catches a removed image or a broken driver release
   workflow_dispatch:
     inputs:
       image:
@@ -44,7 +44,7 @@ jobs:
         uses: ./.github/actions/hana-express
         with:
           agree-to-sap-license: true
-          image: ${{ inputs.image || 'saplabs/hanaexpress:2.00.088.00.20251110.1' }}
+          image: ${{ inputs.image || 'saplabs/hanaexpress:2.00.088.00.20251110.1@sha256:432be2785506e97cefc413f495393fc22fcdda034c2c80db2f0f88efeb16dfaf' }}
 
       - name: Liquibase updates and rolls back HANA over verified TLS
         working-directory: hana/selftest
@@ -124,7 +124,7 @@ jobs:
         uses: ./.github/actions/hana-express
         with:
           agree-to-sap-license: true
-          image: ${{ inputs.image || 'saplabs/hanaexpress:2.00.088.00.20251110.1' }}
+          image: ${{ inputs.image || 'saplabs/hanaexpress:2.00.088.00.20251110.1@sha256:432be2785506e97cefc413f495393fc22fcdda034c2c80db2f0f88efeb16dfaf' }}
 
       # HANA needs most of the runner's 16 GB, so the VM gets 3 GB.
       - name: Start the FIPS VM

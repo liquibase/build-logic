@@ -2,17 +2,17 @@ name: 'SAP HANA, express edition'
 description: |
   Starts SAP HANA, express edition in Docker on the runner, with TLS that a client can verify: the server
   certificate is for localhost and signed by a CA made in the job. Gives the JDBC URL, the SYSTEM password, the CA
-  and a PKCS12 trust store. Needs a Linux x64 runner with 16 GB of memory, such as ubuntu-latest in a public
-  repository. INT-2383.
+  and a PKCS12 trust store. Needs a Linux x64 runner with 16 GB of memory: ubuntu-latest in a public repository,
+  blacksmith-4vcpu-ubuntu-2404 in a private or internal one (where ubuntu-latest has 8 GB). TECHOPS-1693.
 
 inputs:
   agree-to-sap-license:
     description: "Must be true. The image only starts when you accept the license of SAP HANA, express edition (the SAP Developer License Agreement on the image's Docker Hub page)."
     required: true
   image:
-    description: 'The saplabs/hanaexpress image to run.'
+    description: 'The saplabs/hanaexpress image to run. The default is pinned by digest: SAP re-pushes tags.'
     required: false
-    default: 'saplabs/hanaexpress:2.00.088.00.20251110.1'
+    default: 'saplabs/hanaexpress:2.00.088.00.20251110.1@sha256:432be2785506e97cefc413f495393fc22fcdda034c2c80db2f0f88efeb16dfaf'
   password:
     description: 'Password of the SYSTEM user: 8 or more characters with upper case, lower case and a digit. Empty generates one.'
     required: false

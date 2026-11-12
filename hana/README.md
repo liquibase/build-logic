@@ -7,10 +7,10 @@ SAP HANA has no shared test database. Jobs start SAP HANA, express edition in Do
 ```yaml
 jobs:
   hana:
-    runs-on: ubuntu-latest # 16 GB of memory in a public repository; HANA needs about 12 GB
+    runs-on: blacksmith-4vcpu-ubuntu-2404 # 16 GB; see "Runner" below
     steps:
       - id: hana
-        uses: liquibase/build-logic/.github/actions/hana-express@main
+        uses: liquibase/build-logic/.github/actions/hana-express@<commit SHA> # main
         with:
           agree-to-sap-license: true
 
@@ -23,7 +23,11 @@ jobs:
 
 - **License:** `agree-to-sap-license: true` accepts SAP's license for the express edition. The image doesn't start without it.
 - **Start time:** 3 to 4 minutes, image download (1.8 GB) included.
-- **Runner:** Linux x64 with 16 GB of memory, which `ubuntu-latest` has in a public repository such as this one.
+- **Runner:** Linux x64 with 16 GB of memory. HANA needs about 12 GB.
+  - In a private or internal repository (liquibase-pro, liquibase-pro-tests), use `blacksmith-4vcpu-ubuntu-2404`: 4 vCPU, 16 GB, $0.008 a minute. There `ubuntu-latest` has 8 GB, which is not enough. A GitHub larger runner with 16 GB costs $0.012 a minute and would have to be created for the organization.
+  - In a public repository such as this one, `ubuntu-latest` has 16 GB and costs nothing.
+  - A job that starts HANA and runs a short test takes about 10 to 15 minutes: about $0.12 on Blacksmith.
+- **Pinning:** use the action at a commit SHA, as for any shared action. The default image is pinned by digest, because SAP re-pushes its tags.
 - **Driver:** SAP's JDBC driver is `com.sap.cloud.db.jdbc:ngdbc` on Maven Central. Liquibase needs the `liquibase-hanadb` extension.
 - **Databases:** `url` is the tenant database `HXE` (port 39041), the one to test against. `system-url` is the system database (port 39017).
 - **User:** `SYSTEM`, with a password the action generates and masks, unless you pass `password`.
@@ -45,10 +49,10 @@ HANA stays on the runner and the client runs in the FIPS VM ([fips/README.md](..
 
 ```yaml
       - id: hana
-        uses: liquibase/build-logic/.github/actions/hana-express@main
+        uses: liquibase/build-logic/.github/actions/hana-express@<commit SHA> # main
         with:
           agree-to-sap-license: true
-      - uses: liquibase/build-logic/.github/actions/fips-vm@main
+      - uses: liquibase/build-logic/.github/actions/fips-vm@<commit SHA> # main
         with:
           memory-mb: '3072' # HANA needs most of the runner's memory
       - shell: fips-run {0}

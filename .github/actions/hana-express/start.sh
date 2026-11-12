@@ -10,7 +10,7 @@
 #
 # Settings (environment):
 #   HANA_AGREE_TO_SAP_LICENSE  must be true: the image only starts when SAP's license is accepted
-#   HANA_IMAGE                 the image, by default the pinned saplabs/hanaexpress release
+#   HANA_IMAGE                 the image, by default the saplabs/hanaexpress release pinned by digest
 #   HANA_PASSWORD              password of SYSTEM; generated when empty
 #   HANA_EXTRA_SAN             more names for the certificate, such as DNS:db.test,IP:192.0.2.10
 #   HANA_NAME                  container name, hana-express by default
@@ -27,7 +27,7 @@ fail() {
 [ "${HANA_AGREE_TO_SAP_LICENSE:-false}" = true ] ||
   fail "Set agree-to-sap-license to true to accept SAP's license for SAP HANA, express edition."
 
-image=${HANA_IMAGE:-saplabs/hanaexpress:2.00.088.00.20251110.1}
+image=${HANA_IMAGE:-saplabs/hanaexpress:2.00.088.00.20251110.1@sha256:432be2785506e97cefc413f495393fc22fcdda034c2c80db2f0f88efeb16dfaf}
 name=${HANA_NAME:-hana-express}
 work=${HANA_WORK_DIR:-${RUNNER_TEMP:-$(mktemp -d)}/hana-express}
 timeout_min=${HANA_TIMEOUT_MINUTES:-20}
@@ -40,7 +40,7 @@ san="DNS:localhost,DNS:$host,IP:127.0.0.1,IP:10.0.2.2${HANA_EXTRA_SAN:+,$HANA_EX
 system_port=39017
 tenant_port=39041
 
-for tool in docker openssl keytool; do
+for tool in docker openssl keytool jq; do
   command -v "$tool" >/dev/null || fail "$tool is not installed."
 done
 [ "$(uname -m)" = x86_64 ] || fail "SAP HANA, express edition runs on x86_64 only."
@@ -55,7 +55,8 @@ fi
 [ -z "${GITHUB_ACTIONS:-}" ] || echo "::add-mask::$password"
 
 # The image reads the password from a file that its user hxeadm (uid 12000, gid 79) owns.
-printf '{"master_password": "%s"}\n' "$password" >"$work/mounts/passwords.json"
+# jq writes the JSON, so a password with " or \ in it stays valid JSON.
+jq -n --arg p "$password" '{master_password: $p}' >"$work/mounts/passwords.json"
 chmod 600 "$work/mounts/passwords.json"
 sudo chown -R 12000:79 "$work/mounts"
 
@@ -72,7 +73,8 @@ docker run -d --name "$name" --hostname "$host" \
   "$image" --passwords-url file:///hana/mounts/passwords.json --agree-to-sap-license >/dev/null
 
 started=$SECONDS
-until docker logs "$name" 2>&1 | grep -q 'Startup finished'; do
+# grep without -q reads to the end: under pipefail, -q can kill docker logs with SIGPIPE after the match.
+until docker logs "$name" 2>&1 | grep 'Startup finished' >/dev/null; do
   [ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" = true ] || {
     docker logs --tail 60 "$name" >&2 || true
     fail "The container stopped before the database started."

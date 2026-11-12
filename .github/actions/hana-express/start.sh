@@ -109,13 +109,13 @@ docker exec "$name" mkdir -p /tmp/tls
 for f in server.key server.pem ca.pem; do docker cp -q "$tls/$f" "$name:/tmp/tls/$f"; done
 docker exec -u 0 "$name" chown -R 12000:79 /tmp/tls
 # HANA reads its TLS key and certificate from sapsrv.pse in SECUDIR. A login shell sets SECUDIR.
-# The new PSE is built beside it and kept as sapsrv.pse.new.
+# The new PSE is built beside it and kept as sapsrv-new.pse. (sapgenpse adds .pse to a name that doesn't end in it.)
 docker exec "$name" bash -lc '
   set -e
   cd "$SECUDIR"
   cp sapsrv.pse sapsrv.pse.orig
-  rm -f sapsrv.pse.new
-  sapgenpse import_p8 -p "$SECUDIR/sapsrv.pse.new" -x "" -c /tmp/tls/server.pem -r /tmp/tls/ca.pem /tmp/tls/server.key
+  rm -f sapsrv-new.pse
+  sapgenpse import_p8 -p "$SECUDIR/sapsrv-new.pse" -x "" -c /tmp/tls/server.pem -r /tmp/tls/ca.pem /tmp/tls/server.key
   rm -rf /tmp/tls
 '
 rm -f "$tls/server.key"
@@ -124,7 +124,7 @@ rm -f "$tls/server.key"
 # sapsrv.pse it falls back to a certificate of its own ("SAP HANA ClientPKI") and keeps it: that happened once in
 # eight starts while the file was removed and rewritten in place.
 install_pse() {
-  docker exec "$name" bash -lc 'cd "$SECUDIR" && cp sapsrv.pse.new sapsrv.pse.tmp && mv -f sapsrv.pse.tmp sapsrv.pse'
+  docker exec "$name" bash -lc 'cd "$SECUDIR" && cp sapsrv-new.pse sapsrv-tmp.pse && mv -f sapsrv-tmp.pse sapsrv.pse'
 }
 install_pse
 

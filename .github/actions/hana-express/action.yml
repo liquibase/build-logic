@@ -1,0 +1,79 @@
+name: 'SAP HANA, express edition'
+description: |
+  Starts SAP HANA, express edition in Docker on the runner, with TLS that a client can verify: the server
+  certificate is for localhost and signed by a CA made in the job. Gives the JDBC URL, the SYSTEM password, the CA
+  and a PKCS12 trust store. Needs a Linux x64 runner with 8 GB of memory or more: HANA used 5.2 GB at most in 20
+  starts. In a private or internal repository, blacksmith-2vcpu-ubuntu-2404; in a public one, ubuntu-latest.
+  TECHOPS-1693.
+
+inputs:
+  agree-to-sap-license:
+    description: "Must be true. The image only starts when you accept the license of SAP HANA, express edition (the SAP Developer License Agreement on the image's Docker Hub page)."
+    required: true
+  image:
+    description: 'The saplabs/hanaexpress image to run. The default is pinned by digest: SAP re-pushes tags.'
+    required: false
+    default: 'saplabs/hanaexpress:2.00.088.00.20251110.1@sha256:432be2785506e97cefc413f495393fc22fcdda034c2c80db2f0f88efeb16dfaf'
+  password:
+    description: 'Password of the SYSTEM user: 8 or more characters with upper case, lower case and a digit. Empty generates one.'
+    required: false
+    default: ''
+  extra-san:
+    description: 'More names for the server certificate, such as DNS:db.test,IP:192.0.2.10. It always has localhost, 127.0.0.1 and 10.0.2.2 (the runner as seen from the FIPS VM).'
+    required: false
+    default: ''
+  timeout-minutes:
+    description: 'How long to wait for the database to start.'
+    required: false
+    default: '20'
+
+outputs:
+  url:
+    description: 'JDBC URL of the tenant database HXE on localhost, with encrypt=true, validateCertificate=true and the trust store.'
+    value: ${{ steps.start.outputs.url }}
+  system-url:
+    description: 'The same for the system database.'
+    value: ${{ steps.start.outputs.system-url }}
+  host:
+    description: 'localhost'
+    value: ${{ steps.start.outputs.host }}
+  port:
+    description: 'SQL port of the tenant database HXE.'
+    value: ${{ steps.start.outputs.port }}
+  system-port:
+    description: 'SQL port of the system database.'
+    value: ${{ steps.start.outputs.system-port }}
+  username:
+    description: 'SYSTEM'
+    value: ${{ steps.start.outputs.username }}
+  password:
+    description: 'Password of SYSTEM. Masked in the logs.'
+    value: ${{ steps.start.outputs.password }}
+  ca-cert:
+    description: 'Path of the CA certificate (PEM) that signed the server certificate.'
+    value: ${{ steps.start.outputs.ca-cert }}
+  truststore:
+    description: 'Path of a PKCS12 trust store with that CA.'
+    value: ${{ steps.start.outputs.truststore }}
+  truststore-password:
+    description: 'Password of the trust store. It holds only a public certificate.'
+    value: ${{ steps.start.outputs.truststore-password }}
+  container:
+    description: 'Name of the Docker container, for docker exec and docker logs.'
+    value: ${{ steps.start.outputs.container }}
+  image:
+    description: 'The image that ran, with its digest. Keep it with test evidence.'
+    value: ${{ steps.start.outputs.image }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: start
+      shell: bash
+      env:
+        HANA_AGREE_TO_SAP_LICENSE: ${{ inputs.agree-to-sap-license }}
+        HANA_IMAGE: ${{ inputs.image }}
+        HANA_PASSWORD: ${{ inputs.password }}
+        HANA_EXTRA_SAN: ${{ inputs.extra-san }}
+        HANA_TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
+      run: '"$GITHUB_ACTION_PATH/start.sh"'

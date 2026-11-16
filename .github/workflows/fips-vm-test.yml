@@ -98,7 +98,7 @@ jobs:
           liquibase --classpath="$RUNNER_TEMP/postgresql.jar" rollback-count --count=1
           liquibase --classpath="$RUNNER_TEMP/postgresql.jar" update
           docker exec "$(docker ps -qf name=postgres)" psql -U postgres -tAc 'select note from fips_check' |
-            grep -qx 'written by Liquibase in the FIPS VM'
+            grep -x 'written by Liquibase in the FIPS VM' >/dev/null
           {
             echo "### Liquibase in the FIPS VM"
             echo

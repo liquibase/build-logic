@@ -6,7 +6,7 @@ set -euo pipefail
 version=1.3.6
 sha256=66fb0ad7206f3f6fa77ed5b552049d364ccf4b50b1684554f731f76302b52ca0
 
-if command -v oras >/dev/null && oras version | grep -q "^Version: *$version\$"; then
+if command -v oras >/dev/null && oras version | grep "^Version: *$version\$" >/dev/null; then
   exit 0
 fi
 tmp=$(mktemp -d)

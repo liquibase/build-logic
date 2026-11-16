@@ -126,7 +126,8 @@ jobs:
           agree-to-sap-license: true
           image: ${{ inputs.image || 'saplabs/hanaexpress:2.00.088.00.20251110.1@sha256:432be2785506e97cefc413f495393fc22fcdda034c2c80db2f0f88efeb16dfaf' }}
 
-      # HANA needs about 5 GB; the VM gets 3 GB, which the 8 GB of an internal repo's runner could also hold.
+      # HANA needs about 5 GB and the VM gets 3 GB. Tested on 16 GB only: in an internal repo, use
+      # blacksmith-4vcpu-ubuntu-2404, not the 8 GB runner.
       - name: Start the FIPS VM
         uses: ./.github/actions/fips-vm
         with:

@@ -26,6 +26,7 @@ jobs:
 - **Runner:** Linux x64 with 8 GB of memory or more. Measured on 2026-11-12 in 20 starts on Blacksmith: the runner used 5.2 GB at most while HANA started, and HANA 3.2 to 4.4 GB once running.
   - In a private or internal repository (liquibase-pro, liquibase-pro-tests), use `blacksmith-2vcpu-ubuntu-2404`: 2 vCPU, 8 GB, $0.004 a minute, so about $0.06 for a 15-minute job. Tested there 10 times. Leave about 2 GB for the job's own work; `blacksmith-4vcpu-ubuntu-2404` (16 GB, $0.008 a minute) if it needs more.
   - In a public repository such as this one, `ubuntu-latest` has 16 GB and costs nothing.
+  - A job that also starts the FIPS VM (below) needs 16 GB: in a private or internal repository, use `blacksmith-4vcpu-ubuntu-2404` ($0.008 a minute, about $0.12 for a 15-minute job). Set the VM's `memory-mb: '3072'`: without it the VM takes 75% of the runner's memory, about 12 GB of 16, and HANA's 5.2 GB no longer fit. With HANA at up to 5.2 GB and the VM at 3 GB, 8 GB leaves too little for Liquibase in the VM, and the pair is only tested on 16 GB.
 - **Pinning:** use the action at a commit SHA, as for any shared action. The default image is pinned by digest, because SAP re-pushes its tags.
 - **Driver:** SAP's JDBC driver is `com.sap.cloud.db.jdbc:ngdbc` on Maven Central. Liquibase needs the `liquibase-hanadb` extension.
 - **Databases:** `url` is the tenant database `HXE` (port 39041), the one to test against. `system-url` is the system database (port 39017).
@@ -46,7 +47,7 @@ The action turns off HANA's client PKI (`[communication] sslclientpki = false`).
 
 ## With the FIPS VM
 
-HANA stays on the runner and the client runs in the FIPS VM ([fips/README.md](../fips/README.md)). The VM reaches the runner at `10.0.2.2`, which is in the certificate:
+HANA stays on the runner and the client runs in the FIPS VM ([fips/README.md](../fips/README.md)). The VM reaches the runner at `10.0.2.2`, which is in the certificate. Use a 16 GB runner (see "Runner" above):
 
 ```yaml
       - id: hana

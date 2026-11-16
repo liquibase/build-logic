@@ -4,6 +4,8 @@ description: |
   certificate is for localhost and signed by a CA made in the job. Gives the JDBC URL, the SYSTEM password, the CA
   and a PKCS12 trust store. Needs a Linux x64 runner with 8 GB of memory or more: HANA used 5.2 GB at most in 20
   starts. In a private or internal repository, blacksmith-2vcpu-ubuntu-2404; in a public one, ubuntu-latest.
+  A job that also starts the FIPS VM needs 16 GB (blacksmith-4vcpu-ubuntu-2404 in a private or internal repository)
+  and memory-mb: '3072' on the VM.
   TECHOPS-1693.
 
 inputs:

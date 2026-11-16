@@ -81,7 +81,8 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      result: ${{ steps.run.outputs.result }}
+      # FAIL also when the run step never ran (a failed checkout).
+      result: ${{ steps.run.outputs.result || 'FAIL' }}
     steps:
       # The scripts come from build-logic at the ref this workflow runs from, also when another repo calls it.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

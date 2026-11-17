@@ -17,6 +17,19 @@ runs:
       shell: bash
       run: |
         GOOGLE_CREDENTIALS=$(aws secretsmanager get-secret-value --secret-id "${{ inputs.vault-secret-id }}" --region "${{ inputs.aws-region }}" --query 'SecretString' --output text | jq -r '.GOOGLE_CREDENTIALS')
+        # Mask before the value reaches $GITHUB_ENV: every later step prints its env, and a caller on
+        # grouped secrets has not loaded this one through an action that masks it. Covers the whole
+        # JSON, then the private key on its own, both as stored (\n escapes) and decoded (PEM lines).
+        {
+          printf '%s\n' "$GOOGLE_CREDENTIALS"
+          jq -r '.private_key? // empty | (tojson | .[1:-1]), .' <<< "$GOOGLE_CREDENTIALS"
+        } | while IFS= read -r line; do
+          if [ -n "$line" ]; then
+            # The runner unescapes %25 and %0D before matching a mask, so escape % first.
+            line="${line//'%'/%25}"
+            echo "::add-mask::${line//$'\r'/%0D}"
+          fi
+        done
         echo "GOOGLE_CREDENTIALS=$GOOGLE_CREDENTIALS" >> $GITHUB_ENV
     
     - name: configure auth

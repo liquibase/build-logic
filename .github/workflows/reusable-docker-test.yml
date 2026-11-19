@@ -369,6 +369,42 @@ jobs:
           fi
           rm -rf test-properties
 
+      - name: Test CLI-Docker compatibility - Defaults file from environment variable
+        env:
+          PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          echo "Testing that LIQUIBASE_DEFAULTS_FILE is used instead of the image defaults file..."
+          mkdir -p test-env-defaults
+          cat > test-env-defaults/env-defaults.properties << EOF
+          changelogFile=test-changelog.xml
+          url=offline:postgresql
+          EOF
+          cat > test-env-defaults/test-changelog.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+              <changeSet id="1" author="test">
+                  <sql>SELECT 'Test';</sql>
+              </changeSet>
+          </databaseChangeLog>
+          EOF
+          RESULT=$(docker run --rm --env LIQUIBASE_LICENSE_KEY="$PRO_LICENSE_KEY" \
+            -e LIQUIBASE_DEFAULTS_FILE=env-defaults.properties \
+            -v $(pwd)/test-env-defaults:/liquibase/changelog \
+            "liquibase/liquibase:$IMAGE_TAG" \
+            validate 2>&1)
+          echo "Container output: $RESULT"
+          if echo "$RESULT" | grep -q "No validation errors found"; then
+            echo "SUCCESS: Defaults file from LIQUIBASE_DEFAULTS_FILE was used"
+          else
+            echo "FAIL: LIQUIBASE_DEFAULTS_FILE was ignored or validation failed"
+            exit 1
+          fi
+          rm -rf test-env-defaults
+
       - name: Test backward compatibility - No changelog directory
         env:
           PRO_LICENSE_KEY: ${{ env.PRO_LICENSE_KEY }}

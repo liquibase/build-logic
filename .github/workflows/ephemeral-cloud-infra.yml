@@ -121,6 +121,11 @@ on:
         required: false
         type: boolean
         default: false
+      gcp_firestore:
+        description: "Deploy or destroy a named Firestore database for this run. Its URL is at /testautomation/db_details/gcp_firestore_<resources_id>; tests authenticate through the github-actions WIF pool, not a key"
+        required: false
+        type: boolean
+        default: false
       stack_id:
         description: "The stack ID to destroy"
         required: false
@@ -332,6 +337,7 @@ jobs:
           INPUT_AWS_AURORA_POSTGRES: ${{ inputs.aws_aurora_postgres }}
           INPUT_AWS_MYSQL: ${{ inputs.aws_mysql }}
           INPUT_AWS_REDSHIFT: ${{ inputs.aws_redshift }}
+          INPUT_GCP_FIRESTORE: ${{ inputs.gcp_firestore }}
         run: |
           ID=$(echo "$STACK_ID" | cut -d '-' -f 5)
           echo "resources_id=$ID" >> "$GITHUB_OUTPUT"
@@ -358,6 +364,7 @@ jobs:
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_aurora_postgres "$INPUT_AWS_AURORA_POSTGRES"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_mysql "$INPUT_AWS_MYSQL"
           spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_aws_redshift "$INPUT_AWS_REDSHIFT"
+          spacectl stack environment setvar --id $EPHEMERAL_STACK_ID TF_VAR_create_gcp_firestore "$INPUT_GCP_FIRESTORE"
           # Taint the LTHDB database resource to force recreation (ignore errors if resource doesn't exist)
           if [[ "$INPUT_SNOWFLAKE_PRO" == "true" || "$INPUT_SNOWFLAKE_TH" == "true" ]]; then
             echo "Tainting LTHDB database resource to ensure clean state..."

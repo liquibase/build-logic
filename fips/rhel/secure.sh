@@ -5,8 +5,10 @@
 #   - The release archive (FIPS_RHEL_SECURE_URL), checked against FIPS_RHEL_SECURE_SHA256, unpacked to
 #     /opt/liquibase-secure.
 #   - The CI license, when FIPS_RHEL_LICENSE_ROLE_ARN is set: with the instance role, assume that vault role
-#     (it lists fips-rhel-instance in aws_roles) and read PRO_LICENSE_FILE from /vault/grouped/pro-license-file
-#     into /root/.fips-rhel/license.lic. The license never passes through the runner or the user data.
+#     (it lists fips-rhel-instance in aws_roles) and read it from /vault/grouped/pro-license-file into
+#     /root/.fips-rhel/license.lic: PRO_LICENSE_FILE, or PRO_FIPS_LICENSE_FILE (ECDSA, with the fips code) for the
+#     liquibase-secure-fips package, which refuses a standard license. The license never passes through the runner
+#     or the user data.
 #
 # usage: secure.sh RUN_ENV
 set -euo pipefail
@@ -19,6 +21,8 @@ set -euo pipefail
 awscli_version=2.39.2
 awscli_sha256=bb3e675d5c9a915121f3f90b380ec041ba52517067d017e4a4ceba40e0213247
 license_secret=/vault/grouped/pro-license-file
+license_key=PRO_LICENSE_FILE
+[ "${FIPS_RHEL_SECURE_PACKAGE:-liquibase-secure}" != liquibase-secure-fips ] || license_key=PRO_FIPS_LICENSE_FILE
 work=$(mktemp -d)
 
 if [ -n "${FIPS_RHEL_SECURE_URL:-}" ]; then
@@ -45,9 +49,9 @@ if [ -n "${FIPS_RHEL_LICENSE_ROLE_ARN:-}" ]; then
   mkdir -p /root/.fips-rhel
   AWS_ACCESS_KEY_ID=$key AWS_SECRET_ACCESS_KEY=$secret AWS_SESSION_TOKEN=$token \
     aws secretsmanager get-secret-value --secret-id "$license_secret" --query SecretString --output text |
-    jq -r '.PRO_LICENSE_FILE // empty' >/root/.fips-rhel/license.lic
+    jq -r --arg key "$license_key" '.[$key] // empty' >/root/.fips-rhel/license.lic
   [ -s /root/.fips-rhel/license.lic ] || {
-    echo "$license_secret has no PRO_LICENSE_FILE." >&2
+    echo "$license_secret has no $license_key." >&2
     exit 1
   }
 fi

@@ -6,9 +6,9 @@ inputs:
     required: false
     default: 'us-east-1'
   vault-secret-id:
-    description: 'Secret holding GOOGLE_CREDENTIALS. A caller on grouped secrets assumes vault-grouped-google-credentials and passes /vault/grouped/google-credentials (TECHOPS-1108).'
+    description: 'Secret holding GOOGLE_CREDENTIALS, read with the AWS credentials already in the job; the caller assumes vault-grouped-google-credentials first (TECHOPS-1108, TECHOPS-1299).'
     required: false
-    default: '/vault/liquibase'
+    default: '/vault/grouped/google-credentials'
 runs:
   using: 'composite'
   steps:

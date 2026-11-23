@@ -147,7 +147,12 @@ if [ -x "$secure/liquibase" ]; then
   check secure-version "Liquibase Secure $FIPS_RHEL_SECURE_VERSION from the release archive starts" secure_version
   if [ -s "$license" ]; then
     docker compose -f "$selftest/compose.yml" exec -T postgres psql -U postgres -qc 'create database secure' >>"$log" 2>&1
-    check secure-fips-off "Liquibase Secure: the license and update work with FIPS off for Liquibase" secure_fips_off
+    # The FIPS edition always runs in FIPS mode (its start script sets the JVM up), so FIPS off does not exist for it.
+    if [ "${FIPS_RHEL_SECURE_PACKAGE:-liquibase-secure}" = liquibase-secure-fips ]; then
+      say INFO "liquibase-secure-fips: no FIPS-off run, the FIPS edition always runs in FIPS mode"
+    else
+      check secure-fips-off "Liquibase Secure: the license and update work with FIPS off for Liquibase" secure_fips_off
+    fi
     if [ "${FIPS_RHEL_REQUIRE_FIPS_LICENSE:-false}" = true ]; then
       check secure-fips "Liquibase Secure: the license verifies and update works in FIPS mode" secure_fips
     else

@@ -53,12 +53,14 @@ With a `version` (a release, `6.0.1`, or an RC, `6.0.1-RC1`) the run also tests 
 archive exists):
 
 - `run.sh` reads the published `.sha256`, and the instance checks the archive against it before unpacking it.
-- On its first boot, before FIPS mode is on, the instance reads the CI license itself (`rhel/secure.sh`). Its role,
-  `fips-rhel-instance`, may only assume `vault-grouped-pro-license-file`, which lists it in `aws_roles`. The license
-  never passes through GitHub, the runner or the user data.
+- On its first boot, before FIPS mode is on, the instance reads the CI license itself (`rhel/secure.sh`):
+  `PRO_LICENSE_FILE`, or `PRO_FIPS_LICENSE_FILE` (ECDSA P-256 with the `fips` code) for `liquibase-secure-fips`,
+  which refuses a standard license. Its role, `fips-rhel-instance`, may only assume `vault-grouped-pro-license-file`,
+  which lists it in `aws_roles`. The license never passes through GitHub, the runner or the user data.
 - The checks run `liquibase --version`, then `license status` and `update` with FIPS off for Liquibase, which must
   work, and in FIPS mode, which is reported, not enforced, until license files verify in FIPS mode (INT-2438).
-  `require-fips-license: true` makes the FIPS-mode run a check.
+  `require-fips-license: true` makes the FIPS-mode run a check. `liquibase-secure-fips` has no FIPS-off run: the
+  FIPS edition always runs in FIPS mode, so pass `require-fips-license: true` with it, or no license check is made.
 
 Runs without a version get no instance role.
 

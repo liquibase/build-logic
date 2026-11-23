@@ -91,6 +91,7 @@ if [ -n "$license_role" ]; then
 fi
 {
   printf 'FIPS_RHEL_SECURE_VERSION=%q\n' "$secure_version"
+  printf 'FIPS_RHEL_SECURE_PACKAGE=%q\n' "$secure_package"
   printf 'FIPS_RHEL_SECURE_URL=%q\n' "$secure_url"
   printf 'FIPS_RHEL_SECURE_SHA256=%q\n' "$secure_sha256"
   printf 'FIPS_RHEL_LICENSE_ROLE_ARN=%q\n' "$license_role"

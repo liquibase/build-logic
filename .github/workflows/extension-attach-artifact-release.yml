@@ -313,9 +313,9 @@ jobs:
 
       - name: Get Reusable Script Files
         run: |
-          curl -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/get_draft_release.sh
-          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
-          curl -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/upload_asset.sh
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/get_draft_release.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/get_draft_release.sh
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/upload_asset.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/upload_asset.sh
           chmod +x $PWD/.github/get_draft_release.sh
           chmod +x $PWD/.github/sign_artifact.sh
           chmod +x $PWD/.github/upload_asset.sh
@@ -634,7 +634,7 @@ jobs:
       - name: Get upload_zip.sh Script File
         if: inputs.zip == 'true'
         run: |
-          curl -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/upload_zip.sh
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/upload_zip.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/upload_zip.sh
           chmod +x $PWD/.github/upload_zip.sh
 
       - name: Attach Zip File to Draft Release

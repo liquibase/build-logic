@@ -253,18 +253,18 @@ jobs:
 
           mkdir -p $PWD/.github/src/$PACKAGE_NAME/deb/control
           mkdir -p $PWD/.github/src/$PACKAGE_NAME/main/archive
-          curl -o $PWD/.github/src/$PACKAGE_NAME/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/control
-          curl -o $PWD/.github/src/$PACKAGE_NAME/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/postinst
-          curl -o $PWD/.github/src/$PACKAGE_NAME/deb/control/postrm https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/postrm
-          curl -o $PWD/.github/src/$PACKAGE_NAME/main/archive/$PACKAGE_NAME-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/main/archive/${SRC_DIR}-env.sh
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/src/$PACKAGE_NAME/deb/control/control https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/control
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/src/$PACKAGE_NAME/deb/control/postinst https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/postinst
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/src/$PACKAGE_NAME/deb/control/postrm https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/deb/control/postrm
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/src/$PACKAGE_NAME/main/archive/$PACKAGE_NAME-env.sh https://raw.githubusercontent.com/liquibase/build-logic/main/src/${SRC_DIR}/main/archive/${SRC_DIR}-env.sh
 
           # Download appropriate pom.xml based on distribution
           if [ "$DISTRIBUTION" = "liquibase-secure" ]; then
-            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom-secure.xml
+            curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom-secure.xml
           else
-            curl -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
+            curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/package-deb-pom.xml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/package-deb-pom.xml
           fi
-          curl -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/sign_artifact.sh https://raw.githubusercontent.com/liquibase/build-logic/main/.github/sign_artifact.sh
           chmod +x $PWD/.github/sign_artifact.sh
 
       - name: Convert escaped newlines and set GPG key

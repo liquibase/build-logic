@@ -46,7 +46,7 @@ jobs:
       - name: Get Fossa Configuration
         if: ${{ inputs.check_ai_generated_code }}
         run: |
-          curl -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/.fossa.yml
+          curl -fsSL --retry 3 --retry-all-errors -o $PWD/.github/.fossa.yml https://raw.githubusercontent.com/liquibase/build-logic/main/.github/.fossa.yml
 
       - name: Install FOSSA CLI
         run: |

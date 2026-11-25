@@ -58,6 +58,8 @@ If inputs are not provided, `'[8, 11, 17, 18]'` and `'["ubuntu-latest", "windows
 Since TECHOPS-1296 no workflow here reads the `/vault/liquibase` or `/vault/devops` blobs. A job assumes one role per credential it needs and reads only that credential's grouped secret, `/vault/grouped/<group>`.
 
 - The role ARN is composed from the org secret `VAULT_AWS_ACCOUNT_ID`; callers keep `secrets: inherit` and change nothing.
+- `package.yml` is the exception: its Chocolatey and Ansible jobs call deploy workflows that read the role ARNs from the caller's `VAULT_GROUPED_CHOCOLATEY_ROLE_ARN`, `VAULT_GROUPED_ANSIBLE_ROLE_ARN` and `VAULT_GROUPED_GITHUB_APP_LIQUIBASE_ROLE_ARN` secrets.
+  Those jobs run only when the caller is liquibase/liquibase or liquibase/liquibase-pro, which hold the secrets and are in those groups' trust.
 - Pin `liquibase/build-logic/...@main`. A tag or sha cannot assume the roles.
 - A key read through `env.` must come from a group the job requests, or it resolves to an empty string. Add the group's read when you add a key.
 

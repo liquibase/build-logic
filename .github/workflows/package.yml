@@ -1607,7 +1607,8 @@ jobs:
 
   upload_windows_package:
     needs: validate-version
-    if: ${{ inputs.distribution == 'liquibase' }}
+    # Only these callers hold the role secrets the deploy files read.
+    if: ${{ inputs.distribution == 'liquibase' && contains(fromJSON('["liquibase/liquibase", "liquibase/liquibase-pro"]'), github.repository) }}
     uses: liquibase/liquibase-chocolatey/.github/workflows/deploy-package.yml@1eb0775735835ec496f965736886f0dc847c750c # main
     secrets: inherit
     with:
@@ -1629,7 +1630,8 @@ jobs:
 
   upload_ansible_role:
     needs: validate-version
-    if: ${{ inputs.distribution == 'liquibase' }}
+    # Only these callers hold the role secrets the deploy files read.
+    if: ${{ inputs.distribution == 'liquibase' && contains(fromJSON('["liquibase/liquibase", "liquibase/liquibase-pro"]'), github.repository) }}
     uses: liquibase/liquibase-ansible/.github/workflows/deploy-role.yml@1f9f602d59b3a58e7426da4dc0dbd60dae3bebd9 # main
     secrets: inherit
     with:
@@ -1639,7 +1641,8 @@ jobs:
 
   upload_secure_ansible_role:
     needs: validate-version
-    if: ${{ inputs.distribution == 'liquibase-secure' }}
+    # Only these callers hold the role secrets the deploy files read.
+    if: ${{ inputs.distribution == 'liquibase-secure' && contains(fromJSON('["liquibase/liquibase", "liquibase/liquibase-pro"]'), github.repository) }}
     uses: liquibase/liquibase-secure-ansible/.github/workflows/deploy-role.yml@8c15d9d5771e6109e4a403ed08993a2cb43ad1c3 # main
     secrets: inherit
     with:

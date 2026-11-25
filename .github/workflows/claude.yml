@@ -40,7 +40,7 @@ jobs:
     #      is minted per run through workload identity federation and expires in
     #      minutes, where it used to be a long-lived key in the shared vault secret.
     #      That secret is split into grouped secrets: one /vault/grouped/<group> per
-    #      credential, readable only by the workflows that need it.
+    #      set of keys a workflow needs, readable only by the workflows that need it.
     #      [TECHOPS-1129, TECHOPS-1108]
     #
     # It lives here because callers cannot be trusted to add it. On 2026-09-08, 14 repos

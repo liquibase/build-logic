@@ -39,8 +39,8 @@ jobs:
     #   3. The credential itself. This job reads no vault secrets: the Claude API token
     #      is minted per run through workload identity federation and expires in
     #      minutes, where it used to be a long-lived key in the shared vault secret.
-    #      That secret is split into grouped secrets: one /vault/grouped/<group> per
-    #      set of keys a workflow needs, readable only by the workflows that need it.
+    #      That secret's keys are also copied into /vault/grouped/<group>, one per
+    #      credential; the shared secret stays until TECHOPS-1301.
     #      [TECHOPS-1129, TECHOPS-1108]
     #
     # It lives here because callers cannot be trusted to add it. On 2026-09-08, 14 repos

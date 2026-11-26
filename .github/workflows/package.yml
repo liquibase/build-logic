@@ -780,7 +780,11 @@ jobs:
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
-          sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
+          # TECHOPS-1769: the build of createrepo_c from source that used to be here stopped at
+          # cmake (no Doxygen on the runner) and fell back to this package, so the distro
+          # createrepo_c (0.17.0 on ubuntu-22.04) is what has been generating the index. The
+          # flags used below were tested against that version.
+          sudo apt-get install -y createrepo-c
 
           # Get absolute path to the signed RPM file
           SIGNED_RPM_PATH="$(pwd)/$RPM_FILENAME"
@@ -799,38 +803,9 @@ jobs:
             echo "✗ WARNING: RPM may not be properly signed"
           fi
 
-          mkdir -p createrepo_folder
-          cd createrepo_folder
-          git clone https://github.com/rpm-software-management/createrepo_c
-          cd createrepo_c
-          mkdir -p build
-          cd build
-          # Modified CMake command with additional flags to properly disable documentation
-          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
-          make -j || echo "Build failed but continuing..."
-
-          # Check if createrepo_c was built, otherwise try to find system createrepo
-          if [ -f src/createrepo_c ]; then
-            cp src/createrepo_c /opt/createrepo
-          elif command -v createrepo_c &> /dev/null; then
-            echo "Using system createrepo_c instead"
-            ln -sf "$(command -v createrepo_c)" /opt/createrepo
-          elif command -v createrepo &> /dev/null; then
-            echo "Using system createrepo instead"
-            ln -sf "$(command -v createrepo)" /opt/createrepo
-          else
-            echo "Installing createrepo-c from package manager as fallback"
-            sudo apt-get install -y createrepo-c
-            ln -sf "$(command -v createrepo_c)" /opt/createrepo
-          fi
-
-          # Return to workspace root
-          cd $GITHUB_WORKSPACE
-
           # Create YUM repository directory structure
-          mkdir -p yum/noarch
+          mkdir -p yum/noarch yum-published/repodata
 
-          # Download existing RPMs from R2 (excluding the current version to avoid conflicts).
           # TECHOPS-818: yum repo now lives in R2 (repo-liquibase-com) — read-modify-write
           # of the yum metadata over the S3 API.
           # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
@@ -838,26 +813,44 @@ jobs:
           # legacy alias) for every R2 S3-API call in this step. The dry-run S3 step
           # is separate and keeps the token. (same fix as analytics-config#33)
           unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
-          echo "Downloading existing RPMs from R2..."
+          echo "Listing existing RPMs in R2..."
           # Capture the listing first: piping `aws s3 ls` straight into `while` masks an ls
-          # failure (the pipeline's exit status is `while`'s), which would leave yum/noarch/
-          # empty and make the later `sync --delete` wipe the live repo. Capture + count, and
-          # download in the current shell (here-string, not a pipe subshell) so EXPECTED_RPMS
-          # survives for the pre-delete guard below.
+          # failure (the pipeline's exit status is `while`'s), which would leave the package
+          # list empty and publish an index that drops every other RPM. Capture + count, and
+          # loop in the current shell (here-string, not a pipe subshell) so EXPECTED_RPMS
+          # survives for the guard below.
           if ! RAW_LS=$(AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
               aws s3 ls s3://repo-liquibase-com/yum/noarch/ --endpoint-url "$R2_ENDPOINT"); then
-            echo "ERROR: failed to list existing RPMs from R2; aborting before the destructive sync --delete."
+            echo "ERROR: failed to list existing RPMs from R2; aborting before publishing anything."
             exit 1
           fi
           # An empty listing (new/empty repo) is legitimate; grep returning no matches is fine.
           REMOTE_RPMS=$(printf '%s\n' "$RAW_LS" | grep -E '\.rpm$' | awk '{print $4}' || true)
+
+          # TECHOPS-1769: the published index (about 100 KB) already describes the RPMs in
+          # the bucket, so fetch it instead of every RPM; createrepo_c copies their entries
+          # from it below. At the 6.0.3 release the RPMs were 39 downloads (2 minutes) and
+          # another minute of createrepo reading them again.
+          echo "Downloading the published repository metadata from R2..."
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp s3://repo-liquibase-com/yum/noarch/repodata yum-published/repodata --recursive --endpoint-url "$R2_ENDPOINT"
+          # the primary.xml the published repomd.xml points to; the file stays empty when the
+          # repo has no index yet, and then every RPM is downloaded as before
+          PUBLISHED_PRIMARY=$(grep -oE '[0-9a-f]+-primary\.xml\.gz' yum-published/repodata/repomd.xml 2>/dev/null || true)
+          zcat "yum-published/repodata/$PUBLISHED_PRIMARY" > yum-published/primary.xml 2>/dev/null || true
+
           EXPECTED_RPMS=0
+          : > yum-pkglist.txt
           while read -r rpm; do
             [ -z "$rpm" ] && continue
             # Skip if it's the same version we're uploading
             if [[ "$rpm" != "$RPM_FILENAME" ]]; then
-              AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-                aws s3 cp "s3://repo-liquibase-com/yum/noarch/$rpm" yum/noarch/ --endpoint-url "$R2_ENDPOINT"
+              echo "$rpm" >> yum-pkglist.txt
+              # download only an RPM the published index does not describe
+              if ! grep -qF "<location href=\"$rpm\"/>" yum-published/primary.xml; then
+                AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+                  aws s3 cp "s3://repo-liquibase-com/yum/noarch/$rpm" yum/noarch/ --endpoint-url "$R2_ENDPOINT"
+              fi
               EXPECTED_RPMS=$((EXPECTED_RPMS + 1))
             fi
           done <<< "$REMOTE_RPMS"
@@ -879,23 +872,35 @@ jobs:
 
           # Generate repository metadata with the signed RPM
           echo "Generating repository metadata..."
-          /opt/createrepo -dp yum/noarch
+          # 1. Index every RPM that is already in the bucket. An entry the published index
+          #    has is copied from it as it is (--skip-stat: that file is not on this runner);
+          #    an RPM it does not describe was downloaded above and is read from disk.
+          #    Skipped when there is no other RPM: given an empty list createrepo_c indexes
+          #    the whole directory instead, which holds the RPM from this run.
+          if [ -s yum-pkglist.txt ]; then
+            createrepo_c -dp --update --skip-stat --update-md-path yum-published --pkglist yum-pkglist.txt yum/noarch
+          fi
+          # 2. Add the RPM from this run. A pass of its own, so that a re-publish of the same
+          #    file name is read from disk and does not reuse the entry of the copy it replaces.
+          echo "$RPM_FILENAME" >> yum-pkglist.txt
+          createrepo_c -dp --update --skip-stat --pkglist yum-pkglist.txt yum/noarch
 
           # Sign the repository metadata
           echo "Signing repository metadata..."
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASS" --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
 
-          # Guard: every pre-existing remote RPM must be present locally, otherwise the
-          # metadata generated above would silently drop packages from the public index.
+          # Guard: the new index must list every RPM that is in the bucket plus the one from
+          # this run. createrepo_c only warns and carries on when it can neither copy an
+          # entry nor read the file, which would silently drop packages from the public index.
           # Abort rather than publish a repo that loses packages.
-          DOWNLOADED_RPMS=$(find yum/noarch -maxdepth 1 -name '*.rpm' ! -name "$RPM_FILENAME" | wc -l | tr -d ' ')
-          if [ "$DOWNLOADED_RPMS" -ne "$EXPECTED_RPMS" ]; then
-            echo "ERROR: expected $EXPECTED_RPMS existing RPMs from R2 but only $DOWNLOADED_RPMS are present locally;"
+          INDEXED_RPMS=$(zcat yum/noarch/repodata/*-primary.xml.gz | grep -c '<package type="rpm">' || true)
+          if [ "$INDEXED_RPMS" -ne "$((EXPECTED_RPMS + 1))" ]; then
+            echo "ERROR: the new index lists $INDEXED_RPMS RPMs, expected the $EXPECTED_RPMS in R2 plus $RPM_FILENAME;"
             echo "refusing to publish metadata that would drop live RPMs from the yum repo."
             exit 1
           fi
-          echo "Verified $DOWNLOADED_RPMS/$EXPECTED_RPMS existing RPMs present locally."
+          echo "Verified the new index lists the $EXPECTED_RPMS existing RPMs plus $RPM_FILENAME."
 
           # TECHOPS-1095: never `aws s3 sync --delete` the yum tree. On 2026-08-12 that
           # sync uploaded repodata/repomd.xml and then deleted it again within the same
@@ -1085,7 +1090,8 @@ jobs:
           R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         run: |
-          sudo apt-get install -y libcurl4-openssl-dev libbz2-dev libxml2-dev libssl-dev zlib1g-dev pkg-config libglib2.0-dev liblzma-dev libsqlite0-dev libsqlite3-dev librpm-dev libzstd-dev python3 cmake
+          # TECHOPS-1769: the distro createrepo_c, as in the production step.
+          sudo apt-get install -y createrepo-c
 
           # Get absolute path to the signed RPM file
           SIGNED_RPM_PATH="$(pwd)/$RPM_FILENAME"
@@ -1104,62 +1110,50 @@ jobs:
             echo "✗ WARNING: RPM may not be properly signed"
           fi
 
-          mkdir -p createrepo_folder
-          cd createrepo_folder
-          git clone https://github.com/rpm-software-management/createrepo_c
-          cd createrepo_c
-          mkdir -p build
-          cd build
-          # Modified CMake command with additional flags to properly disable documentation
-          cmake .. -DWITH_ZCHUNK=NO -DWITH_LIBMODULEMD=NO -DENABLE_DRPM=NO -DENABLE_PYTHON=NO -DENABLE_DOCS=NO -DDISABLE_DOCUMENTATION_TARGET=ON || echo "CMake configuration failed but continuing..."
-          make -j || echo "Build failed but continuing..."
-
-          # Check if createrepo_c was built, otherwise try to find system createrepo
-          if [ -f src/createrepo_c ]; then
-            cp src/createrepo_c /opt/createrepo
-          elif command -v createrepo_c &> /dev/null; then
-            echo "Using system createrepo_c instead"
-            ln -sf "$(command -v createrepo_c)" /opt/createrepo
-          elif command -v createrepo &> /dev/null; then
-            echo "Using system createrepo instead"
-            ln -sf "$(command -v createrepo)" /opt/createrepo
-          else
-            echo "Installing createrepo-c from package manager as fallback"
-            sudo apt-get install -y createrepo-c
-            ln -sf "$(command -v createrepo_c)" /opt/createrepo
-          fi
-
-          # Return to workspace root
-          cd $GITHUB_WORKSPACE
-
           # Create YUM repository directory structure
-          mkdir -p yum/noarch
+          mkdir -p yum/noarch yum-published/repodata
 
           # TECHOPS-929: the dry-run yum repo now lives in R2 (repo-liquibase-com-dry-run).
           # configure-aws-credentials (OIDC) exported AWS_SESSION_TOKEN into the job
           # env; R2 rejects a request carrying a session token, so drop it and the
           # legacy alias before talking to R2.
           unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
-          echo "Downloading existing RPMs from R2..."
+          echo "Listing existing RPMs in R2..."
           # Capture the listing first: piping `aws s3 ls` straight into `while` masks an ls
-          # failure (the pipeline's exit status is `while`'s), which would leave yum/noarch/
-          # empty and make the later sync wipe the dry-run repo. Capture + count, and
-          # download in the current shell (here-string, not a pipe subshell) so EXPECTED_RPMS
-          # survives for the pre-delete guard below. (same fix as the production step)
+          # failure (the pipeline's exit status is `while`'s), which would leave the package
+          # list empty and publish an index that drops every other RPM. Capture + count, and
+          # loop in the current shell (here-string, not a pipe subshell) so EXPECTED_RPMS
+          # survives for the guard below. (same fix as the production step)
           if ! RAW_LS=$(AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
               aws s3 ls s3://repo-liquibase-com-dry-run/yum/noarch/ --endpoint-url "$R2_ENDPOINT"); then
-            echo "ERROR: failed to list existing RPMs from R2; aborting before the destructive sync."
+            echo "ERROR: failed to list existing RPMs from R2; aborting before publishing anything."
             exit 1
           fi
           # An empty listing (new/empty repo) is legitimate; grep returning no matches is fine.
           REMOTE_RPMS=$(printf '%s\n' "$RAW_LS" | grep -E '\.rpm$' | awk '{print $4}' || true)
+
+          # TECHOPS-1769: fetch the published index instead of every RPM it describes, and
+          # let createrepo_c copy their entries from it (same as the production step).
+          echo "Downloading the published repository metadata from R2..."
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp s3://repo-liquibase-com-dry-run/yum/noarch/repodata yum-published/repodata --recursive --endpoint-url "$R2_ENDPOINT"
+          # the primary.xml the published repomd.xml points to; the file stays empty when the
+          # repo has no index yet, and then every RPM is downloaded as before
+          PUBLISHED_PRIMARY=$(grep -oE '[0-9a-f]+-primary\.xml\.gz' yum-published/repodata/repomd.xml 2>/dev/null || true)
+          zcat "yum-published/repodata/$PUBLISHED_PRIMARY" > yum-published/primary.xml 2>/dev/null || true
+
           EXPECTED_RPMS=0
+          : > yum-pkglist.txt
           while read -r rpm; do
             [ -z "$rpm" ] && continue
             # Skip if it's the same version we're uploading
             if [[ "$rpm" != "$RPM_FILENAME" ]]; then
-              AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
-                aws s3 cp "s3://repo-liquibase-com-dry-run/yum/noarch/$rpm" yum/noarch/ --endpoint-url "$R2_ENDPOINT"
+              echo "$rpm" >> yum-pkglist.txt
+              # download only an RPM the published index does not describe
+              if ! grep -qF "<location href=\"$rpm\"/>" yum-published/primary.xml; then
+                AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+                  aws s3 cp "s3://repo-liquibase-com-dry-run/yum/noarch/$rpm" yum/noarch/ --endpoint-url "$R2_ENDPOINT"
+              fi
               EXPECTED_RPMS=$((EXPECTED_RPMS + 1))
             fi
           done <<< "$REMOTE_RPMS"
@@ -1181,23 +1175,35 @@ jobs:
 
           # Generate repository metadata with the signed RPM
           echo "Generating repository metadata..."
-          /opt/createrepo -dp yum/noarch
+          # 1. Index every RPM that is already in the bucket. An entry the published index
+          #    has is copied from it as it is (--skip-stat: that file is not on this runner);
+          #    an RPM it does not describe was downloaded above and is read from disk.
+          #    Skipped when there is no other RPM: given an empty list createrepo_c indexes
+          #    the whole directory instead, which holds the RPM from this run.
+          if [ -s yum-pkglist.txt ]; then
+            createrepo_c -dp --update --skip-stat --update-md-path yum-published --pkglist yum-pkglist.txt yum/noarch
+          fi
+          # 2. Add the RPM from this run. A pass of its own, so that a re-publish of the same
+          #    file name is read from disk and does not reuse the entry of the copy it replaces.
+          echo "$RPM_FILENAME" >> yum-pkglist.txt
+          createrepo_c -dp --update --skip-stat --pkglist yum-pkglist.txt yum/noarch
 
           # Sign the repository metadata
           echo "Signing repository metadata..."
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep "sec" | head -1 | sed 's/.*\/\([A-F0-9]\{16\}\).*/\1/')
           gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASS" --detach-sign --armor -u "$GPG_KEY_ID" yum/noarch/repodata/repomd.xml
 
-          # Guard: every pre-existing remote RPM must be present locally, otherwise the
-          # metadata generated above would silently drop packages from the dry-run index.
+          # Guard: the new index must list every RPM that is in the bucket plus the one from
+          # this run. createrepo_c only warns and carries on when it can neither copy an
+          # entry nor read the file, which would silently drop packages from the dry-run index.
           # Abort rather than publish a repo that loses packages.
-          DOWNLOADED_RPMS=$(find yum/noarch -maxdepth 1 -name '*.rpm' ! -name "$RPM_FILENAME" | wc -l | tr -d ' ')
-          if [ "$DOWNLOADED_RPMS" -ne "$EXPECTED_RPMS" ]; then
-            echo "ERROR: expected $EXPECTED_RPMS existing RPMs from R2 but only $DOWNLOADED_RPMS are present locally;"
+          INDEXED_RPMS=$(zcat yum/noarch/repodata/*-primary.xml.gz | grep -c '<package type="rpm">' || true)
+          if [ "$INDEXED_RPMS" -ne "$((EXPECTED_RPMS + 1))" ]; then
+            echo "ERROR: the new index lists $INDEXED_RPMS RPMs, expected the $EXPECTED_RPMS in R2 plus $RPM_FILENAME;"
             echo "refusing to publish metadata that would drop live RPMs from the dry-run yum repo."
             exit 1
           fi
-          echo "Verified $DOWNLOADED_RPMS/$EXPECTED_RPMS existing RPMs present locally."
+          echo "Verified the new index lists the $EXPECTED_RPMS existing RPMs plus $RPM_FILENAME."
 
           # TECHOPS-1095: never `aws s3 sync --delete` the yum tree. On 2026-08-12 that
           # sync uploaded repodata/repomd.xml and then deleted it again within the same

@@ -86,6 +86,19 @@ on:
         required: false
         type: string
         default: ''
+      promote_from:
+        description: >-
+          Image reference with a digest (e.g. ghcr.io/liquibase/liquibase-pro/liquibase-secure-ga@sha256:...)
+          of an image index an earlier run already built and pushed. When set, nothing is built: that
+          image is copied as it is, attestation manifests included, to every enabled registry under the
+          tags a build would have pushed, and the job fails unless each tag then resolves to that same
+          digest. Signing and the outputs work as they do after a build. The build inputs
+          (dockerfile_path, build_context, platforms, build_args, no_cache, cache_from_gha,
+          generate_sbom, provenance_mode, image_* labels) are not used. With dry_run nothing is copied.
+          A private source is read with the logins of this job, so one on GHCR needs push_ghcr.
+        required: false
+        type: string
+        default: ''
       sign_with_cosign:
         description: 'Enable cosign keyless signing (Secure ONLY)'
         required: false
@@ -183,7 +196,7 @@ jobs:
       id-token: write
       packages: write
     outputs:
-      digest: ${{ steps.build-and-push.outputs.digest }}
+      digest: ${{ steps.promote.outputs.digest || steps.build-and-push.outputs.digest }}
       tags: ${{ steps.generate-tags.outputs.tags }}
       unsigned_repos: ${{ steps.check-signing.outputs.unsigned_repos }}
 
@@ -211,6 +224,7 @@ jobs:
           echo "DOCKERHUB_USERNAME_DECODED=$decoded_username" >> "$GITHUB_ENV"
 
       - name: Set up QEMU
+        if: ${{ inputs.promote_from == '' }}
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
 
       - name: Set up Docker Buildx
@@ -386,8 +400,54 @@ jobs:
             echo "Generated tags: ${TAGS}"
           fi
 
+      # TECHOPS-1769: promote instead of build. The image index at promote_from, built and pushed
+      # by an earlier run together with its SBOM and provenance attestations, is copied as it is
+      # to every enabled registry under the tags a build would have pushed, so the release serves
+      # the digest that was tested and no registry can end up with a different one. Given a
+      # single source, `imagetools create` pushes the source index byte for byte along with every
+      # manifest and blob it references; the loop below fails the job if a tag resolves to
+      # anything else. Running it again is safe: it pushes the same digest.
+      - name: Promote Docker Image
+        id: promote
+        if: ${{ inputs.promote_from != '' }}
+        env:
+          PROMOTE_FROM: ${{ inputs.promote_from }}
+          TAGS: ${{ steps.generate-tags.outputs.tags }}
+          IS_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$PROMOTE_FROM" =~ ^[^@[:space:]]+@sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::promote_from must be an image reference with a digest (repo@sha256:...), got '${PROMOTE_FROM}'. A tag can move; a digest cannot."
+            exit 1
+          fi
+          if [[ "$IS_DRY_RUN" == "true" ]]; then
+            echo "Dry run: ${PROMOTE_FROM} is not copied to any registry."
+            exit 0
+          fi
+          DIGEST="${PROMOTE_FROM##*@}"
+          IFS=',' read -ra TAG_LIST <<< "$TAGS"
+          TAG_ARGS=()
+          for tag in "${TAG_LIST[@]}"; do TAG_ARGS+=(--tag "$tag"); done
+          docker buildx imagetools create "${TAG_ARGS[@]}" "$PROMOTE_FROM"
+          for tag in "${TAG_LIST[@]}"; do
+            # A registry can refuse a token for a moment right after a push (see the cosign
+            # wrapper above), so each tag gets three tries before it fails the job.
+            for attempt in 1 2 3; do
+              PUSHED=$(docker buildx imagetools inspect "$tag" --format '{{json .Manifest}}' | jq -r '.digest') || PUSHED=""
+              if [[ "$PUSHED" == "$DIGEST" ]]; then break; fi
+              if [[ "$attempt" -lt 3 ]]; then sleep 10; fi
+            done
+            if [[ "$PUSHED" != "$DIGEST" ]]; then
+              echo "::error::${tag} resolves to '${PUSHED}', not to ${DIGEST} from ${PROMOTE_FROM}."
+              exit 1
+            fi
+            echo "${tag} -> ${PUSHED}"
+          done
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
       - name: Build and Push Docker Image
         id: build-and-push
+        if: ${{ inputs.promote_from == '' }}
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: ${{ inputs.build_context }}
@@ -438,7 +498,7 @@ jobs:
         if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_dockerhub }}
         env:
           DOCKERHUB_REPO: ${{ inputs.dockerhub_repo }}
-          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.promote.outputs.digest || steps.build-and-push.outputs.digest }}
           COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
         run: |
           "${RUNNER_TEMP}/cosign-sign-retry.sh" "${DOCKERHUB_REPO}@${IMAGE_DIGEST}"
@@ -449,7 +509,7 @@ jobs:
         if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_ghcr }}
         env:
           GHCR_REPO: ${{ inputs.ghcr_repo }}
-          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.promote.outputs.digest || steps.build-and-push.outputs.digest }}
           COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
         run: |
           "${RUNNER_TEMP}/cosign-sign-retry.sh" "${GHCR_REPO}@${IMAGE_DIGEST}"
@@ -460,14 +520,14 @@ jobs:
         if: ${{ inputs.sign_with_cosign && !inputs.dry_run && inputs.push_ecr }}
         env:
           ECR_REPO: ${{ inputs.ecr_repo }}
-          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.promote.outputs.digest || steps.build-and-push.outputs.digest }}
           COSIGN_IDENTITY_REGEXP: ${{ inputs.cosign_identity_regexp }}
         run: |
           "${RUNNER_TEMP}/cosign-sign-retry.sh" "${ECR_REPO}@${IMAGE_DIGEST}"
 
       - name: Check signing outcome
         id: check-signing
-        if: ${{ !cancelled() && inputs.sign_with_cosign && !inputs.dry_run && steps.build-and-push.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.sign_with_cosign && !inputs.dry_run && (steps.build-and-push.outcome == 'success' || steps.promote.outcome == 'success') }}
         env:
           DOCKERHUB_REPO: ${{ inputs.dockerhub_repo }}
           GHCR_REPO: ${{ inputs.ghcr_repo }}
@@ -475,7 +535,7 @@ jobs:
           DOCKERHUB_OUTCOME: ${{ steps.sign-dockerhub.outcome }}
           GHCR_OUTCOME: ${{ steps.sign-ghcr.outcome }}
           ECR_OUTCOME: ${{ steps.sign-ecr.outcome }}
-          IMAGE_DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.promote.outputs.digest || steps.build-and-push.outputs.digest }}
           FAIL_ON_SIGNING_FAILURE: ${{ inputs.fail_job_on_signing_failure }}
           RESIGN_WORKFLOW: ${{ inputs.resign_workflow }}
           LB_VERSION: ${{ inputs.version }}

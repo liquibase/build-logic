@@ -428,7 +428,17 @@ jobs:
           IFS=',' read -ra TAG_LIST <<< "$TAGS"
           TAG_ARGS=()
           for tag in "${TAG_LIST[@]}"; do TAG_ARGS+=(--tag "$tag"); done
-          docker buildx imagetools create "${TAG_ARGS[@]}" "$PROMOTE_FROM"
+          # One 5xx or refused token from a registry must not fail the release (see the cosign wrapper
+          # above), and the copy is safe to repeat, so it gets three tries.
+          for attempt in 1 2 3; do
+            if docker buildx imagetools create "${TAG_ARGS[@]}" "$PROMOTE_FROM"; then break; fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "::error::Could not copy ${PROMOTE_FROM} after 3 attempts."
+              exit 1
+            fi
+            echo "::warning::Copying ${PROMOTE_FROM} failed on attempt ${attempt}/3; retrying in $((attempt * 15))s."
+            sleep $((attempt * 15))
+          done
           for tag in "${TAG_LIST[@]}"; do
             # A registry can refuse a token for a moment right after a push (see the cosign
             # wrapper above), so each tag gets three tries before it fails the job.

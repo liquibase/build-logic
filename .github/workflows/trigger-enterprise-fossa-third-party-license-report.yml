@@ -5,7 +5,7 @@ on:
     inputs:
       version_number_for_3p_fossa_report_generation:
         type: string
-        description: 'Supply the DaticalDb-installer version number to be stored in the s3 bucket. eg 8.7.352'
+        description: 'Supply the DaticalDb-installer version number to be stored in the R2 bucket. eg 8.7.352'
         required: false
 
 permissions:
@@ -33,19 +33,13 @@ jobs:
     env:
       VERSION_INPUT: ${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}
     steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - name: Get the GitHub token from vault
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-11
 
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
-        with:
-          secret-ids: |
-            ,/vault/liquibase
-          parse-json-secrets: true
       - name: Set workflow inputs
         env:
           REPO_NAME: ${{ matrix.repo.name }}
@@ -61,7 +55,7 @@ jobs:
         id: return_dispatch
         continue-on-error: true
         with:
-          token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
+          token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
           ref: ${{ matrix.repo.ref }}
           repo: ${{ matrix.repo.name }}
           owner: ${{ matrix.repo.owner }}
@@ -97,7 +91,7 @@ jobs:
       - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
         uses: Codex-/await-remote-run@1fd400f3e2033480390bd521e6626b24365c9c20 # v1
         with:
-          token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
+          token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
           run_id: ${{ steps.return_dispatch.outputs.run_id }}
           repo: ${{ matrix.repo.name }}
           owner: ${{ matrix.repo.owner }}
@@ -109,19 +103,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: wait-for-fossa-report-generation
     steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - name: Get the cloudflare-r2 secret from vault
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
+          group: cloudflare-r2
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-cloudflare-r2-4
 
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
-        with:
-          secret-ids: |
-            ,/vault/liquibase
-          parse-json-secrets: true
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -129,19 +117,29 @@ jobs:
           ref: main
           path: build-logic
 
-      - name: Configure AWS credentials for S3 access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
-          aws-region: us-east-1
-
-      - name: Download reports from S3 and Rearrange CSV files
+      - name: Download reports from R2 and Rearrange CSV files
+        env:
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          VERSION_INPUT: ${{ inputs.version_number_for_3p_fossa_report_generation }}
         run: |
-          # Create a directory to store downloaded reports from S3
+          # An empty version made the download read the stale unversioned enterprise_fossa_report//raw_reports folder.
+          if [ -z "$VERSION_INPUT" ]; then
+            echo "::error::version_number_for_3p_fossa_report_generation is required to combine reports"
+            exit 1
+          fi
+
+          # R2 rejects a request carrying a session token; OIDC creds export one, so
+          # drop it (and its legacy alias) before every R2 S3-API call.
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+
+          # Create a directory to store downloaded reports from R2
           mkdir -p /home/runner/work/enterprise/fossa_reports_s3
 
-          # Download all files from the specified S3 bucket to the created directory
-          aws s3 cp --recursive "s3://liquibaseorg-origin/enterprise_fossa_report/${VERSION_INPUT}/raw_reports" /home/runner/work/enterprise/fossa_reports_s3/
+          # Download all files from the specified R2 bucket to the created directory
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp --recursive "s3://liquibase-org-assets/enterprise_fossa_report/${VERSION_INPUT}/raw_reports" /home/runner/work/enterprise/fossa_reports_s3/ --endpoint-url "$R2_ENDPOINT"
 
           # List the contents of the directory to confirm successful download
           ls -l /home/runner/work/enterprise/fossa_reports_s3
@@ -187,11 +185,20 @@ jobs:
           name: enterprise_report
           path: ./enterprise_report.csv
 
-      - name: Upload merged CSV to S3
+      - name: Upload merged CSV to R2
         if: always()
         env:
           VERSION_NUMBER: ${{ inputs.version_number_for_3p_fossa_report_generation }}
-        run: aws s3 cp enterprise_report.csv "s3://liquibaseorg-origin/enterprise_fossa_report/${VERSION_NUMBER}/enterprise_report_${VERSION_NUMBER}.csv"
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          # R2 rejects a request carrying a session token; OIDC creds export one, so
+          # drop it (and its legacy alias) before every R2 S3-API call.
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+          # CRC32: newer aws-cli defaults to a CRC64NVME checksum, which R2 rejects.
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp enterprise_report.csv "s3://liquibase-org-assets/enterprise_fossa_report/${VERSION_NUMBER}/enterprise_report_${VERSION_NUMBER}.csv" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
 
 
   trigger-datical-service:
@@ -200,24 +207,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - name: Get the GitHub token from vault
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
-        with:
-          secret-ids: |
-            ,/vault/liquibase
-          parse-json-secrets: true
+          group: liquibot-github-pat
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-liquibot-github-pat-11
 
       - name: Dispatch an action for datical-service
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
-          token: ${{ env.FOSSA_TRIGGER_REPORT_GENERATION }}
+          token: ${{ env.LIQUIBOT_PAT_GPM_ACCESS }}
           repository: Datical/datical-service
           event-type: trigger-fossa-report-generation
           client-payload: '{"ref": "main", "version_number_for_3p_fossa_report_generation": "${{ github.event.inputs.version_number_for_3p_fossa_report_generation }}"}'

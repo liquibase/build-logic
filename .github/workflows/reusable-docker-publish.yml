@@ -93,7 +93,7 @@ jobs:
         run: |
           TAG_NAME="v${VERSION}${TAG_SUFFIX}"
           if [[ "$RELEASE_TYPE" == "liquibase-secure-release" ]]; then
-            RELEASE_NAME="v${VERSION} SECURE"
+            RELEASE_NAME="Docker v${VERSION}"
           else
             RELEASE_NAME="v${VERSION}"
           fi

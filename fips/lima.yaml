@@ -1,0 +1,42 @@
+# FIPS-mode AlmaLinux 9 VM for Liquibase FIPS 140-3 testing on a laptop.
+# Don't use this file directly: `fips-vm up` creates the VM from it, then runs provision.sh and turns FIPS mode on.
+minimumLimaVersion: "2.0.0"
+
+# Lima's own AlmaLinux 9 template: pinned cloud images for x86_64 and aarch64.
+base:
+  - template:almalinux-9
+
+cpus: 4
+memory: "8GiB"
+disk: "60GiB"
+
+# Your home folder is shared at the same path, so `fips-vm run` works in any project folder under it.
+mounts:
+  - location: "~"
+    writable: true
+
+containerd:
+  system: false
+  user: false
+
+provision:
+  # Lima installs a few packages with dnf at boot (sshfs on Linux), before provision.sh runs. Pick the closest mirror
+  # and download in parallel for those too: some AlmaLinux mirrors are very slow from some networks.
+  - mode: dependency
+    script: |
+      #!/bin/sh
+      for setting in fastestmirror=True max_parallel_downloads=10; do
+        grep -q "^${setting%%=*}=" /etc/dnf/dnf.conf || echo "$setting" >> /etc/dnf/dnf.conf
+      done
+  # rpcbind isn't needed. Stopping it at boot, before Lima starts forwarding ports, avoids warnings about port 111,
+  # which the laptop already uses.
+  - mode: boot
+    script: |
+      #!/bin/sh
+      systemctl disable --now rpcbind.socket rpcbind.service >/dev/null 2>&1 || true
+
+# The VM's Docker socket, for `fips-vm docker-env`. Ports the VM listens on, like a database container's,
+# also reach the laptop's localhost.
+portForwards:
+  - guestSocket: "/var/run/docker.sock"
+    hostSocket: "{{.Dir}}/sock/docker.sock"

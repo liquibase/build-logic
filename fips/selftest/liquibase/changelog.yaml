@@ -1,0 +1,30 @@
+# Smoke test for Liquibase in the FIPS VM, run by .github/workflows/fips-vm-test.yml.
+databaseChangeLog:
+  - changeSet:
+      id: create-fips-check
+      author: fips-vm
+      changes:
+        - createTable:
+            tableName: fips_check
+            columns:
+              - column:
+                  name: id
+                  type: int
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: note
+                  type: varchar(100)
+  - changeSet:
+      id: insert-fips-check
+      author: fips-vm
+      changes:
+        - insert:
+            tableName: fips_check
+            columns:
+              - column: { name: id, value: "1" }
+              - column: { name: note, value: "written by Liquibase in the FIPS VM" }
+      rollback:
+        - delete:
+            tableName: fips_check
+            where: id = 1

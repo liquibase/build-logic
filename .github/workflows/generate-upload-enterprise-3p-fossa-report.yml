@@ -1,8 +1,9 @@
-# This workflow is invoked by individual Datical repositories to generate and upload the 3rd-party license report using FOSSA to S3. It is triggered by the central workflow located at: 
+# This workflow is invoked by individual Datical repositories to generate and upload the 3rd-party license report using FOSSA to Cloudflare R2. It is triggered by the central workflow located at:
 # build-logic/.github/workflows/trigger-enterprise-fossa-third-party-license-report.yml
-# The workflow generates a CSV report of 3rd-party licenses and uploads it to S3 and as an artifact for the team to view under `raw_reports`.
+# The workflow generates a CSV report of 3rd-party licenses and uploads it to R2 and as an artifact for the team to view under `raw_reports`.
+# TECHOPS-1320: R2 bucket is liquibase-org-assets, same enterprise_fossa_report/ key prefix as before.
 
-name: Generate and upload 3rd Party License Fossa Report to s3
+name: Generate and upload 3rd Party License Fossa Report to R2
 
 on:
   workflow_call:
@@ -26,19 +27,12 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      - name: Get the fossa secret from vault
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
         with:
-          role-to-assume: ${{ secrets.LIQUIBASE_VAULT_OIDC_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Get secrets from vault
-        id: vault-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802 # v2.0.10
-        with:
-          secret-ids: |
-            ,/vault/liquibase
-          parse-json-secrets: true
+          group: fossa
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+          role: vault-grouped-fossa-2
 
       - name: Get the commit sha
         id: get_commit_sha
@@ -87,18 +81,47 @@ jobs:
           @csv
           ' fossa.json >> $csv_filename
 
-      - name: Configure AWS credentials for S3 access
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: ${{ env.AWS_PROD_GITHUB_OIDC_ROLE_ARN_INFRASTRUCTURE }}
-          aws-region: us-east-1
+      # Push runs of the calling repos pass an empty version: only a dispatch from
+      # trigger-enterprise-fossa-third-party-license-report.yml carries one. Those
+      # runs still scan, and still publish the report to the build page below, but
+      # must not touch R2. Before this guard they uploaded to
+      # enterprise_fossa_report//raw_reports/<repo>.csv (note the empty version
+      # segment), which is where every "//" key in the bucket came from. After the
+      # version check further down was added, the same runs failed instead.
+      - name: Skip R2 upload (no report version)
+        if: inputs.version_number_for_3p_fossa_report_generation == ''
+        run: echo "::notice::No version_number_for_3p_fossa_report_generation (push run), so the report is not uploaded to R2. It is still attached to this run as the fossa-reports artifact."
 
-      - name: Upload 3rd Party report to S3
-        if: always()
+      - name: Get the cloudflare-r2 secret from vault
+        if: inputs.version_number_for_3p_fossa_report_generation != ''
+        uses: liquibase/build-logic/.github/actions/setup-aws-vault@2003fece51886ec69cda3df1cb4520b3ceeb2e0c # main
+        with:
+          group: cloudflare-r2
+          aws-account-id: ${{ secrets.VAULT_AWS_ACCOUNT_ID }}
+
+      - name: Upload 3rd Party report to R2
+        if: always() && inputs.version_number_for_3p_fossa_report_generation != ''
+        env:
+          R2_AKID: ${{ env.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          R2_SECRET: ${{ env.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: https://${{ env.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          CSV_FILENAME: ${{ steps.get_repo_name.outputs.repo_name }}.csv
         run: |
-          csv_filename="${{ steps.get_repo_name.outputs.repo_name }}.csv"
-          aws s3 cp $csv_filename s3://liquibaseorg-origin/enterprise_fossa_report/${{ env.VERSION_NUMBER }}/raw_reports/
-                
+          # VERSION_NUMBER is read as a plain shell variable, not interpolated as an
+          # expression, and validated before use in the object key (script injection).
+          # Deliberately not written as the expression here: GitHub interpolates
+          # expressions anywhere in a run block, including comments.
+          if ! [[ "$VERSION_NUMBER" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::VERSION_NUMBER '$VERSION_NUMBER' contains unexpected characters"
+            exit 1
+          fi
+          # R2 rejects a request carrying a session token; OIDC creds export one, so
+          # drop it (and its legacy alias) before every R2 S3-API call.
+          unset AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+          # CRC32: newer aws-cli defaults to a CRC64NVME checksum, which R2 rejects.
+          AWS_ACCESS_KEY_ID="$R2_AKID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
+            aws s3 cp "$CSV_FILENAME" "s3://liquibase-org-assets/enterprise_fossa_report/${VERSION_NUMBER}/raw_reports/" --checksum-algorithm CRC32 --endpoint-url "$R2_ENDPOINT"
+
       - name: Set CSV filename
         id: set_csv_filename
         run: echo "csv_filename=${{ steps.get_repo_name.outputs.repo_name }}.csv" >> $GITHUB_OUTPUT    

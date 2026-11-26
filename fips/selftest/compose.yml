@@ -1,0 +1,12 @@
+# Smoke test for the FIPS VM: docker compose starts PostgreSQL.
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: fips-vm-selftest-password
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      retries: 30

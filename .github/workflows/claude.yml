@@ -83,6 +83,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      # bubblewrap and socat back Claude Code's Bash sandbox; the profile lets bwrap
+      # create user namespaces on Ubuntu 24.04. [TECHOPS-1044]
+      - name: Install the Claude Code sandbox dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap socat
+          sudo tee /etc/apparmor.d/bwrap >/dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+            include if exists <local/bwrap>
+          }
+          EOF
+          sudo systemctl reload apparmor
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
@@ -99,6 +116,29 @@ jobs:
           anthropic_organization_id: eead731b-3597-46ca-8e5f-75c5956bb781
           anthropic_federation_rule_id: fdrl_019Z4pCgENxpcyqV8Fm76RW4
           anthropic_service_account_id: svac_01AzJbNCHk8R4Na66HtSLxVS
+          # Bash sandbox: GitHub-only egress, OIDC credentials hidden. User-scope settings,
+          # because a repo's own settings ignore strictAllowlist and credentials. [TECHOPS-1044]
+          settings: |
+            {
+              "sandbox": {
+                "enabled": true,
+                "allowUnsandboxedCommands": false,
+                "failIfUnavailable": true,
+                "network": {
+                  "strictAllowlist": true,
+                  "allowedDomains": ["github.com", "api.github.com"]
+                },
+                "filesystem": {
+                  "denyRead": ["${{ runner.temp }}/claude-workload-identity"]
+                },
+                "credentials": {
+                  "envVars": [
+                    { "name": "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "mode": "deny" },
+                    { "name": "ACTIONS_ID_TOKEN_REQUEST_URL", "mode": "deny" }
+                  ]
+                }
+              }
+            }
           # Enable CI tools by granting actions:read permission to Claude
           # This activates mcp__github_ci__* tools for checking workflow runs and test results
           # Reference: https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#additional_permissions
@@ -119,4 +159,7 @@ jobs:
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Read,Edit,Replace,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details"
             --disallowedTools "Read(//proc/**),Read(/${{ runner.temp }}/claude-workload-identity/**)"
             --model ${{ inputs.model }}
+        env:
+          # Also strips credentials from hooks and MCP servers. [TECHOPS-1044]
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
 

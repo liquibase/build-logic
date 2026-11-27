@@ -669,7 +669,7 @@ jobs:
             Version: ${{ needs.build-multi-architecture.outputs.artifact_version || inputs.dry_run_version || 'unknown' }}
             Dry run: ${{ inputs.dry_run }}
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            <@U042HRTL4DT>
+            <!subteam^S0AR48X7E4E>
           SLACK_TITLE: "Release artifact attachment failed for ${{ github.repository }}"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}

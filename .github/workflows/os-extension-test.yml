@@ -298,7 +298,7 @@ jobs:
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2.3.3
         env:
           SLACK_COLOR: danger
-          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <@U042HRTL4DT>"
+          SLACK_MESSAGE: "View details on GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} <!subteam^S0AR48X7E4E>"
           SLACK_TITLE: "❌ ${{ github.repository }} ❌ ${{ needs.build.result == 'failure' && 'Build' || 'Tests' }} failed on branch ${{ github.ref }} for commit ${{ github.sha }} in repository ${{ github.repository }}"
           SLACK_USERNAME: liquibot
           SLACK_WEBHOOK: ${{ env.NIGHTLY_BUILDS_SLACK_WEBHOOK }}
